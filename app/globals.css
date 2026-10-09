@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --safe-bottom: env(safe-area-inset-bottom, 0px); }
+html, body { background: #F5EFE6; color: #2B2B2B; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+body { font-family: system-ui, 'Segoe UI', 'Noto Sans Devanagari', Roboto, sans-serif; }
+
+@layer components {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid > * { min-width: 0; }
+  .card { @apply bg-white rounded-2xl border border-sand-200 shadow-sm; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[44px] text-sm font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none select-none; }
+  .btn-primary { @apply btn bg-terra text-white hover:bg-terra-600; }
+  .btn-outline { @apply btn border border-sand-300 bg-white text-char hover:bg-sand-100; }
+  .btn-ghost { @apply btn text-char-700 hover:bg-sand-200; }
+  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-green { @apply btn bg-emerald-600 text-white hover:bg-emerald-700; }
+  .btn-sm { @apply min-h-[36px] px-3 text-xs rounded-lg; }
+  .input { @apply w-full min-h-[44px] rounded-xl border border-sand-300 bg-white px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-terra/40 focus:border-terra; }
+  textarea.input { @apply py-2; }
+  .label { @apply block text-xs font-semibold text-char-500 mb-1; }
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold; }
+  .badge-red { @apply badge bg-red-100 text-red-700; }
+  .badge-green { @apply badge bg-emerald-100 text-emerald-700; }
+  .badge-amber { @apply badge bg-amber-100 text-amber-800; }
+  .badge-gray { @apply badge bg-sand-200 text-char-700; }
+  .badge-blue { @apply badge bg-sky-100 text-sky-700; }
+  .th { @apply text-left text-[11px] uppercase tracking-wide text-char-500 font-semibold px-3 py-2 bg-sand-100 whitespace-nowrap; }
+  .td { @apply px-3 py-2.5 text-sm border-t border-sand-100 align-top; }
+}
+
+.skeleton { background: linear-gradient(90deg, #EADFCF 25%, #F5EFE6 37%, #EADFCF 63%); background-size: 400% 100%; animation: sk 1.4s ease infinite; border-radius: 12px; }
+@keyframes sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.safe-pb { padding-bottom: calc(var(--safe-bottom) + 4px); }
+.sheet-enter { animation: sheet .22s ease-out; }
+@keyframes sheet { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* printable documents (invoice, gate pass, salary slip) */
+.print-doc { background: #fff; color: #111; }
+@media print {
+  body { background: #fff !important; }
+  .no-print, nav, header, aside, .fab { display: none !important; }
+  .print-doc { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: 100% !important; }
+  main { padding: 0 !important; margin: 0 !important; }
+  @page { size: A4; margin: 10mm; }
+}
+
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

@@ -1,0 +1,187 @@
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, Plus, X, WifiOff, LogOut, Languages, PanelLeftClose, PanelLeftOpen, MoreHorizontal } from 'lucide-react';
+import { useApp } from './Providers';
+import { NAV_GROUPS, DASH, BOTTOM_TABS, ALL_ITEMS, QUICK_ADD } from '@/lib/nav';
+import { ROLE_USERS } from '@/lib/perm';
+import { cx, SkeletonList } from './ui';
+
+const permOf = (it) => it.perm || it.key;
+const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'));
+
+function Brand({ compact }) {
+  const { t } = useApp();
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="w-8 h-8 rounded-lg bg-terra text-white flex items-center justify-center font-bold shrink-0">V</div>
+      {!compact && (
+        <div className="min-w-0 leading-tight">
+          <div className="font-bold text-sm truncate">{t('appName')}</div>
+          <div className="text-[10px] text-char-500 truncate">RD Natural Stones · Bijoliya</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LangToggle() {
+  const { lang, setLang } = useApp();
+  return (
+    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label="Language">
+      <Languages size={14} /> {lang === 'en' ? 'हिं' : 'EN'}
+    </button>
+  );
+}
+
+export default function Shell({ children }) {
+  const { session, t, can, logout, online, queued, lang } = useApp();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [drawer, setDrawer] = useState(false);
+  const [fab, setFab] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => { setDrawer(false); setFab(false); }, [pathname]);
+  useEffect(() => { if (session === null) router.replace('/login'); }, [session, router]);
+  useEffect(() => { try { setCollapsed(localStorage.getItem('vss_side') === '1'); } catch {} }, []);
+
+  if (!session) return <div className="p-6 max-w-md mx-auto"><SkeletonList n={5} /></div>;
+
+  const role = session.role;
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => can(permOf(it))) })).filter((g) => g.items.length);
+  const tabKeys = (BOTTOM_TABS[role] || BOTTOM_TABS.default);
+  const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && can(permOf(i))).slice(0, 4);
+  const quick = QUICK_ADD.filter((q) => can(permOf(ALL_ITEMS.find((i) => i.key === q.key) || { key: q.key })));
+  const showFab = quick.length > 0 && role !== 'worker' ? true : role === 'worker';
+  const hi = lang === 'hi';
+
+  const NavLink = ({ it, small }) => {
+    const Icon = it.icon;
+    const active = isActive(pathname, it.href);
+    return (
+      <Link href={it.href} title={t(it.key)}
+        className={cx('flex items-center gap-3 rounded-xl px-3 min-h-[40px] md:min-h-[31px] md:py-0 text-sm md:text-[13px] font-medium transition', active ? 'bg-terra text-white' : 'text-char-700 hover:bg-sand-200', small && 'min-h-[44px]')}>
+        <Icon size={18} className="shrink-0" />
+        {!(collapsed && !small) && <span className="truncate">{t(it.key)}</span>}
+      </Link>
+    );
+  };
+
+  return (
+    <div className="min-h-screen md:flex">
+      {/* Desktop sidebar */}
+      <aside className={cx('hidden md:flex flex-col shrink-0 bg-white border-r border-sand-200 h-screen sticky top-0 transition-all', collapsed ? 'w-[68px]' : 'w-64')}>
+        <div className="p-2.5 flex items-center justify-between border-b border-sand-100 shrink-0">
+          <Brand compact={collapsed} />
+          <button className="p-1.5 rounded-lg hover:bg-sand-100 text-char-500" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
+        <nav className="flex-1 p-2 space-y-1.5 overflow-y-auto no-scrollbar">
+          <NavLink it={DASH} />
+          {groups.map((g) => (
+            <div key={g.key}>
+              {!collapsed && <div className="px-3 pt-1 text-[10px] font-bold uppercase tracking-wider text-char-300">{t(g.key)}</div>}
+              <div>{g.items.map((it) => <NavLink key={it.key} it={it} />)}</div>
+            </div>
+          ))}
+        </nav>
+        <div className="p-2.5 border-t border-sand-100 text-xs shrink-0">
+          {!collapsed && <div className="mb-1.5 leading-tight"><span className="font-semibold">{session.name}</span> <span className="text-char-500 capitalize">· {hi ? ROLE_USERS[role].hi : role}</span></div>}
+          <button onClick={logout} className="btn-outline btn-sm w-full"><LogOut size={14} />{!collapsed && t('logout')}</button>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top bar */}
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-sand-200 no-print">
+          <div className="flex items-center justify-between gap-2 px-4 h-14">
+            <div className="md:hidden"><Brand /></div>
+            <div className="hidden md:flex items-center gap-2">
+              <span className="font-bold">{t('appName')}</span>
+              <span className="badge-amber">{t('demo')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="md:hidden badge-amber">{t('demo')}</span>
+              <span className="hidden sm:inline-flex badge-gray capitalize">{hi ? ROLE_USERS[role].hi : role}</span>
+              <LangToggle />
+              <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
+            </div>
+          </div>
+          {(!online || queued > 0) && (
+            <div className="bg-amber-100 text-amber-900 text-xs font-semibold px-4 py-1.5 flex items-center gap-2">
+              <WifiOff size={14} /> {!online ? t('offline') : `${queued} saved entries waiting to send`}
+              {queued > 0 && <span className="ml-auto badge-amber">{queued}</span>}
+            </div>
+          )}
+        </header>
+
+        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">{children}</main>
+      </div>
+
+      {/* FAB quick add */}
+      {showFab && (
+        <div className="fab fixed right-4 bottom-[88px] md:bottom-6 z-40 no-print">
+          {fab && (
+            <div className="absolute bottom-16 right-0 w-56 card p-2 shadow-xl sheet-enter">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase text-char-300">{t('quickAdd')}</div>
+              {(role === 'worker' ? [QUICK_ADD[0]] : quick).map((q) => {
+                const Icon = q.icon;
+                return (
+                  <Link key={q.key} href={q.href} className="flex items-center gap-3 rounded-lg px-3 min-h-[44px] hover:bg-sand-100 text-sm font-medium">
+                    <Icon size={18} className="text-terra" /> {t(q.key)}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+          <button onClick={() => setFab(!fab)} className="w-14 h-14 rounded-full bg-terra text-white shadow-lg flex items-center justify-center active:scale-95 transition" aria-label={t('quickAdd')}>
+            {fab ? <X size={26} /> : <Plus size={28} />}
+          </button>
+        </div>
+      )}
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-sand-200 flex safe-pb no-print">
+        {tabs.map((it) => {
+          const Icon = it.icon;
+          const active = isActive(pathname, it.href);
+          return (
+            <Link key={it.key} href={it.href} className={cx('flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[58px] text-[10px] font-semibold', active ? 'text-terra' : 'text-char-500')}>
+              <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+              <span className="truncate max-w-[70px]">{it.key === 'dailyReport' ? (hi ? 'रिपोर्ट' : 'Report') : it.key === 'machines' ? (hi ? 'मशीन' : 'Machines') : t(it.key)}</span>
+            </Link>
+          );
+        })}
+        <button onClick={() => setDrawer(true)} className={cx('flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[58px] text-[10px] font-semibold', drawer ? 'text-terra' : 'text-char-500')}>
+          <MoreHorizontal size={22} /><span>{t('more')}</span>
+        </button>
+      </nav>
+
+      {/* More drawer */}
+      {drawer && (
+        <div className="md:hidden fixed inset-0 z-[55] no-print">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
+          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto sheet-enter safe-pb">
+            <div className="sticky top-0 bg-white px-4 py-3 flex items-center justify-between border-b border-sand-100">
+              <div className="font-bold flex items-center gap-2"><Menu size={18} /> {t('menu')}</div>
+              <button onClick={() => setDrawer(false)} className="p-2"><X size={20} /></button>
+            </div>
+            <div className="p-3 space-y-4">
+              <NavLink it={DASH} small />
+              {groups.map((g) => (
+                <div key={g.key}>
+                  <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-char-300">{t(g.key)}</div>
+                  <div className="grid grid-cols-2 gap-1.5">{g.items.map((it) => <NavLink key={it.key} it={it} small />)}</div>
+                </div>
+              ))}
+              <button onClick={logout} className="btn-outline w-full"><LogOut size={16} /> {t('logout')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
