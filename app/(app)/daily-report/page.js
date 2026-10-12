@@ -6,17 +6,18 @@ import { Plus, Lock, Check, X, Pencil } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, cx } from '@/components/ui';
 import { api, submit, downloadCSV } from '@/lib/client';
+import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, num } from '@/lib/format';
 
-const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], employeeId: '' });
+const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '' });
 
 export default function DailyReportPage() {
-  const { t, role, session } = useApp();
+  const { t, can, perm, session } = useApp();
   const sp = useSearchParams();
-  const isWorker = role === 'worker';
+  const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
   const [date, setDate] = useState(todayISO());
   const { data, loading, reload } = useFetch(`/api/dailyreports?date=${date}&sort=empName`);
-  const emps = useFetch(isWorker ? null : '/api/employees?status=active&limit=500&sort=name');
+  const emps = useFetch(isWorker || !can('employees') ? null : '/api/employees?status=active&limit=500&sort=name');
   const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=10' : null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -26,22 +27,23 @@ export default function DailyReportPage() {
   const today = todayISO();
   const locked = (d) => today > addDays(d, 1);
 
-  function openNew(row) {
-    if (row) { setEditing(row); setForm({ ...blank(), ...row, photos: row.photos || (row.photo ? [row.photo] : []) }); }
-    else { setEditing(null); setForm({ ...blank(), date }); }
+  async function openNew(row) {
+    if (row) {
+      try { const full = await api(`/api/dailyreports/${row._id}`); setEditing(full); setForm({ ...blank(), ...full, photos: full.photos || [] }); } catch (e) { toast.error(e.message); return; }
+    } else { setEditing(null); setForm({ ...blank(), date }); }
     setOpen(true);
   }
   useEffect(() => { if (sp.get('new') === '1') openNew(); /* eslint-disable-next-line */ }, []);
 
   async function save() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
-    if (!isWorker && !editing && !form.employeeId) { toast.error('Choose the employee'); return; }
+    if (!isWorker && !editing && !form.empCode) { toast.error('Choose the employee'); return; }
     setSaving(true);
-    const body = { narration: form.narration, hours: form.hours === '' ? 0 : Number(form.hours), quantity: form.quantity === '' ? 0 : Number(form.quantity), problem: form.problem, plan: form.plan, photos: form.photos };
+    const body = { narration: form.narration, hours: form.hours === '' ? 0 : Number(form.hours), quantity: form.quantity === '' ? 0 : Number(form.quantity), problem: form.problem || '', plan: form.plan || '', photos: form.photos || [] };
     try {
       const res = editing
         ? await submit(`/api/dailyreports/${editing._id}`, body, { method: 'PATCH', label: 'Daily report' })
-        : await submit('/api/dailyreports', { ...body, date: form.date || date, employeeId: form.employeeId || undefined }, { label: 'Daily report' });
+        : await submit('/api/dailyreports', { ...body, date: form.date || date, ...(isWorker ? {} : { empCode: form.empCode }) }, { label: 'Daily report' });
       toast.success(res?.queued ? t('offline') : 'Report submitted ✔');
       setOpen(false); reload(); mine.reload?.();
     } catch (e) { toast.error(e.message); }
@@ -54,13 +56,12 @@ export default function DailyReportPage() {
     try { await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck, supRemark: remark } }); toast.success(supCheck === 'ok' ? 'Marked OK' : 'Marked not OK'); reload(); } catch (e) { toast.error(e.message); }
   }
 
-  const rows = isWorker ? data || [] : data || [];
+  const rows = data || [];
   const filledCodes = new Set(rows.map((r) => r.empCode));
   const missing = (emps.data || []).filter((e) => !filledCodes.has(e.empCode));
-  const canCheck = ['owner', 'manager', 'supervisor'].includes(role);
+  const canCheck = can('dailyreports', 'approve');
 
   const Card = ({ r }) => {
-    const photos = r.photos?.length ? r.photos : r.photo ? [r.photo] : [];
     return (
       <div className="card p-4">
         <div className="flex items-start justify-between gap-2">
@@ -68,7 +69,7 @@ export default function DailyReportPage() {
           <div className="flex items-center gap-1.5 shrink-0">
             {r.supCheck === 'ok' && <Badge tone="green">Supervisor OK</Badge>}
             {r.supCheck === 'not_ok' && <Badge tone="red">Not OK</Badge>}
-            {locked(r.date) ? <Badge tone="gray"><Lock size={10} /> Locked</Badge> : (isWorker || canCheck || ['accountant'].includes(role)) && <button className="p-1.5 rounded-lg hover:bg-sand-100" onClick={() => openNew(r)} title="Edit"><Pencil size={15} /></button>}
+            {locked(r.date) ? <Badge tone="gray"><Lock size={10} /> Locked</Badge> : can('dailyreports', 'edit') && <button className="icon-btn" onClick={() => openNew(r)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>}
           </div>
         </div>
         <p className="text-sm mt-2 whitespace-pre-wrap">{r.narration}</p>
@@ -77,7 +78,7 @@ export default function DailyReportPage() {
         </div>
         {r.problem && <div className="mt-2 text-sm"><span className="font-semibold text-red-600">Problem:</span> {r.problem}</div>}
         {r.plan && <div className="text-sm"><span className="font-semibold text-char-500">Tomorrow:</span> {r.plan}</div>}
-        {photos.length > 0 && <div className="flex gap-2 mt-2 flex-wrap">{photos.map((p, i) => (/* eslint-disable-next-line @next/next/no-img-element */<img key={i} src={p} alt="" className="h-16 w-16 rounded-lg object-cover border border-sand-200" />))}</div>}
+        {r.photoCount > 0 && <div className="text-xs text-char-500 mt-2">📷 {r.photoCount} photo{r.photoCount > 1 ? 's' : ''} (open Edit to view)</div>}
         {r.supRemark && <div className="mt-2 text-xs bg-sand-100 rounded-lg px-2 py-1">Supervisor: {r.supRemark}</div>}
         {canCheck && (
           <div className="flex gap-2 mt-3">
@@ -118,9 +119,9 @@ export default function DailyReportPage() {
         <div className="space-y-4">
           {!isWorker && !editing && (
             <Field label="Employee (you are filling for)" required>
-              <select className="input" value={form.employeeId} onChange={(e) => set({ employeeId: e.target.value })}>
+              <select className="input" value={form.empCode} onChange={(e) => set({ empCode: e.target.value })}>
                 <option value="">Select employee…</option>
-                {(emps.data || []).map((e) => <option key={e._id} value={e._id}>{e.name} · {e.job}</option>)}
+                {(emps.data || []).map((e) => <option key={e._id} value={e.empCode}>{e.name} · {e.job}</option>)}
               </select>
             </Field>
           )}

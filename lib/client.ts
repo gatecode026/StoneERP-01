@@ -133,3 +133,33 @@ export function compressImage(file: File, maxDim = 900, quality = 0.65): Promise
   });
 }
 
+
+/**
+ * Transitional helper: GET a URL; if the server answers with the standard list envelope {data, nextCursor}, follow the
+ * cursor (max `maxPages` x 100 rows) and return a plain array. Screens move to infinite lists in Phase 6.
+ */
+export async function fetchAllPages(url: string, maxPages = 15): Promise<any> {
+  const first = await api(url);
+  if (!first || !Array.isArray(first.data) || !('nextCursor' in first)) return first;
+  const rows = [...first.data];
+  let cursor: string | null = first.nextCursor;
+  for (let i = 1; cursor && i < maxPages; i++) {
+    const sep = url.includes('?') ? '&' : '?';
+    const next = await api(`${url}${sep}cursor=${encodeURIComponent(cursor)}`);
+    rows.push(...next.data);
+    cursor = next.nextCursor;
+  }
+  return rows;
+}
+
+/** Real device location (GPS), never a made-up place. Resolves to {text} only when the user refuses or the device has none. */
+export function getLocation(timeoutMs = 6000): Promise<{ lat?: number; lng?: number; text: string }> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve({ text: 'Location not available' });
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: +p.coords.latitude.toFixed(5), lng: +p.coords.longitude.toFixed(5), text: `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}` }),
+      () => resolve({ text: 'Location not shared' }),
+      { timeout: timeoutMs, maximumAge: 60_000 }
+    );
+  });
+}

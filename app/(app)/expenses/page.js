@@ -14,15 +14,18 @@ import { inr, fmtDate, todayISO, monthOf, fmtMonth, daysInMonth, sum, groupBy } 
 const COLORS = ['#B5651D', '#2B2B2B', '#D9A066', '#7F4412', '#A8A8A8', '#E3C79F', '#6B6B6B', '#9A5416', '#C98A4B', '#4B4B4B'];
 
 export default function ExpensesPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const [tab, setTab] = useState('entries');
   const [month, setMonth] = useState(monthOf(todayISO()));
   const [viewer, setViewer] = useState(null);
   const heads = useFetch('/api/expenseheads?sort=name');
   const monthData = useFetch(tab === 'report' ? `/api/expenses?from=${month}-01&to=${month}-${String(daysInMonth(month)).padStart(2, '0')}&status=approved,pending&limit=5000` : null, [month]);
-  const approver = role === 'owner' || role === 'manager';
+  const approver = can('expenses', 'approve');
   const headOptions = [...new Set([...EXPENSE_HEADS, ...(heads.data || []).map((h) => h.name)])];
 
+  async function openBill(r) {
+    try { const full = await api(`/api/expenses/${r._id}`); setViewer(full.billPhoto); } catch (e) { toast.error(e.message); }
+  }
   async function addHead() {
     const name = window.prompt('New expense head name:');
     if (!name?.trim()) return;
@@ -51,7 +54,7 @@ export default function ExpensesPage() {
     { key: 'paidBy', label: 'Paid by', render: (r) => `${r.paidBy} → ${r.paidTo || '—'}` },
     { key: 'spentBy', label: 'Spent by' },
     { key: 'site', label: 'For', render: (r) => r.site || '—' },
-    { key: 'billPhoto', label: 'Bill', render: (r) => (r.billPhoto ? <img src={r.billPhoto} alt="bill" className="h-10 w-10 rounded object-cover border border-sand-200 cursor-pointer" onClick={() => setViewer(r.billPhoto)} /> : <Badge tone="red">No bill</Badge>) },
+    { key: 'hasBill', label: 'Bill', render: (r) => (r.hasBill ? <button className="badge-green min-h-[28px]" onClick={() => openBill(r)}>View bill</button> : <Badge tone="red">No bill</Badge>) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
   ];
 
@@ -62,11 +65,11 @@ export default function ExpensesPage() {
 
   return (
     <RoleGuard perm="expenses">
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'entries', label: 'Entries' }, ...(['owner', 'manager', 'accountant'].includes(role) ? [{ key: 'report', label: 'Monthly report' }] : [])]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'entries', label: 'Entries' }, ...(can('reports') ? [{ key: 'report', label: 'Monthly report' }] : [])]} />
       {tab === 'entries' && (
         <CrudPage model="expenses" title={t('expenses')} subtitle="Every rupee spent, with a bill photo, the same day" label="Expense" fields={fields} columns={columns} sort="-date,-createdAt"
           searchKeys={['head', 'paidTo', 'spentBy', 'narration', 'site']} canEdit={() => false} exportName="expenses"
-          headerExtra={approver && <button className="btn-outline btn-sm" onClick={addHead}><Plus size={14} /> Add head</button>}
+          headerExtra={can('expenseheads', 'create') && <button className="btn-outline btn-sm" onClick={addHead}><Plus size={14} /> Add head</button>}
           filters={[{ key: 'head', label: 'All heads', options: headOptions }, { key: 'status', label: 'All status', options: [{ value: 'pending', label: 'Pending approval' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }] }]}
           summary={(rows, all) => {
             const today = all.filter((r) => r.date === todayISO() && r.status !== 'rejected');

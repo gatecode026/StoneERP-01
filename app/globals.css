@@ -26,6 +26,7 @@ body { font-family: system-ui, 'Segoe UI', 'Noto Sans Devanagari', Roboto, sans-
   .badge-amber { @apply badge bg-amber-100 text-amber-800; }
   .badge-gray { @apply badge bg-sand-200 text-char-700; }
   .badge-blue { @apply badge bg-sky-100 text-sky-700; }
+  .icon-btn { @apply inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg hover:bg-sand-100; }
   .th { @apply text-left text-[11px] uppercase tracking-wide text-char-500 font-semibold px-3 py-2 bg-sand-100 whitespace-nowrap; }
   .td { @apply px-3 py-2.5 text-sm border-t border-sand-100 align-top; }
 }

@@ -5,7 +5,8 @@ import { Camera, CheckCheck, MapPin, Check, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, cx } from '@/components/ui';
 import CrudPage from '@/components/CrudPage';
-import { submit, api } from '@/lib/client';
+import { submit, api, getLocation } from '@/lib/client';
+import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, fmtDate, monthOf } from '@/lib/format';
 import { SALARY } from '@/lib/config';
 
@@ -18,8 +19,8 @@ const STATES = [
 ];
 
 export default function AttendancePage() {
-  const { t, role, session } = useApp();
-  const isWorker = role === 'worker';
+  const { t, can, perm } = useApp();
+  const isWorker = scopeOf(perm, 'attendance', 'create') === 'own';
   const [tab, setTab] = useState('mark');
   const [date, setDate] = useState(todayISO());
   const [q, setQ] = useState('');
@@ -28,7 +29,7 @@ export default function AttendancePage() {
   const [marks, setMarks] = useState({});
   const [selfie, setSelfie] = useState(false);
   const [sf, setSf] = useState({ employeeId: '', photo: '', loc: '' });
-  const canMark = ['owner', 'manager', 'supervisor', 'accountant'].includes(role);
+  const canMark = can('attendance', 'create') && !isWorker;
 
   useEffect(() => { const m = {}; (att.data || []).forEach((a) => { m[a.empCode] = a; }); setMarks(m); }, [att.data]);
 
@@ -36,27 +37,32 @@ export default function AttendancePage() {
     const prev = marks[e.empCode];
     setMarks((m) => ({ ...m, [e.empCode]: { ...(m[e.empCode] || {}), state, empCode: e.empCode, ...extra } }));
     try {
-      await submit('/api/attendance', { date, employeeId: e._id, empCode: e.empCode, empName: e.name, state, method: 'manual', ...(state === 'overtime' ? { otHours: extra.otHours ?? prev?.otHours ?? SALARY.otHoursDefault } : {}) }, { label: `Attendance ${e.name}` });
+      await submit('/api/attendance', { date, empCode: e.empCode, state, ...(state === 'overtime' ? { otHours: extra.otHours ?? prev?.otHours ?? SALARY.otHoursDefault } : {}) }, { label: `Attendance ${e.name}` });
     } catch (err) { toast.error(err.message); setMarks((m) => ({ ...m, [e.empCode]: prev })); }
   }
   async function markAll() {
     const todo = (emps.data || []).filter((e) => !marks[e.empCode]);
     if (!todo.length) { toast('Everyone is already marked'); return; }
     const id = toast.loading(`Marking ${todo.length} present…`);
-    for (const e of todo) await mark(e, 'present');
-    toast.success('Done', { id }); att.reload();
+    try {
+      // one request for the whole team (one transaction), not one per person
+      await api('/api/bulk/attendance', { method: 'POST', body: { date, marks: todo.map((e) => ({ empCode: e.empCode, state: 'present' })) } });
+      toast.success('Done', { id });
+    } catch (err) { toast.error(err.message, { id }); }
+    att.reload();
   }
 
   function getLoc() {
-    if (!navigator.geolocation) { setSf((s) => ({ ...s, loc: 'Location not available' })); return; }
-    navigator.geolocation.getCurrentPosition((p) => setSf((s) => ({ ...s, loc: `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}` })), () => setSf((s) => ({ ...s, loc: 'Factory gate (location not shared)' })), { timeout: 5000 });
+    setSf((x) => ({ ...x, loc: '' }));
+    getLocation().then((l) => setSf((x) => ({ ...x, loc: l.text, geo: l })));
   }
   async function saveSelfie() {
     const emp = isWorker ? null : (emps.data || []).find((x) => x._id === sf.employeeId);
     if (!isWorker && !emp) { toast.error('Choose the employee'); return; }
     if (!sf.photo) { toast.error('Take a selfie'); return; }
     try {
-      const body = isWorker ? { date, state: 'present', selfie: sf.photo, location: sf.loc, method: 'selfie' } : { date, employeeId: emp._id, empCode: emp.empCode, empName: emp.name, state: 'present', selfie: sf.photo, location: sf.loc, method: 'selfie' };
+      const location = sf.geo || { text: sf.loc || 'Location not shared' };
+      const body = isWorker ? { selfie: sf.photo, location } : { date, empCode: emp.empCode, state: 'present', selfie: sf.photo, location };
       const r = await submit('/api/attendance', body, { label: 'Selfie attendance' });
       toast.success(r.queued ? t('offline') : 'Attendance marked with selfie ✔');
       setSelfie(false); setSf({ employeeId: '', photo: '', loc: '' }); att.reload();
@@ -105,7 +111,7 @@ export default function AttendancePage() {
                     </div>
                     <div className="grid grid-cols-5 gap-1.5">
                       {STATES.map((s) => (
-                        <button key={s.v} disabled={!canMark} onClick={() => mark(e, s.v)}
+                        <button key={s.v} aria-label={s.label} disabled={!canMark} onClick={() => mark(e, s.v)}
                           className={cx('min-h-[46px] rounded-xl border text-sm font-bold transition active:scale-95 disabled:opacity-60', m?.state === s.v ? s.on : 'bg-white border-sand-300 text-char-700')}>
                           <span className="md:hidden">{s.short}</span><span className="hidden md:inline">{s.label}</span>
                         </button>
@@ -124,7 +130,7 @@ export default function AttendancePage() {
         <CrudPage model="leaves" title="Leave requests" label="Leave request" noHeader sort="-createdAt" searchKeys={['empName', 'reason']}
           fields={[{ name: 'empCode', label: 'Employee', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'empName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } }, { name: 'from', label: 'From', type: 'date', required: true }, { name: 'to', label: 'To', type: 'date', required: true }, { name: 'reason', label: 'Reason', wide: true }]}
           columns={[{ key: 'empName', label: 'Employee', primary: true }, { key: 'from', label: 'From', render: (r) => fmtDate(r.from) }, { key: 'to', label: 'To', render: (r) => fmtDate(r.to) }, { key: 'reason', label: 'Reason' }, { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'approved' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Badge> }]}
-          rowActions={(row, { reload }) => (row.status === 'pending' && ['owner', 'manager'].includes(role) ? ['approve', 'reject'].map((a) => ({ label: a === 'approve' ? 'Approve' : 'Reject', tone: a === 'approve' ? 'green' : undefined, icon: a === 'approve' ? <Check size={14} /> : <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'leaves', id: row._id, action: a } }); toast.success(a === 'approve' ? 'Leave approved' : 'Rejected'); reload(); } catch (e) { toast.error(e.message); } } })) : [])} />
+          rowActions={(row, { reload }) => (row.status === 'pending' && can('leaves', 'approve') ? ['approve', 'reject'].map((a) => ({ label: a === 'approve' ? 'Approve' : 'Reject', tone: a === 'approve' ? 'green' : undefined, icon: a === 'approve' ? <Check size={14} /> : <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'leaves', id: row._id, action: a } }); toast.success(a === 'approve' ? 'Leave approved' : 'Rejected'); reload(); } catch (e) { toast.error(e.message); } } })) : [])} />
       )}
 
       <Sheet open={selfie} onClose={() => setSelfie(false)} title={t('selfie')}

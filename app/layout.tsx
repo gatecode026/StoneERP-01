@@ -4,6 +4,8 @@ import { Providers } from '@/components/Providers';
 import { getSessionUser } from '@/lib/auth/session';
 import { publicUser } from '@/lib/auth/public';
 import type { ClientSession } from '@/components/Providers';
+import { getEffectivePerm, describePerm } from '@/lib/perm/engine';
+import { getSettings } from '@/lib/settings';
 
 export const metadata: Metadata = {
   title: 'Vipul Stone Suppliers – ERP',
@@ -20,7 +22,11 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser().catch(() => null);
-  const session = (user ? publicUser(user) : null) as ClientSession | null;
+  let session: ClientSession | null = null;
+  if (user) {
+    const [perm, st] = await Promise.all([getEffectivePerm(user), getSettings()]);
+    session = { ...publicUser(user), perm: describePerm(perm), company: st.company } as ClientSession;
+  }
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';
   return (
     <html lang={lang}>

@@ -9,18 +9,19 @@ import { api } from '@/lib/client';
 import { inr, num, fmtDate, sum, groupBy, todayISO } from '@/lib/format';
 
 export default function PurchasesPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const [tab, setTab] = useState('purchases');
-  const approver = role === 'owner' || role === 'manager';
+  const approver = can('purchases', 'approve');
   const sup = useFetch('/api/suppliers?limit=500');
   const pur = useFetch('/api/purchases?limit=2000&sort=-date');
 
-  const payable = (p) => Math.max(0, (p.total || 0) - (p.paidAmount || 0));
+  const payable = (p) => Math.max(0, p.outstanding ?? (p.total || 0) - (p.paidAmount || 0));
   async function pay(p, reload) {
     const amt = window.prompt(`Pay supplier ${p.supplierName}. Amount (pending ${inr(payable(p))}):`, String(payable(p)));
     if (!amt) return;
-    const mode = window.prompt('Mode: Cash / UPI / Bank', 'Bank') || 'Bank';
-    try { await api('/api/actions', { method: 'POST', body: { action: 'paySupplier', purchaseId: p._id, amount: Number(amt), mode } }); toast.success('Payment recorded'); reload(); pur.reload(); } catch (e) { toast.error(e.message); }
+    const m = (window.prompt('Mode: Cash / UPI / Bank', 'Bank') || 'Bank').trim().toLowerCase();
+    const mode = m === 'cash' ? 'Cash' : m === 'upi' ? 'UPI' : 'Bank';
+    try { await api(`/api/purchases/${p._id}/pay`, { method: 'POST', body: { amount: Number(amt), mode } }); toast.success('Payment recorded'); reload(); pur.reload(); } catch (e) { toast.error(e.message); }
   }
 
   const fields = [
@@ -44,7 +45,7 @@ export default function PurchasesPage() {
     { key: 'total', label: 'Total', align: 'right', render: (r) => <b>{inr(r.total)}</b> },
     { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
     { key: 'billNo', label: 'Bill', render: (r) => r.billNo || '—' },
-    { label: 'Payment', render: (r) => (payable(r) > 0 ? <Badge tone={r.dueDate && r.dueDate < todayISO() ? 'red' : 'amber'}>Due {inr(payable(r))} · {fmtDate(r.dueDate)}</Badge> : <Badge tone="green">Paid</Badge>) },
+    { label: 'Payment', render: (r) => (r.status === 'pending' ? <Badge tone="amber">Awaiting approval</Badge> : payable(r) > 0 ? <Badge tone={r.dueDate && r.dueDate < todayISO() ? 'red' : 'amber'}>Due {inr(payable(r))} · {fmtDate(r.dueDate)}</Badge> : <Badge tone="green">Paid</Badge>) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
   ];
 
@@ -79,7 +80,7 @@ export default function PurchasesPage() {
         <CrudPage model="suppliers" title="Suppliers" label="Supplier" searchKeys={['name', 'city', 'supplies']} sort="name"
           fields={[{ name: 'name', label: 'Supplier name', required: true, wide: true }, { name: 'mobile', label: 'Mobile', type: 'tel' }, { name: 'gstin', label: 'GST number' }, { name: 'city', label: 'City' }, { name: 'supplies', label: 'Supplies', placeholder: 'Blocks, blades, diesel…' }]}
           columns={[{ key: 'name', label: 'Supplier', primary: true }, { key: 'city', label: 'City' }, { key: 'mobile', label: 'Mobile' }, { key: 'gstin', label: 'GST' }, { key: 'supplies', label: 'Supplies' },
-            { label: 'We owe', align: 'right', render: (r) => { const o = sum((pur.data || []).filter((p) => p.supplierId === r._id && p.status === 'approved'), payable); return o ? <b className="text-amber-700">{inr(o)}</b> : '—'; } }]}
+            { key: 'outstanding', label: 'We owe', align: 'right', render: (r) => (r.outstanding > 0 ? <b className="text-amber-700">{inr(r.outstanding)}</b> : '—') }]}
         />
       )}
     </RoleGuard>

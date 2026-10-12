@@ -18,7 +18,7 @@ export default function ComplaintsPage() {
     { name: 'invoiceNo', label: 'Bill number' },
     { name: 'problem', label: 'Problem', type: 'select', options: PROBLEMS, required: true },
     { name: 'details', label: 'Details', type: 'textarea', wide: true },
-    { name: 'photo', label: 'Photos', type: 'photo' },
+    { name: 'photos', label: 'Photos', type: 'photos' },
     { name: 'action', label: 'Action decided', type: 'select', options: ACTIONS },
     { name: 'actionNote', label: 'Reason / remark', wide: true },
     { name: 'state', label: 'Status', type: 'select', options: STATES, default: 'open' },

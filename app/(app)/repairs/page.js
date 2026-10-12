@@ -11,13 +11,12 @@ import { addDays, todayISO, fmtDate, inr, sum, groupBy, monthOf } from '@/lib/fo
 const serviceDue = (m) => (m.lastServiceDate && m.serviceIntervalDays ? addDays(m.lastServiceDate, Number(m.serviceIntervalDays)) : null);
 
 export default function RepairsPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const [tab, setTab] = useState('repairs');
   const [hist, setHist] = useState('');
   const machines = useFetch('/api/machines?sort=name');
   const repairs = useFetch('/api/repairs?sort=-date&limit=2000');
   const today = todayISO();
-  const office = ['owner', 'manager', 'accountant'].includes(role);
 
   const fields = [
     { name: 'kind', label: 'Type', type: 'select', required: true, default: 'breakdown', options: [{ value: 'breakdown', label: 'Breakdown / repair' }, { value: 'service', label: 'Routine service' }] },
@@ -69,7 +68,7 @@ export default function RepairsPage() {
             { key: 'lastServiceDate', label: 'Last service', render: (r) => fmtDate(r.lastServiceDate) },
             { key: 'serviceIntervalDays', label: 'Interval', render: (r) => `${r.serviceIntervalDays} days` },
             { key: 'due', label: 'Next due', render: (r) => (r.due ? <Badge tone={r.due < today ? 'red' : r.due <= addDays(today, 7) ? 'amber' : 'green'}>{fmtDate(r.due)}{r.due < today ? ' – overdue' : r.due <= addDays(today, 7) ? ' – due soon' : ''}</Badge> : '—') },
-          ]} actions={(r) => (office || role === 'supervisor') && (
+          ]} actions={(r) => can('repairs', 'create') && (
             <button className="btn-outline btn-sm" onClick={async () => { try { await api('/api/repairs', { method: 'POST', body: { kind: 'service', status: 'closed', date: today, machineId: r._id, problem: 'Routine service', action: 'Oil change, belt check, greasing', cost: 0 } }); toast.success('Service recorded'); machines.reload(); repairs.reload(); } catch (e) { toast.error(e.message); } }}>Mark serviced</button>
           )} />
         </div>

@@ -4,7 +4,7 @@ import { Printer, MessageCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, SkeletonList, Empty } from '@/components/ui';
 import { openWA } from '@/lib/client';
-import { COMPANY, SALARY } from '@/lib/config';
+import { SALARY } from '@/lib/config';
 import { inr, fmtMonth, num, amountInWords, fmtDate, todayISO } from '@/lib/format';
 
 const L = {
@@ -14,24 +14,25 @@ const L = {
 
 export default function Slip() {
   const { month, code } = useParams();
-  const { lang, setLang, role } = useApp();
-  const { data, loading } = useFetch(`/api/salary?month=${month}&empCode=${code}`);
+  const company = useApp().session.company;
+  const { lang, setLang, can } = useApp();
+  const { data, loading } = useFetch(`/api/salary/slip?month=${month}&empCode=${code}`);
   const l = L[lang];
   if (loading) return <SkeletonList />;
-  const r = data?.rows?.[0];
-  if (!r) return <RoleGuard perm="salary"><Empty text="No salary data for this employee and month" /></RoleGuard>;
-  const msg = `*${L.en.title} – ${fmtMonth(month)}*\n${r.name} (${r.empCode})\nWages ${inr(r.wages)}${r.otPay ? ` + OT ${inr(r.otPay)}` : ''}\nPF/ESI ${inr(r.pf + r.esi)} · Advance ${inr(r.advanceRecovery)}\n*Net salary: ${inr(r.net)}*\n— ${COMPANY.name}`;
+  const r = data?.row;
+  if (!r) return <RoleGuard perm={["salarysheets", "salaryslips"]}><Empty text="No salary data for this employee and month" /></RoleGuard>;
+  const msg = `*${L.en.title} – ${fmtMonth(month)}*\n${r.name} (${r.empCode})\nWages ${inr(r.wages)}${r.otPay ? ` + OT ${inr(r.otPay)}` : ''}\nPF/ESI ${inr(r.pf + r.esi)} · Advance ${inr(r.advanceRecovery)}\n*Net salary: ${inr(r.net)}*\n— ${company.name}`;
   const Row = ({ a, b, bold }) => <div className={`flex justify-between py-1.5 border-b border-gray-200 ${bold ? 'font-bold' : ''}`}><span>{a}</span><span>{b}</span></div>;
   return (
-    <RoleGuard perm="salary">
+    <RoleGuard perm={["salarysheets", "salaryslips"]}>
       <PageHeader title={l.title} back="/salary" actions={<>
         <button className="btn-outline" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}>{lang === 'en' ? 'हिन्दी' : 'English'}</button>
         <button className="btn-primary" onClick={() => window.print()}><Printer size={16} /> Print / PDF</button>
-        {role !== 'worker' && <button className="btn-green" onClick={() => openWA(msg, r.mobile)}><MessageCircle size={16} /> WhatsApp</button>}
+        {can('salarysheets') && <button className="btn-green" onClick={() => openWA(msg, r.mobile)}><MessageCircle size={16} /> WhatsApp</button>}
       </>} />
       <div className="print-doc card max-w-2xl mx-auto p-6 text-sm">
         <div className="flex justify-between items-start border-b-2 border-black pb-3">
-          <div><div className="text-lg font-extrabold">{COMPANY.name}</div><div className="text-xs text-gray-600">{COMPANY.address}</div></div>
+          <div><div className="text-lg font-extrabold">{company.name}</div><div className="text-xs text-gray-600">{company.address}</div></div>
           <div className="text-right"><div className="text-xl font-extrabold">{l.title}</div><div className="font-bold">{fmtMonth(month)}</div></div>
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 py-3 border-b border-gray-300">

@@ -8,8 +8,8 @@ import { JOBS } from '@/lib/config';
 import { inr, fmtDate } from '@/lib/format';
 
 export default function EmployeesPage() {
-  const { t, role } = useApp();
-  const showPay = role !== 'supervisor';
+  const { t, can, perm } = useApp();
+  const showPay = ['read', 'write'].includes(perm?.fields?.money);
   const columns = [
     { key: 'name', label: 'Name', primary: true, render: (r) => <span>{r.name} <span className="text-char-500 font-normal text-xs">{r.empCode}</span></span> },
     { key: 'job', label: 'Job' },
@@ -28,7 +28,7 @@ export default function EmployeesPage() {
       <CrudPage
         model="employees" title={t('employees')} subtitle="One profile per person, with documents" label="Employee"
         fields={EMPLOYEE_FIELDS} columns={columns} searchKeys={['name', 'job', 'site', 'empCode', 'mobile']} sort="empCode"
-        canAdd={['owner', 'manager', 'accountant'].includes(role)} canEdit={() => ['owner', 'manager', 'accountant'].includes(role)}
+        
         filters={[
           { key: 'job', label: 'All jobs', options: JOBS },
           { key: 'site', label: 'All sites', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] },

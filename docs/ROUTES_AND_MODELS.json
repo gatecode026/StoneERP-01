@@ -50,7 +50,7 @@
       "file": "app/(app)/page.js"
     },
     {
-      "path": "/employees",
+      "path": "/eomployees",
       "purpose": "Part 1 employee profiles",
       "requiredPerm": "employees",
       "rolesAllowed": [

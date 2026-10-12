@@ -4,11 +4,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import { translate } from '@/lib/i18n';
-import { canView } from '@/lib/perm';
-import { api, flushQueue, getQueue } from '@/lib/client';
+import { can as canPerm, type ClientPerm } from '@/lib/clientPerm';
+import { api, fetchAllPages, flushQueue, getQueue } from '@/lib/client';
 
 export type ClientSession = {
   id: string; username: string; name: string; role: string; preset: string | null; empCode: string | null; lang: string; mustChangePassword: boolean;
+  perm: ClientPerm;
+  company: { name: string; brand: string; address: string; gstin: string; state: string; stateCode: string; phone: string; email: string; bankName: string; bankAccount: string; ifsc: string };
 };
 type AppCtx = {
   lang: 'en' | 'hi';
@@ -18,7 +20,8 @@ type AppCtx = {
   logout: () => Promise<void>;
   online: boolean;
   queued: number;
-  can: (key: string) => boolean;
+  can: (resource: string, action?: string) => boolean;
+  perm: ClientPerm | null;
   role: string | undefined;
 };
 
@@ -72,8 +75,8 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
     router.refresh();
   }, [router]);
 
-  const can = useCallback((key: string) => !!session && canView(session.role, key), [session]);
-  const value = useMemo<AppCtx>(() => ({ lang, setLang, t, session, logout, online, queued, can, role: session?.role }), [lang, setLang, t, session, logout, online, queued, can]);
+  const can = useCallback((resource: string, action = 'view') => !!session && canPerm(session.perm, resource, action as never), [session]);
+  const value = useMemo<AppCtx>(() => ({ lang, setLang, t, session, logout, online, queued, can, perm: session?.perm ?? null, role: session?.role }), [lang, setLang, t, session, logout, online, queued, can]);
 
   return (
     <Ctx.Provider value={value}>
@@ -93,7 +96,7 @@ export function useFetch(url: string | null, deps: unknown[] = []) {
     if (!url) { setLoading(false); return; }
     let live = true;
     setLoading(true);
-    api(url).then((d) => { if (live) { setData(d); setError(null); setLoading(false); } })
+    fetchAllPages(url).then((d) => { if (live) { setData(d); setError(null); setLoading(false); } })
       .catch((e) => { if (live) { setError(e); setLoading(false); } });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

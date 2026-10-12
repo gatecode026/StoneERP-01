@@ -9,7 +9,7 @@ import { MACHINE_TYPES } from '@/lib/config';
 import { todayISO, addDays, fmtDate, monthOf, num, sum, groupBy, daysInMonth, fmtMonth } from '@/lib/format';
 
 export default function MachinesPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const [tab, setTab] = useState('entries');
   const [date, setDate] = useState(todayISO());
   const [mode, setMode] = useState('day');
@@ -17,7 +17,7 @@ export default function MachinesPage() {
   const today = todayISO();
   const machines = useFetch('/api/machines?sort=name');
   const monthEntries = useFetch(tab === 'monthly' ? `/api/machineentries?from=${month}-01&to=${month}-${String(daysInMonth(month)).padStart(2, '0')}&limit=5000` : null, [month]);
-  const canManage = ['owner', 'manager'].includes(role);
+  const canManage = can('machines', 'create');
 
   const entryFields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
@@ -63,7 +63,7 @@ export default function MachinesPage() {
   const byOperator = Object.entries(groupBy(ents.filter((e) => e.operatorName && e.outputSqft > 0), 'operatorName')).map(([name, es]) => ({ name, sqft: sum(es, 'outputSqft'), shifts: es.length })).sort((a, b) => b.sqft - a.sqft);
 
   return (
-    <RoleGuard perm="machines">
+    <RoleGuard perm="machineentries">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'entries', label: 'Shift entries' }, { key: 'machines', label: 'Machine list' }, { key: 'monthly', label: 'Monthly output' }]} />
 
       {tab === 'entries' && (

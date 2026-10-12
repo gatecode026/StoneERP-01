@@ -5,10 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Menu, Plus, X, WifiOff, LogOut, Languages, PanelLeftClose, PanelLeftOpen, MoreHorizontal } from 'lucide-react';
 import { useApp } from './Providers';
 import { NAV_GROUPS, DASH, BOTTOM_TABS, ALL_ITEMS, QUICK_ADD } from '@/lib/nav';
-import { ROLE_USERS } from '@/lib/perm';
+import { ROLE_LABEL } from '@/lib/roles';
 import { cx, SkeletonList } from './ui';
 
-const permOf = (it) => it.perm || it.key;
+const canOpen = (can, it) => (it.res || []).some((r) => can(r));
 const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'));
 
 function Brand({ compact }) {
@@ -50,11 +50,11 @@ export default function Shell({ children }) {
   if (!session) return <div className="p-6 max-w-md mx-auto"><SkeletonList n={5} /></div>;
 
   const role = session.role;
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => can(permOf(it))) })).filter((g) => g.items.length);
-  const tabKeys = (BOTTOM_TABS[role] || BOTTOM_TABS.default);
-  const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && can(permOf(i))).slice(0, 4);
-  const quick = QUICK_ADD.filter((q) => can(permOf(ALL_ITEMS.find((i) => i.key === q.key) || { key: q.key })));
-  const showFab = quick.length > 0 && role !== 'worker' ? true : role === 'worker';
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => canOpen(can, it)) })).filter((g) => g.items.length);
+  const tabKeys = (BOTTOM_TABS[session.perm.roleKey] || BOTTOM_TABS[role] || BOTTOM_TABS.default);
+  const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && canOpen(can, i)).slice(0, 4);
+  const quick = QUICK_ADD.filter((q) => can(q.res, 'create'));
+  const showFab = quick.length > 0;
   const hi = lang === 'hi';
 
   const NavLink = ({ it, small }) => {
@@ -89,7 +89,7 @@ export default function Shell({ children }) {
           ))}
         </nav>
         <div className="p-2.5 border-t border-sand-100 text-xs shrink-0">
-          {!collapsed && <div className="mb-1.5 leading-tight"><span className="font-semibold">{session.name}</span> <span className="text-char-500 capitalize">· {hi ? ROLE_USERS[role].hi : role}</span></div>}
+          {!collapsed && <div className="mb-1.5 leading-tight"><span className="font-semibold">{session.name}</span> <span className="text-char-500 capitalize">· {ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span></div>}
           <button onClick={logout} className="btn-outline btn-sm w-full"><LogOut size={14} />{!collapsed && t('logout')}</button>
         </div>
       </aside>
@@ -103,7 +103,7 @@ export default function Shell({ children }) {
               <span className="font-bold">{t('appName')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="hidden sm:inline-flex badge-gray capitalize">{hi ? ROLE_USERS[role].hi : role}</span>
+              <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
               <LangToggle />
               <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
@@ -125,7 +125,7 @@ export default function Shell({ children }) {
           {fab && (
             <div className="absolute bottom-16 right-0 w-56 card p-2 shadow-xl sheet-enter">
               <div className="px-2 py-1 text-[10px] font-bold uppercase text-char-300">{t('quickAdd')}</div>
-              {(role === 'worker' ? [QUICK_ADD[0]] : quick).map((q) => {
+              {quick.map((q) => {
                 const Icon = q.icon;
                 return (
                   <Link key={q.key} href={q.href} className="flex items-center gap-3 rounded-lg px-3 min-h-[44px] hover:bg-sand-100 text-sm font-medium">

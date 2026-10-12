@@ -61,10 +61,10 @@ export function Badge({ tone = 'gray', children, className }) {
   return <span className={cx(`badge-${tone}`, className)}>{children}</span>;
 }
 
-export function Field({ label, hint, children, className, required }) {
+export function Field({ label, hint, children, className, required, htmlFor }) {
   return (
     <div className={className}>
-      {label && <label className="label">{label}{required && <span className="text-red-500"> *</span>}</label>}
+      {label && <label htmlFor={htmlFor} className="label">{label}{required && <span className="text-red-500"> *</span>}</label>}
       {children}
       {hint && <div className="text-[11px] text-char-500 mt-1">{hint}</div>}
     </div>
@@ -79,9 +79,15 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center no-print">
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center no-print" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[94vh] rounded-t-3xl md:rounded-2xl shadow-2xl', wide ? 'md:max-w-3xl' : 'md:max-w-xl')}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-sand-200 shrink-0">
@@ -122,7 +128,8 @@ export function SearchBox({ value, onChange, placeholder }) {
 export function RoleGuard({ perm, children }) {
   const { can, session, t } = useApp();
   if (session === undefined) return <SkeletonList />;
-  if (!can(perm)) {
+  const allowed = Array.isArray(perm) ? perm.some((p) => can(p)) : can(perm);
+  if (!allowed) {
     return (
       <div className="card p-8 text-center">
         <ShieldAlert className="mx-auto text-terra mb-2" />

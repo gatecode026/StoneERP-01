@@ -9,24 +9,24 @@ import {
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useApp, useFetch } from '@/components/Providers';
 import { PageHeader, StatCard, SkeletonList, Skeleton, Section, Badge, Empty, PhotoInput, cx } from '@/components/ui';
-import { api, openWA, submit } from '@/lib/client';
+import { api, openWA, submit, getLocation } from '@/lib/client';
 import { todayISO, inr, inrShort, num, fmtDate, shortDay } from '@/lib/format';
 import { reportLines, reportText } from '@/lib/report';
-import { canApprove } from '@/lib/perm';
+import { scopeOf } from '@/lib/clientPerm';
 
 const COLORS = ['#B5651D', '#2B2B2B', '#D9A066', '#7F4412', '#A8A8A8', '#E3C79F', '#6B6B6B', '#9A5416'];
 
 export default function Dashboard() {
-  const { session, role } = useApp();
+  const { session, perm } = useApp();
   if (!session) return <SkeletonList />;
-  if (role === 'worker') return <WorkerHome />;
+  if (scopeOf(perm, 'attendance', 'view') === 'own' && scopeOf(perm, 'dailyreports', 'view') === 'own') return <WorkerHome />;
   return <OwnerDashboard />;
 }
 
 function OwnerDashboard() {
-  const { t, lang, role } = useApp();
+  const { t, lang, can } = useApp();
   const [date, setDate] = useState(todayISO());
-  const { data, loading, error, reload } = useFetch(`/api/dashboard?date=${date}`);
+  const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`);
 
   async function decide(a, action) {
     try {
@@ -53,18 +53,18 @@ function OwnerDashboard() {
   if (error) return <>{header}<Empty text={error.message} /></>;
   const d = data;
   const lines = reportLines(d, lang);
-  const canDecide = canApprove(role);
+  const canDecide = can('expenses', 'approve') || can('purchases', 'approve') || can('advances', 'approve') || can('leaves', 'approve');
 
   return (
     <div>
       {header}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={Users} label={t('attendance')} value={`${d.attendance.present}/${d.attendance.total}`} sub={`${d.attendance.absent} ${t('absent').toLowerCase()} · ${d.attendance.leave} ${t('leave').toLowerCase()}`} href="/attendance" />
-        <StatCard icon={ClipboardList} label={t('reportsFilled')} value={`${d.reports.filled}/${d.attendance.total}`} sub={`${d.reports.missing} ${t('reportsMissing')}`} tone={d.reports.missing ? 'amber' : 'green'} href="/daily-report" />
-        <StatCard icon={Cog} label={t('machineOutput')} value={`${num(d.machines.totalSqft)} sq ft`} sub={`${d.machines.idleHours} h idle`} href="/machines" />
-        <StatCard icon={AlertTriangle} label={t('breakdowns')} value={d.machines.breakdowns.length} sub={d.machines.breakdowns.map((m) => m.name).join(', ') || 'All running'} tone={d.machines.breakdowns.length ? 'red' : 'green'} valueClass={d.machines.breakdowns.length ? 'text-red-700' : ''} href="/repairs" />
-        <StatCard icon={PackageX} label={t('lowStock')} value={d.stock.lowStock.length} sub={d.stock.lowStock[0]?.name || 'All above minimum'} tone={d.stock.lowStock.length ? 'red' : 'green'} valueClass={d.stock.lowStock.length ? 'text-red-700' : ''} href="/stock" />
+        {d.attendance && <StatCard icon={Users} label={t('attendance')} value={`${d.attendance.present}/${d.attendance.total}`} sub={`${d.attendance.absent} ${t('absent').toLowerCase()} · ${d.attendance.leave} ${t('leave').toLowerCase()}`} href="/attendance" />}
+        {d.reports && <StatCard icon={ClipboardList} label={t('reportsFilled')} value={`${d.reports.filled}/${d.attendance?.total ?? '—'}`} sub={`${d.reports.missing} ${t('reportsMissing')}`} tone={d.reports.missing ? 'amber' : 'green'} href="/daily-report" />}
+        {d.machines && <><StatCard icon={Cog} label={t('machineOutput')} value={`${num(d.machines.totalSqft)} sq ft`} sub={`${d.machines.idleHours} h idle`} href="/machines" />
+        <StatCard icon={AlertTriangle} label={t('breakdowns')} value={d.machines.breakdowns.length} sub={d.machines.breakdowns.map((m) => m.name).join(', ') || 'All running'} tone={d.machines.breakdowns.length ? 'red' : 'green'} valueClass={d.machines.breakdowns.length ? 'text-red-700' : ''} href="/repairs" /></>}
+        {d.stock && <StatCard icon={PackageX} label={t('lowStock')} value={d.stock.lowStock.length} sub={d.stock.lowStock[0]?.name || 'All above minimum'} tone={d.stock.lowStock.length ? 'red' : 'green'} valueClass={d.stock.lowStock.length ? 'text-red-700' : ''} href="/stock" />}
         {d.sales && <>
           <StatCard icon={Receipt} label={t('todaySales')} value={inrShort(d.sales.today)} sub={`${d.sales.orders} orders`} href="/sales" />
           <StatCard icon={Truck} label={t('dispatches')} value={d.sales.dispatches} sub="trucks out today" href="/dispatch" />
@@ -121,7 +121,7 @@ function OwnerDashboard() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mt-4">
-        <Section title="Machine output – last 7 days (sq ft)">
+        {d.trend && <Section title="Machine output – last 7 days (sq ft)">
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.trend.map((x) => ({ ...x, day: shortDay(x.date) }))} margin={{ left: -15, right: 4, top: 4 }}>
@@ -133,7 +133,7 @@ function OwnerDashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Section>
+        </Section>}
 
         {d.expenses && (
           <Section title="Expenses by head – today">
@@ -153,7 +153,7 @@ function OwnerDashboard() {
           </Section>
         )}
 
-        <Section title="Machines today">
+        {d.machines && <Section title="Machines today">
           <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {d.machines.byMachine.filter((m) => m.sqft > 0 || m.stoppedMins).map((m) => (
               <div key={m.name} className="flex items-center justify-between text-sm gap-2">
@@ -163,18 +163,18 @@ function OwnerDashboard() {
               </div>
             ))}
           </div>
-        </Section>
+        </Section>}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4 mt-4">
-        <Section title={<span className="flex items-center gap-2"><Bell size={16} /> Alerts</span>} right={<Link href="/tasks?tab=reminders" className="text-xs text-terra font-semibold">All {d.reminderCount} →</Link>}>
-          {d.alerts.length ? d.alerts.map((a, i) => (
+        <Section title={<span className="flex items-center gap-2"><Bell size={16} /> Alerts</span>} right={<Link href="/tasks?tab=reminders" className="text-xs text-terra font-semibold">All {d.reminderCount ?? 0} →</Link>}>
+          {(d.alerts || []).length ? d.alerts.map((a, i) => (
             <Link key={i} href={a.link || '/'} className="flex items-start gap-2 py-2 border-b border-sand-100 last:border-0 text-sm">
               <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" /><span className="font-medium">{a.title}</span>
             </Link>
           )) : <div className="text-sm text-char-500 py-4 text-center">No urgent alerts</div>}
         </Section>
-        <Section title={`Daily reports not filled (${d.reports.missing})`}>
+        {d.reports && <Section title={`Daily reports not filled (${d.reports.missing})`}>
           <div className="flex flex-wrap gap-1.5">
             {d.reports.missingNames.map((n) => <span key={n} className="badge-amber">{n}</span>)}
             {!d.reports.missing && <span className="text-sm text-char-500">All reports filled ✔</span>}
@@ -183,7 +183,7 @@ function OwnerDashboard() {
             <div className="text-xs font-bold uppercase text-char-500 mt-4 mb-1">Problems raised today</div>
             {d.reports.problems.map((p, i) => <div key={i} className="text-sm py-1"><b>{p.name}:</b> <span className="text-red-600">{p.problem}</span></div>)}
           </>}
-        </Section>
+        </Section>}
       </div>
     </div>
   );
@@ -192,14 +192,16 @@ function OwnerDashboard() {
 function WorkerHome() {
   const { t, session } = useApp();
   const date = todayISO();
-  const { data, loading, reload } = useFetch(`/api/dashboard?date=${date}`);
+  const { data, loading, reload } = useFetch(`/api/home?date=${date}`);
   const [selfie, setSelfie] = useState('');
   const [busy, setBusy] = useState(false);
   if (loading || !data) return <SkeletonList />;
   const markAtt = async () => {
     setBusy(true);
     try {
-      const r = await submit('/api/attendance', { date, state: 'present', selfie, location: 'Factory gate (GPS)' }, { label: 'Attendance' });
+      if (!selfie) { toast.error('Take a selfie first'); setBusy(false); return; }
+      const location = await getLocation();
+      const r = await submit('/api/attendance', { selfie, location }, { label: 'Attendance' });
       toast.success(r.queued ? t('offline') : 'Attendance marked ✔');
       reload();
     } catch (e) { toast.error(e.message); }

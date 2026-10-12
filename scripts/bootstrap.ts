@@ -9,8 +9,7 @@
 import { connect, disconnect } from '../lib/db';
 import { User } from '../lib/models/auth';
 import { Settings } from '../lib/models/settings';
-import { MODELS as LEGACY } from '../lib/models';
-const MODELS = LEGACY as Record<string, import('mongoose').Model<any>>; // eslint-disable-line @typescript-eslint/no-explicit-any
+import { MODELS } from '../lib/models';
 import { generatePassword, hashPassword, mobileSchema, passwordSchema } from '../lib/auth/password';
 import { EXPENSE_HEADS } from '../lib/config';
 

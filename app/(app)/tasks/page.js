@@ -23,13 +23,13 @@ const REMINDER_TABLE = [
 ];
 
 export default function TasksPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') === 'reminders' ? 'reminders' : 'tasks');
   const [doneRow, setDoneRow] = useState(null);
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState('');
-  const canAssign = ['owner', 'manager', 'accountant', 'supervisor'].includes(role);
+  const canAssign = can('tasks', 'create');
   const rem = useFetch(tab === 'reminders' ? '/api/reminders' : null);
   const today = todayISO();
 
@@ -57,7 +57,7 @@ export default function TasksPage() {
 
   return (
     <RoleGuard perm="tasks">
-      {role !== 'worker' && role !== 'salesperson' && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'tasks', label: 'Tasks' }, { key: 'reminders', label: 'Reminder centre' }]} />}
+      {can('reminders') && canAssign && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'tasks', label: 'Tasks' }, { key: 'reminders', label: 'Reminder centre' }]} />}
       {tab === 'tasks' && (
         <CrudPage model="tasks" title={t('tasks')} subtitle="Give work to anyone, see what is pending and overdue" label="Task" addLabel="Assign task" fields={fields} columns={columns}
           sort="dueDate" searchKeys={['title', 'assignedName']} canAdd={canAssign} canEdit={(r) => canAssign && r.state !== 'done'}

@@ -12,11 +12,11 @@ const CAT = [{ value: 'raw', label: 'Raw stone' }, { value: 'finished', label: '
 const UNITS = ['sq ft', 'sq m', 'pieces', 'CFT', 'tonne', 'litres', 'kg', 'numbers'];
 
 export default function StockPage() {
-  const { t, role } = useApp();
+  const { t, can, perm } = useApp();
   const [tab, setTab] = useState('items');
   const [reloadKey, setReloadKey] = useState(0);
-  const money = role === 'owner' || role === 'manager' || role === 'accountant';
-  const manage = role !== 'salesperson';
+  const money = ['read', 'write'].includes(perm.fields.cost); // purchase / cost rates
+  const manage = can('stockitems', 'create');
 
   const itemFields = [
     { name: 'name', label: 'Item name', required: true, wide: true },
@@ -27,10 +27,10 @@ export default function StockPage() {
     { name: 'finish', label: 'Finish', type: 'select', options: ['Natural', 'Honed', 'Polished', 'Flamed', 'Split face', 'Sandblasted'] },
     { name: 'grade', label: 'Grade', type: 'select', options: ['A', 'B', 'C'] },
     { name: 'location', label: 'Location in yard' },
-    { name: 'balance', label: 'Opening balance', type: 'number', default: 0, readOnlyOnEdit: true, hint: 'Later changes happen through stock movements' },
+    { name: 'openingBalance', label: 'Opening balance', type: 'number', default: 0, createOnly: true, hint: 'Later changes happen through stock movements' },
     { name: 'minLevel', label: 'Minimum level (alert below this)', type: 'number' },
     { name: 'sellRate', label: 'Selling rate (₹)', type: 'number' },
-    ...(money ? [{ name: 'costRate', label: 'Cost rate (₹)', type: 'number' }] : []),
+    ...(money ? [{ name: 'costRate', label: 'Cost rate (₹)', type: 'number', group: 'cost' }] : []),
     { name: 'photo', label: 'Photo', type: 'photo' },
   ];
 
@@ -47,7 +47,7 @@ export default function StockPage() {
   ];
 
   return (
-    <RoleGuard perm="stock">
+    <RoleGuard perm="stockitems">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Balance' }, { key: 'moves', label: 'Movements' }]} />
       {tab === 'items' ? (
         <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="category,name"
@@ -93,7 +93,7 @@ export default function StockPage() {
           searchKeys={['itemName', 'ref', 'note']}
           filters={[{ key: 'type', label: 'All movements', options: ['in', 'out', 'transfer', 'damage'] }]}
           onSaved={() => setReloadKey((k) => k + 1)}
-          rowActions={(row, { reload }) => (row.status === 'pending' && (role === 'owner' || role === 'manager') ? [
+          rowActions={(row, { reload }) => (row.status === 'pending' && can('stockmovements', 'approve') ? [
             { label: 'Approve', tone: 'green', icon: <Check size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'stockmovements', id: row._id, action: 'approve' } }); toast.success('Approved'); reload(); } catch (e) { toast.error(e.message); } } },
             { label: 'Reject', icon: <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'stockmovements', id: row._id, action: 'reject' } }); reload(); } catch (e) { toast.error(e.message); } } },
           ] : [])}

@@ -13,7 +13,7 @@ import { inr, inrShort, num, fmtDate, todayISO, daysBetween, sum, groupBy } from
 const STAGE = { quotation: ['gray', 'Quotation'], order: ['blue', 'Order'], dispatched: ['green', 'Dispatched'] };
 
 export default function SalesPage() {
-  const { t, role } = useApp();
+  const { t } = useApp();
   const router = useRouter();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'orders');
@@ -26,7 +26,6 @@ export default function SalesPage() {
   const list = tab === 'quotations' ? all.filter((s) => s.stage === 'quotation') : all.filter((s) => s.stage !== 'quotation');
   const todays = all.filter((s) => s.date === today && s.stage !== 'quotation');
   const bySp = Object.entries(groupBy(all.filter((s) => s.stage !== 'quotation'), 'salesperson')).map(([name, ss]) => ({ name, orders: ss.length, total: sum(ss, 'total') })).sort((a, b) => b.total - a.total);
-  const showMoney = role !== 'salesperson' || true;
 
   const columns = [
     { key: 'saleNo', label: 'Order', primary: true, render: (r) => <span>{r.saleNo}<div className="text-[11px] text-char-500 font-normal">{r.customerName}</div></span> },

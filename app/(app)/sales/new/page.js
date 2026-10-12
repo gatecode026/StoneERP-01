@@ -15,7 +15,7 @@ const newItem = () => ({ stockItemId: '', name: '', hsn: '6802', qty: '', unit: 
 
 export default function NewSale() {
   const router = useRouter();
-  const { t } = useApp();
+  const { t, session } = useApp();
   const customers = useFetch('/api/customers?sort=name&limit=500');
   const stock = useFetch('/api/stockitems?category=finished&sort=name');
   const [customerId, setCustomerId] = useState('');
@@ -29,7 +29,7 @@ export default function NewSale() {
   const [cform, setCform] = useState({});
 
   const customer = (customers.data || []).find((c) => c._id === customerId);
-  const taxType = taxTypeFor(customer);
+  const taxType = taxTypeFor(customer, session.company);
   const totals = computeTotals(items, taxType);
 
   useEffect(() => {

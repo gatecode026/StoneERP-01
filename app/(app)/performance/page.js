@@ -10,18 +10,18 @@ import { todayISO, monthOf, fmtMonth, num } from '@/lib/format';
 const tone = (s) => (s >= 80 ? 'green' : s >= 60 ? 'amber' : 'red');
 
 export default function PerformancePage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const [month, setMonth] = useState(monthOf(todayISO()));
   const { data, loading, reload } = useFetch(`/api/performance?month=${month}`);
   const [sel, setSel] = useState(null);
   const [remark, setRemark] = useState('');
-  const canRemark = role === 'owner' || role === 'manager';
+  const canRemark = can('perfremarks', 'create');
   const rows = data?.rows || [];
 
   async function saveRemark() {
     try {
       if (sel.remarkId) await api(`/api/perfremarks/${sel.remarkId}`, { method: 'PATCH', body: { remark } });
-      else await api('/api/perfremarks', { method: 'POST', body: { month, empCode: sel.empCode, empName: sel.name, remark } });
+      else await api('/api/perfremarks', { method: 'POST', body: { month, empCode: sel.empCode, remark } });
       toast.success('Remark saved'); setSel(null); reload();
     } catch (e) { toast.error(e.message); }
   }

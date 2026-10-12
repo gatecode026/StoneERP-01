@@ -5,30 +5,30 @@ import toast from 'react-hot-toast';
 import { useApp, useFetch } from '@/components/Providers';
 import { PageHeader, SkeletonList, RoleGuard } from '@/components/ui';
 import { api, openWA } from '@/lib/client';
-import { COMPANY } from '@/lib/config';
 import { fmtDate, fmtDateTime, num, inr } from '@/lib/format';
 
 export default function GatePass() {
   const { id } = useParams();
-  const { role } = useApp();
+  const company = useApp().session.company;
+  const { can } = useApp();
   const { data: d, loading, reload } = useFetch(`/api/dispatches/${id}`);
   if (loading || !d) return <SkeletonList />;
   const out = d.status === 'out';
-  const msg = `Dear ${d.customerName}, your order ${d.saleNo || ''} has left our Bijoliya factory.\nTruck: ${d.truckNo}\nDriver: ${d.driverName || '-'} ${d.driverMobile || ''}\nInvoice: ${d.invoiceNo || '-'}\nE-way bill: ${d.eway || '-'}\n— ${COMPANY.name}`;
+  const msg = `Dear ${d.customerName}, your order ${d.saleNo || ''} has left our Bijoliya factory.\nTruck: ${d.truckNo}\nDriver: ${d.driverName || '-'} ${d.driverMobile || ''}\nInvoice: ${d.invoiceNo || '-'}\nE-way bill: ${d.eway || '-'}\n— ${company.name}`;
   async function markOut() {
-    try { await api(`/api/dispatches/${id}`, { method: 'PATCH', body: { status: 'out' } }); toast.success('Truck marked out – stock deducted'); reload(); } catch (e) { toast.error(e.message); }
+    try { await api(`/api/dispatches/${id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out – stock deducted'); reload(); } catch (e) { toast.error(e.message); }
   }
   const Row = ({ k, v }) => <tr><td className="py-1.5 pr-4 text-gray-500 w-40 align-top">{k}</td><td className="py-1.5 font-medium">{v || '—'}</td></tr>;
   return (
-    <RoleGuard perm="dispatch">
+    <RoleGuard perm="dispatches">
       <PageHeader title={`Gate pass ${d.gatePassNo}`} back="/dispatch" actions={<>
-        {!out && ['owner', 'manager', 'supervisor', 'accountant'].includes(role) && <button className="btn-primary" onClick={markOut}><LogOut size={16} /> Guard: mark truck out</button>}
+        {!out && can('dispatches', 'approve') && <button className="btn-primary" onClick={markOut}><LogOut size={16} /> Guard: mark truck out</button>}
         {out && <button className="btn-green" onClick={() => openWA(msg, d.customerMobile)}><MessageCircle size={16} /> Tell customer</button>}
         <button className="btn-outline" onClick={() => window.print()}><Printer size={16} /> Print</button>
       </>} />
       <div className="print-doc card max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-start border-b-2 border-black pb-3">
-          <div><div className="text-xl font-bold">{COMPANY.name}</div><div className="text-xs text-gray-600">{COMPANY.address}<br />GSTIN: {COMPANY.gstin}</div></div>
+          <div><div className="text-xl font-bold">{company.name}</div><div className="text-xs text-gray-600">{company.address}<br />GSTIN: {company.gstin}</div></div>
           <div className="text-right"><div className="text-2xl font-extrabold tracking-wide">GATE PASS</div><div className="font-bold">{d.gatePassNo}</div><div className="text-xs">{fmtDate(d.date)}</div></div>
         </div>
         <table className="w-full text-sm mt-4"><tbody>

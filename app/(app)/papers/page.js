@@ -22,7 +22,7 @@ export default function PapersPage() {
     return <Badge tone="green">{fmtDate(r.expiryDate)}</Badge>;
   };
   return (
-    <RoleGuard perm="papers">
+    <RoleGuard perm="documents">
       <CrudPage model="documents" title={t('papers')} subtitle="Licences and certificates in one place — reminder 30 and 7 days before expiry" label="Paper" sort="expiryDate" searchKeys={['name', 'category', 'note']}
         fields={[
           { name: 'name', label: 'Paper name', required: true, wide: true }, { name: 'category', label: 'Category', type: 'select', options: CATS, required: true, default: 'Company' },

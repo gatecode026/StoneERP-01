@@ -7,16 +7,16 @@ import { fmtDateTime } from '@/lib/format';
 
 export default function AuditPage() {
   const { t } = useApp();
-  const { data, loading } = useFetch('/api/auditlogs?limit=400&sort=-createdAt');
+  const { data, loading } = useFetch('/api/auditlogs?limit=100&sort=-at');
   const [q, setQ] = useState('');
   const rows = (data || []).filter((r) => !q || [r.model, r.by, r.action, r.label].join(' ').toLowerCase().includes(q.toLowerCase()));
   return (
-    <RoleGuard perm="audit">
+    <RoleGuard perm="auditlogs">
       <PageHeader title={t('audit')} subtitle="Nothing is deleted. Every change shows who changed it and when."
-        actions={rows.length > 0 && <ExportBtn onClick={() => downloadCSV('audit-trail', rows.map((r) => ({ ...r, when: fmtDateTime(r.createdAt), changed: r.changes ? Object.keys(r.changes).join(', ') : '' })), [{ key: 'when', label: 'When' }, { key: 'by', label: 'By' }, { key: 'role', label: 'Role' }, { key: 'model', label: 'Record' }, { key: 'action', label: 'Action' }, { key: 'label', label: 'Label' }, { key: 'changed', label: 'Fields' }])} />} />
+        actions={rows.length > 0 && <ExportBtn onClick={() => downloadCSV('audit-trail', rows.map((r) => ({ ...r, when: fmtDateTime(r.at), changed: r.changes ? Object.keys(r.changes).join(', ') : '' })), [{ key: 'when', label: 'When' }, { key: 'by', label: 'By' }, { key: 'role', label: 'Role' }, { key: 'model', label: 'Record' }, { key: 'action', label: 'Action' }, { key: 'label', label: 'Label' }, { key: 'changed', label: 'Fields' }])} />} />
       <div className="mb-3"><SearchBox value={q} onChange={setQ} /></div>
       <DataList loading={loading} rows={rows} columns={[
-        { key: 'createdAt', label: 'When', primary: true, render: (r) => fmtDateTime(r.createdAt) },
+        { key: 'at', label: 'When', primary: true, render: (r) => fmtDateTime(r.at) },
         { key: 'by', label: 'By', render: (r) => <span>{r.by} <span className="text-char-500 text-xs">({r.role})</span></span> },
         { key: 'model', label: 'Record' },
         { key: 'action', label: 'Action', render: (r) => <Badge tone={r.action === 'void' || r.action === 'reject' ? 'red' : r.action === 'create' ? 'green' : r.action === 'approve' ? 'blue' : 'gray'}>{r.action}</Badge> },
