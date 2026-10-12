@@ -7,7 +7,7 @@ import { monthOf, todayISO } from '@/lib/format';
 export const dynamic = 'force-dynamic';
 
 export const GET = handler(async (req) => {
-  const s = requireSession();
+  const s = await requireSession();
   if (!canView(s.role, 'salary')) throw new HttpError(403, 'No access');
   const sp = new URL(req.url).searchParams;
   const month = sp.get('month') || monthOf(todayISO());

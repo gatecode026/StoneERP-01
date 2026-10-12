@@ -2,7 +2,9 @@
 import { AlertTriangle } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Badge } from '@/components/ui';
+import { useState } from 'react';
 import { useApp } from '@/components/Providers';
+import DocViewer from '@/components/DocViewer';
 import { fmtDate, todayISO, addDays, daysBetween } from '@/lib/format';
 
 const CATS = ['Company', 'Licence', 'Machine', 'Vehicle', 'Insurance', 'Agreement', 'Loan', 'Other'];
@@ -10,6 +12,7 @@ const CATS = ['Company', 'Licence', 'Machine', 'Vehicle', 'Insurance', 'Agreemen
 export default function PapersPage() {
   const { t } = useApp();
   const today = todayISO();
+  const [viewer, setViewer] = useState(null);
   const expiry = (r) => {
     if (!r.expiryDate) return <span className="text-char-300">No expiry</span>;
     const d = daysBetween(today, r.expiryDate);
@@ -26,7 +29,7 @@ export default function PapersPage() {
           { name: 'expiryDate', label: 'Expiry date (if any)', type: 'date' }, { name: 'file', label: 'Scan / photo', type: 'photo', buttonLabel: 'Scan / upload' }, { name: 'note', label: 'Note', type: 'textarea', wide: true },
         ]}
         columns={[{ key: 'name', label: 'Paper', primary: true, render: (r) => <span>{r.name}<div className="text-[11px] text-char-500 font-normal">{r.note}</div></span> }, { key: 'category', label: 'Category' }, { key: 'expiryDate', label: 'Expiry', render: expiry },
-          { label: 'File', render: (r) => (r.file ? <a href={r.file} target="_blank" rel="noreferrer" className="text-terra font-semibold text-sm" onClick={(e) => { e.preventDefault(); const w = window.open(); w.document.write(`<img src="${r.file}" style="max-width:100%">`); }}>View</a> : '—') }]}
+          { label: 'File', render: (r) => (r.file ? <a href="#" target="_blank" rel="noreferrer" className="text-terra font-semibold text-sm" onClick={(e) => { e.preventDefault(); setViewer(r.file); }}>View</a> : '—') }]}
         filters={[{ key: 'category', label: 'All categories', options: CATS }, { key: 'exp', label: 'Expiry', options: [{ value: 'soon', label: 'Expiring in 30 days' }], test: (r) => r.expiryDate && r.expiryDate <= addDays(today, 30) }]}
         summary={(rows, all) => {
           const soon = all.filter((r) => r.expiryDate && r.expiryDate <= addDays(today, 30));
@@ -34,6 +37,7 @@ export default function PapersPage() {
         }}
         rowClass={(r) => (r.expiryDate && r.expiryDate <= addDays(today, 7) ? 'bg-red-50/60' : '')}
       />
+      <DocViewer src={viewer} title="Paper" onClose={() => setViewer(null)} />
     </RoleGuard>
   );
 }

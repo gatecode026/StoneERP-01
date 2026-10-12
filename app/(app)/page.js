@@ -4,7 +4,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
   Users, ClipboardList, Cog, AlertTriangle, PackageX, Receipt, Truck, HandCoins, Hourglass, IndianRupee, Wallet, Landmark,
-  Check, X, RotateCcw, MessageCircle, Bell, CalendarCheck, ListChecks, FileText, Camera,
+  Check, X, MessageCircle, Bell, CalendarCheck, ListChecks, FileText, Camera,
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useApp, useFetch } from '@/components/Providers';
@@ -27,21 +27,6 @@ function OwnerDashboard() {
   const { t, lang, role } = useApp();
   const [date, setDate] = useState(todayISO());
   const { data, loading, error, reload } = useFetch(`/api/dashboard?date=${date}`);
-  const [seeding, setSeeding] = useState(false);
-
-  async function seed(force) {
-    if (force && !confirm('Reset all demo data? This wipes the database and reloads the sample data.')) return;
-    setSeeding(true);
-    const id = toast.loading('Loading demo data… (about 15 seconds)');
-    try {
-      await api('/api/seed' + (force ? '?force=1' : ''), { method: force ? 'POST' : 'GET' });
-      toast.success('Demo data ready', { id });
-      reload();
-    } catch (e) { toast.error(e.message, { id }); }
-    setSeeding(false);
-  }
-  useEffect(() => { if (data?.empty && !seeding) seed(false); /* first run: auto-load demo data */ // eslint-disable-next-line
-  }, [data?.empty]);
 
   async function decide(a, action) {
     try {
@@ -57,12 +42,12 @@ function OwnerDashboard() {
       subtitle={fmtDate(date)}
       actions={<>
         <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />
-        {role === 'owner' && <button className="btn-outline btn-sm" onClick={() => seed(true)} disabled={seeding}><RotateCcw size={14} /> {t('resetDemo')}</button>}
       </>}
     />
   );
 
-  if (loading || data?.empty) {
+  if (!loading && data?.empty) return <>{header}<Empty text="No data yet. Add employees, machines and stock items to start (Owner: use Import in Settings)." /></>;
+  if (loading) {
     return <>{header}<div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div></>;
   }
   if (error) return <>{header}<Empty text={error.message} /></>;

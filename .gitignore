@@ -1,3 +1,14 @@
-﻿node_modules
+node_modules
 .next
+.env
 .env.local
+.env.*.local
+coverage
+playwright-report
+test-results
+*.tsbuildinfo
+next-env.d.ts
+/uploads
+/backups
+.vitest-cache
+.dev-db

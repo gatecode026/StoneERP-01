@@ -6,7 +6,7 @@ import { todayISO } from '@/lib/format';
 export const dynamic = 'force-dynamic';
 
 export const GET = handler(async (req) => {
-  const s = requireSession();
+  const s = await requireSession();
   const date = new URL(req.url).searchParams.get('date') || todayISO();
   const count = await MODELS.employees.estimatedDocumentCount();
   if (!count) return ok({ empty: true });

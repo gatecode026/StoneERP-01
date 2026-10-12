@@ -1,7 +1,7 @@
-import { MODELS, REGISTRY } from './models';
-import { COMPANY, CUTTING_TYPES } from './config';
-import { computeTotals, taxTypeFor } from './gst';
-import { todayISO, addDays, monthOf, daysInMonth, sum } from './format';
+import { MODELS, REGISTRY } from '../lib/models';
+import { COMPANY, CUTTING_TYPES } from '../lib/config';
+import { computeTotals, taxTypeFor } from '../lib/gst';
+import { todayISO, addDays, monthOf, daysInMonth, sum } from '../lib/format';
 
 // tiny deterministic PRNG so the demo looks the same every reset
 function rng(seed) {

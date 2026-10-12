@@ -11,7 +11,7 @@ const need = (s, roles) => {
 };
 
 export const POST = handler(async (req) => {
-  const s = requireSession();
+  const s = await requireSession();
   const ctx = { session: s };
   const b = await req.json();
 

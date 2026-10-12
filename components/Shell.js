@@ -101,10 +101,8 @@ export default function Shell({ children }) {
             <div className="md:hidden"><Brand /></div>
             <div className="hidden md:flex items-center gap-2">
               <span className="font-bold">{t('appName')}</span>
-              <span className="badge-amber">{t('demo')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="md:hidden badge-amber">{t('demo')}</span>
               <span className="hidden sm:inline-flex badge-gray capitalize">{hi ? ROLE_USERS[role].hi : role}</span>
               <LangToggle />
               <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>

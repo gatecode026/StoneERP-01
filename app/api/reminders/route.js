@@ -5,7 +5,7 @@ import { canView } from '@/lib/perm';
 export const dynamic = 'force-dynamic';
 
 export const GET = handler(async () => {
-  const s = requireSession();
+  const s = await requireSession();
   if (!canView(s.role, 'reminders')) throw new HttpError(403, 'No access');
   return ok(await computeReminders());
 });

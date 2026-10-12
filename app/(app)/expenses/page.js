@@ -7,6 +7,7 @@ import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, StatCard, Section, DataList, Badge } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { api } from '@/lib/client';
+import DocViewer from '@/components/DocViewer';
 import { EXPENSE_HEADS, LIMITS } from '@/lib/config';
 import { inr, fmtDate, todayISO, monthOf, fmtMonth, daysInMonth, sum, groupBy } from '@/lib/format';
 
@@ -16,6 +17,7 @@ export default function ExpensesPage() {
   const { t, role } = useApp();
   const [tab, setTab] = useState('entries');
   const [month, setMonth] = useState(monthOf(todayISO()));
+  const [viewer, setViewer] = useState(null);
   const heads = useFetch('/api/expenseheads?sort=name');
   const monthData = useFetch(tab === 'report' ? `/api/expenses?from=${month}-01&to=${month}-${String(daysInMonth(month)).padStart(2, '0')}&status=approved,pending&limit=5000` : null, [month]);
   const approver = role === 'owner' || role === 'manager';
@@ -49,7 +51,7 @@ export default function ExpensesPage() {
     { key: 'paidBy', label: 'Paid by', render: (r) => `${r.paidBy} → ${r.paidTo || '—'}` },
     { key: 'spentBy', label: 'Spent by' },
     { key: 'site', label: 'For', render: (r) => r.site || '—' },
-    { key: 'billPhoto', label: 'Bill', render: (r) => (r.billPhoto ? <img src={r.billPhoto} alt="bill" className="h-10 w-10 rounded object-cover border border-sand-200 cursor-pointer" onClick={() => { const w = window.open(); w.document.write(`<img src="${r.billPhoto}" style="max-width:100%">`); }} /> : <Badge tone="red">No bill</Badge>) },
+    { key: 'billPhoto', label: 'Bill', render: (r) => (r.billPhoto ? <img src={r.billPhoto} alt="bill" className="h-10 w-10 rounded object-cover border border-sand-200 cursor-pointer" onClick={() => setViewer(r.billPhoto)} /> : <Badge tone="red">No bill</Badge>) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
   ];
 
@@ -93,6 +95,7 @@ export default function ExpensesPage() {
           </div>
         </div>
       )}
+      <DocViewer src={viewer} title="Bill" onClose={() => setViewer(null)} />
     </RoleGuard>
   );
 }
