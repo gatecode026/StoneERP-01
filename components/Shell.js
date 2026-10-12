@@ -2,11 +2,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, Plus, X, WifiOff, LogOut, Languages, PanelLeftClose, PanelLeftOpen, MoreHorizontal } from 'lucide-react';
+import { Menu, Plus, X, WifiOff, LogOut, Languages, PanelLeftClose, PanelLeftOpen, MoreHorizontal, Search } from 'lucide-react';
 import { useApp } from './Providers';
 import { NAV_GROUPS, DASH, BOTTOM_TABS, ALL_ITEMS, QUICK_ADD } from '@/lib/nav';
 import { ROLE_LABEL } from '@/lib/roles';
-import { cx, SkeletonList } from './ui';
+import { cx, SkeletonList, Sheet } from './ui';
 
 const canOpen = (can, it) => (it.res || []).some((r) => can(r));
 const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'));
@@ -42,6 +42,8 @@ export default function Shell({ children }) {
   const [drawer, setDrawer] = useState(false);
   const [fab, setFab] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [finder, setFinder] = useState(false);
+  const [fq, setFq] = useState('');
 
   useEffect(() => { setDrawer(false); setFab(false); }, [pathname]);
   useEffect(() => { if (session === null) router.replace('/login'); }, [session, router]);
@@ -104,6 +106,7 @@ export default function Shell({ children }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
+              <button className="h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label="Search screens"><Search size={16} /></button>
               <LangToggle />
               <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
@@ -157,6 +160,17 @@ export default function Shell({ children }) {
           <MoreHorizontal size={22} /><span>{t('more')}</span>
         </button>
       </nav>
+
+      {/* Go-to search: only screens this person may open */}
+      <Sheet open={finder} onClose={() => setFinder(false)} title={t('search')}>
+        <input className="input mb-3" autoFocus aria-label={t('search')} placeholder={t('search')} value={fq} onChange={(e) => setFq(e.target.value)} />
+        <div className="space-y-1">
+          {ALL_ITEMS.filter((it) => canOpen(can, it) && (!fq || t(it.key).toLowerCase().includes(fq.toLowerCase()) || it.key.toLowerCase().includes(fq.toLowerCase()))).map((it) => {
+            const Icon = it.icon;
+            return <Link key={it.key} href={it.href} onClick={() => setFinder(false)} className="flex items-center gap-3 rounded-lg px-3 min-h-[44px] hover:bg-sand-100 text-sm font-medium"><Icon size={18} className="text-terra" /> {t(it.key)}</Link>;
+          })}
+        </div>
+      </Sheet>
 
       {/* More drawer */}
       {drawer && (

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Wrench } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import CrudPage from '@/components/CrudPage';
@@ -11,7 +12,8 @@ import { todayISO, addDays, fmtDate, monthOf, num, sum, groupBy, daysInMonth, fm
 export default function MachinesPage() {
   const { t, can } = useApp();
   const [tab, setTab] = useState('entries');
-  const [date, setDate] = useState(todayISO());
+  const sp = useSearchParams();
+  const [date, setDate] = useState(sp.get('date') || todayISO());
   const [mode, setMode] = useState('day');
   const [month, setMonth] = useState(monthOf(todayISO()));
   const today = todayISO();

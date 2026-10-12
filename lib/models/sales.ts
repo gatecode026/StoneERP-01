@@ -38,6 +38,7 @@ export const Sale = defineModel(
     taxType: { type: S, enum: ['cgst_sgst', 'igst', 'export'], default: 'cgst_sgst' },
     items: { type: [saleItem], validate: (v: unknown[]) => v.length > 0 && v.length <= 60 },
     taxable: N, cgst: N, sgst: N, igst: N, roundOff: N,
+    costTotal: money({ default: 0 }), // cost of the goods at today's cost rates (cost group) => profit per order
     total: money({ default: 0 }),
     paid: money({ default: 0 }),
     outstanding: money({ default: 0 }),

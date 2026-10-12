@@ -93,7 +93,7 @@ export const RESOURCES = {
   // ---- Selling ----
   customers: { label: { en: 'Customers', hi: 'ग्राहक' }, group: 'selling', part: 5, model: true, actions: CRUD,
     own: [{ field: 'ownerUserId', value: 'userId' }], team: [{ field: 'ownerUserId', in: 'userIds' }] },
-  sales: { label: { en: 'Sales & quotations', hi: 'बिक्री और कोटेशन' }, group: 'selling', part: 5, model: true, actions: ALL_A,
+  sales: { label: { en: 'Sales & quotations', hi: 'बिक्री और कोटेशन' }, group: 'selling', part: 5, model: true, actions: ALL_A, fieldGroups: { cost: ['costTotal'] },
     own: [{ field: 'salespersonUserId', value: 'userId' }], team: [{ field: 'salespersonUserId', in: 'userIds' }] },
   invoices: { label: { en: 'GST invoices', hi: 'जीएसटी बिल' }, group: 'selling', part: 5, actions: ['view', 'create', 'export'],
     own: [{ field: 'salespersonUserId', value: 'userId' }], team: [{ field: 'salespersonUserId', in: 'userIds' }] },

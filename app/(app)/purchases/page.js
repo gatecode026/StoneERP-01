@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Check, X, Banknote } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
@@ -10,7 +11,8 @@ import { inr, num, fmtDate, sum, groupBy, todayISO } from '@/lib/format';
 
 export default function PurchasesPage() {
   const { t, can } = useApp();
-  const [tab, setTab] = useState('purchases');
+  const sp = useSearchParams();
+  const [tab, setTab] = useState(sp.get('tab') || 'purchases');
   const approver = can('purchases', 'approve');
   const sup = useFetch('/api/suppliers?limit=500');
   const pur = useFetch('/api/purchases?limit=2000&sort=-date');

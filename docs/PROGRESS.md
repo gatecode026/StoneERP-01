@@ -56,3 +56,24 @@ One entry per phase. Every phase ends with: `npm run lint`, `npm run typecheck`,
 * Live smoke (production build + local replica set + seeded data): 5 roles log in; supervisor list has no pay/bank/document keys, salesperson stock has no costRate, worker/guard get 403 on everything else; all 15 owner pages return 200.
 
 **Known limits carried forward:** screens still load pages of 100 rows and follow cursors (true infinite lists + virtualization → Phase 6); no browser E2E yet (Phase 8); `docs/ROUTES_AND_MODELS.json` is the audit baseline and is regenerated in Phase 8.
+
+## Phase 3 — Role-specific homes and navigation  ✅
+
+**One endpoint, one round trip per home:** `GET /api/home` returns the payload for the signed-in role (BFF). Sections the person may not see are omitted and listed in `denied`, so the card can say "No permission". Nothing is hidden client-side only.
+
+| Home | Content (all from one response) | Files |
+|---|---|---|
+| **Owner** (opens on the 8 pm report) | The PDF Part 8 sections — attendance, daily work filled/missing with problems in red, machine output/breakdowns/idle hours, stock **main items in hand** (rendered; the demo computed but never showed them) + below-minimum, sales/dispatches/received/pending, expenses by head, cash + bank — plus day-vs-yesterday deltas, a date picker for any past day, the approvals inbox with **bulk approve/reject**, the alerts strip, WhatsApp preview/share, and **profit per order and per block** (cost-group data; hidden from everyone without cost access). | `lib/services/home.ts`, `components/home/OwnerHome.js` |
+| **Manager** | Operations board: report sections she may see, pending approvals with over-limit items shown **"Needs Owner"** (approve button disabled), machines with no entry yet, reports to check, overdue tasks, low stock. No salary-rate controls. | `RoleHomes.js` |
+| **Accountant** | Money board: receivables **ageing 0-15 / 16-30 / 31-60 / 60+** (Mongo `$bucket`), top-owing customers with one-tap WhatsApp reminder, payables due this week, orders without a GST bill, trucks sent without e-way bill, salary-sheet status, cash/bank + closing status, month-close checklist, export shortcuts. | `RoleHomes.js` |
+| **Supervisor** | Team board, no money anywhere: one-tap P/A/½/OT/L per person (optimistic) + **Mark all present** (single bulk request), team reports to check (OK / Not OK), machines with no entry this shift, team output, breakdowns, safety check-ups due, tasks. | `RoleHomes.js` |
+| **Salesperson** | Sales board: my sales today/month, my open quotations/orders, my customers who owe (with age in days and WhatsApp reminder), live stock search, my open complaints, big "New quotation". Scope is *own*: another salesperson's home is empty. | `RoleHomes.js` |
+| **Worker** | Exactly four cards: mark attendance (selfie + real GPS), write today's report, my salary slip, my tasks. Large buttons. | `RoleHomes.js` |
+| **Job presets** | Guard (trucks waiting → **Mark truck OUT** with gate-pass link), Store keeper (stock to refill, today's movements), Mechanic (open breakdowns, service due), Cashier (cash/bank, closing count, today's entries), Driver (today's trips, diesel this month, vehicle papers), Yard in-charge (blocks in yard, trucks in) — the one daily task first, then the worker cards. | `RoleHomes.js` |
+
+* Every card handles ready / empty / no-permission; the page handles loading (skeleton shaped like the final layout) and error (retry). Charts are lazy-loaded (`next/dynamic`) so they never weigh on first paint.
+* Navigation, bottom tabs, quick-add button and a new **Go-to search** are generated from the permission payload (a person only ever sees screens they can open); bottom tabs are chosen per role/preset.
+* Every number drills down to the list it came from: `/stock?low=1`, `/expenses?status=pending`, `/dispatch?status=out`, `/repairs?status=open`, `/sales?tab=pending`, `/purchases?tab=payable`, `?date=` on reports/attendance/machines. Lists accept `?<filter>=<value>` as their starting filter.
+* Sales now store `costTotal` (cost group) at write time, which is what makes profit per order possible without exposing cost to roles that cannot see it.
+
+**Verification:** 11 new API tests (every role's home returns 200 with the right shape and < 50 KB; Owner has comparison/approvals/profit; supervisor home contains no money/cost/profit key anywhere; salesperson cannot see another's customers; worker payload is exactly `date, denied, kind, self`; presets' first card; "denied" marker after the Owner removes a right; 401 when signed out; future dates rejected).

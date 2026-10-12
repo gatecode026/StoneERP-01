@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeftRight, AlertTriangle, Check, X } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
@@ -13,7 +14,8 @@ const UNITS = ['sq ft', 'sq m', 'pieces', 'CFT', 'tonne', 'litres', 'kg', 'numbe
 
 export default function StockPage() {
   const { t, can, perm } = useApp();
-  const [tab, setTab] = useState('items');
+  const sp = useSearchParams();
+  const [tab, setTab] = useState(sp.get('tab') || 'items');
   const [reloadKey, setReloadKey] = useState(0);
   const money = ['read', 'write'].includes(perm.fields.cost); // purchase / cost rates
   const manage = can('stockitems', 'create');

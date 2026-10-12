@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { CheckCircle2 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
@@ -12,7 +13,8 @@ const serviceDue = (m) => (m.lastServiceDate && m.serviceIntervalDays ? addDays(
 
 export default function RepairsPage() {
   const { t, can } = useApp();
-  const [tab, setTab] = useState('repairs');
+  const sp = useSearchParams();
+  const [tab, setTab] = useState(sp.get('tab') || 'repairs');
   const [hist, setHist] = useState('');
   const machines = useFetch('/api/machines?sort=name');
   const repairs = useFetch('/api/repairs?sort=-date&limit=2000');

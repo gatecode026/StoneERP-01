@@ -39,7 +39,11 @@ async function priceSale(ctx: SvcCtx, customer: any, items: z.infer<typeof lineS
   const taxType = taxTypeFor(customer, ctx.settings.company);
   const t = computeTotals(items as any, taxType);
   if (!t.rows.length || t.taxable <= 0) throw badRequest('Add at least one item with quantity and rate');
-  return { taxType, ...t };
+  // cost of goods at current cost rates, kept off the lines so it never reaches roles without cost access
+  const ids = items.map((i) => i.stockItemId).filter(Boolean);
+  const costs = new Map((await StockItem.find({ _id: { $in: ids } }).session(ctx.session ?? null).select('costRate').lean() as any[]).map((x) => [String(x._id), Number(x.costRate) || 0]));
+  const costTotal = round2(items.reduce((a, i) => a + (costs.get(String(i.stockItemId)) ?? 0) * i.qty, 0));
+  return { taxType, costTotal, ...t };
 }
 
 export const sales: ResourceDef = {
@@ -47,7 +51,7 @@ export const sales: ResourceDef = {
   listFields: ['saleNo', 'date', 'stage', 'customerId', 'customerName', 'customerMobile', 'items', 'taxable', 'total', 'paid', 'outstanding', 'invoiceNo', 'invoiceDate', 'salesperson', 'fullyDispatched', 'taxType'],
   sortable: ['date', 'createdAt', 'total', 'outstanding'], defaultSort: '-date', searchFields: ['saleNo', 'customerName', 'invoiceNo'],
   dateFields: ['date', 'invoiceDate'], filters: { stage: { enum: ['quotation', 'order', 'dispatched'] }, customerId: 'oid', salespersonUserId: 'oid', invoiceNo: 'string', saleNo: 'string' },
-  serverOnly: ['saleNo', 'paid', 'outstanding', 'invoiceNo', 'invoiceDate', 'invoiceFy', 'total', 'taxable', 'cgst', 'sgst', 'igst', 'roundOff', 'taxType', 'dispatchedQty', 'fullyDispatched', 'salesperson', 'salespersonUserId', 'orderDate', 'customerName'],
+  serverOnly: ['costTotal', 'saleNo', 'paid', 'outstanding', 'invoiceNo', 'invoiceDate', 'invoiceFy', 'total', 'taxable', 'cgst', 'sgst', 'igst', 'roundOff', 'taxType', 'dispatchedQty', 'fullyDispatched', 'salesperson', 'salespersonUserId', 'orderDate', 'customerName'],
   create: z.object({ customerId: oidStr, date: dateStr.optional(), stage: enumOf(['quotation', 'order']).optional(), items: z.array(lineSchema).min(1).max(60), advance: num(0, 1e9).optional(), advanceMode: enumOf(MODES).optional() }).strict(),
   update: z.object({ items: z.array(lineSchema).min(1).max(60), date: dateStr }).partial().strict(),
   lifecycle: {
@@ -65,7 +69,7 @@ export const sales: ResourceDef = {
       const saleNo = 'SO-' + String(await nextSeq('sale', ctx.session, 8)).padStart(4, '0');
       const [sale] = await Sale.create([{
         saleNo, date, stage, customerId: c._id, customerName: c.name, customerGstin: c.gstin, customerState: c.state, customerCountry: c.country, customerAddress: c.address, customerMobile: c.mobile,
-        taxType: priced.taxType, items: priced.rows, taxable: priced.taxable, cgst: priced.cgst, sgst: priced.sgst, igst: priced.igst, roundOff: priced.roundOff, total: priced.total,
+        taxType: priced.taxType, items: priced.rows, taxable: priced.taxable, costTotal: priced.costTotal, cgst: priced.cgst, sgst: priced.sgst, igst: priced.igst, roundOff: priced.roundOff, total: priced.total,
         paid: 0, outstanding: stage === 'order' ? priced.total : 0, orderDate: stage === 'order' ? date : undefined, salesperson: ctx.actor.name, salespersonUserId: oid(ctx.actor.id),
         createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name,
       }], { session: ctx.session });
@@ -80,7 +84,7 @@ export const sales: ResourceDef = {
       if (patch.items) {
         const c = await customerById(ctx, prev.customerId);
         const priced = await priceSale(ctx, c, patch.items);
-        Object.assign(patch, { items: priced.rows, taxable: priced.taxable, cgst: priced.cgst, sgst: priced.sgst, igst: priced.igst, roundOff: priced.roundOff, total: priced.total, taxType: priced.taxType });
+        Object.assign(patch, { items: priced.rows, costTotal: priced.costTotal, taxable: priced.taxable, cgst: priced.cgst, sgst: priced.sgst, igst: priced.igst, roundOff: priced.roundOff, total: priced.total, taxType: priced.taxType });
       }
       return patch;
     },

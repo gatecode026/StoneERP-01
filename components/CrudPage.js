@@ -128,7 +128,8 @@ export default function CrudPage({
   const qs = new URLSearchParams({ limit: '100', ...(sort ? { sort } : {}), ...baseQuery }).toString();
   const { data, loading, error, reload } = useFetch(`/api/${model}?${qs}`, [JSON.stringify(baseQuery)]);
   const [q, setQ] = useState('');
-  const [fv, setFv] = useState({});
+  // drill-down links from the home screens arrive as ?<filter>=<value> (e.g. /stock?low=1, /expenses?status=pending)
+  const [fv, setFv] = useState(() => Object.fromEntries(filters.map((f) => [f.key, sp.get(f.key) || '']).filter(([, v]) => v)));
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});

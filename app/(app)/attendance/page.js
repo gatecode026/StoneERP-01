@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Camera, CheckCheck, MapPin, Check, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
@@ -22,7 +23,8 @@ export default function AttendancePage() {
   const { t, can, perm } = useApp();
   const isWorker = scopeOf(perm, 'attendance', 'create') === 'own';
   const [tab, setTab] = useState('mark');
-  const [date, setDate] = useState(todayISO());
+  const sp = useSearchParams();
+  const [date, setDate] = useState(sp.get('date') || todayISO());
   const [q, setQ] = useState('');
   const emps = useFetch(isWorker ? null : '/api/employees?status=active&limit=500&sort=empCode');
   const att = useFetch(`/api/attendance?${isWorker ? `from=${monthOf(date)}-01&to=${date}&sort=-date` : `date=${date}`}&limit=1000`);

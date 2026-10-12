@@ -15,7 +15,7 @@ export default function DailyReportPage() {
   const { t, can, perm, session } = useApp();
   const sp = useSearchParams();
   const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(sp.get('date') || todayISO());
   const { data, loading, reload } = useFetch(`/api/dailyreports?date=${date}&sort=empName`);
   const emps = useFetch(isWorker || !can('employees') ? null : '/api/employees?status=active&limit=500&sort=name');
   const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=10' : null);
