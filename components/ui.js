@@ -180,6 +180,33 @@ export function LoadMore({ list }) {
   );
 }
 
+/** Numbered pages: Previous / 1 2 3 … / Next, "Showing 26–50 of 100", and a page-size choice. */
+export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
+  if (total == null || total === 0) return null;
+  const capped = total > 10000;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const from = (page - 1) * pageSize + 1;
+  const to = (page - 1) * pageSize + shown;
+  const nums = [...new Set([1, 2, page - 1, page, page + 1, pages - 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const btn = 'min-w-[44px] min-h-[44px] rounded-lg border text-sm font-semibold';
+  return (
+    <nav aria-label="Pages" className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="text-xs text-char-500">Showing {from}–{to} of {capped ? '10,000+' : total}</div>
+      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page">Prev</button>
+        {nums.map((n, i) => (
+          <span key={n} className="flex items-center gap-1.5">
+            {i > 0 && n - nums[i - 1] > 1 && <span className="text-char-300">…</span>}
+            <button className={`${btn} ${n === page ? 'bg-terra text-white border-terra' : 'border-sand-300 bg-white'}`} aria-current={n === page ? 'page' : undefined} onClick={() => onPage(n)}>{n}</button>
+          </span>
+        ))}
+        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page">Next</button>
+        <select aria-label="Rows per page" className="input !w-auto !min-h-[44px] ml-1" value={pageSize} onChange={(e) => onSize(Number(e.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n} / page</option>)}</select>
+      </div>
+    </nav>
+  );
+}
+
 export function ExportBtn({ onClick, label }) {
   const { t } = useApp();
   return <button className="btn-outline btn-sm" onClick={onClick}><Download size={14} /> {label || t('export')}</button>;

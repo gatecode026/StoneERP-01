@@ -28,7 +28,7 @@ export default function EmployeesPage() {
     <RoleGuard perm="employees">
       <CrudPage
         model="employees" title={t('employees')} subtitle="One profile per person, with documents" label="Employee"
-        fields={EMPLOYEE_FIELDS} columns={columns} sort="empCode" wide headerExtra={<ImportEmployees />}
+        fields={EMPLOYEE_FIELDS} columns={columns} sort="empCode" pagination={25} wide headerExtra={<ImportEmployees />}
         
         filters={[
           { key: 'job', label: 'All jobs', options: JOBS },

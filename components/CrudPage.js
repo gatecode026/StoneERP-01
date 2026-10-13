@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, History as HistoryIcon, Pencil, Ban } from 'lucide-react';
 import { useApp, useFetch } from './Providers';
-import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, LoadMore, Badge, cx } from './ui';
+import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, LoadMore, Pagination, Badge, cx } from './ui';
 import LookupSelect from './LookupSelect';
 import { api, submit, ApiError } from '@/lib/client';
 import { toQuery, useDebounced, usePagedList } from '@/lib/usePaged';
@@ -155,7 +155,7 @@ export async function saveWithConfirm(path, body, opts) {
 const same = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
 export default function CrudPage({
-  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets,
+  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
 }) {
@@ -168,7 +168,12 @@ export default function CrudPage({
   // everything that narrows the list is sent to the server (search, filters, sort); the browser never filters or sorts a big list itself
   const filterParams = Object.assign({}, ...filters.map((f) => (fv[f.key] ? (f.toQuery ? f.toQuery(fv[f.key]) : { [f.key]: fv[f.key] }) : {})));
   const params = { ...(sort ? { sort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
-  const list = usePagedList(`/api/${model}`, params);
+  // numbered pages (opt-in with `pagination`): ?page=N, the server counts the total; searching or filtering goes back to page 1
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(typeof pagination === 'number' ? pagination : 25);
+  const narrowing = JSON.stringify(params);
+  useEffect(() => { setPage(1); }, [narrowing, pageSize]);
+  const list = usePagedList(`/api/${model}`, pagination ? { ...params, page } : params, pagination ? { limit: pageSize } : {});
   const { loading, error } = list;
   const rows = list.rows;
   const [fTick, setFTick] = useState(0);
@@ -311,7 +316,7 @@ export default function CrudPage({
       {error ? <div role="alert" className="card p-4 text-red-600 text-sm">{error.message}</div> : (
         <>
           <DataList loading={loading} rows={rows} columns={columns} empty={emptyText || t('noData')} rowClass={rowClass} actions={rowActs} />
-          {!loading && <LoadMore list={list} />}
+          {!loading && (pagination ? <Pagination page={page} pageSize={pageSize} total={list.total} shown={rows.length} onPage={setPage} onSize={setPageSize} /> : <LoadMore list={list} />)}
         </>
       )}
 
