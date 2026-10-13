@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { AlertTriangle } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Badge } from '@/components/ui';
@@ -25,7 +26,7 @@ export default function PapersPage() {
   };
   return (
     <RoleGuard perm="documents">
-      <CrudPage model="documents" title={t('papers')} subtitle="Licences and certificates in one place — reminder 30 and 7 days before expiry" label="Paper" sort="expiryDate"
+      <CrudPage model="documents" headerExtra={<ImportData resource="documents" perm="documents" noun="papers" />} title={t('papers')} subtitle="Licences and certificates in one place — reminder 30 and 7 days before expiry" label="Paper" sort="expiryDate"
         fields={[
           { name: 'name', label: 'Paper name', required: true, wide: true }, { name: 'category', label: 'Category', type: 'select', options: CATS, required: true, default: 'Company' },
           { name: 'expiryDate', label: 'Expiry date (if any)', type: 'date' }, { name: 'file', label: 'Scan / photo / PDF', type: 'doc', resource: 'documents', kind: 'docs', buttonLabel: 'Scan / upload' }, { name: 'note', label: 'Note', type: 'textarea', wide: true },

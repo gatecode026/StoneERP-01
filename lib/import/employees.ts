@@ -65,7 +65,10 @@ const COLS = COLUMNS;
 
 function cellText(v: any): string {
   if (v === null || v === undefined) return '';
-  if (v instanceof Date) return v.toISOString().slice(0, 10); // Excel date cells arrive as UTC midnight
+  if (v instanceof Date) {
+    if (v.getUTCFullYear() < 1950) return v.toISOString().slice(11, 16); // a time-only Excel cell
+    return v.toISOString().slice(0, 10); // Excel date cells arrive as UTC midnight
+  }
   if (typeof v === 'object') {
     if ('result' in v) return cellText(v.result); // formula
     if ('richText' in v) return v.richText.map((t: any) => t.text).join('');

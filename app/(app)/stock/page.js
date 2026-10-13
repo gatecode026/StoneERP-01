@@ -75,7 +75,7 @@ export default function StockPage() {
           rowActions={(row) => manage ? [{ label: 'Move', icon: <ArrowLeftRight size={14} />, onClick: () => { setTab('moves'); toast('Choose "Add" to record a movement for ' + row.name); } }] : []}
         />
       ) : (
-        <CrudPage key={'m' + reloadKey} model="stockmovements" title="Stock movements" subtitle="In · out · transfer · damage (damage needs owner approval)" label="Stock movement"
+        <CrudPage key={'m' + reloadKey} model="stockmovements" headerExtra={<ImportData resource="stockmovements" perm="stockmovements" noun="stock movements" />} title="Stock movements" subtitle="In · out · transfer · damage (damage needs owner approval)" label="Stock movement"
           sort="-date,-createdAt" canAdd={manage} canEdit={() => false} allowVoid={false}
           fields={[
             { name: 'date', label: 'Date', type: 'date', required: true },

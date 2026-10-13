@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -79,7 +80,7 @@ export default function DispatchPage() {
     <RoleGuard perm="dispatches">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'out', label: 'Trucks out' }, { key: 'in', label: 'Trucks in' }, { key: 'freight', label: 'Freight' }]} />
       {tab === 'out' && (
-        <CrudPage model="dispatches" baseQuery={{ direction: 'out' }} title={t('dispatch')} subtitle="No truck leaves the gate without a gate pass" label="Loading slip" addLabel="New loading slip" wide
+        <CrudPage model="dispatches" baseQuery={{ direction: 'out' }} headerExtra={<ImportData resource="dispatch-out" perm="dispatches" noun="loading slips" hint="order, truck, item and quantity are required" />} title={t('dispatch')} subtitle="No truck leaves the gate without a gate pass" label="Loading slip" addLabel="New loading slip" wide
           fields={outFields} columns={outCols} sort="-date,-createdAt"
           canEdit={(r) => r.status === 'loading'}
           beforeSave={async (b) => prep(b)}
@@ -90,7 +91,7 @@ export default function DispatchPage() {
           exportColumns={[{ key: 'gatePassNo', label: 'Gate pass' }, { key: 'date', label: 'Date' }, { key: 'customerName', label: 'Customer' }, { key: 'truckNo', label: 'Truck' }, { key: 'driverName', label: 'Driver' }, { key: 'netWeight', label: 'Net weight kg' }, { key: 'freight', label: 'Freight' }, { key: 'status', label: 'Status' }]} />
       )}
       {tab === 'in' && (
-        <CrudPage model="dispatches" baseQuery={{ direction: 'in' }} title="Incoming trucks" subtitle="Blocks and purchases entered at the gate" label="Incoming truck" addLabel="Truck in"
+        <CrudPage model="dispatches" baseQuery={{ direction: 'in' }} headerExtra={<ImportData resource="dispatch-in" perm="dispatches" noun="incoming trucks" />} title="Incoming trucks" subtitle="Blocks and purchases entered at the gate" label="Incoming truck" addLabel="Truck in"
           fields={inFields} defaults={{ direction: 'in' }} sort="-date,-createdAt"
           columns={[{ key: 'truckNo', label: 'Truck', primary: true }, { key: 'kind', label: 'Brought', render: (r) => r.kind || '—' }, { key: 'driverName', label: 'Driver' }, { key: 'netWeight', label: 'Net weight', render: (r) => (r.netWeight ? `${num(r.netWeight)} kg` : '—') }, { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) }, { key: 'note', label: 'Note', wide: true }]} />
       )}

@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import toast from 'react-hot-toast';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Badge, Section } from '@/components/ui';
@@ -34,7 +35,7 @@ export default function ComplaintsPage() {
   ];
   return (
     <RoleGuard perm="complaints">
-      <CrudPage model="complaints" title={t('complaints')} subtitle="Followed until closed" label="Complaint" fields={fields} columns={columns} sort="-date,-createdAt"
+      <CrudPage model="complaints" headerExtra={<ImportData resource="complaints" perm="complaints" noun="complaints" hint="customer and problem are required" />} title={t('complaints')} subtitle="Followed until closed" label="Complaint" fields={fields} columns={columns} sort="-date,-createdAt"
         exportName="complaints"
         filters={[{ key: 'state', label: 'All status', options: STATES }, { key: 'problem', label: 'All problems', options: PROBLEMS }]}
         facets={{ by: 'problem' }}

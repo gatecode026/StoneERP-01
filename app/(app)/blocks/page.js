@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -49,7 +50,7 @@ export default function BlocksPage() {
     <RoleGuard perm="blocks">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'blocks', label: 'Block register' }, { key: 'royalty', label: 'Royalty' }]} />
       {tab === 'blocks' ? (
-        <CrudPage model="blocks" title={t('blocks')} subtitle="Every block gets its own number — follow it until it is cut and sold" label="Block"
+        <CrudPage model="blocks" headerExtra={<ImportData resource="blocks" perm="blocks" noun="blocks" hint="rawanna and size are required; the block number is given by the app" />} title={t('blocks')} subtitle="Every block gets its own number — follow it until it is cut and sold" label="Block"
           fields={fields} columns={columns} sort="-blockNo"
           canEdit={() => false} addLabel="New block"
           rowActions={(row, { reload }) => (row.stage !== 'cut' && can('blocks', 'edit') ? [{ label: 'Mark cut', onClick: async () => {
@@ -67,7 +68,7 @@ export default function BlocksPage() {
           exportColumns={[{ key: 'blockNo', label: 'Block' }, { key: 'date', label: 'Date' }, { key: 'rawanna', label: 'Rawanna' }, { key: 'truckNo', label: 'Truck' }, { key: 'length', label: 'L' }, { key: 'width', label: 'W' }, { key: 'height', label: 'H' }, { key: 'cft', label: 'CFT' }, { key: 'grade', label: 'Grade' }, { key: 'stage', label: 'Stage' }]}
         />
       ) : (
-        <CrudPage model="royalties" title="Royalty paid record" subtitle="Own quarry — royalty paid and due dates" label="Royalty" sort="-month"
+        <CrudPage model="royalties" headerExtra={<ImportData resource="royalties" perm="royalties" noun="royalty records" />} title="Royalty paid record" subtitle="Own quarry — royalty paid and due dates" label="Royalty" sort="-month"
           fields={[
             { name: 'month', label: 'Month', type: 'month', required: true }, { name: 'amount', label: 'Amount (₹)', type: 'number', required: true },
             { name: 'dueDate', label: 'Due date', type: 'date', required: true }, { name: 'paidDate', label: 'Paid on', type: 'date' },

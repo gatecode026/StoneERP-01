@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -58,7 +59,7 @@ export default function RepairsPage() {
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'repairs', label: 'Repairs & breakdowns' }, { key: 'service', label: 'Service schedule', count: ms.filter((m) => m.due && m.due <= addDays(today, 7)).length || undefined }, { key: 'history', label: 'Machine history' }, { key: 'monthly', label: 'Monthly report' }]} />
 
       {tab === 'repairs' && (
-        <CrudPage model="repairs" title={t('repairs')} subtitle="Breakdown → mechanic → repair record. Every repair rupee is linked to its machine." label="Repair" fields={fields} columns={columns}
+        <CrudPage model="repairs" headerExtra={<ImportData resource="repairs" perm="repairs" noun="repairs and services" hint="machine, type and problem are required" />} title={t('repairs')} subtitle="Breakdown → mechanic → repair record. Every repair rupee is linked to its machine." label="Repair" fields={fields} columns={columns}
           sort="-date,-createdAt"
           filters={[{ key: 'status', label: 'All', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }] }, { key: 'kind', label: 'All types', options: ['breakdown', 'service'] }]}
           rowClass={(r) => (r.status === 'open' ? 'bg-red-50/60' : '')} exportName="repairs"

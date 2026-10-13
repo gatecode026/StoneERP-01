@@ -16,14 +16,14 @@ async function post(resource, file, commit) {
   return data;
 }
 
-export default function ImportData({ resource, noun, hint }) {
+export default function ImportData({ resource, perm, noun, hint }) {
   const { can } = useApp();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [res, setRes] = useState(null);
   const [busy, setBusy] = useState(false);
   const input = useRef(null);
-  if (!can(resource, 'create')) return null;
+  if (!can(perm || resource, 'create')) return null;
 
   const reset = () => { setFile(null); setRes(null); if (input.current) input.current.value = ''; };
   const close = () => { setOpen(false); reset(); };

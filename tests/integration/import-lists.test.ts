@@ -99,7 +99,8 @@ describe('Excel import for master lists', () => {
     }
     expect((await send(worker, 'customers', s)).status).toBe(403);
     expect((await send(owner, 'users', s)).status).toBe(404);
-    expect((await send(owner, 'sales', s)).status).toBe(404); // transactions are not importable
+    expect((await send(owner, 'auditlogs', s)).status).toBe(404); // the audit trail is never importable
+    expect((await send(owner, 'cashclosings', s)).status).toBe(404); // nor are cash closings (they are counted by a person)
     expect((await send(owner, 'customers', new File(['x'], 'a.txt'))).status).toBe(400);
     expect((await send(owner, 'customers', await sheet([['Foo'], ['bar']]))).status).toBe(400);
   });

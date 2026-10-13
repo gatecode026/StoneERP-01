@@ -72,7 +72,7 @@ export default function MachinesPage() {
         <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift" label="Machine entry" addLabel="New entry" wide
           fields={entryFields} columns={columns} sort="-date,-createdAt" canEdit={() => false}
           exportName={`machine-entries-${date}`} onSaved={() => {}}
-          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">This day</option><option value="month">Month to date</option></select></>}
+          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">This day</option><option value="month">Month to date</option></select></>}
           facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
           summary={(rows, { facets: f }) => (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -56,7 +57,7 @@ export default function SalaryPage() {
   return (
     <RoleGuard perm={["salarysheets", "salaryslips"]}>
       <PageHeader title={t('salary')} subtitle={isWorker ? 'Your salary slip' : 'Calculated automatically from attendance, pay rate and advances'}
-        actions={<>
+        actions={<>{!isWorker && <ImportData resource="advances" perm="advances" noun="advances" hint="employee and amount are required" />}
           <input type="month" className="input !w-auto" value={month} max={monthOf(todayISO())} onChange={(e) => setMonth(e.target.value || month)} />
           {office && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/salary/preview?month=${month}&all=1`); downloadCSV(`salary-sheet-${month}`, all.rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, { key: 'otPay', label: 'Overtime' }, { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }]); } catch (e) { toast.error(e.message); } }} />}
         </>} />

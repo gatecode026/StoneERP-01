@@ -47,7 +47,7 @@ export default function SalesPage() {
   return (
     <RoleGuard perm="sales">
       <PageHeader title={t('sales')} subtitle="Quotation → order → dispatch → GST bill → payment"
-        actions={<>
+        actions={<><ImportData resource="sales" perm="sales" noun="orders and quotations" hint="one row per item line; rows with the same Order ref make one order" />
           {can('sales', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/sales?${toQuery({ ...listParams, ...(dq ? { q: dq } : {}) })}`)} />}
           <Link href="/sales/new" className="btn-primary"><Plus size={18} /> {t('newQuotation')}</Link>
         </>} />

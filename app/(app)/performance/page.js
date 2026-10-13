@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Trophy, MessageSquare } from 'lucide-react';
@@ -33,7 +34,7 @@ export default function PerformancePage() {
   return (
     <RoleGuard perm="performance">
       <PageHeader title={t('performance')} subtitle="Monthly scorecard from what was already entered"
-        actions={<><input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />{rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/performance?month=${month}&all=1`); downloadCSV(`performance-${month}`, all.rows, [{ key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'presentDays', label: 'Days present' }, { key: 'absent', label: 'Absent' }, { key: 'onTime', label: 'Reports on time' }, { key: 'qty', label: 'Output' }, { key: 'breakdowns', label: 'Breakdowns' }, { key: 'score', label: 'Score' }, { key: 'remark', label: 'Owner remark' }]); } catch (e) { toast.error(e.message); } }} />}</>} />
+        actions={<><ImportData resource="perfremarks" perm="perfremarks" noun="performance remarks" /><input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />{rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/performance?month=${month}&all=1`); downloadCSV(`performance-${month}`, all.rows, [{ key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'presentDays', label: 'Days present' }, { key: 'absent', label: 'Absent' }, { key: 'onTime', label: 'Reports on time' }, { key: 'qty', label: 'Output' }, { key: 'breakdowns', label: 'Breakdowns' }, { key: 'score', label: 'Score' }, { key: 'remark', label: 'Owner remark' }]); } catch (e) { toast.error(e.message); } }} />}</>} />
       <Section title={<span className="flex items-center gap-2"><Trophy size={16} className="text-terra" /> Best workers – {fmtMonth(month)}</span>} className="mb-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {(data?.top || []).map((r, i) => (

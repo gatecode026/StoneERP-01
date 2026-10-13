@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -84,7 +85,7 @@ export default function AttendancePage() {
   return (
     <RoleGuard perm="attendance">
       <PageHeader title={t('attendance')} subtitle={isWorker ? 'Your attendance this month' : 'Mark your team — present, absent, half day, overtime or leave'}
-        actions={<>{!isWorker && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}{selfieBtn}</>} />
+        actions={<>{!isWorker && (tab === 'leaves' ? <ImportData resource="leaves" perm="leaves" noun="leave requests" /> : <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />)}{!isWorker && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}{selfieBtn}</>} />
 
       {!isWorker && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Mark attendance' }, { key: 'leaves', label: 'Leave requests' }]} />}
 

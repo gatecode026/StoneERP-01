@@ -61,7 +61,7 @@ export default function PurchasesPage() {
     <RoleGuard perm="purchases">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'purchases', label: 'Purchases' }, { key: 'payable', label: 'We owe' }, { key: 'suppliers', label: 'Suppliers' }]} />
       {tab === 'purchases' && (
-        <CrudPage model="purchases" title={t('purchases')} subtitle="Stock goes up by itself when a purchase is saved" label="Purchase" fields={fields} columns={columns}
+        <CrudPage model="purchases" headerExtra={<ImportData resource="purchases" perm="purchases" noun="purchases" hint="supplier, item, quantity and rate are required" />} title={t('purchases')} subtitle="Stock goes up by itself when a purchase is saved" label="Purchase" fields={fields} columns={columns}
           sort="-date,-createdAt" canEdit={() => false} allowVoid
           filters={[{ key: 'status', label: 'All status', options: ['approved', 'pending', 'rejected'] }]}
           exportName="purchases" rowActions={rowActions}

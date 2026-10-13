@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Lock } from 'lucide-react';
@@ -64,7 +65,7 @@ export default function CashPage() {
       </div>
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'cash', label: 'Cash book' }, { key: 'close', label: 'Closing history', count: closings.length }]} />
       {tab === 'cash' ? (
-        <CrudPage model="cashentries" title={t('cash')} subtitle="Every cash and bank movement, the same day" label="Cash entry" fields={fields} sort="-date"
+        <CrudPage model="cashentries" headerExtra={<ImportData resource="cashentries" perm="cashentries" noun="cash book entries" />} title={t('cash')} subtitle="Every cash and bank movement, the same day" label="Cash entry" fields={fields} sort="-date"
           baseQuery={{ type: 'in,out' }} searchKeys={['head', 'ref', 'note']} canEdit={() => false} exportName="cash-book" noHeader={false}
           filters={[{ key: 'account', label: 'Cash + bank', options: [{ value: 'cash', label: 'Cash' }, { value: 'bank', label: 'Bank' }] }, { key: 'type', label: 'In + out', options: [{ value: 'in', label: 'In' }, { value: 'out', label: 'Out' }] }]}
           onSaved={() => acct.reload()}

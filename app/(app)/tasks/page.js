@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -59,7 +60,7 @@ export default function TasksPage() {
     <RoleGuard perm="tasks">
       {can('reminders') && canAssign && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'tasks', label: 'Tasks' }, { key: 'reminders', label: 'Reminder centre' }]} />}
       {tab === 'tasks' && (
-        <CrudPage model="tasks" title={t('tasks')} subtitle="Give work to anyone, see what is pending and overdue" label="Task" addLabel="Assign task" fields={fields} columns={columns}
+        <CrudPage model="tasks" headerExtra={<ImportData resource="tasks" perm="tasks" noun="tasks" />} title={t('tasks')} subtitle="Give work to anyone, see what is pending and overdue" label="Task" addLabel="Assign task" fields={fields} columns={columns}
           sort="dueDate" canAdd={canAssign} canEdit={(r) => canAssign && r.state !== 'done'}
           filters={[{ key: 'state', label: 'All tasks', options: [{ value: 'pending', label: 'Pending' }, { value: 'done', label: 'Done' }, { value: 'overdue', label: 'Overdue' }], toQuery: (v) => (v === 'overdue' ? { overdue: '1' } : { state: v }) }]}
           rowClass={(r) => (r.state !== 'done' && r.dueDate < today ? 'bg-red-50/50' : '')}

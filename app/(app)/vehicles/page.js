@@ -38,7 +38,7 @@ export default function VehiclesPage() {
             return soon.length ? <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /> Expiring within 30 days</div>{soon.map((s) => <div key={s}>{s}</div>)}</div> : null;
           }} />
       ) : (
-        <CrudPage model="vehicletrips" title="Trips & diesel" subtitle="Diesel used per hour or per km — extra use stands out" label="Trip" sort="-date,-createdAt"
+        <CrudPage model="vehicletrips" headerExtra={<ImportData resource="vehicletrips" perm="vehicletrips" noun="trips and diesel" />} title="Trips & diesel" subtitle="Diesel used per hour or per km — extra use stands out" label="Trip" sort="-date,-createdAt"
           fields={[
             { name: 'date', label: 'Date', type: 'date', required: true }, { name: 'vehicleId', label: 'Vehicle', type: 'ref', required: true, ref: { model: 'vehicles', nameField: 'vehicleName' } },
             { name: 'driverCode', label: 'Driver', type: 'ref', ref: { model: 'employees', valueKey: 'empCode', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } }, { name: 'work', label: 'Trip or work done', wide: true, placeholder: 'Block shifted quarry → factory' },

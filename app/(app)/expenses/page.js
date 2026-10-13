@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -72,7 +73,7 @@ export default function ExpensesPage() {
       {tab === 'entries' && (
         <CrudPage model="expenses" title={t('expenses')} subtitle="Every rupee spent, with a bill photo, the same day" label="Expense" fields={fields} columns={columns} sort="-date,-createdAt"
           canEdit={() => false} exportName="expenses"
-          headerExtra={can('expenseheads', 'create') && <button className="btn-outline btn-sm" onClick={addHead}><Plus size={14} /> Add head</button>}
+          headerExtra={<><ImportData resource="expenses" perm="expenses" noun="expenses" hint="head, amount and paid-by are required" />{can('expenseheads', 'create') && <button className="btn-outline btn-sm" onClick={addHead}><Plus size={14} /> Add head</button>}</>}
           filters={[{ key: 'head', label: 'All heads', options: headOptions }, { key: 'status', label: 'All status', options: [{ value: 'pending', label: 'Pending approval' }, { value: 'approved', label: 'Approved' }, { value: 'rejected', label: 'Rejected' }] }]}
           onSaved={() => ov.reload()}
           summary={(rows, { total }) => {
