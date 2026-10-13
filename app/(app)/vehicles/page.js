@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
@@ -25,7 +26,7 @@ export default function VehiclesPage() {
     <RoleGuard perm="vehicles">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'vehicles', label: 'Vehicles & papers' }, { key: 'trips', label: 'Trips & diesel' }]} />
       {tab === 'vehicles' ? (
-        <CrudPage model="vehicles" title={t('vehicles')} subtitle="Every truck, tractor, loader and crane — papers and expiry dates" label="Vehicle" sort="name"
+        <CrudPage model="vehicles" title={t('vehicles')} subtitle="Every truck, tractor, loader and crane — papers and expiry dates" label="Vehicle" sort="name" headerExtra={<ImportData resource="vehicles" noun="vehicles" hint="name and type are required" />}
           fields={[
             { name: 'name', label: 'Name', required: true, placeholder: 'Truck RJ06 GA 4521' }, { name: 'regNo', label: 'Registration no.' }, { name: 'kind', label: 'Type', type: 'select', options: KINDS, required: true },
             ...EXP.map(([k, l]) => ({ name: k, label: `${l} expiry`, type: 'date' })),

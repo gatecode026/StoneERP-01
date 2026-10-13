@@ -13,9 +13,9 @@ export const DEFAULT_IMPORT_PASSWORD = process.env.IMPORT_DEFAULT_PASSWORD || '1
 export const MAX_ROWS = 2000;
 export const MAX_BYTES = 5 * 1024 * 1024;
 
-type Col = { key: string; label: string; aliases: string[]; example: string; note?: string; parse?: (v: string) => unknown };
-const norm = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
-const digits = (v: string) => v.replace(/[^0-9]/g, '');
+export type Col = { key: string; label: string; aliases: string[]; example: string; note?: string; parse?: (v: string) => unknown };
+export const norm = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export const digits = (v: string) => v.replace(/[^0-9]/g, '');
 const yes = (v: string) => ['yes', 'y', 'true', '1', 'haan', 'ha'].includes(v.trim().toLowerCase());
 const SITES = ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'];
 
@@ -29,14 +29,14 @@ export function parseDate(v: string): string {
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   throw new Error(`"${s}" is not a date (use DD-MM-YYYY)`);
 }
-function tenDigits(v: string): string {
+export function tenDigits(v: string): string {
   let d = digits(v);
   if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
   if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
   return d;
 }
 
-export const COLUMNS: Col[] = [
+export const COLUMNS: Col[] = [ // eslint-disable-line
   { key: 'empCode', label: 'Employee code', aliases: ['code', 'empcode', 'employeeid', 'empid', 'id'], example: 'E101', note: 'Leave empty to number automatically' },
   { key: 'name', label: 'Name', aliases: ['employeename', 'fullname'], example: 'Ramesh Meena', note: 'Required' },
   { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / operator', note: 'Manager / Accountant / Supervisor / Salesperson / Worker / operator' },
@@ -61,8 +61,7 @@ export const COLUMNS: Col[] = [
   { key: 'supervisorCode', label: 'Supervisor code', aliases: ['supervisor', 'reportsto', 'team'], example: '', note: 'Employee code of the supervisor', parse: (v) => v.trim().toUpperCase() },
 ];
 
-const byHeader = new Map<string, Col>();
-for (const c of COLUMNS) for (const h of [c.label, c.key, ...c.aliases]) byHeader.set(norm(h), c);
+const COLS = COLUMNS;
 
 function cellText(v: any): string {
   if (v === null || v === undefined) return '';
@@ -79,7 +78,9 @@ function cellText(v: any): string {
 export type ParsedRow = { row: number; input: Record<string, unknown>; errors: string[] };
 
 /** Read the first sheet; the first row holds the column titles (any order, any of the accepted spellings). */
-export async function readSheet(buf: Buffer, filename: string): Promise<{ rows: ParsedRow[]; unknownColumns: string[] }> {
+export async function readSheet(buf: Buffer, filename: string, columns: Col[] = COLUMNS, required: string[] = ['name', 'job']): Promise<{ rows: ParsedRow[]; unknownColumns: string[] }> {
+  const byHeader = new Map<string, Col>();
+  for (const c of columns) for (const h of [c.label, c.key, ...c.aliases]) byHeader.set(norm(h), c);
   const wb = new ExcelJS.Workbook();
   const isCsv = filename.toLowerCase().endsWith('.csv');
   try {
@@ -99,7 +100,8 @@ export async function readSheet(buf: Buffer, filename: string): Promise<{ rows: 
     cols[n] = c;
     if (t && !c) unknownColumns.push(t);
   });
-  if (!cols.some((c) => c?.key === 'name') || !cols.some((c) => c?.key === 'job')) throw badRequest('The first row must have the column titles, including "Name" and "Job". Download the template to see them.');
+  const missing = required.filter((k) => !cols.some((c) => c?.key === k));
+  if (missing.length) throw badRequest(`The first row must have the column titles, including ${missing.map((k) => '"' + (columns.find((c) => c.key === k)?.label ?? k) + '"').join(' and ')}. Download the template to see them.`);
   const rows: ParsedRow[] = [];
   for (let r = 2; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
@@ -150,9 +152,9 @@ export async function checkRows(rows: ParsedRow[]): Promise<Checked[]> {
 }
 
 /** The downloadable template: titles, one example row, and a notes sheet. */
-export async function buildTemplate(): Promise<Buffer> {
+export async function buildTemplate(COLUMNS: Col[] = COLS, sheetName = 'Employees', footnote = 'Dates are DD-MM-YYYY. Delete the example row before importing. Only "Name" and "Job" are required.'): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('Employees');
+  const ws = wb.addWorksheet(sheetName);
   ws.addRow(COLUMNS.map((c) => c.label)).font = { bold: true };
   ws.addRow(COLUMNS.map((c) => c.example));
   COLUMNS.forEach((c, i) => { ws.getColumn(i + 1).width = Math.max(14, c.label.length + 4); });
@@ -161,7 +163,7 @@ export async function buildTemplate(): Promise<Buffer> {
   notes.addRow(['Column', 'Notes']).font = { bold: true };
   for (const c of COLUMNS) notes.addRow([c.label, c.note ?? '']);
   notes.addRow([]);
-  notes.addRow(['Dates are DD-MM-YYYY. Delete the example row before importing. Only "Name" and "Job" are required.']);
+  notes.addRow([footnote]);
   notes.getColumn(1).width = 22; notes.getColumn(2).width = 60;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

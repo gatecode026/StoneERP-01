@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -52,7 +53,7 @@ export default function StockPage() {
     <RoleGuard perm="stockitems">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Balance' }, { key: 'moves', label: 'Movements' }]} />
       {tab === 'items' ? (
-        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="name"
+        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="name, type and unit are required; opening balance becomes the first stock-in" />}
           fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
           filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }] }]}

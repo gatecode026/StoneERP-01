@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -80,7 +81,7 @@ export default function SalesPage() {
       </>)}
 
       {tab === 'customers' && (
-        <CrudPage model="customers" noHeader={false} title="Customers" label="Customer" fields={CUSTOMER_FIELDS} sort="name"
+        <CrudPage model="customers" noHeader={false} title="Customers" label="Customer" fields={CUSTOMER_FIELDS} sort="name" headerExtra={<ImportData resource="customers" noun="customers" hint="name and mobile are required" />}
           columns={[{ key: 'name', label: 'Customer', primary: true }, { key: 'city', label: 'City' }, { key: 'country', label: 'Country' }, { key: 'mobile', label: 'Mobile' }, { key: 'gstin', label: 'GST', render: (r) => r.gstin || '—' },
             { key: 'outstanding', label: 'Pending', align: 'right', render: (r) => (r.outstanding > 0 ? <b className="text-amber-700">{inr(r.outstanding)}</b> : '—') }]}
           exportName="customers" />

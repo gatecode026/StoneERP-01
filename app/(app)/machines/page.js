@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Wrench } from 'lucide-react';
@@ -87,7 +88,7 @@ export default function MachinesPage() {
       )}
 
       {tab === 'machines' && (
-        <CrudPage model="machines" title="Machine list" subtitle="Entered once" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name"
+        <CrudPage model="machines" title="Machine list" subtitle="Entered once" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" headerExtra={<ImportData resource="machines" noun="machines" hint="name and type are required" />}
           fields={[
             { name: 'name', label: 'Machine name / number', required: true }, { name: 'type', label: 'Type', type: 'select', options: MACHINE_TYPES, required: true },
             { name: 'location', label: 'Location', type: 'select', options: ['Factory', 'Yard', 'Quarry'], default: 'Factory' }, { name: 'purchaseDate', label: 'Purchase date', type: 'date' },

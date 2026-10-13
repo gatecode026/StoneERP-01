@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -74,7 +75,7 @@ export default function PurchasesPage() {
           summary={(rows, { facets: f }) => <div className="grid grid-cols-2 gap-3"><StatCard label="Total we owe" value={inr(f?.sums?.outstanding ?? 0)} tone="amber" /><StatCard label="Open bills" value={f?.total ?? 0} /></div>} />
       )}
       {tab === 'suppliers' && (
-        <CrudPage model="suppliers" title="Suppliers" label="Supplier" sort="name"
+        <CrudPage model="suppliers" title="Suppliers" label="Supplier" sort="name" headerExtra={<ImportData resource="suppliers" noun="suppliers" hint="only the supplier name is required" />}
           fields={[{ name: 'name', label: 'Supplier name', required: true, wide: true }, { name: 'mobile', label: 'Mobile', type: 'tel' }, { name: 'gstin', label: 'GST number' }, { name: 'city', label: 'City' }, { name: 'supplies', label: 'Supplies', placeholder: 'Blocks, blades, diesel…' }]}
           columns={[{ key: 'name', label: 'Supplier', primary: true }, { key: 'city', label: 'City' }, { key: 'mobile', label: 'Mobile' }, { key: 'gstin', label: 'GST' }, { key: 'supplies', label: 'Supplies' },
             { key: 'outstanding', label: 'We owe', align: 'right', render: (r) => (r.outstanding > 0 ? <b className="text-amber-700">{inr(r.outstanding)}</b> : '—') }]}
