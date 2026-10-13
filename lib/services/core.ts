@@ -43,19 +43,19 @@ export async function nextSeq(key: string, session: ClientSession | undefined, s
  * The ONLY place a stock balance changes. One atomic pipeline update: the balance moves (conditionally, so it can never go
  * below zero) and the indexed `belowMin` flag is recomputed from the new balance in the same write.
  */
+const balancePipeline = (delta: number) => [
+  { $set: { balance: { $add: ['$balance', delta] } } },
+  { $set: { belowMin: { $and: [{ $gt: [{ $ifNull: ['$minLevel', 0] }, 0] }, { $lt: ['$balance', '$minLevel'] }] } } },
+];
+const balanceFilter = (itemId: unknown, delta: number, requireEnough?: boolean) => ({ _id: itemId, ...(requireEnough && delta < 0 ? { balance: { $gte: -delta } } : {}) });
+
 export async function incBalance(session: ClientSession | undefined, itemId: unknown, delta: number, opts: { requireEnough?: boolean } = {}): Promise<boolean> {
-  const filter: Record<string, unknown> = { _id: itemId };
-  if (opts.requireEnough && delta < 0) filter.balance = { $gte: -delta };
-  const r = await StockItem.updateOne(
-    filter,
-    [
-      { $set: { balance: { $add: ['$balance', delta] } } },
-      { $set: { belowMin: { $and: [{ $gt: [{ $ifNull: ['$minLevel', 0] }, 0] }, { $lt: ['$balance', '$minLevel'] }] } } },
-    ],
-    { session, updatePipeline: true }
-  );
+  const r = await StockItem.updateOne(balanceFilter(itemId, delta, opts.requireEnough), balancePipeline(delta), { session, updatePipeline: true });
   return r.matchedCount > 0;
 }
+
+/** The same atomic balance change as a bulkWrite operation (used when many items move in one request). */
+export const balanceOp = (itemId: unknown, delta: number, requireEnough?: boolean) => ({ updateOne: { filter: balanceFilter(itemId, delta, requireEnough), update: balancePipeline(delta) } });
 
 /**
  * Change an item's balance atomically. Taking stock out is a conditional update ({balance: {$gte: qty}}),

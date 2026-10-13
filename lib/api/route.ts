@@ -6,6 +6,9 @@ import { getEnv, isProd } from '../env';
 import { connect } from '../db';
 import { resolveSession, cookieName, type SessionUser } from '../auth/session';
 import { clientIp } from '../auth/ratelimit';
+import { apiRateLimit } from './ratelimit';
+import { compressJson } from './http';
+import { currentStore, runWithStore } from './reqctx';
 
 export const MAX_JSON_BYTES = 256 * 1024;
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -85,6 +88,8 @@ export function route(opts: Opts, fn: Handler) {
     const requestId = req.headers.get('x-request-id') ?? crypto.randomUUID();
     const t0 = Date.now();
     let status = 500;
+    let uid: string | undefined;
+    return runWithStore(requestId, async () => {
     try {
       await connect();
       if (opts.csrf !== false) assertSameOrigin(req);
@@ -93,6 +98,8 @@ export function route(opts: Opts, fn: Handler) {
         if (!user) throw unauthorized();
         if (auth === 'required' && user.mustChangePassword) throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'Please set a new password first');
       }
+      uid = user?.id;
+      const rate = await apiRateLimit(user?.id ?? null, clientIp(req.headers));
       const ctx: Ctx = {
         req, requestId, user, ip: clientIp(req.headers), query: req.nextUrl.searchParams,
         params: ((await c?.params) ?? {}) as Record<string, string>,
@@ -103,19 +110,25 @@ export function route(opts: Opts, fn: Handler) {
         },
       };
       const out = await fn(ctx);
-      const res = out instanceof Response ? out : NextResponse.json(out ?? { ok: true });
+      const res0 = out instanceof Response ? out : NextResponse.json(out ?? { ok: true });
+      const res = await compressJson(req, res0);
       status = res.status;
       res.headers.set('x-request-id', requestId);
+      if (!res.headers.has('Cache-Control')) res.headers.set('Cache-Control', 'private, no-store');
+      if (rate) { res.headers.set('X-RateLimit-Limit', String(rate.limit)); res.headers.set('X-RateLimit-Remaining', String(rate.remaining)); }
       return res;
     } catch (e) {
       const res = toResponse(e, requestId);
       status = res.status;
       res.headers.set('x-request-id', requestId);
+      res.headers.set('Cache-Control', 'private, no-store');
       return res;
     } finally {
       const ms = Date.now() - t0;
-      const log = ms > 800 ? logger.warn.bind(logger) : logger.info.bind(logger);
-      if (isProd() || ms > 200) log({ requestId, method: req.method, path: req.nextUrl.pathname, status, ms, uid: undefined }, 'request');
+      const st = currentStore();
+      const log = ms > 800 || status >= 500 ? logger.warn.bind(logger) : logger.info.bind(logger);
+      if (isProd() || ms > 200) log({ requestId, method: req.method, path: req.nextUrl.pathname, status, ms, uid, queries: st?.queries ?? 0, dbMs: Math.round(st?.dbMs ?? 0) }, 'request');
     }
+    });
   };
 }

@@ -4,7 +4,9 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Camera, CheckCheck, MapPin, Check, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, LoadMore, cx } from '@/components/ui';
+import LookupSelect from '@/components/LookupSelect';
+import { useDebounced, usePagedList } from '@/lib/usePaged';
 import CrudPage from '@/components/CrudPage';
 import { submit, api, getLocation } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
@@ -26,32 +28,35 @@ export default function AttendancePage() {
   const sp = useSearchParams();
   const [date, setDate] = useState(sp.get('date') || todayISO());
   const [q, setQ] = useState('');
-  const emps = useFetch(isWorker ? null : '/api/employees?status=active&limit=500&sort=empCode');
-  const att = useFetch(`/api/attendance?${isWorker ? `from=${monthOf(date)}-01&to=${date}&sort=-date` : `date=${date}`}&limit=1000`);
-  const [marks, setMarks] = useState({});
+  const dq = useDebounced(q.trim(), 300);
+  // one request builds the whole sheet: a page of people with today's marks merged in, plus exact counts for the whole team
+  const sheet = usePagedList(isWorker ? null : '/api/attendance/sheet', { date, q: dq }, { limit: 50, count: false });
+  const att = useFetch(isWorker ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
+  const [over, setOver] = useState({}); // marks tapped on this screen, shown at once (optimistic)
   const [selfie, setSelfie] = useState(false);
-  const [sf, setSf] = useState({ employeeId: '', photo: '', loc: '' });
+  const [sf, setSf] = useState({ empCode: '', photo: '', loc: '' });
   const canMark = can('attendance', 'create') && !isWorker;
 
-  useEffect(() => { const m = {}; (att.data || []).forEach((a) => { m[a.empCode] = a; }); setMarks(m); }, [att.data]);
+  useEffect(() => { setOver({}); }, [sheet.rows, date]);
+  const view = (e) => ({ ...e, ...(over[e.empCode] || {}) });
 
   async function mark(e, state, extra = {}) {
-    const prev = marks[e.empCode];
-    setMarks((m) => ({ ...m, [e.empCode]: { ...(m[e.empCode] || {}), state, empCode: e.empCode, ...extra } }));
+    const prev = over[e.empCode];
+    setOver((m) => ({ ...m, [e.empCode]: { ...(m[e.empCode] || {}), state, ...extra } }));
     try {
-      await submit('/api/attendance', { date, empCode: e.empCode, state, ...(state === 'overtime' ? { otHours: extra.otHours ?? prev?.otHours ?? SALARY.otHoursDefault } : {}) }, { label: `Attendance ${e.name}` });
-    } catch (err) { toast.error(err.message); setMarks((m) => ({ ...m, [e.empCode]: prev })); }
+      await submit('/api/attendance', { date, empCode: e.empCode, state, ...(state === 'overtime' ? { otHours: extra.otHours ?? view(e).otHours ?? SALARY.otHoursDefault } : {}) }, { label: `Attendance ${e.name}` });
+    } catch (err) { toast.error(err.message); setOver((m) => { const n = { ...m }; if (prev) n[e.empCode] = prev; else delete n[e.empCode]; return n; }); }
   }
   async function markAll() {
-    const todo = (emps.data || []).filter((e) => !marks[e.empCode]);
-    if (!todo.length) { toast('Everyone is already marked'); return; }
-    const id = toast.loading(`Marking ${todo.length} present…`);
+    const todo = unmarked;
+    if (!todo) { toast('Everyone is already marked'); return; }
+    const id = toast.loading(`Marking ${todo} present…`);
     try {
-      // one request for the whole team (one transaction), not one per person
-      await api('/api/bulk/attendance', { method: 'POST', body: { date, marks: todo.map((e) => ({ empCode: e.empCode, state: 'present' })) } });
+      // one request for the whole team (one transaction, one bulkWrite): the server marks everyone who has no mark yet
+      await api('/api/bulk/attendance', { method: 'POST', body: { date, rest: 'present' } });
       toast.success('Done', { id });
     } catch (err) { toast.error(err.message, { id }); }
-    att.reload();
+    sheet.reload();
   }
 
   function getLoc() {
@@ -59,21 +64,20 @@ export default function AttendancePage() {
     getLocation().then((l) => setSf((x) => ({ ...x, loc: l.text, geo: l })));
   }
   async function saveSelfie() {
-    const emp = isWorker ? null : (emps.data || []).find((x) => x._id === sf.employeeId);
-    if (!isWorker && !emp) { toast.error('Choose the employee'); return; }
+    if (!isWorker && !sf.empCode) { toast.error('Choose the employee'); return; }
     if (!sf.photo) { toast.error('Take a selfie'); return; }
     try {
       const location = sf.geo || { text: sf.loc || 'Location not shared' };
-      const body = isWorker ? { selfie: sf.photo, location } : { date, empCode: emp.empCode, state: 'present', selfie: sf.photo, location };
+      const body = isWorker ? { selfie: sf.photo, location } : { date, empCode: sf.empCode, state: 'present', selfie: sf.photo, location };
       const r = await submit('/api/attendance', body, { label: 'Selfie attendance' });
       toast.success(r.queued ? t('offline') : 'Attendance marked with selfie ✔');
-      setSelfie(false); setSf({ employeeId: '', photo: '', loc: '' }); att.reload();
+      setSelfie(false); setSf({ empCode: '', photo: '', loc: '' }); isWorker ? att.reload() : sheet.reload();
     } catch (e) { toast.error(e.message); }
   }
 
-  const list = (emps.data || []).filter((e) => !q || `${e.name} ${e.job}`.toLowerCase().includes(q.toLowerCase()));
-  const counts = (s) => Object.values(marks).filter((m) => m?.state === s).length;
-  const unmarked = (emps.data || []).filter((e) => !marks[e.empCode]).length;
+  // exact team counts from the server, adjusted for what was tapped since the sheet loaded
+  const counts = (st) => (sheet.meta.counts?.[st] || 0) + sheet.rows.reduce((n, r) => { const o = over[r.empCode]; return o ? n + (o.state === st ? 1 : 0) - (r.state === st ? 1 : 0) : n; }, 0);
+  const unmarked = Math.max(0, (sheet.meta.unmarked || 0) - sheet.rows.filter((r) => !r.state && over[r.empCode]?.state).length);
 
   const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> {t('selfie')}</button>;
 
@@ -97,18 +101,19 @@ export default function AttendancePage() {
             <StatCard label="Not marked" value={unmarked} tone={unmarked ? 'amber' : 'green'} />
           </div>
           <div className="flex gap-2 mb-3 flex-wrap"><SearchBox value={q} onChange={setQ} placeholder="Search name or job…" />{canMark && <button className="btn-green" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}</div>
-          {emps.loading || att.loading ? <SkeletonList n={6} /> : (
+          {sheet.loading ? <SkeletonList n={6} /> : (
             <div className="space-y-2.5">
-              {list.map((e) => {
-                const m = marks[e.empCode];
+              {sheet.rows.map((r) => {
+                const e = r;
+                const m = view(r);
                 return (
-                  <div key={e._id} className={cx('card p-3', !m && 'border-amber-300')}>
+                  <div key={e.empCode} className={cx('card p-3', !m.state && 'border-amber-300')}>
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="min-w-0"><div className="font-semibold text-sm truncate">{e.name}</div><div className="text-[11px] text-char-500">{e.job} · {e.empCode}</div></div>
                       <div className="flex items-center gap-2">
                         {m?.state === 'overtime' && <input className="input !w-16 !min-h-[36px] text-center" type="number" min="0" defaultValue={m.otHours ?? SALARY.otHoursDefault} title="Overtime hours" onBlur={(ev) => mark(e, 'overtime', { otHours: Number(ev.target.value) })} />}
                         {m?.method === 'selfie' && <Badge tone="blue"><MapPin size={10} /> selfie</Badge>}
-                        {!m && <Badge tone="amber">not marked</Badge>}
+                        {!m.state && <Badge tone="amber">not marked</Badge>}
                       </div>
                     </div>
                     <div className="grid grid-cols-5 gap-1.5">
@@ -124,6 +129,7 @@ export default function AttendancePage() {
               })}
             </div>
           )}
+          {!sheet.loading && <LoadMore list={sheet} />}
           <p className="text-[11px] text-char-500 mt-3 md:hidden">P = Present · A = Absent · ½ = Half day · OT = Overtime · L = Leave</p>
         </>
       )}
@@ -139,7 +145,7 @@ export default function AttendancePage() {
         footer={<><button className="btn-outline flex-1" onClick={() => setSelfie(false)}>Cancel</button><button className="btn-primary flex-[2]" onClick={saveSelfie}>Mark present</button></>}>
         <div className="space-y-4">
           {!isWorker && (
-            <Field label="Employee" required><select className="input" value={sf.employeeId} onChange={(e) => setSf({ ...sf, employeeId: e.target.value })}><option value="">Select…</option>{(emps.data || []).map((e) => <option key={e._id} value={e._id}>{e.name} · {e.job}</option>)}</select></Field>
+            <Field label="Employee" required><LookupSelect kind="employees" by="empCode" value={sf.empCode} onChange={(it) => setSf({ ...sf, empCode: it ? it.id : '' })} /></Field>
           )}
           <Field label="Selfie" required><PhotoInput value={sf.photo} onChange={(p) => setSf({ ...sf, photo: p })} label="Take selfie" capture="user" /></Field>
           <div className="text-sm flex items-center gap-2 text-char-700"><MapPin size={16} className="text-terra" /> {sf.loc || 'Getting location…'}</div>

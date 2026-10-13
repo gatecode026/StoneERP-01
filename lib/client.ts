@@ -2,6 +2,8 @@
 'use client';
 // Browser-side helpers: API wrapper with offline queue, CSV export, WhatsApp links, image compression.
 
+import { CSV_BOM, csvCell } from './export/csv';
+
 const QKEY = 'vss_queue';
 
 export class ApiError extends Error {
@@ -88,17 +90,10 @@ export async function flushQueue(onSent?: (item: any, ok: boolean, e?: any) => v
 export function downloadCSV(filename: string, rows: any[], columns?: any[]) {
   if (!rows?.length) return;
   const cols = columns || Object.keys(rows[0]).filter((k) => typeof rows[0][k] !== 'object');
-  const esc = (v: any) => {
-    if (v === null || v === undefined) return '';
-    let s = String(v);
-    // CSV/Excel formula injection (audit S-17): neutralise text cells that would be executed as formulas
-    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    s = s.replace(/"/g, '""');
-    return /[",\n]/.test(s) ? `"${s}"` : s;
-  };
+  const esc = csvCell; // same escaping as the server export: formula cells neutralised, quotes and newlines handled
   const head = cols.map((c) => esc(c.label || c.key || c)).join(',');
-  const body = rows.map((r) => cols.map((c) => esc(typeof c === 'string' ? r[c] : c.value ? c.value(r) : r[c.key])).join(',')).join('\n');
-  const blob = new Blob(['﻿' + head + '\n' + body], { type: 'text/csv;charset=utf-8;' });
+  const body = rows.map((r) => cols.map((c) => esc(typeof c === 'string' ? r[c] : c.value ? c.value(r) : r[c.key])).join(',')).join('\r\n');
+  const blob = new Blob([CSV_BOM + head + '\r\n' + body], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename.endsWith('.csv') ? filename : filename + '.csv';
@@ -133,24 +128,6 @@ export function compressImage(file: File, maxDim = 900, quality = 0.65): Promise
   });
 }
 
-
-/**
- * Transitional helper: GET a URL; if the server answers with the standard list envelope {data, nextCursor}, follow the
- * cursor (max `maxPages` x 100 rows) and return a plain array. Screens move to infinite lists in Phase 6.
- */
-export async function fetchAllPages(url: string, maxPages = 15): Promise<any> {
-  const first = await api(url);
-  if (!first || !Array.isArray(first.data) || !('nextCursor' in first)) return first;
-  const rows = [...first.data];
-  let cursor: string | null = first.nextCursor;
-  for (let i = 1; cursor && i < maxPages; i++) {
-    const sep = url.includes('?') ? '&' : '?';
-    const next = await api(`${url}${sep}cursor=${encodeURIComponent(cursor)}`);
-    rows.push(...next.data);
-    cursor = next.nextCursor;
-  }
-  return rows;
-}
 
 /** Real device location (GPS), never a made-up place. Resolves to {text} only when the user refuses or the device has none. */
 export function getLocation(timeoutMs = 6000): Promise<{ lat?: number; lng?: number; text: string }> {

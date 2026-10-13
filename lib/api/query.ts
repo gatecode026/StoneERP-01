@@ -4,7 +4,7 @@ import { badRequest } from '../errors';
 import { isISODate } from '../time';
 
 // The ONE list-query contract (docs/API.md):
-//   ?limit (default 25, max 100) &cursor &sort=<allow-listed field> (prefix - for descending) &q=<prefix search>
+//   ?limit (default 25, max 100) &cursor | &page &sort=<allow-listed field> (prefix - for descending) &q=<prefix search>
 //   &from &to (&dateField) &includeVoid=1 &count=1 &ids=a,b &<allow-listed filter keys…>
 // Unknown keys are rejected, so nothing a client sends can become an arbitrary Mongo condition.
 
@@ -21,6 +21,12 @@ export type ListSpec = {
   /** date fields that `from`/`to` may apply to; first is the default */
   dateFields?: readonly string[];
   maxLimit?: number;
+  /** server-defined filters whose meaning is more than "field equals value" (e.g. low=1, docs=missing) */
+  named?: Record<string, (value: string) => Record<string, any>>;
+  /** numeric fields the facets endpoint may sum (money fields are still removed for people without money access) */
+  statFields?: readonly string[];
+  /** derived numbers the facets endpoint may sum, e.g. stock value; `needs` are fields the caller must be allowed to see */
+  computed?: Record<string, { expr: any; needs: readonly string[] }>;
 };
 
 export type ListQuery = {
@@ -33,13 +39,17 @@ export type ListQuery = {
   includeVoid: boolean;
   count: boolean;
   select: string[];
+  /** conditions from named filters */
+  extra: Record<string, any>[];
+  /** 1-based page number (offset paging, for screens that jump to a page); cursor paging is preferred for long lists */
+  page?: number;
 };
 
 const RESERVED = new Set(['limit', 'cursor', 'sort', 'q', 'from', 'to', 'dateField', 'includeVoid', 'count', 'ids', 'fields', '_t', 'page']);
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;
 
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function parseValue(key: string, spec: FilterSpec, raw: string): any {
   const one = (v: string) => {
@@ -98,8 +108,11 @@ export function parseListQuery(sp: URLSearchParams, spec: ListSpec, opts: { hidd
   if (hidden.has(sortField)) throw badRequest(`Cannot sort by "${sortField}"`);
 
   const match: Record<string, any> = {};
+  const extra: Record<string, any>[] = [];
   for (const [k, raw] of sp.entries()) {
     if (RESERVED.has(k)) continue;
+    const named = Object.prototype.hasOwnProperty.call(spec.named ?? {}, k) ? spec.named![k] : undefined;
+    if (named && !hidden.has(k)) { const c = named(raw); if (Object.keys(c).length) extra.push(c); continue; }
     const f = spec.filters[k];
     if (!f || hidden.has(k)) throw badRequest(`Unknown filter "${k}"`);
     match[k] = parseValue(k, f, raw);
@@ -127,13 +140,21 @@ export function parseListQuery(sp: URLSearchParams, spec: ListSpec, opts: { hidd
   for (const f of requested) if (!spec.listFields.includes(f)) throw badRequest(`Field "${f}" is not available in lists`);
   const select = (requested.length ? requested : [...spec.listFields]).filter((f) => !hidden.has(f));
 
-  return { limit, cursor: cursorRaw ? decodeCursor(cursorRaw) : undefined, sortField, sortDir, q, match, includeVoid: sp.get('includeVoid') === '1', count: sp.get('count') === '1', select };
+  const pageRaw = sp.get('page');
+  let page: number | undefined;
+  if (pageRaw) {
+    page = Number(pageRaw);
+    if (!Number.isInteger(page) || page < 1 || page > 200) throw badRequest('page must be a whole number from 1 to 200');
+    if (cursorRaw) throw badRequest('Use either page or cursor, not both');
+  }
+  return { page, extra, limit, cursor: cursorRaw ? decodeCursor(cursorRaw) : undefined, sortField, sortDir, q, match, includeVoid: sp.get('includeVoid') === '1', count: sp.get('count') === '1', select };
 }
 
 /** Compose the final Mongo filter: user filters + search + scope + keyset cursor. */
 export function buildFilter(lq: ListQuery, spec: ListSpec, scope: Record<string, any>) {
   const and: Record<string, any>[] = [];
   if (Object.keys(lq.match).length) and.push(lq.match);
+  for (const c of lq.extra) and.push(c);
   if (!lq.includeVoid) and.push({ isVoid: false });
   if (lq.q && spec.searchFields?.length) {
     const re = new RegExp('^' + escapeRe(lq.q), 'i');

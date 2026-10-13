@@ -62,4 +62,41 @@ export const IdempotencyKey = defineModel(
   { noBase: true, indexes: [[{ key: 1, userId: 1 }, { unique: true }], [{ expireAt: 1 }, { expireAfterSeconds: 0 }]] }
 );
 
+/** One row per scheduled-job run. `_id` = "<job>:<period>", so a job that already succeeded for its period is never run twice. Non-financial log: expires after 180 days. */
+export const JobRun = defineModel(
+  'JobRun',
+  {
+    _id: { type: S },
+    name: { type: S, required: true },
+    period: { type: S, required: true },
+    status: { type: S, enum: ['running', 'ok', 'failed'], default: 'running' },
+    attempts: { type: N, default: 1 },
+    trigger: { type: S, enum: ['cron', 'manual', 'cli'], default: 'cron' },
+    startedAt: { type: Date, default: Date.now },
+    finishedAt: Date,
+    durationMs: N,
+    result: { type: Schema.Types.Mixed },
+    error: S,
+  },
+  { noBase: true, indexes: [[{ name: 1, startedAt: -1 }], [{ startedAt: 1 }, { expireAfterSeconds: 180 * 86400 }]] }
+);
+
+/** Outbox for messages (WhatsApp / SMS). Jobs only QUEUE here; the sender (adapter) delivers and marks sent/failed. `_id` is a dedupe key. Expires after 90 days. */
+export const Notification = defineModel(
+  'Notification',
+  {
+    _id: { type: S },
+    channel: { type: S, enum: ['whatsapp', 'sms'], default: 'whatsapp' },
+    to: { type: S, required: true },
+    kind: { type: S, required: true },
+    text: { type: S, required: true, maxlength: 4000 },
+    status: { type: S, enum: ['queued', 'sent', 'failed', 'skipped'], default: 'queued' },
+    attempts: { type: N, default: 0 },
+    sentAt: Date,
+    error: S,
+    meta: { type: Schema.Types.Mixed },
+  },
+  { noBase: true, indexes: [[{ status: 1, createdAt: 1 }], [{ createdAt: 1 }, { expireAfterSeconds: 90 * 86400 }]] }
+);
+
 export { B };

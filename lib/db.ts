@@ -1,4 +1,5 @@
 import mongoose, { type ClientSession } from 'mongoose';
+import { invalidate } from './cache';
 import dns from 'node:dns';
 import { getEnv, isProd } from './env';
 import { logger } from './logger';
@@ -93,6 +94,7 @@ export async function withTxn<T>(fn: (session: ClientSession | undefined) => Pro
     await session.withTransaction(async () => {
       out = await fn(session);
     }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+    invalidate('home', 'reminders'); // dashboards derive from committed data: drop cached copies the moment something changes
     return out;
   } finally {
     await session.endSession();

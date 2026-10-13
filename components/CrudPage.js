@@ -1,11 +1,13 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, History as HistoryIcon, Pencil, Ban } from 'lucide-react';
 import { useApp, useFetch } from './Providers';
-import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, Badge, cx } from './ui';
-import { api, submit, downloadCSV, ApiError } from '@/lib/client';
+import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, LoadMore, Badge, cx } from './ui';
+import LookupSelect from './LookupSelect';
+import { api, submit, ApiError } from '@/lib/client';
+import { toQuery, useDebounced, usePagedList } from '@/lib/usePaged';
 import { todayISO, fmtDate, fmtDateTime } from '@/lib/format';
 
 const TONE = {
@@ -19,28 +21,28 @@ export function StatusBadge({ value }) {
 
 const optList = (o) => (o || []).map((x) => (typeof x === 'string' ? { value: x, label: x } : x));
 
-function RefSelect({ field, form, set }) {
+// model name used in forms -> /api/lookup kind
+const LOOKUP_KIND = { employees: 'employees', machines: 'machines', stockitems: 'items', customers: 'customers', suppliers: 'suppliers', vehicles: 'vehicles', blocks: 'blocks', sales: 'sales' };
+
+function RefSelect({ field, form, set, id }) {
   const r = field.ref;
-  const q = new URLSearchParams({ limit: '100', sort: r.sort || 'name', ...(r.query || {}) }).toString();
-  const { data, loading } = useFetch(`/api/${r.model}?${q}`);
-  const rows = (data || []).filter((x) => (r.filter ? r.filter(x, form) : true));
-  return (
-    <select className="input" value={form[field.name] || ''} disabled={loading}
-      onChange={(e) => {
-        const row = rows.find((x) => String(x[r.valueKey || '_id']) === e.target.value);
-        const val = e.target.value;
-        const patch = { [field.name]: val };
-        if (r.nameField) patch[r.nameField] = row ? (r.label ? r.label(row) : row[r.labelKey || 'name']) : '';
-        if (field.onPick) Object.assign(patch, field.onPick(row, form) || {});
-        set(patch);
-      }}>
-      <option value="">{loading ? 'Loading…' : 'Select…'}</option>
-      {rows.map((x) => {
-        const v = String(x[r.valueKey || '_id']);
-        return <option key={v} value={v}>{r.label ? r.label(x) : x[r.labelKey || 'name']}</option>;
-      })}
-    </select>
-  );
+  const kind = LOOKUP_KIND[r.model];
+  const { sort: _sort, ...query } = r.query || {}; // eslint-disable-line no-unused-vars
+  const by = r.valueKey && r.valueKey !== '_id' ? r.valueKey : undefined;
+  async function pick(it) {
+    const patch = { [field.name]: it ? it.id : '' };
+    if (r.nameField) patch[r.nameField] = it ? it.label : '';
+    if (it && field.onPick) {
+      // pickers that copy details from the chosen record (order items, item unit…) read the full record once
+      try {
+        const rowId = by ? (await api(`/api/${r.model}?${toQuery({ [by]: it.id, limit: 1 })}`)).data?.[0]?._id : it.id;
+        Object.assign(patch, field.onPick(await api(`/api/${r.model}/${rowId}`), form) || {});
+      } catch { /* the label alone is still saved */ }
+    } else if (!it && field.onPick) Object.assign(patch, field.onPick(null, form) || {});
+    set(patch);
+  }
+  if (!kind) return <div className="text-sm text-red-600">No lookup for {r.model}</div>;
+  return <LookupSelect id={id} kind={kind} by={by} query={query} value={form[field.name] || ''} valueLabel={r.nameField ? form[r.nameField] : undefined} onChange={pick} />;
 }
 
 // field-group access: a field tagged group:'money'|'cost'|'pii' is hidden unless the user can read it, read-only unless they can write it
@@ -67,7 +69,7 @@ export function FormFields({ fields, form, set, mode }) {
                 {optList(f.options).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             ); break;
-          case 'ref': input = <RefSelect field={f} form={form} set={set} />; break;
+          case 'ref': input = <RefSelect id={id} field={f} form={form} set={set} />; break;
           case 'photo': input = <PhotoInput value={v} onChange={(x) => set({ [f.name]: x })} label={f.buttonLabel} />; break;
           case 'doc': input = <DocInput value={v} onChange={(x) => set({ [f.name]: x })} resource={f.resource} kind={f.kind} label={f.buttonLabel} />; break;
           case 'photos': input = <PhotoInput multiple value={v} onChange={(x) => set({ [f.name]: x })} />; break;
@@ -120,17 +122,26 @@ export async function saveWithConfirm(path, body, opts) {
 const same = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
 export default function CrudPage({
-  model, title, subtitle, fields, columns, searchKeys = ['name'], filters = [], defaults = {}, baseQuery = {}, sort,
+  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
 }) {
   const { t, can, perm } = useApp();
   const sp = useSearchParams();
-  const qs = new URLSearchParams({ limit: '100', ...(sort ? { sort } : {}), ...baseQuery }).toString();
-  const { data, loading, error, reload } = useFetch(`/api/${model}?${qs}`, [JSON.stringify(baseQuery)]);
   const [q, setQ] = useState('');
+  const dq = useDebounced(q.trim(), 300);
   // drill-down links from the home screens arrive as ?<filter>=<value> (e.g. /stock?low=1, /expenses?status=pending)
   const [fv, setFv] = useState(() => Object.fromEntries(filters.map((f) => [f.key, sp.get(f.key) || '']).filter(([, v]) => v)));
+  // everything that narrows the list is sent to the server (search, filters, sort); the browser never filters or sorts a big list itself
+  const filterParams = Object.assign({}, ...filters.map((f) => (fv[f.key] ? (f.toQuery ? f.toQuery(fv[f.key]) : { [f.key]: fv[f.key] }) : {})));
+  const params = { ...(sort ? { sort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
+  const list = usePagedList(`/api/${model}`, params);
+  const { loading, error } = list;
+  const rows = list.rows;
+  const [fTick, setFTick] = useState(0);
+  const facetQs = facets && !facets.url ? toQuery({ ...(facets.query || {}), ...baseQuery, ...filterParams, by: facets.by, sum: facets.sum, named: facets.named }) : null;
+  const fac = useFetch(facets ? (facets.url || `/api/${model}/facets?${facetQs}`) : null, [fTick]);
+  const reload = () => { list.reload(); setFTick((x) => x + 1); };
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
@@ -142,19 +153,6 @@ export default function CrudPage({
   const mayAdd = canAdd && can(model, 'create');
   const openNew = () => { setEditing(null); setForm({ date: todayISO(), ...Object.fromEntries(fields.filter((f) => f.default !== undefined).map((f) => [f.name, typeof f.default === 'function' ? f.default() : f.default])), ...defaults }); setOpen(true); };
   useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew(); /* eslint-disable-next-line */ }, []);
-
-  const rows = useMemo(() => {
-    let r = data || [];
-    if (q.trim()) {
-      const s = q.toLowerCase();
-      r = r.filter((x) => searchKeys.some((k) => String(x[k] ?? '').toLowerCase().includes(s)));
-    }
-    for (const f of filters) {
-      const val = fv[f.key];
-      if (val) r = r.filter((x) => (f.test ? f.test(x, val) : String(x[f.key]) === val));
-    }
-    return r;
-  }, [data, q, fv, filters, searchKeys]);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   // lists carry no photos or documents, so editing loads the full record first
@@ -223,7 +221,7 @@ export default function CrudPage({
         <PageHeader title={title} subtitle={subtitle}
           actions={<>
             {headerExtra}
-            {exportName && rows.length > 0 && can(model, 'export') && <ExportBtn onClick={() => downloadCSV(exportName, rows, exportColumns || columns.filter((c) => c.key).map((c) => ({ key: c.key, label: c.label })))} />}
+            {exportName && rows.length > 0 && can(model, 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/${model}?${toQuery(params)}`)} />}
             {mayAdd && <button className="btn-primary" onClick={openNew}><Plus size={18} /> {addLabel || t('add')}</button>}
           </>} />
       )}
@@ -237,9 +235,12 @@ export default function CrudPage({
           </select>
         ))}
       </div>
-      {summary && !loading && <div className="mb-3">{summary(rows, data || [])}</div>}
+      {summary && !loading && <div className="mb-3">{summary(rows, { total: list.total, facets: fac.data, loading: fac.loading })}</div>}
       {error ? <div role="alert" className="card p-4 text-red-600 text-sm">{error.message}</div> : (
-        <DataList loading={loading} rows={rows} columns={columns} empty={emptyText || t('noData')} rowClass={rowClass} actions={rowActs} />
+        <>
+          <DataList loading={loading} rows={rows} columns={columns} empty={emptyText || t('noData')} rowClass={rowClass} actions={rowActs} />
+          {!loading && <LoadMore list={list} />}
+        </>
       )}
 
       <Sheet open={open} onClose={() => setOpen(false)} wide={wide} title={editing ? `${t('edit')} – ${label}` : formTitle || `${t('newEntry')} – ${label}`}

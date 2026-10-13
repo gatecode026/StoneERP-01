@@ -6,7 +6,7 @@ import CrudPage from '@/components/CrudPage';
 import { RoleGuard, StatCard, Badge, Tabs, Sheet, Field } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { api } from '@/lib/client';
-import { inr, fmtDate, todayISO, sum } from '@/lib/format';
+import { inr, fmtDate, todayISO } from '@/lib/format';
 
 export default function CashPage() {
   const { t, can } = useApp();
@@ -16,15 +16,13 @@ export default function CashPage() {
   const [note, setNote] = useState('');
   const today = todayISO();
   // balances come from the running account totals; the page never sums the whole cash book
-  const acct = useFetch('/api/accounts');
-  const todays = useFetch(`/api/cashentries?date=${today}&type=in,out&limit=100`);
-  const closingsQ = useFetch('/api/cashclosings?limit=30&sort=-date');
-  const closings = closingsQ.data || [];
-  const flows = todays.data || [];
+  // balances, today's movement and the closing history arrive together (one request); the cash book below pages by itself
+  const acct = useFetch('/api/cash/overview');
+  const closings = acct.data?.closings || [];
   const cash = acct.data?.cash ?? 0;
   const bank = acct.data?.bank ?? 0;
-  const cashIn = sum(flows.filter((r) => r.account === 'cash' && r.type === 'in'), 'amount');
-  const cashOut = sum(flows.filter((r) => r.account === 'cash' && r.type === 'out'), 'amount');
+  const cashIn = acct.data?.today?.cashIn ?? 0;
+  const cashOut = acct.data?.today?.cashOut ?? 0;
   const todayClose = closings.find((c) => c.date === today);
 
   async function confirmClose() {
@@ -33,7 +31,7 @@ export default function CashPage() {
     try {
       const r = await api('/api/cashclosings', { method: 'POST', body: { counted: c, note } });
       toast[r.difference === 0 ? 'success' : 'error'](r.difference === 0 ? 'Cash matches the app ✔' : `Difference ${inr(r.difference)} flagged to owner`);
-      setOpen(false); setCounted(''); setNote(''); closingsQ.reload(); acct.reload();
+      setOpen(false); setCounted(''); setNote(''); acct.reload();
     } catch (e) { toast.error(e.message); }
   }
 
@@ -69,7 +67,7 @@ export default function CashPage() {
         <CrudPage model="cashentries" title={t('cash')} subtitle="Every cash and bank movement, the same day" label="Cash entry" fields={fields} sort="-date"
           baseQuery={{ type: 'in,out' }} searchKeys={['head', 'ref', 'note']} canEdit={() => false} exportName="cash-book" noHeader={false}
           filters={[{ key: 'account', label: 'Cash + bank', options: [{ value: 'cash', label: 'Cash' }, { value: 'bank', label: 'Bank' }] }, { key: 'type', label: 'In + out', options: [{ value: 'in', label: 'In' }, { value: 'out', label: 'Out' }] }]}
-          onSaved={() => { acct.reload(); todays.reload(); }}
+          onSaved={() => acct.reload()}
           rowClass={(r) => (r.reversed || r.reversalOf ? 'opacity-60' : '')}
           columns={[
             { key: 'head', label: 'Head', primary: true, render: (r) => <span>{r.head}<div className="text-[11px] text-char-500 font-normal">{r.note || r.ref}{r.reversalOf ? ' · reversal' : r.reversed ? ' · reversed' : ''}</div></span> },

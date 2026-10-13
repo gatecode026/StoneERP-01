@@ -27,17 +27,18 @@ export default function EmployeesPage() {
     <RoleGuard perm="employees">
       <CrudPage
         model="employees" title={t('employees')} subtitle="One profile per person, with documents" label="Employee"
-        fields={EMPLOYEE_FIELDS} columns={columns} searchKeys={['name', 'job', 'site', 'empCode', 'mobile']} sort="empCode"
+        fields={EMPLOYEE_FIELDS} columns={columns} sort="empCode"
         
         filters={[
           { key: 'job', label: 'All jobs', options: JOBS },
           { key: 'site', label: 'All sites', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] },
-          { key: 'docs', label: 'Documents', options: [{ value: 'missing', label: 'Missing documents' }], test: (r, v) => v === 'missing' && missingDocs(r).length > 0 },
+          { key: 'docs', label: 'Documents', options: [{ value: 'missing', label: 'Missing documents' }] },
           { key: 'status', label: 'Working + left', options: [{ value: 'active', label: 'Working' }, { value: 'left', label: 'Left' }] },
         ]}
-        summary={(rows, all) => {
-          const miss = all.filter((e) => missingDocs(e).length).length;
-          return miss ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> {miss} employees have a missing document</div> : null;
+        facets={{ by: 'status', query: { docs: 'missing', status: 'active' } }}
+        summary={(rows, { facets: f }) => {
+          const miss = f?.total || 0; // active employees without Aadhaar or passbook on file, counted by the server
+          return miss ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> {miss} working employees have a missing document</div> : null;
         }}
         exportName="employees"
         exportColumns={[{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'site', label: 'Site' }, { key: 'mobile', label: 'Mobile' }, { key: 'payType', label: 'Pay type' }, { key: 'rate', label: 'Rate' }, { key: 'joiningDate', label: 'Joining date' }]}

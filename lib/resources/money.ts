@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { AuditLog, CashClosing, CashEntry, ExpenseHead, Expense, PaperDoc } from '../models';
 import type { ResourceDef } from '../api/resource';
 import { badRequest, confirmable, conflict } from '../errors';
-import { todayIST } from '../time';
+import { addDays, todayIST } from '../time';
 import { accountBalance, accountFor, oid, postCash, reverseCashFor, round2, type SvcCtx } from '../services/core';
 import { withinApprovalLimit } from '../perm/engine';
 import { dateStr, empCode, enumOf, num, oidStr, photo, posNum, req, text, PAY_BY } from './zod';
@@ -22,6 +22,7 @@ export const expenses: ResourceDef = {
   listFields: ['date', 'head', 'amount', 'paidBy', 'paidTo', 'spentBy', 'spentByCode', 'site', 'narration', 'status', 'approvedBy', 'hasBill'],
   sortable: ['date', 'createdAt', 'amount'], defaultSort: '-date', searchFields: ['head', 'paidTo', 'spentBy', 'narration', 'site'],
   dateFields: ['date'], filters: { status: { enum: ['approved', 'pending', 'rejected'] }, head: 'string', site: 'string', spentByCode: 'string', paidBy: { enum: PAY_BY }, date: 'date' },
+  statFields: ['amount'],
   serverOnly: ['hasBill', 'status', 'approvedBy', 'approvedAt', 'approvalRemark', 'cashEntryId', 'pettyCashUserId'],
   create: z.object(expenseFields).strict(),
   update: z.object({ narration: text(500), site: text(80), paidTo: text(120), billPhoto: photo }).partial().strict(),
@@ -70,6 +71,7 @@ export const cashentries: ResourceDef = {
   listFields: ['date', 'account', 'type', 'amount', 'head', 'ref', 'note', 'refModel', 'reversed', 'reversalOf'],
   sortable: ['date', 'createdAt'], defaultSort: '-date', searchFields: ['head', 'ref', 'note'],
   dateFields: ['date'], filters: { account: 'string', type: { enum: ['in', 'out'] }, head: 'string', date: 'date' },
+  statFields: ['amount'],
   create: z.object({ date: dateStr.optional(), account: enumOf(['cash', 'bank']), type: enumOf(['in', 'out']), amount: posNum(1e9), head: enumOf(CASH_HEADS), ref: text(120).optional(), note: text(500).optional() }).strict(),
   lifecycle: {
     async create(ctx, input) {
@@ -125,13 +127,14 @@ export const documents: ResourceDef = {
   key: 'documents', model: PaperDoc, label: (d) => d.name,
   listFields: ['name', 'category', 'expiryDate', 'note'], sortable: ['expiryDate', 'name', 'createdAt'], defaultSort: 'expiryDate', searchFields: ['name', 'note'],
   filters: { category: 'string' }, dateFields: ['expiryDate'],
+  named: { exp: (v) => (v === 'soon' ? { expiryDate: { $gt: '', $lte: addDays(todayIST(), 30) } } : {}) },
   create: z.object(docFields).strict(), update: z.object(docFields).partial().strict(),
 };
 
 export const auditlogs: ResourceDef = {
   key: 'auditlogs', model: AuditLog, label: (d) => `${d.model} ${d.action}`,
   listFields: ['model', 'refId', 'action', 'by', 'role', 'label', 'changes', 'at'],
-  sortable: ['at'], defaultSort: '-at', searchFields: ['by', 'label', 'action'], dateFields: [],
+  sortable: ['at'], defaultSort: '-at', searchFields: [], dateFields: [], // no free-text search: the log is huge and only model / record id are indexed
   filters: { refId: 'string', model: 'string', action: 'string', byId: 'oid' },
 };
 

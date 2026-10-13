@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import { translate } from '@/lib/i18n';
 import { can as canPerm, type ClientPerm } from '@/lib/clientPerm';
-import { api, fetchAllPages, flushQueue, getQueue } from '@/lib/client';
+import { api, flushQueue, getQueue } from '@/lib/client';
 
 export type ClientSession = {
   id: string; username: string; name: string; role: string; preset: string | null; empCode: string | null; lang: string; mustChangePassword: boolean;
@@ -88,7 +88,8 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
   );
 }
 
-// Fetch hook with reload
+// Fetch hook with reload. One request, no hidden paging: a list endpoint answers with its first page ({data, nextCursor}) and this
+// hook returns the rows of that page. Screens that show long lists use usePagedList (lib/usePaged.ts); this is for bounded data.
 export function useFetch(url: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(!!url);
@@ -98,7 +99,7 @@ export function useFetch(url: string | null, deps: unknown[] = []) {
     if (!url) { setLoading(false); return; }
     let live = true;
     setLoading(true);
-    fetchAllPages(url).then((d) => { if (live) { setData(d); setError(null); setLoading(false); } })
+    api(url).then((d) => (d && Array.isArray(d.data) && 'nextCursor' in d ? d.data : d)).then((d) => { if (live) { setData(d); setError(null); setLoading(false); } })
       .catch((e) => { if (live) { setError(e); setLoading(false); } });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

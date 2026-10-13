@@ -12,6 +12,7 @@ import { buildFilter, encodeCursor, parseListQuery, type ListSpec } from './quer
 import type { AuthCtx } from './withAuth';
 import { oid, type SvcCtx } from '../services/core';
 import { ingestPhotos } from '../storage/files';
+import { jsonWithEtag, stripNulls } from './http';
 
 /**
  * A resource = a model + the contract for talking to it over HTTP. Business rules live in `lifecycle`
@@ -73,15 +74,17 @@ export async function listResource(auth: AuthCtx, def: ResourceDef) {
   const rows: any[] = await def.model
     .find(filter, projection)
     .sort({ [lq.sortField]: lq.sortDir, _id: lq.sortDir })
+    .skip(lq.page ? (lq.page - 1) * lq.limit : 0)
     .limit(lq.limit + 1)
     .lean();
   const hasMore = rows.length > lq.limit;
   if (hasMore) rows.pop();
   const last = rows[rows.length - 1];
   const nextCursor = hasMore && last ? encodeCursor(lq.sortField === '_id' ? null : last[lq.sortField], last._id) : null;
-  const out: Record<string, unknown> = { data: rows.map((r) => projectDoc(auth.perm, def.key, r)), nextCursor };
+  const out: Record<string, unknown> = { data: rows.map((r) => stripNulls(projectDoc(auth.perm, def.key, r))), nextCursor };
+  if (lq.page) out.page = lq.page;
   if (lq.count) out.total = await def.model.countDocuments(baseFilter, { limit: 10001 });
-  return NextResponse.json(out);
+  return jsonWithEtag(auth.req, out); // unchanged lists answer 304 with no body
 }
 
 // ------------------------------------------------------------------ get
@@ -89,7 +92,7 @@ export async function getResource(auth: AuthCtx, def: ResourceDef, id: string) {
   const f = await scopedIdFilter(auth.user, auth.perm, def.key, 'view', id);
   const doc = f ? await def.model.findOne(f).lean() : null;
   if (!doc) throw notFound(); // out-of-scope rows look exactly like missing rows (no IDOR hint)
-  return NextResponse.json(projectDoc(auth.perm, def.key, doc as any));
+  return jsonWithEtag(auth.req, stripNulls(projectDoc(auth.perm, def.key, doc as any)));
 }
 
 // ------------------------------------------------------------------ create

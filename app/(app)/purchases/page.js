@@ -4,18 +4,16 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Check, X, Banknote } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
-import { RoleGuard, Tabs, StatCard, Badge, Section, DataList } from '@/components/ui';
-import { useApp, useFetch } from '@/components/Providers';
+import { RoleGuard, Tabs, StatCard, Badge } from '@/components/ui';
+import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
-import { inr, num, fmtDate, sum, groupBy, todayISO } from '@/lib/format';
+import { inr, num, fmtDate, todayISO } from '@/lib/format';
 
 export default function PurchasesPage() {
   const { t, can } = useApp();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'purchases');
   const approver = can('purchases', 'approve');
-  const sup = useFetch('/api/suppliers?limit=500');
-  const pur = useFetch('/api/purchases?limit=2000&sort=-date');
 
   const payable = (p) => Math.max(0, p.outstanding ?? (p.total || 0) - (p.paidAmount || 0));
   async function pay(p, reload) {
@@ -23,7 +21,7 @@ export default function PurchasesPage() {
     if (!amt) return;
     const m = (window.prompt('Mode: Cash / UPI / Bank', 'Bank') || 'Bank').trim().toLowerCase();
     const mode = m === 'cash' ? 'Cash' : m === 'upi' ? 'UPI' : 'Bank';
-    try { await api(`/api/purchases/${p._id}/pay`, { method: 'POST', body: { amount: Number(amt), mode } }); toast.success('Payment recorded'); reload(); pur.reload(); } catch (e) { toast.error(e.message); }
+    try { await api(`/api/purchases/${p._id}/pay`, { method: 'POST', body: { amount: Number(amt), mode } }); toast.success('Payment recorded'); reload(); } catch (e) { toast.error(e.message); }
   }
 
   const fields = [
@@ -51,35 +49,31 @@ export default function PurchasesPage() {
     { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
   ];
 
-  // payable per supplier
-  const bySup = Object.entries(groupBy((pur.data || []).filter((p) => p.status === 'approved' && payable(p) > 0), 'supplierName'))
-    .map(([name, ps]) => ({ name, owed: sum(ps, payable), next: ps.map((p) => p.dueDate).filter(Boolean).sort()[0], bills: ps.length }))
-    .sort((a, b) => b.owed - a.owed);
+  const rowActions = (row, { reload }) => [
+    payable(row) > 0 && row.status === 'approved' && { label: 'Pay', icon: <Banknote size={14} />, tone: 'primary', onClick: () => pay(row, reload) },
+    row.status === 'pending' && approver && { label: 'Approve', tone: 'green', icon: <Check size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'purchases', id: row._id, action: 'approve' } }); toast.success('Approved – stock updated'); reload(); } catch (e) { toast.error(e.message); } } },
+    row.status === 'pending' && approver && { label: 'Reject', icon: <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'purchases', id: row._id, action: 'reject' } }); reload(); } catch (e) { toast.error(e.message); } } },
+  ].filter(Boolean);
 
   return (
     <RoleGuard perm="purchases">
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'purchases', label: 'Purchases' }, { key: 'payable', label: 'We owe', count: bySup.length }, { key: 'suppliers', label: 'Suppliers' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'purchases', label: 'Purchases' }, { key: 'payable', label: 'We owe' }, { key: 'suppliers', label: 'Suppliers' }]} />
       {tab === 'purchases' && (
         <CrudPage model="purchases" title={t('purchases')} subtitle="Stock goes up by itself when a purchase is saved" label="Purchase" fields={fields} columns={columns}
-          sort="-date,-createdAt" searchKeys={['itemName', 'supplierName', 'billNo']} canEdit={() => false} allowVoid
+          sort="-date,-createdAt" canEdit={() => false} allowVoid
           filters={[{ key: 'status', label: 'All status', options: ['approved', 'pending', 'rejected'] }]}
-          exportName="purchases" onSaved={() => pur.reload()}
-          rowActions={(row, { reload }) => [
-            payable(row) > 0 && row.status === 'approved' && { label: 'Pay', icon: <Banknote size={14} />, tone: 'primary', onClick: () => pay(row, reload) },
-            row.status === 'pending' && approver && { label: 'Approve', tone: 'green', icon: <Check size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'purchases', id: row._id, action: 'approve' } }); toast.success('Approved – stock updated'); reload(); } catch (e) { toast.error(e.message); } } },
-            row.status === 'pending' && approver && { label: 'Reject', icon: <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'purchases', id: row._id, action: 'reject' } }); reload(); } catch (e) { toast.error(e.message); } } },
-          ].filter(Boolean)}
+          exportName="purchases" rowActions={rowActions}
         />
       )}
       {tab === 'payable' && (
-        <div>
-          <div className="grid grid-cols-2 gap-3 mb-3"><StatCard label="Total we owe" value={inr(sum(bySup, 'owed'))} tone="amber" /><StatCard label="Suppliers" value={bySup.length} /></div>
-          <DataList rows={bySup} rowKey="name" loading={pur.loading} empty="No pending supplier payments"
-            columns={[{ key: 'name', label: 'Supplier', primary: true }, { key: 'bills', label: 'Open bills' }, { key: 'owed', label: 'Amount pending', align: 'right', render: (r) => <b>{inr(r.owed)}</b> }, { key: 'next', label: 'Next due', render: (r) => <Badge tone={r.next && r.next < todayISO() ? 'red' : 'amber'}>{fmtDate(r.next)}</Badge> }]} />
-        </div>
+        // bills that still owe money, earliest due date first; the totals come from the server in one aggregate
+        <CrudPage model="purchases" title="We owe" subtitle="Approved bills not yet paid, earliest due date first" label="Purchase" noHeader fields={[]} columns={columns.filter((c) => c.key !== 'status')}
+          baseQuery={{ payable: '1' }} sort="dueDate" canAdd={false} canEdit={() => false} allowVoid={false} rowActions={rowActions} emptyText="No pending supplier payments"
+          facets={{ sum: 'outstanding' }}
+          summary={(rows, { facets: f }) => <div className="grid grid-cols-2 gap-3"><StatCard label="Total we owe" value={inr(f?.sums?.outstanding ?? 0)} tone="amber" /><StatCard label="Open bills" value={f?.total ?? 0} /></div>} />
       )}
       {tab === 'suppliers' && (
-        <CrudPage model="suppliers" title="Suppliers" label="Supplier" searchKeys={['name', 'city', 'supplies']} sort="name"
+        <CrudPage model="suppliers" title="Suppliers" label="Supplier" sort="name"
           fields={[{ name: 'name', label: 'Supplier name', required: true, wide: true }, { name: 'mobile', label: 'Mobile', type: 'tel' }, { name: 'gstin', label: 'GST number' }, { name: 'city', label: 'City' }, { name: 'supplies', label: 'Supplies', placeholder: 'Blocks, blades, diesel…' }]}
           columns={[{ key: 'name', label: 'Supplier', primary: true }, { key: 'city', label: 'City' }, { key: 'mobile', label: 'Mobile' }, { key: 'gstin', label: 'GST' }, { key: 'supplies', label: 'Supplies' },
             { key: 'outstanding', label: 'We owe', align: 'right', render: (r) => (r.outstanding > 0 ? <b className="text-amber-700">{inr(r.outstanding)}</b> : '—') }]}

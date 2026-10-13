@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { jsonWithEtag, stripNulls } from '@/lib/api/http';
 import { withAuth } from '@/lib/api/withAuth';
 import { computeYield } from '@/lib/services/analytics';
 import { getSettings } from '@/lib/settings';
@@ -15,5 +15,5 @@ export const GET = withAuth('yield', 'view', async (auth) => {
     const { costPerSqft, ...rest } = r;
     return hideCost ? rest : { ...rest, costPerSqft };
   });
-  return NextResponse.json({ ...data, rows, bySupplier, hideCost });
+  return jsonWithEtag(auth.req, stripNulls({ ...data, rows, bySupplier, hideCost }));
 });

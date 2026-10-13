@@ -7,7 +7,7 @@ import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
-import { inr, num, fmtDate, sum } from '@/lib/format';
+import { inr, num, fmtDate } from '@/lib/format';
 
 const CAT = [{ value: 'raw', label: 'Raw stone' }, { value: 'finished', label: 'Finished goods' }, { value: 'consumable', label: 'Consumables' }];
 const UNITS = ['sq ft', 'sq m', 'pieces', 'CFT', 'tonne', 'litres', 'kg', 'numbers'];
@@ -52,17 +52,19 @@ export default function StockPage() {
     <RoleGuard perm="stockitems">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Balance' }, { key: 'moves', label: 'Movements' }]} />
       {tab === 'items' ? (
-        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="category,name"
-          fields={itemFields} columns={itemCols} searchKeys={['name', 'size', 'location', 'finish']}
+        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="name"
+          fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
-          filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }], test: (r) => r.minLevel && r.balance < r.minLevel }]}
-          summary={(rows, all) => {
-            const low = all.filter((r) => r.minLevel && r.balance < r.minLevel);
+          filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }] }]}
+          // counts and stock value come from the server in one aggregate; the low-stock names are the first few rows of the indexed alert list
+          facets={{ sum: money ? 'value' : undefined, named: 'low' }}
+          summary={(rows, { total, facets: f }) => {
+            const low = f?.named?.low ?? 0;
             return (
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="Items" value={all.length} />
-                {money ? <StatCard label="Stock value" value={inr(sum(all, (r) => (r.balance || 0) * (r.costRate || 0)))} /> : <StatCard label="Below minimum" value={low.length} tone={low.length ? 'red' : 'green'} />}
-                {money && <StatCard label="Below minimum" value={low.length} sub={low.map((x) => x.name).join(', ')} tone={low.length ? 'red' : 'green'} />}
+                <StatCard label="Items" value={total ?? '…'} />
+                {money ? <StatCard label="Stock value" value={inr(f?.sums?.value ?? 0)} /> : <StatCard label="Below minimum" value={low} tone={low ? 'red' : 'green'} />}
+                {money && <StatCard label="Below minimum" value={low} sub={low ? 'Use the Alerts filter to see which' : undefined} tone={low ? 'red' : 'green'} />}
               </div>
             );
           }}
@@ -92,7 +94,6 @@ export default function StockPage() {
             { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
             { key: 'createdBy', label: 'By' },
           ]}
-          searchKeys={['itemName', 'ref', 'note']}
           filters={[{ key: 'type', label: 'All movements', options: ['in', 'out', 'transfer', 'damage'] }]}
           onSaved={() => setReloadKey((k) => k + 1)}
           rowActions={(row, { reload }) => (row.status === 'pending' && can('stockmovements', 'approve') ? [

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { trackQueries } from '../api/reqctx';
 import mongoose, { Schema, type Model, type SchemaDefinition, type IndexDefinition, type IndexOptions } from 'mongoose';
 
 export const S = String;
@@ -39,6 +40,7 @@ export function defineModel(name: string, fields: SchemaDefinition, opts: ModelO
   if (mongoose.models[name]) return mongoose.models[name] as AnyModel;
   const schema = new Schema({ ...(opts.noBase ? {} : baseFields), ...fields }, { timestamps: true, strict: true, versionKey: false, minimize: false });
   for (const [def, o] of opts.indexes ?? []) schema.index(def, o);
+  schema.plugin(trackQueries);
   return mongoose.model(name, schema) as AnyModel;
 }
 

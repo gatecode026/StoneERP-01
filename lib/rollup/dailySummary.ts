@@ -2,6 +2,7 @@
 import mongoose, { Schema, type ClientSession } from 'mongoose';
 import { reportRead } from '../db';
 import { Account, Attendance, CashEntry, DailyReport, Dispatch, Expense, MachineEntry, Payment, Sale } from '../models';
+import { trackQueries } from '../api/reqctx';
 
 /**
  * One document per business date holding the day's totals. Every write path bumps it with $inc INSIDE the same transaction
@@ -22,6 +23,7 @@ const daySchema = new Schema(
   },
   { timestamps: true, versionKey: false, minimize: false }
 );
+daySchema.plugin(trackQueries);
 export const DailySummary = mongoose.models.DailySummary || mongoose.model('DailySummary', daySchema);
 
 export type Inc = Record<string, number>;

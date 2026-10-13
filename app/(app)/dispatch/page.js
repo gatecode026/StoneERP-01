@@ -7,12 +7,13 @@ import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, DataList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { api, openWA } from '@/lib/client';
-import { inr, num, fmtDate, todayISO, sum, groupBy } from '@/lib/format';
+import { inr, num, fmtDate, todayISO, sum } from '@/lib/format';
 
 export default function DispatchPage() {
   const { t, can } = useApp();
   const [tab, setTab] = useState('out');
-  const all = useFetch('/api/dispatches?limit=2000&sort=-date,-createdAt');
+  // the Freight tab asks the server for per-transporter totals; the truck lists page by themselves
+  const fr = useFetch(tab === 'freight' ? '/api/dispatches/freight' : null);
   const canMark = can('dispatches', 'approve');
 
   const outFields = [
@@ -53,7 +54,7 @@ export default function DispatchPage() {
   };
   const markOut = async (row, reload) => {
     if (!window.confirm(`Mark truck ${row.truckNo} OUT? Stock will be deducted.`)) return;
-    try { await api(`/api/dispatches/${row._id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out ✔'); reload(); all.reload(); } catch (e) { toast.error(e.message); }
+    try { await api(`/api/dispatches/${row._id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out ✔'); reload(); } catch (e) { toast.error(e.message); }
   };
   const waMsg = (r) => `Dear ${r.customerName}, your order ${r.saleNo || ''} has left our Bijoliya factory.\nTruck: ${r.truckNo}\nDriver: ${r.driverName || '-'} ${r.driverMobile || ''}\nInvoice: ${r.invoiceNo || '-'}\nE-way bill: ${r.eway || '-'}\n— Vipul Stone Suppliers`;
 
@@ -71,35 +72,32 @@ export default function DispatchPage() {
     row.status === 'out' && { label: '', icon: <MessageCircle size={14} />, onClick: () => openWA(waMsg(row), row.customerMobile) },
   ].filter(Boolean);
 
-  // freight per transporter
-  const outs = (all.data || []).filter((d) => d.direction === 'out');
-  const freight = Object.entries(groupBy(outs.filter((d) => d.freight), (d) => d.transporter || '—')).map(([name, ds]) => ({
-    name, trips: ds.length, total: sum(ds, 'freight'), paid: sum(ds.filter((d) => d.freightPaid), 'freight'), pending: sum(ds.filter((d) => !d.freightPaid), 'freight'), ids: ds.filter((d) => !d.freightPaid),
-  }));
+  const freight = fr.data?.rows || [];
 
   return (
     <RoleGuard perm="dispatches">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'out', label: 'Trucks out' }, { key: 'in', label: 'Trucks in' }, { key: 'freight', label: 'Freight' }]} />
       {tab === 'out' && (
         <CrudPage model="dispatches" baseQuery={{ direction: 'out' }} title={t('dispatch')} subtitle="No truck leaves the gate without a gate pass" label="Loading slip" addLabel="New loading slip" wide
-          fields={outFields} columns={outCols} sort="-date,-createdAt" searchKeys={['gatePassNo', 'truckNo', 'customerName', 'driverName', 'saleNo']}
+          fields={outFields} columns={outCols} sort="-date,-createdAt"
           canEdit={(r) => r.status === 'loading'}
-          beforeSave={async (b) => prep(b)} onSaved={() => all.reload()}
+          beforeSave={async (b) => prep(b)}
           filters={[{ key: 'status', label: 'All status', options: [{ value: 'loading', label: 'Loading' }, { value: 'out', label: 'Truck out' }] }]}
-          summary={(rows, a) => <div className="grid grid-cols-3 gap-3"><StatCard label="Out today" value={a.filter((d) => d.date === todayISO() && d.status === 'out').length} tone="green" /><StatCard label="Loading now" value={a.filter((d) => d.status === 'loading').length} tone="amber" /><StatCard label="Total trucks" value={a.length} /></div>}
+          facets={{ by: 'status', query: { direction: 'out', from: todayISO() } }}
+          summary={(rows, { facets: f }) => <div className="grid grid-cols-3 gap-3"><StatCard label="Out today" value={f?.groups?.out?.n ?? 0} tone="green" /><StatCard label="Loading today" value={f?.groups?.loading?.n ?? 0} tone="amber" /><StatCard label="Trucks today" value={f?.total ?? 0} /></div>}
           rowActions={outActions} exportName="dispatches"
           exportColumns={[{ key: 'gatePassNo', label: 'Gate pass' }, { key: 'date', label: 'Date' }, { key: 'customerName', label: 'Customer' }, { key: 'truckNo', label: 'Truck' }, { key: 'driverName', label: 'Driver' }, { key: 'netWeight', label: 'Net weight kg' }, { key: 'freight', label: 'Freight' }, { key: 'status', label: 'Status' }]} />
       )}
       {tab === 'in' && (
         <CrudPage model="dispatches" baseQuery={{ direction: 'in' }} title="Incoming trucks" subtitle="Blocks and purchases entered at the gate" label="Incoming truck" addLabel="Truck in"
-          fields={inFields} defaults={{ direction: 'in' }} sort="-date,-createdAt" searchKeys={['truckNo', 'driverName', 'note', 'kind']} onSaved={() => all.reload()}
+          fields={inFields} defaults={{ direction: 'in' }} sort="-date,-createdAt"
           columns={[{ key: 'truckNo', label: 'Truck', primary: true }, { key: 'kind', label: 'Brought', render: (r) => r.kind || '—' }, { key: 'driverName', label: 'Driver' }, { key: 'netWeight', label: 'Net weight', render: (r) => (r.netWeight ? `${num(r.netWeight)} kg` : '—') }, { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) }, { key: 'note', label: 'Note', wide: true }]} />
       )}
       {tab === 'freight' && (
         <div>
           <div className="grid grid-cols-2 gap-3 mb-3"><StatCard label="Freight pending" value={inr(sum(freight, 'pending'))} tone="amber" /><StatCard label="Freight paid" value={inr(sum(freight, 'paid'))} tone="green" /></div>
-          <DataList loading={all.loading} rows={freight} rowKey="name" empty="No freight entered" columns={[{ key: 'name', label: 'Transporter', primary: true }, { key: 'trips', label: 'Trips' }, { key: 'total', label: 'Total', render: (r) => inr(r.total) }, { key: 'paid', label: 'Paid', render: (r) => inr(r.paid) }, { key: 'pending', label: 'Pending', render: (r) => <b className={r.pending ? 'text-amber-700' : ''}>{inr(r.pending)}</b> }]}
-            actions={(r) => r.pending > 0 && can('cashentries', 'create') && <button className="btn-outline btn-sm" onClick={async () => { if (!confirm(`Mark ${inr(r.pending)} freight as paid to ${r.name}?`)) return; try { for (const d of r.ids) await api(`/api/dispatches/${d._id}/freight-paid`, { method: 'POST', body: { mode: 'Bank' } }); toast.success('Marked paid'); all.reload(); } catch (e) { toast.error(e.message); } }}>Mark paid</button>} />
+          <DataList loading={fr.loading} rows={freight} rowKey="name" empty="No freight entered" columns={[{ key: 'name', label: 'Transporter', primary: true }, { key: 'trips', label: 'Trips' }, { key: 'total', label: 'Total', render: (r) => inr(r.total) }, { key: 'paid', label: 'Paid', render: (r) => inr(r.paid) }, { key: 'pending', label: 'Pending', render: (r) => <b className={r.pending ? 'text-amber-700' : ''}>{inr(r.pending)}</b> }]}
+            actions={(r) => r.pending > 0 && can('cashentries', 'create') && <button className="btn-outline btn-sm" onClick={async () => { if (!confirm(`Mark ${inr(r.pending)} freight as paid to ${r.name}?`)) return; try { await api('/api/bulk/freight-paid', { method: 'POST', body: { ...(r.transporter ? { transporter: r.transporter } : {}), mode: 'Bank' } }); toast.success('Marked paid'); fr.reload(); } catch (e) { toast.error(e.message); } }}>Mark paid</button>} />
         </div>
       )}
     </RoleGuard>

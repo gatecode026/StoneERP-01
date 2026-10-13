@@ -6,6 +6,8 @@
  *   report                                            writes docs/PERF_REPORT.md from the JSON files above
  */
 import fs from 'node:fs';
+import http from 'node:http';
+import zlib from 'node:zlib';
 import mongoose from 'mongoose';
 import { connect, disconnect } from '../lib/db';
 import { addDays, todayIST } from '../lib/time';
@@ -126,6 +128,26 @@ async function explainMode() {
 }
 
 // ---------------------------------------------------------------- HTTP latency
+/** GET with the browser's Accept-Encoding and WITHOUT decoding, so the size is what really crosses the network. */
+function wireGet(url: string, cookie: string): Promise<{ status: number; wire: number; decoded: number; encoding: string }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = http.request({ hostname: u.hostname, port: u.port, path: u.pathname + u.search, headers: { cookie, 'accept-encoding': 'gzip, deflate, br' } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks);
+        const enc = String(res.headers['content-encoding'] ?? '');
+        let decoded = raw.length;
+        try { decoded = (enc === 'br' ? zlib.brotliDecompressSync(raw) : enc === 'gzip' ? zlib.gunzipSync(raw) : raw).length; } catch { /* keep wire size */ }
+        resolve({ status: res.statusCode ?? 0, wire: raw.length, decoded, encoding: enc });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 async function httpMode() {
   const base = arg('--base') ?? 'http://localhost:3100';
   const logins: [string, string][] = [['owner', '9000000001'], ['manager', '9000000002'], ['accountant', '9000000003'], ['supervisor', '9000000004'], ['salesperson', '9000000005'], ['worker', '9000000006']];
@@ -142,24 +164,30 @@ async function httpMode() {
     ['owner', 'list cash entries', '/api/cashentries?limit=25'], ['owner', 'list expenses', '/api/expenses?limit=25'], ['owner', 'list audit log', '/api/auditlogs?limit=25'], ['owner', 'list daily reports (a day)', `/api/dailyreports?date=${day}&limit=25`],
     ['owner', 'list machine entries (a day)', `/api/machineentries?date=${day}&limit=25`], ['owner', 'yield report', '/api/yield'], ['owner', 'performance scorecards', `/api/performance?month=${day.slice(0, 7)}`], ['owner', 'reminders', '/api/reminders'], ['owner', 'accounts balance', '/api/accounts'],
     ['accountant', 'list payments', '/api/payments?limit=25'], ['supervisor', 'team daily reports', '/api/dailyreports?limit=25'], ['supervisor', 'team attendance', `/api/attendance?date=${day}&limit=100`], ['salesperson', 'my sales', '/api/sales?limit=25'], ['worker', 'my reports', '/api/dailyreports?limit=10'],
+    // Phase 5: screen endpoints
+    ['owner', 'attendance sheet (50 people + exact counts)', `/api/attendance/sheet?date=${day}&limit=50`], ['supervisor', 'attendance sheet (team)', `/api/attendance/sheet?date=${day}&limit=50`],
+    ['owner', 'lookup employees (typeahead)', '/api/lookup/employees?q=Emp'], ['owner', 'lookup customers (typeahead)', '/api/lookup/customers?q=Cust'], ['owner', 'lookup items (typeahead)', '/api/lookup/items?q=Slab'],
+    ['owner', 'sales overview', '/api/sales/overview'], ['owner', 'sales: pending payments page', '/api/sales?pending=1&sort=date&limit=25&count=1'], ['owner', 'sales facets', '/api/sales/facets?by=stage&sum=total'],
+    ['owner', 'cash overview', '/api/cash/overview'], ['owner', 'expenses overview', '/api/expenses/overview'], ['owner', 'expenses monthly report', `/api/expenses/report?month=${day.slice(0, 7)}`], ['owner', 'machine month report', `/api/machineentries/monthly?month=${day.slice(0, 7)}`],
+    ['owner', 'stock facets (value + low count)', '/api/stockitems/facets?sum=value&named=low'], ['owner', 'dispatch freight totals', '/api/dispatches/freight'], ['owner', 'daily reports: who is missing', `/api/dailyreports/missing?date=${day}`],
+    ['owner', 'list employees (100 rows)', '/api/employees?limit=100'], ['owner', 'list sales (100 rows)', '/api/sales?limit=100'], ['owner', 'list audit log (100 rows)', '/api/auditlogs?limit=100'],
   ];
   const N = 25;
   const out = [];
   for (const [role, label, url] of eps) {
     const t: number[] = [];
-    let size = 0, status = 0;
+    let size = 0, wire = 0, status = 0;
     for (let i = 0; i <= N; i++) {
       const s = process.hrtime.bigint();
-      const r = await fetch(base + url, { headers: { cookie: jars[role] } });
-      const body = await r.arrayBuffer();
+      const r = await wireGet(base + url, jars[role]);
       t.push(Number(process.hrtime.bigint() - s) / 1e6);
-      size = body.byteLength; status = r.status;
+      size = r.decoded; wire = r.wire; status = r.status;
     }
     const cold = t[0];
     const warm = t.slice(1).sort((a, b) => a - b);
     const q = (p: number) => +warm[Math.min(warm.length - 1, Math.floor(p * warm.length))].toFixed(1);
-    out.push({ role, label, url, status, bytes: size, coldMs: +cold.toFixed(1), p50: q(0.5), p95: q(0.95), max: +warm[warm.length - 1].toFixed(1) });
-    console.log(`${String(status).padEnd(4)} cold ${cold.toFixed(0).padStart(5)} ms   p50 ${String(q(0.5)).padStart(6)}   p95 ${String(q(0.95)).padStart(6)}   ${(size / 1024).toFixed(1).padStart(6)} KB   ${role}: ${label}`);
+    out.push({ role, label, url, status, bytes: size, wire, coldMs: +cold.toFixed(1), p50: q(0.5), p95: q(0.95), max: +warm[warm.length - 1].toFixed(1) });
+    console.log(`${String(status).padEnd(4)} cold ${cold.toFixed(0).padStart(5)} ms   p50 ${String(q(0.5)).padStart(6)}   p95 ${String(q(0.95)).padStart(6)}   ${(size / 1024).toFixed(1).padStart(6)} KB (${(wire / 1024).toFixed(1)} on the wire)   ${role}: ${label}`);
   }
   fs.writeFileSync(`${OUT}/http.json`, JSON.stringify(out, null, 2));
 }
@@ -183,8 +211,9 @@ function reportMode() {
   }
   if (http) {
     L.push('## API latency (production build, local machine, perf dataset)', '', 'Cold = very first request after login for that endpoint; p50 / p95 over 25 warm requests. Single user, local MongoDB — real devices add network time.', '',
-      '| Role | Endpoint | Status | Size | Cold ms | p50 ms | p95 ms |', '|---|---|---:|---:|---:|---:|---:|', ...http.map((h: any) => `| ${h.role} | ${h.label} | ${h.status} | ${(h.bytes / 1024).toFixed(1)} KB | ${h.coldMs} | ${h.p50} | ${h.p95} |`), '');
+      '| Role | Endpoint | Status | JSON size | On the wire | Cold ms | p50 ms | p95 ms |', '|---|---|---:|---:|---:|---:|---:|---:|', ...http.map((h: any) => `| ${h.role} | ${h.label} | ${h.status} | ${(h.bytes / 1024).toFixed(1)} KB | ${((h.wire ?? h.bytes) / 1024).toFixed(1)} KB | ${h.coldMs} | ${h.p50} | ${h.p95} |`), '');
   }
+  if (fs.existsSync(`${OUT}/phase5.md`)) L.push('', fs.readFileSync(`${OUT}/phase5.md`, 'utf8')); // hand-written measurements that are not produced by a script
   fs.writeFileSync('docs/PERF_REPORT.md', L.join('\n'));
   console.log('wrote docs/PERF_REPORT.md');
 }

@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/daily-report",
+      "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/jobs/payment-reminders",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/jobs/reconcile",
+      "schedule": "30 20 * * *"
+    },
+    {
+      "path": "/api/jobs/scorecards",
+      "schedule": "30 21 1 * *"
+    }
+  ]
+}

@@ -45,6 +45,7 @@ export const employees: ResourceDef = {
   listFields: ['empCode', 'name', 'mobile', 'job', 'site', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
   sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
   filters: { status: { enum: ['active', 'left'] }, job: 'string', site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
+  named: { docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}) }, // same rule as the profile's "missing documents" badge
   serverOnly: ['docFlags', 'isVoid'],
   create: z.object({ empCode: empCode.optional(), ...employeeFields }).strict(),
   update: z.object(employeeFields).partial().strict(),
@@ -269,6 +270,7 @@ export const tasks: ResourceDef = {
   listFields: ['title', 'details', 'assignedCode', 'assignedName', 'assignedBy', 'dueDate', 'priority', 'state', 'doneAt', 'doneNote'],
   sortable: ['dueDate', 'createdAt'], defaultSort: 'dueDate', searchFields: ['title', 'assignedName'],
   dateFields: ['dueDate'], filters: { state: { enum: ['pending', 'done'] }, assignedCode: 'string', priority: { enum: ['Normal', 'High'] } },
+  named: { overdue: (v) => (v === '1' ? { state: 'pending', dueDate: { $lt: todayIST() } } : {}) },
   serverOnly: ['assignedName', 'assignedBy', 'assignedById', 'doneAt'],
   create: z.object({ title: req(200), details: text(2000).optional(), assignedCode: empCode, dueDate: dateStr, priority: enumOf(['Normal', 'High']).optional() }).strict(),
   update: z.object({ title: req(200), details: text(2000), assignedCode: empCode, dueDate: dateStr, priority: enumOf(['Normal', 'High']), state: enumOf(['pending', 'done']), doneNote: text(1000), donePhoto: photo }).partial().strict(),

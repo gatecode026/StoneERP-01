@@ -1,4 +1,5 @@
 'use client';
+import LookupSelect from '@/components/LookupSelect';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { KeyRound, Plus, UserCog } from 'lucide-react';
@@ -19,7 +20,6 @@ export default function UsersPage() {
   const [f, setF] = useState({});
   const [secret, setSecret] = useState(null);
   const [busy, setBusy] = useState(false);
-  const emps = useFetch(edit ? '/api/employees?status=active&limit=100&sort=name' : null);
 
   function open(u) {
     setEdit(u || {});
@@ -77,10 +77,7 @@ export default function UsersPage() {
           <Field label="Job preset (optional)" htmlFor="u_preset" hint="A restricted variant: guard, store keeper, mechanic, cashier, driver…"><select id="u_preset" className="input" value={f.preset} onChange={(e) => setF({ ...f, preset: e.target.value })}>{PRESETS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
           {!edit?.id && (
             <Field label="Linked employee" htmlFor="u_emp" hint="Needed so “own” records (report, attendance, slip) can be found">
-              <select id="u_emp" className="input" value={f.empCode} onChange={(e) => setF({ ...f, empCode: e.target.value })}>
-                <option value="">Not an employee</option>
-                {(emps.data || []).map((e) => <option key={e._id} value={e.empCode}>{e.name} ({e.empCode})</option>)}
-              </select>
+              <LookupSelect id="u_emp" kind="employees" by="empCode" value={f.empCode} onChange={(it) => setF({ ...f, empCode: it ? it.id : '' })} placeholder="Not an employee — search to link one" />
             </Field>
           )}
           <div>

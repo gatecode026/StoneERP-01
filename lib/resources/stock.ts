@@ -20,6 +20,8 @@ export const stockitems: ResourceDef = {
   listFields: ['name', 'category', 'unit', 'size', 'thickness', 'finish', 'grade', 'location', 'balance', 'minLevel', 'sellRate', 'costRate', 'allowNegative'],
   sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish'],
   filters: { category: { enum: ['raw', 'finished', 'consumable'] }, grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
+  named: { low: (v) => (v === '1' ? { belowMin: true } : {}) }, // uses the indexed flag kept by incBalance
+  computed: { value: { expr: { $multiply: [{ $ifNull: ['$balance', 0] }, { $ifNull: ['$costRate', 0] }] }, needs: ['costRate'] } },
   serverOnly: ['balance', 'belowMin'],
   create: z.object({ ...itemFields, openingBalance: num(0, 1e9).optional() }).strict(),
   update: z.object(itemFields).partial().strict(),
@@ -85,6 +87,8 @@ export const purchases: ResourceDef = {
   listFields: ['date', 'supplierId', 'supplierName', 'itemId', 'itemName', 'qty', 'rate', 'gstPercent', 'total', 'paidAmount', 'outstanding', 'prevRate', 'billNo', 'payMode', 'dueDate', 'status', 'approvedBy', 'hasBill'],
   sortable: ['date', 'dueDate', 'createdAt', 'total'], defaultSort: '-date', searchFields: ['itemName', 'supplierName', 'billNo'],
   dateFields: ['date', 'dueDate'], filters: { supplierId: 'oid', itemId: 'oid', status: { enum: ['approved', 'pending', 'rejected'] }, billNo: 'string' },
+  named: { payable: (v) => (v === '1' ? { status: 'approved', outstanding: { $gt: 0 } } : {}) },
+  statFields: ['total', 'outstanding', 'paidAmount'],
   serverOnly: ['total', 'paidAmount', 'outstanding', 'prevRate', 'status', 'approvedBy', 'approvedAt', 'supplierName', 'itemName', 'stockMovementId', 'hasBill'],
   create: z.object({ date: dateStr.optional(), supplierId: oidStr, itemId: oidStr, qty: posNum(1e9), rate: posNum(1e8), gstPercent: z.coerce.number().refine((v) => [0, 5, 12, 18, 28].includes(v)).optional(), billNo: text(60).optional(), billPhoto: photo.optional(), paidNow: z.boolean().optional(), payMode: enumOf(['Cash', 'UPI', 'Bank']).optional(), dueDate: dateStr.optional() }).strict(),
   lifecycle: {

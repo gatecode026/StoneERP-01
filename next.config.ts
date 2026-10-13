@@ -18,8 +18,7 @@ const nextConfig: NextConfig = {
     if (isProd) common.push({ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' });
     return [
       { source: '/:path*', headers: common },
-      // API responses are never cacheable by shared caches unless a route says so explicitly
-      { source: '/api/:path*', headers: [{ key: 'Cache-Control', value: 'private, no-store' }] },
+      // /api responses default to `private, no-store`; lib/api/route.ts sets it (masters opt into ETag revalidation)
     ];
   },
 };

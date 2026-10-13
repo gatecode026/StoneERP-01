@@ -8,6 +8,7 @@ import type { SessionUser } from '../auth/session';
 import type { AppSettings } from '../settings';
 import { addDays, daysBetween, daysInMonth, monthEnd, monthOf, monthStart, todayIST } from '../time';
 import { fmtInr } from '../fmt';
+import { trackQueries } from '../api/reqctx';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const r0 = (n: number) => Math.round(Number(n) || 0);
@@ -82,6 +83,7 @@ async function performanceAll(month: string) {
 }
 
 const perfSnapSchema = new mongoose.Schema({ _id: String, workingDays: Number, rows: mongoose.Schema.Types.Mixed }, { timestamps: true, versionKey: false });
+perfSnapSchema.plugin(trackQueries);
 const PerfSnapshot = mongoose.models.PerfSnapshot || mongoose.model('PerfSnapshot', perfSnapSchema);
 
 /**

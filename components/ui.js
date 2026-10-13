@@ -142,6 +142,18 @@ export function RoleGuard({ perm, children }) {
   return children;
 }
 
+/** Footer for a paged list: how many are shown, and the button for the next page. */
+export function LoadMore({ list }) {
+  if (!list.rows.length) return null;
+  const total = list.total == null ? null : list.total > 10000 ? '10,000+' : list.total;
+  return (
+    <div className="mt-3 flex flex-col items-center gap-1.5">
+      <div className="text-xs text-char-500">Showing {list.rows.length}{total != null ? ` of ${total}` : ''}</div>
+      {list.hasMore && <button className="btn-outline" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? 'Loading…' : 'Load more'}</button>}
+    </div>
+  );
+}
+
 export function ExportBtn({ onClick, label }) {
   const { t } = useApp();
   return <button className="btn-outline btn-sm" onClick={onClick}><Download size={14} /> {label || t('export')}</button>;

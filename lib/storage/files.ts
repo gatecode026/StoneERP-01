@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import mongoose, { Schema } from 'mongoose';
 import { badRequest, payloadTooLarge } from '../errors';
 import { getStorage, newKey, thumbOf, type Stored } from './index';
+import { trackQueries } from '../api/reqctx';
 
 export const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // what a phone camera can send before we shrink it
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
@@ -26,6 +27,7 @@ const fileSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false }, versionKey: false }
 );
 fileSchema.index({ uploadedById: 1, createdAt: -1 });
+fileSchema.plugin(trackQueries);
 export const FileObject = mongoose.models.FileObject || mongoose.model('FileObject', fileSchema);
 
 const DATA_URL = /^data:([a-z]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i;

@@ -4,7 +4,7 @@ import { Block, Machine, MachineEntry, Repair, Royalty, StockItem, Vehicle, Vehi
 import { MACHINE_TYPES } from '../models/production';
 import type { ResourceDef } from '../api/resource';
 import { badRequest, conflict } from '../errors';
-import { minutesBetween, todayIST } from '../time';
+import { addDays, minutesBetween, todayIST } from '../time';
 import { applyStock, nextSeq, oid, reverseStockFor, round2 } from '../services/core';
 import { employeeByCode, machineById } from '../services/lookup';
 import * as roll from '../rollup/dailySummary';
@@ -44,6 +44,7 @@ export const machineentries: ResourceDef = {
   listFields: ['date', 'shift', 'machineId', 'machineName', 'machineType', 'operatorCode', 'operatorName', 'startTime', 'stopTime', 'hoursRun', 'hourMeterStart', 'hourMeterEnd', 'workDone', 'outputSqft', 'pieces', 'blockNo', 'wasteSqft', 'wasteReason', 'stoppedMins', 'stopReason', 'breakdown', 'bladeChanged', 'bladeCost', 'electricityUnits', 'dieselLitres', 'remarks'],
   sortable: ['date', 'createdAt', 'outputSqft'], defaultSort: '-date', searchFields: ['machineName', 'operatorName', 'workDone'],
   dateFields: ['date'], filters: { date: 'date', machineId: 'oid', operatorCode: 'string', blockNo: 'number', shift: { enum: ['Day', 'Night'] }, breakdown: 'bool' },
+  statFields: ['outputSqft', 'stoppedMins', 'wasteSqft', 'pieces'],
   serverOnly: ['machineName', 'machineType', 'operatorName', 'hoursRun', 'repairId'],
   create: z.object(entryFields).strict(),
   update: z.object({ remarks: text(1000), photo, wasteReason: text(300), workDone: text(500) }).partial().strict(),
@@ -166,6 +167,7 @@ export const repairs: ResourceDef = {
   listFields: ['kind', 'date', 'machineId', 'machineName', 'problem', 'action', 'spares', 'cost', 'stoppedHours', 'mechanic', 'status', 'reportedByCode'],
   sortable: ['date', 'createdAt'], defaultSort: '-date', searchFields: ['machineName', 'problem', 'spares'],
   dateFields: ['date'], filters: { status: { enum: ['open', 'closed'] }, kind: { enum: ['breakdown', 'service'] }, machineId: 'oid' },
+  statFields: ['cost', 'stoppedHours'],
   serverOnly: ['machineName', 'reportedByCode'],
   create: z.object(repairFields).strict(),
   update: z.object(repairFields).partial().omit({ kind: true, machineId: true }).strict(),
@@ -196,6 +198,7 @@ export const vehicles: ResourceDef = {
   key: 'vehicles', model: Vehicle, label: (d) => d.name,
   listFields: ['name', 'regNo', 'kind', 'driverCode', 'insuranceExpiry', 'fitnessExpiry', 'permitExpiry', 'pucExpiry', 'notes'],
   sortable: ['name', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'regNo'], filters: { kind: { enum: ['Truck', 'Tractor', 'Loader', 'Crane', 'Other'] }, driverCode: 'string' },
+  named: { expiring: (v) => { const days = Number(v); if (!(days >= 1 && days <= 365)) return {}; const to = addDays(todayIST(), days); return { $or: ['insuranceExpiry', 'fitnessExpiry', 'permitExpiry', 'pucExpiry'].map((f) => ({ [f]: { $gt: '', $lte: to } })) }; } },
   create: z.object(vehicleFields).strict(), update: z.object(vehicleFields).partial().strict(),
 };
 
@@ -203,7 +206,9 @@ export const vehicletrips: ResourceDef = {
   key: 'vehicletrips', model: VehicleTrip, label: (d) => `${d.vehicleName} ${d.date}`,
   listFields: ['date', 'vehicleId', 'vehicleName', 'driverCode', 'driverName', 'work', 'hours', 'km', 'hourMeter', 'odometer', 'dieselLitres', 'dieselAmount', 'dieselPerUnit'],
   sortable: ['date', 'createdAt'], defaultSort: '-date', searchFields: ['vehicleName', 'driverName', 'work'],
-  dateFields: ['date'], filters: { vehicleId: 'oid', driverCode: 'string', date: 'date' }, serverOnly: ['vehicleName', 'driverName', 'dieselPerUnit'],
+  dateFields: ['date'], filters: { vehicleId: 'oid', driverCode: 'string', date: 'date' }, statFields: ['dieselLitres', 'dieselAmount', 'km', 'hours', 'dieselPerUnit'],
+  named: { measured: (v) => (v === '1' ? { dieselPerUnit: { $gt: 0 } } : {}) }, // trips where litres per hour/km could be worked out
+  serverOnly: ['vehicleName', 'driverName', 'dieselPerUnit'],
   create: z.object({ date: dateStr.optional(), vehicleId: oidStr, driverCode: empCode.optional(), work: text(300).optional(), hours: num().optional(), km: num().optional(), hourMeter: num().optional(), odometer: num().optional(), dieselLitres: num(0, 5000), dieselAmount: num().optional() }).strict(),
   update: z.object({ work: text(300), hours: num(), km: num(), dieselLitres: num(0, 5000), dieselAmount: num() }).partial().strict(),
   lifecycle: {

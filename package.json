@@ -17,7 +17,8 @@
     "perf:seed": "tsx scripts/perf-seed.ts",
     "perf:bench": "tsx scripts/perf-bench.ts",
     "migrate:photos": "tsx scripts/migrate-photos.ts",
-    "job:reconcile": "tsx scripts/reconcile.ts"
+    "job:reconcile": "tsx scripts/reconcile.ts",
+    "job": "tsx scripts/job.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",

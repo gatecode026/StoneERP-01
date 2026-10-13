@@ -4,8 +4,10 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, Lock, Check, X, Pencil } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, cx } from '@/components/ui';
-import { api, submit, downloadCSV } from '@/lib/client';
+import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, LoadMore, cx } from '@/components/ui';
+import LookupSelect from '@/components/LookupSelect';
+import { usePagedList, toQuery } from '@/lib/usePaged';
+import { api, submit } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, num } from '@/lib/format';
 
@@ -16,9 +18,12 @@ export default function DailyReportPage() {
   const sp = useSearchParams();
   const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
   const [date, setDate] = useState(sp.get('date') || todayISO());
-  const { data, loading, reload } = useFetch(`/api/dailyreports?date=${date}&sort=empName`);
-  const emps = useFetch(isWorker || !can('employees') ? null : '/api/employees?status=active&limit=500&sort=name');
+  // workers see their own recent reports; everybody else sees the chosen day, a page at a time, plus who has not filled it (2 requests)
+  const day = usePagedList(isWorker ? null : '/api/dailyreports', { date, sort: 'empName' }, { limit: 30 });
+  const missingQ = useFetch(isWorker ? null : `/api/dailyreports/missing?date=${date}`);
   const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=10' : null);
+  const { loading } = day;
+  const reload = () => { day.reload(); missingQ.reload?.(); };
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(blank());
@@ -56,9 +61,9 @@ export default function DailyReportPage() {
     try { await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck, supRemark: remark } }); toast.success(supCheck === 'ok' ? 'Marked OK' : 'Marked not OK'); reload(); } catch (e) { toast.error(e.message); }
   }
 
-  const rows = data || [];
-  const filledCodes = new Set(rows.map((r) => r.empCode));
-  const missing = (emps.data || []).filter((e) => !filledCodes.has(e.empCode));
+  const rows = day.rows;
+  const missing = missingQ.data?.people || [];
+  const missingCount = missingQ.data?.count || 0;
   const canCheck = can('dailyreports', 'approve');
 
   const Card = ({ r }) => {
@@ -95,7 +100,7 @@ export default function DailyReportPage() {
       <PageHeader title={t('dailyReport')} subtitle={isWorker ? 'What you did today, in your own words' : `Every employee's report for ${fmtDate(date)}`}
         actions={<>
           {!isWorker && <input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} />}
-          {!isWorker && rows.length > 0 && <ExportBtn onClick={() => downloadCSV(`daily-reports-${date}`, rows, [{ key: 'empName', label: 'Employee' }, { key: 'job', label: 'Job' }, { key: 'narration', label: 'Work done' }, { key: 'hours', label: 'Hours' }, { key: 'quantity', label: 'Quantity sq ft' }, { key: 'problem', label: 'Problem' }, { key: 'plan', label: 'Plan' }, { key: 'supCheck', label: 'Supervisor check' }])} />}
+          {!isWorker && can('dailyreports', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/dailyreports?${toQuery({ date, sort: 'empName' })}`)} />}
           <button className="btn-primary" onClick={() => openNew()}><Plus size={18} /> {isWorker ? 'Fill today\'s report' : t('add')}</button>
         </>} />
 
@@ -104,10 +109,11 @@ export default function DailyReportPage() {
       ) : loading ? <SkeletonList /> : (
         <>
           {!rows.length ? <Empty text={`No reports for ${fmtDate(date)} yet`} /> : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r) => <Card key={r._id} r={r} />)}</div>}
-          {missing.length > 0 && (
+          <LoadMore list={day} />
+          {missingCount > 0 && (
             <div className="card p-4 mt-4 border-amber-200 bg-amber-50">
-              <div className="font-bold text-sm mb-2">Not filled ({missing.length})</div>
-              <div className="flex flex-wrap gap-1.5">{missing.map((e) => <span key={e._id} className="badge-amber">{e.name}</span>)}</div>
+              <div className="font-bold text-sm mb-2">Not filled ({missingCount})</div>
+              <div className="flex flex-wrap gap-1.5">{missing.map((e) => <span key={e.empCode} className="badge-amber">{e.name}</span>)}{missingCount > missing.length && <span className="text-xs text-char-500 self-center">+ {missingCount - missing.length} more</span>}</div>
             </div>
           )}
         </>
@@ -119,10 +125,7 @@ export default function DailyReportPage() {
         <div className="space-y-4">
           {!isWorker && !editing && (
             <Field label="Employee (you are filling for)" required>
-              <select className="input" value={form.empCode} onChange={(e) => set({ empCode: e.target.value })}>
-                <option value="">Select employee…</option>
-                {(emps.data || []).map((e) => <option key={e._id} value={e.empCode}>{e.name} · {e.job}</option>)}
-              </select>
+              <LookupSelect kind="employees" by="empCode" value={form.empCode} onChange={(it) => set({ empCode: it ? it.id : '' })} />
             </Field>
           )}
           <Field label={t('workDone')} required>

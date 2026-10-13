@@ -86,3 +86,4 @@ export async function resetRoleConfig(key: string) {
   await RolePermission.findOneAndUpdate({ _id: '_meta' }, { $inc: { version: 1 } }, { upsert: true });
   invalidate();
 }
+export const permVersion = () => cache.version;
