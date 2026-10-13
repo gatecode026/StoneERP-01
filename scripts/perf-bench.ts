@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Benchmarks against the perf database made by scripts/perf-seed.ts. Never run against production.
+ * Benchmarks an already-populated test database (the seed script was removed: load your own data). Never run against production.
  *   explain  --label before|after [--sync-indexes]   explain("executionStats") for every hot query -> docs/perf/explain-<label>.json
  *   http     [--base http://localhost:3100]          API latency (cold + warm, p50/p95) for each role  -> docs/perf/http.json
  *   report                                            writes docs/PERF_REPORT.md from the JSON files above

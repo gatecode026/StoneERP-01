@@ -1,6 +1,6 @@
 # Performance report
 
-Generated 2026-10-13 from `scripts/perf-seed.ts` data (separate database, never production).
+Generated 2026-10-13 from a production-scale test dataset (separate database, never production; the generator script has since been removed).
 
 ## Dataset
 
