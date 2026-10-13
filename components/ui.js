@@ -10,7 +10,7 @@ export const cx = (...a) => a.filter(Boolean).join(' ');
 
 export function PageHeader({ title, subtitle, actions, back }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3 mb-4">
       <div className="min-w-0">
         {back && (
           <Link href={back} className="inline-flex items-center text-xs text-char-500 mb-1 hover:text-terra"><ChevronLeft size={14} /> Back</Link>
@@ -18,7 +18,7 @@ export function PageHeader({ title, subtitle, actions, back }) {
         <h1 className="text-xl md:text-2xl font-bold text-char leading-tight">{title}</h1>
         {subtitle && <p className="text-sm text-char-500 mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2 no-print">{actions}</div>}
+      {actions && <div className="page-actions no-print">{actions}</div>}
     </div>
   );
 }
@@ -119,7 +119,7 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
 
 export function Tabs({ tabs, value, onChange }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
+    <div className="tabs-row flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
       {tabs.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
           className={cx('shrink-0 min-h-[40px] px-4 rounded-full text-sm font-semibold border transition',

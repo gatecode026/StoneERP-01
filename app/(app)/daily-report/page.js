@@ -115,12 +115,12 @@ export default function DailyReportPage() {
           <Pager list={day} />
           {missingCount > 0 && (
             <div className="card p-4 mt-4 border-amber-200 bg-amber-50">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-bold text-sm">Not filled yet</div>
                   <div className="text-xs text-char-500">{missingCount} {missingCount === 1 ? 'person has' : 'people have'} not sent a report for {fmtDate(date)}</div>
                 </div>
-                {missing.length > 12 && <button className="btn-outline btn-sm" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>{showAll ? 'Show fewer' : `Show all ${missing.length}`}</button>}
+                {missing.length > 12 && <button className="btn-outline btn-sm shrink-0" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>{showAll ? 'Hide' : 'Show all'}</button>}
               </div>
               <div className={cx('flex flex-wrap gap-1.5 mt-3', showAll && 'max-h-64 overflow-y-auto pr-1')}>
                 {(showAll ? missing : missing.slice(0, 12)).map((e) => <span key={e.empCode} className="badge-amber" title={e.job}>{e.name}</span>)}

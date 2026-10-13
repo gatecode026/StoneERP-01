@@ -45,7 +45,7 @@ export default function ImportEmployees() {
 
   return (
     <>
-      <button className="btn-outline btn-sm" onClick={() => setOpen(true)}><FileSpreadsheet size={14} /> Import from Excel</button>
+      <button className="btn-outline btn-sm" onClick={() => setOpen(true)}><FileSpreadsheet size={14} /> <span className="sm:hidden">Import</span><span className="hidden sm:inline">Import from Excel</span></button>
       <Sheet open={open} onClose={() => { setOpen(false); reset(); }} title="Import employees from Excel" wide
         footer={<>
           <button className="btn-outline" onClick={() => { setOpen(false); reset(); }}>Close</button>

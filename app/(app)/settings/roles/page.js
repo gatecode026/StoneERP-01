@@ -66,12 +66,13 @@ function RolesEditor() {
         ))}
       </div>
 
-      <div className="card p-3 mb-3 flex flex-wrap items-center gap-2 sticky top-[56px] z-30">
-        <ShieldCheck size={18} className="text-terra" />
+      <div className="card p-3 mb-3 grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 sticky top-[56px] z-30">
+        <div className="col-span-3 flex items-center gap-2 sm:contents"><ShieldCheck size={18} className="text-terra shrink-0" />
         <div className="text-sm flex-1 min-w-[160px]"><b>{role.label.en}</b> {role.base ? <Badge tone="gray">base role</Badge> : <Badge tone="blue">job preset</Badge>}{dirty && <Badge tone="amber" className="ml-1.5">unsaved</Badge>}</div>
-        <button className="btn-outline btn-sm" onClick={() => setPreview(true)}><Eye size={14} /> View as this role</button>
-        <button className="btn-outline btn-sm" onClick={reset} disabled={busy || !role.custom}><RotateCcw size={14} /> Reset to defaults</button>
-        <button className="btn-primary btn-sm" onClick={save} disabled={busy || !dirty}><Save size={14} /> Save</button>
+        </div>
+        <button className="btn-outline btn-sm w-full sm:w-auto" onClick={() => setPreview(true)}><Eye size={14} /> <span>View as</span></button>
+        <button className="btn-outline btn-sm w-full sm:w-auto" onClick={reset} disabled={busy || !role.custom}><RotateCcw size={14} /> Reset</button>
+        <button className="btn-primary btn-sm w-full sm:w-auto" onClick={save} disabled={busy || !dirty}><Save size={14} /> Save</button>
       </div>
 
       <Section title="Hidden information (applies to every screen)" className="mb-3">

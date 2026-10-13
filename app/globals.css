@@ -63,3 +63,30 @@ body { font-family: system-ui, 'Segoe UI', var(--font-deva), 'Noto Sans Devanaga
 
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---- mobile polish -------------------------------------------------------------------------------------------------------------- */
+/* one tidy action bar under every page title: wraps, equal heights, date / month / select controls share the row instead of one per line */
+.page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; width: 100%; }
+@media (min-width: 640px) { .page-actions { width: auto; justify-content: flex-end; } }
+.page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 44px; }
+.page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input {
+  width: auto !important; flex: 1 1 140px; min-width: 0; max-width: 100%; min-height: 44px;
+}
+@media (min-width: 640px) { .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input { flex: 0 0 auto; } }
+/* the primary action ("Add", "New entry") always sits at the end of the bar and is easy to hit */
+.page-actions > .btn-primary { margin-left: auto; }
+/* tab rows scroll sideways; a soft edge shows there is more */
+@media (max-width: 767px) { .tabs-row { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); scroll-snap-type: x proximity; } .tabs-row > * { scroll-snap-align: start; } }
+/* nothing may push the page wider than the phone */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, video, canvas, svg { max-width: 100%; }
+@media (max-width: 480px) { .card { border-radius: 1rem; } }
+.tabs-row { scroll-padding-left: 1rem; scroll-padding-right: 1rem; }
+.page-actions input[type='month'] { min-width: 172px; }
+.page-actions input[type='date'] { min-width: 150px; }
+/* an odd last stat card spans the full row instead of sitting alone in half of it */
+@media (max-width: 767px) { .grid.grid-cols-2 > :last-child:nth-child(odd) { grid-column: span 2; } }
+@media (max-width: 639px) {
+  .filter-row > div:first-child { flex: 1 1 100%; }
+  .filter-row > select { flex: 1 1 calc(50% - .25rem); width: auto !important; min-width: 0 !important; }
+}

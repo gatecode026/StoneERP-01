@@ -47,7 +47,7 @@ export default function ImportData({ resource, perm, noun, hint }) {
 
   return (
     <>
-      <button className="btn-outline btn-sm" onClick={() => setOpen(true)}><FileSpreadsheet size={14} /> Import from Excel</button>
+      <button className="btn-outline btn-sm" onClick={() => setOpen(true)}><FileSpreadsheet size={14} /> <span className="sm:hidden">Import</span><span className="hidden sm:inline">Import from Excel</span></button>
       <Sheet open={open} onClose={close} title={`Import ${noun} from Excel`} wide
         footer={<>
           <button className="btn-outline" onClick={close}>Close</button>

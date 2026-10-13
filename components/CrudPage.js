@@ -315,7 +315,7 @@ export default function CrudPage({
           </>} />
       )}
       {topContent}
-      <div className="flex flex-wrap gap-2 mb-3">
+      <div className="filter-row flex flex-wrap gap-2 mb-3">
         <SearchBox value={q} onChange={setQ} />
         {filters.map((f) => (
           <select key={f.key} aria-label={f.label} className="input !w-auto min-w-[130px]" value={fv[f.key] || ''} onChange={(e) => setFv({ ...fv, [f.key]: e.target.value })}>

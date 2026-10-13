@@ -30,7 +30,7 @@ function Brand({ compact }) {
 function LangToggle() {
   const { lang, setLang } = useApp();
   return (
-    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label="Language">
+    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1 h-11 min-w-[44px] px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label="Language">
       <Languages size={14} /> {lang === 'en' ? 'हिं' : 'EN'}
     </button>
   );
@@ -106,16 +106,16 @@ export default function Shell({ children }) {
       <div className={cx('min-w-0 flex flex-col transition-all duration-200 ease-in-out', collapsed ? 'md:pl-[68px]' : 'md:pl-64')}>
         {/* Top bar */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-sand-200 no-print">
-          <div className="flex items-center justify-between gap-2 px-4 h-14">
-            <div className="md:hidden"><Brand /></div>
+          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-14">
+            <div className="md:hidden min-w-0 flex-1"><Brand /></div>
             <div className="hidden md:flex items-center gap-2">
               <span className="font-bold">{t('appName')}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
               <button className="h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label="Search screens"><Search size={16} /></button>
               <LangToggle />
-              <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
+              <button className="md:hidden h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
           </div>
           {(!online || queued > 0) && (
