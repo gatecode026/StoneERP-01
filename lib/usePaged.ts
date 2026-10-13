@@ -84,3 +84,13 @@ export function usePagedList(path: string | null, params: Record<string, unknown
 
   return { rows, total, loading, loadingMore, error, hasMore: !!cursor, loadMore, reload: load, meta };
 }
+
+/** A list shown as numbered pages (Prev / 1 2 3 / Next): the server returns page N and the exact total; changing the search or filters goes back to page 1. */
+export function useNumberedList(path: string | null, params: Record<string, unknown> = {}, opts: { size?: number } = {}) {
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(opts.size ?? 25);
+  const narrowing = JSON.stringify([path, params]);
+  useEffect(() => { setPage(1); }, [narrowing, size]);
+  const list = usePagedList(path, { ...params, page }, { limit: size });
+  return { ...list, page, setPage, size, setSize };
+}

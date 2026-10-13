@@ -10,5 +10,5 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth('attendance', 'view', async (auth) => {
   const date = dateStr.default(todayIST()).parse(auth.query.get('date') ?? undefined);
   if (date > todayIST()) throw badRequest('Choose today or an earlier day');
-  return attendanceSheet(auth, date, { q: auth.query.get('q') ?? undefined, after: auth.query.get('cursor') ?? undefined, limit: Number(auth.query.get('limit') ?? 50) || 50 });
+  return attendanceSheet(auth, date, { q: auth.query.get('q') ?? undefined, after: auth.query.get('cursor') ?? undefined, page: Number(auth.query.get('page') ?? 0) || undefined, limit: Number(auth.query.get('limit') ?? 50) || 50 });
 });

@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from '@/components/Providers';
-import { RoleGuard, PageHeader, DataList, Badge, ExportBtn, LoadMore } from '@/components/ui';
-import { toQuery, usePagedList } from '@/lib/usePaged';
+import { RoleGuard, PageHeader, DataList, Badge, ExportBtn, Pager } from '@/components/ui';
+import { toQuery, useNumberedList } from '@/lib/usePaged';
 import { fmtDateTime } from '@/lib/format';
 
 // record types worth filtering by (indexed on the server: model + time)
@@ -13,7 +13,7 @@ export default function AuditPage() {
   const [model, setModel] = useState('');
   // newest first, a page at a time; the filter runs on the server (the log can hold millions of rows)
   const params = { sort: '-at', ...(model ? { model } : {}) };
-  const list = usePagedList('/api/auditlogs', params, { limit: 50, count: false });
+  const list = useNumberedList('/api/auditlogs', params, { size: 50 });
   const { loading, rows } = list;
   return (
     <RoleGuard perm="auditlogs">
@@ -28,7 +28,7 @@ export default function AuditPage() {
         { key: 'label', label: 'Item', render: (r) => r.label || '—' },
         { key: 'changes', label: 'Changes', wide: true, render: (r) => (r.changes ? Object.entries(r.changes).map(([k, v]) => <div key={k} className="text-xs"><b>{k}:</b> {v.from !== undefined && <span className="text-red-600 line-through mr-1">{String(v.from)}</span>}<span className="text-emerald-700">{String(v.to)}</span></div>) : '—') },
       ]} />
-      {!loading && <LoadMore list={list} />}
+      <Pager list={list} />
     </RoleGuard>
   );
 }

@@ -4,9 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Plus, MessageCircle } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
-import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, ExportBtn, LoadMore, SearchBox } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, ExportBtn, Pager, SearchBox } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
-import { toQuery, useDebounced, usePagedList } from '@/lib/usePaged';
+import { toQuery, useDebounced, useNumberedList } from '@/lib/usePaged';
 import { useApp, useFetch } from '@/components/Providers';
 import { CUSTOMER_FIELDS } from '@/components/fields';
 import { openWA } from '@/lib/client';
@@ -25,8 +25,8 @@ export default function SalesPage() {
   // the numbers on top: one request. The lists below page by themselves and are searched / filtered by the server.
   const ov = useFetch('/api/sales/overview');
   const listParams = tab === 'quotations' ? { stage: 'quotation', sort: '-date' } : tab === 'pending' ? { pending: '1', sort: 'date' } : { stage: 'order,dispatched', sort: '-date' };
-  const sales = usePagedList(tab === 'orders' || tab === 'quotations' || tab === 'pending' ? '/api/sales' : null, { ...listParams, ...(dq ? { q: dq } : {}) });
-  const items = usePagedList(tab === 'rates' ? '/api/stockitems' : null, { category: 'finished', sort: 'name' }, { limit: 50 });
+  const sales = useNumberedList(tab === 'orders' || tab === 'quotations' || tab === 'pending' ? '/api/sales' : null, { ...listParams, ...(dq ? { q: dq } : {}) });
+  const items = useNumberedList(tab === 'rates' ? '/api/stockitems' : null, { category: 'finished', sort: 'name' }, { size: 25 });
   const today = todayISO();
   const pend = (s) => Math.max(0, s.outstanding ?? (s.total || 0) - (s.paid || 0));
   const list = sales.rows;
@@ -63,7 +63,7 @@ export default function SalesPage() {
       {(tab === 'orders' || tab === 'quotations') && (
         <>
           <DataList loading={sales.loading} rows={list} columns={columns} onRowClick={(r) => router.push(`/sales/${r._id}`)} empty={tab === 'orders' ? 'No orders yet' : 'No quotations'} />
-          {!sales.loading && <LoadMore list={sales} />}
+          <Pager list={sales} />
         </>
       )}
 
@@ -76,7 +76,7 @@ export default function SalesPage() {
         ]} actions={(r) => (
           <button className="btn-green btn-sm" onClick={() => openWA(`Dear ${r.customerName}, gentle reminder from Vipul Stone Suppliers: ${inr(r.pending)} is pending against order ${r.saleNo}${r.invoiceNo ? ` (Invoice ${r.invoiceNo})` : ''}. Kindly arrange the payment at the earliest. Thank you.`, r.customerMobile)}><MessageCircle size={14} /> Remind</button>
         )} />
-        {!sales.loading && <LoadMore list={sales} />}
+        <Pager list={sales} />
       </>)}
 
       {tab === 'customers' && (
@@ -111,7 +111,7 @@ function RateList({ items }) {
         { key: 'name', label: 'Product', primary: true }, { key: 'unit', label: 'Unit' }, { key: 'sellRate', label: 'List rate', align: 'right', render: (r) => <b>₹{num(r.sellRate)}</b> },
         { label: 'Last rate to customer', render: (r) => (cust ? (hist.loading ? '…' : last[r._id] ? `₹${num(last[r._id].rate)} (${fmtDate(last[r._id].date)})` : 'Not sold before') : '—') },
       ]} />
-      {!items.loading && <LoadMore list={items} />}
+      <Pager list={items} />
     </div>
   );
 }

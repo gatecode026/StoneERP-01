@@ -5,9 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { CheckCircle2 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
-import { RoleGuard, Tabs, Badge, DataList, LoadMore } from '@/components/ui';
+import { RoleGuard, Tabs, Badge, DataList, Pager } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
-import { usePagedList } from '@/lib/usePaged';
+import { useNumberedList } from '@/lib/usePaged';
 import { useApp, useFetch } from '@/components/Providers';
 import { api } from '@/lib/client';
 import { addDays, todayISO, fmtDate, inr, monthOf, daysInMonth } from '@/lib/format';
@@ -23,7 +23,7 @@ export default function RepairsPage() {
   const month = monthOf(today);
   // machines are a small master list; everything else is asked of the server for just the tab that is open
   const machines = useFetch('/api/machines?sort=name&limit=100');
-  const hrep = usePagedList(tab === 'history' && hist ? '/api/repairs' : null, { machineId: hist, sort: '-date' });
+  const hrep = useNumberedList(tab === 'history' && hist ? '/api/repairs' : null, { machineId: hist, sort: '-date' });
   const monthly = useFetch(tab === 'monthly' ? `/api/repairs/facets?by=machineId&sum=cost,stoppedHours&from=${month}-01&to=${month}-${String(daysInMonth(month)).padStart(2, '0')}` : null);
 
   const fields = [
@@ -85,7 +85,7 @@ export default function RepairsPage() {
       {tab === 'history' && (
         <div>
           <div className="mb-3"><LookupSelect kind="machines" value={hist} onChange={(it) => setHist(it ? it.id : '')} placeholder="Select a machine…" /></div>
-          {hist && <><DataList loading={hrep.loading} rows={hrep.rows} columns={columns} empty="No repair or service recorded for this machine" />{!hrep.loading && <LoadMore list={hrep} />}</>}
+          {hist && <><DataList loading={hrep.loading} rows={hrep.rows} columns={columns} empty="No repair or service recorded for this machine" /><Pager list={hrep} /></>}
         </div>
       )}
 

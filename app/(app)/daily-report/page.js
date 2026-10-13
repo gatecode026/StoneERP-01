@@ -5,9 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, Lock, Check, X, Pencil } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, LoadMore, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, cx } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
-import { usePagedList, toQuery } from '@/lib/usePaged';
+import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, num } from '@/lib/format';
@@ -20,7 +20,7 @@ export default function DailyReportPage() {
   const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
   const [date, setDate] = useState(sp.get('date') || todayISO());
   // workers see their own recent reports; everybody else sees the chosen day, a page at a time, plus who has not filled it (2 requests)
-  const day = usePagedList(isWorker ? null : '/api/dailyreports', { date, sort: 'empName' }, { limit: 30 });
+  const day = useNumberedList(isWorker ? null : '/api/dailyreports', { date, sort: 'empName' }, { size: 25 });
   const missingQ = useFetch(isWorker ? null : `/api/dailyreports/missing?date=${date}`);
   const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=10' : null);
   const { loading } = day;
@@ -110,7 +110,7 @@ export default function DailyReportPage() {
       ) : loading ? <SkeletonList /> : (
         <>
           {!rows.length ? <Empty text={`No reports for ${fmtDate(date)} yet`} /> : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r) => <Card key={r._id} r={r} />)}</div>}
-          <LoadMore list={day} />
+          <Pager list={day} />
           {missingCount > 0 && (
             <div className="card p-4 mt-4 border-amber-200 bg-amber-50">
               <div className="font-bold text-sm mb-2">Not filled ({missingCount})</div>

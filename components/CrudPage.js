@@ -155,7 +155,7 @@ export async function saveWithConfirm(path, body, opts) {
 const same = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
 export default function CrudPage({
-  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination,
+  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination = 25,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
 }) {

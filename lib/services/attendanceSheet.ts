@@ -15,7 +15,7 @@ export async function markableFilter(auth: AuthCtx): Promise<Record<string, any>
  * One request for the whole "mark attendance" screen: a page of people (alphabetical by code) with today's mark merged in,
  * plus exact counts for the whole team (not just the loaded page).
  */
-export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: string; after?: string; limit?: number }) {
+export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: string; after?: string; page?: number; limit?: number }) {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
   const teamSf = await markableFilter(auth);
   const base: Record<string, any> = { status: 'active', isVoid: false };
@@ -24,7 +24,7 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
   const pageFilter = { $and: [base, teamSf, search, ...(opts.after ? [{ empCode: { $gt: opts.after.toUpperCase() } }] : [])] };
 
   const [people, total, marked] = await Promise.all([
-    Employee.find(pageFilter, 'empCode name job').sort({ empCode: 1 }).limit(limit + 1).lean() as Promise<any[]>,
+    Employee.find(pageFilter, 'empCode name job').sort({ empCode: 1 }).skip(opts.page && opts.page > 1 ? (Math.min(opts.page, 200) - 1) * limit : 0).limit(limit + 1).lean() as Promise<any[]>,
     Employee.countDocuments({ $and: [base, teamSf] }),
     // counts for everybody in the team: group today's marks by state (empCodes of the team come from the same filter)
     Employee.find({ $and: [base, teamSf] }, 'empCode').lean().then((emps: any[]) => Attendance.aggregate([

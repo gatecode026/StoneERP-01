@@ -4,9 +4,9 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Camera, CheckCheck, MapPin, Check, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, LoadMore, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, Pager, cx } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
-import { useDebounced, usePagedList } from '@/lib/usePaged';
+import { useDebounced, useNumberedList } from '@/lib/usePaged';
 import CrudPage from '@/components/CrudPage';
 import { submit, api, getLocation } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
@@ -30,7 +30,7 @@ export default function AttendancePage() {
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
   // one request builds the whole sheet: a page of people with today's marks merged in, plus exact counts for the whole team
-  const sheet = usePagedList(isWorker ? null : '/api/attendance/sheet', { date, q: dq }, { limit: 50, count: false });
+  const sheet = useNumberedList(isWorker ? null : '/api/attendance/sheet', { date, q: dq }, { size: 25 });
   const att = useFetch(isWorker ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
   const [over, setOver] = useState({}); // marks tapped on this screen, shown at once (optimistic)
   const [selfie, setSelfie] = useState(false);
@@ -129,7 +129,7 @@ export default function AttendancePage() {
               })}
             </div>
           )}
-          {!sheet.loading && <LoadMore list={sheet} />}
+          <Pager list={sheet} />
           <p className="text-[11px] text-char-500 mt-3 md:hidden">P = Present · A = Absent · ½ = Half day · OT = Overtime · L = Leave</p>
         </>
       )}

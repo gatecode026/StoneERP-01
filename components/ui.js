@@ -207,6 +207,12 @@ export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
   );
 }
 
+/** Pagination bar for a list made with useNumberedList. */
+export function Pager({ list }) {
+  if (list.loading) return null;
+  return <Pagination page={list.page} pageSize={list.size} total={list.total} shown={list.rows.length} onPage={list.setPage} onSize={list.setSize} />;
+}
+
 export function ExportBtn({ onClick, label }) {
   const { t } = useApp();
   return <button className="btn-outline btn-sm" onClick={onClick}><Download size={14} /> {label || t('export')}</button>;
