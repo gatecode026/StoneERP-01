@@ -1,4 +1,5 @@
 'use client';
+import ImportEmployees from '@/components/ImportEmployees';
 import { AlertTriangle } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Badge } from '@/components/ui';
@@ -21,13 +22,13 @@ export default function EmployeesPage() {
       const m = missingDocs(r);
       return m.length ? <Badge tone="red"><AlertTriangle size={11} /> Missing: {m.join(', ')}</Badge> : <Badge tone="green">Complete</Badge>;
     } },
-    { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status === 'left' ? 'void' : 'active'} /> },
+    { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.isVoid ? 'void' : r.status === 'left' ? 'void' : 'active'} /> },
   ];
   return (
     <RoleGuard perm="employees">
       <CrudPage
         model="employees" title={t('employees')} subtitle="One profile per person, with documents" label="Employee"
-        fields={EMPLOYEE_FIELDS} columns={columns} sort="empCode"
+        fields={EMPLOYEE_FIELDS} columns={columns} sort="empCode" wide headerExtra={<ImportEmployees />}
         
         filters={[
           { key: 'job', label: 'All jobs', options: JOBS },

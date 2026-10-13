@@ -175,6 +175,12 @@ export default function CrudPage({
   const facetQs = facets && !facets.url ? toQuery({ ...(facets.query || {}), ...baseQuery, ...filterParams, by: facets.by, sum: facets.sum, named: facets.named }) : null;
   const fac = useFetch(facets ? (facets.url || `/api/${model}/facets?${facetQs}`) : null, [fTick]);
   const reload = () => { list.reload(); setFTick((x) => x + 1); };
+  useEffect(() => { // other components (e.g. the Excel import) announce that this screen's data changed
+    const h = () => reload();
+    window.addEventListener('vss-data-changed', h);
+    return () => window.removeEventListener('vss-data-changed', h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.reload]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
