@@ -90,3 +90,7 @@ img, video, canvas, svg { max-width: 100%; }
   .filter-row > div:first-child { flex: 1 1 100%; }
   .filter-row > select { flex: 1 1 calc(50% - .25rem); width: auto !important; min-width: 0 !important; }
 }
+/* phones: the main action ("New quotation", "Add") is one wide, easy-to-hit button above the tools, never a lone button pushed to the right */
+@media (max-width: 639px) {
+  .page-actions > .btn-primary { order: -1; flex: 1 1 100%; margin-left: 0; justify-content: center; }
+}
