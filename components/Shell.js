@@ -127,7 +127,7 @@ export default function Shell({ children }) {
         </header>
         <SyncSheet open={syncOpen} onClose={() => setSyncOpen(false)} />
 
-        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">{children}</main>
+        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-24 max-w-[1400px] w-full mx-auto">{children}</main>
       </div>
 
       {/* FAB quick add */}

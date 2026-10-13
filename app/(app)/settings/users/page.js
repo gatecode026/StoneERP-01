@@ -62,7 +62,7 @@ export default function UsersPage() {
         { key: 'lastLoginAt', label: 'Last sign-in', render: (r) => (r.lastLoginAt ? fmtDateTime(r.lastLoginAt) : 'never') },
         { key: 'active', label: 'Status', render: (r) => (r.active ? (r.mustChangePassword ? <Badge tone="amber">first sign-in pending</Badge> : <Badge tone="green">active</Badge>) : <Badge tone="red">deactivated</Badge>) },
       ]} actions={(r) => (
-        <div className="flex gap-1 justify-end flex-wrap">
+        <div className="flex items-center gap-1.5 justify-end flex-nowrap whitespace-nowrap">
           {can('users', 'edit') && <button className="icon-btn" aria-label="Edit user" title="Edit" onClick={() => open(r)}><UserCog size={16} /></button>}
           {can('users', 'edit') && <button className="icon-btn" aria-label="Reset password" title="Reset password" onClick={() => reset(r)}><KeyRound size={16} /></button>}
           {can('users', 'edit') && <button className="btn-outline btn-sm" onClick={() => toggle(r)}>{r.active ? 'Deactivate' : 'Activate'}</button>}
