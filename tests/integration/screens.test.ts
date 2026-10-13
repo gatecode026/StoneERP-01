@@ -15,6 +15,8 @@ import * as machMonthly from '@/app/api/machineentries/monthly/route';
 import * as freight from '@/app/api/dispatches/freight/route';
 import * as bulkFreight from '@/app/api/bulk/freight-paid/route';
 import * as approvals from '@/app/api/approvals/route';
+import * as salaryPreview from '@/app/api/salary/preview/route';
+import * as performance from '@/app/api/performance/route';
 import * as orderRoute from '@/app/api/sales/[id]/order/route';
 import * as outRoute from '@/app/api/dispatches/[id]/out/route';
 
@@ -226,6 +228,29 @@ describe('freight: totals per transporter and one-request payment', () => {
     expect((await call(owner, freight.GET as never, '/api/dispatches/freight')).json.rows[0]).toMatchObject({ paid: 3500, pending: 0 });
     expect((await call(acc, bulkFreight.POST as never, '/x', { method: 'POST', body: { transporter: 'Sharma Roadlines' } })).status).toBe(409); // nothing left to pay
     expect((await call(guard, bulkFreight.POST as never, '/x', { method: 'POST', body: { transporter: 'X' } })).status).toBe(403);
+  });
+});
+
+describe('salary sheet and performance: paged on the server, totals over everybody', () => {
+  it('returns one page of rows with the full-sheet totals; all=1 returns everyone', async () => {
+    const month = monthOf(today);
+    const full = (await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&all=1`)).json;
+    const pg = (await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&page=2&limit=5`)).json;
+    expect(full.rows.length).toBeGreaterThan(5);
+    expect(pg.rows).toHaveLength(5);
+    expect(pg).toMatchObject({ page: 2, limit: 5, total: full.rows.length, pages: Math.ceil(full.rows.length / 5) });
+    expect(pg.rows[0].empCode).toBe(full.rows[5].empCode);
+    expect(pg.totals).toEqual(full.totals); // totals never depend on the page
+    expect((await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&q=worker 3`)).json.total).toBe(1);
+    expect((await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&page=999&limit=5`)).json.page).toBe(pg.pages); // out-of-range page = last page
+  });
+  it('performance: ranking and best five over everybody, table paged', async () => {
+    const month = monthOf(today);
+    const full = (await call(owner, performance.GET as never, `/api/performance?month=${month}&all=1`)).json;
+    const pg = (await call(owner, performance.GET as never, `/api/performance?month=${month}&page=1&limit=4`)).json;
+    expect(pg.rows).toHaveLength(4);
+    expect(pg.total).toBe(full.rows.length);
+    expect(pg.top.map((r: any) => r.empCode)).toEqual(full.rows.slice(0, 5).map((r: any) => r.empCode));
   });
 });
 

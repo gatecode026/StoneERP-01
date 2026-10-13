@@ -170,3 +170,7 @@ The local demo database (`vss_dev`) now holds **only the six dashboard logins** 
 ## Numbered pagination on every list  ✅
 
 Every list screen now shows **Prev / 1 2 3 … / Next**, "Showing 26–50 of 100" and a rows-per-page choice (10 / 25 / 50 / 100), with the count and the page supplied by the server: all screens built on the shared list component (employees, stock, movements, expenses, cash book, purchases, suppliers, machines, dispatch, blocks, vehicles, trips, repairs, complaints, tasks, leaves, advances, papers, safety, customers…) plus Sales (orders, quotations, pending, rate list), Attendance sheet, Daily reports, Audit trail and Repairs machine history. A screen can opt out with `pagination={false}`. Searching or filtering returns to page 1. Checked in the browser (employees 1–25 of 100, attendance next page 26–50); the empty screens show no bar until they have rows. 508 tests pass.
+
+## Salary and Performance paged; Daily report "Not filled" list tidied  ✅
+
+Salary sheet and Performance scorecards now show **numbered pages** like every other list. The server pages the table (`?page&limit`, `all=1` for the Excel export) while the sheet totals, the ranking and the "best five" cards are always worked out over everybody. The Daily Work Report's "Not filled" list no longer prints every name: it shows a summary ("100 people have not sent a report"), the first 12 names and a **Show all** toggle that opens a scrollable box. Tests: 510 pass.

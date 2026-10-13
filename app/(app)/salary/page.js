@@ -1,11 +1,11 @@
 'use client';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { BadgeCheck, Save, Banknote, FileText, MessageCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, Sheet, KV, ExportBtn, Section, SkeletonList, Empty } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, Sheet, KV, ExportBtn, Section, SkeletonList, Empty, Pagination } from '@/components/ui';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { api, downloadCSV, openWA } from '@/lib/client';
 import { inr, num, fmtMonth, todayISO, monthOf, addDays, fmtDate } from '@/lib/format';
@@ -19,7 +19,11 @@ export default function SalaryPage() {
   const isWorker = !can('salarysheets'); // people without the sheet only ever see their own slip
   const [tab, setTab] = useState('sheet');
   const [month, setMonth] = useState(prevMonth());
-  const raw = useFetch(isWorker ? `/api/salary/slip?month=${month}` : `/api/salary/preview?month=${month}`);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(25);
+  useEffect(() => { setPage(1); }, [month, size]);
+  // the sheet's totals cover everybody; the table below is one page at a time (server side)
+  const raw = useFetch(isWorker ? `/api/salary/slip?month=${month}` : `/api/salary/preview?month=${month}&page=${page}&limit=${size}`);
   const { loading, reload } = raw;
   const data = isWorker ? (raw.data?.row ? { status: raw.data.status, rows: [raw.data.row], totals: {} } : raw.data && { status: 'preview', rows: [], totals: {} }) : raw.data;
   const [sel, setSel] = useState(null);
@@ -54,7 +58,7 @@ export default function SalaryPage() {
       <PageHeader title={t('salary')} subtitle={isWorker ? 'Your salary slip' : 'Calculated automatically from attendance, pay rate and advances'}
         actions={<>
           <input type="month" className="input !w-auto" value={month} max={monthOf(todayISO())} onChange={(e) => setMonth(e.target.value || month)} />
-          {office && rows.length > 0 && <ExportBtn onClick={() => downloadCSV(`salary-sheet-${month}`, rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, { key: 'otPay', label: 'Overtime' }, { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }])} />}
+          {office && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/salary/preview?month=${month}&all=1`); downloadCSV(`salary-sheet-${month}`, all.rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, { key: 'otPay', label: 'Overtime' }, { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }]); } catch (e) { toast.error(e.message); } }} />}
         </>} />
 
       {!isWorker && can('advances') && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'sheet', label: 'Salary sheet' }, { key: 'advances', label: 'Advance register' }]} />}
@@ -81,7 +85,10 @@ export default function SalaryPage() {
             </>
           )}
           {loading ? <SkeletonList /> : rows.length ? (
-            <DataList rows={rows} rowKey="empCode" columns={columns} onRowClick={setSel} />
+            <>
+              <DataList rows={rows} rowKey="empCode" columns={columns} onRowClick={setSel} />
+              {!isWorker && <Pagination page={page} pageSize={size} total={data?.total} shown={rows.length} onPage={setPage} onSize={setSize} />}
+            </>
           ) : <Empty text="No salary data for this month" />}
           <p className="text-[11px] text-char-500 mt-3">
             Monthly = salary ÷ days in month × days present (paid leave counts) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime = {SALARY.otMultiplier}× hourly rate ·

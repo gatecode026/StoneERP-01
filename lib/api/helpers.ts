@@ -36,3 +36,17 @@ export async function action<T>(
 
 export const confirmedBody = z.object({ _confirmed: z.boolean().optional() });
 export const monthQuery = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'month must be YYYY-MM');
+
+/**
+ * Page a computed report (salary sheet, scorecards): ?page=2&limit=25&q=ram  →  { rows, total, page, limit, pages }.
+ * `all=1` returns every row (for the Excel/CSV export). Totals and rankings are always worked out over ALL rows first.
+ */
+export function pageRows<T extends Record<string, any>>(rows: T[], sp: URLSearchParams, searchKeys: string[] = ['name', 'empCode']) {
+  const q = sp.get('q')?.trim().toLowerCase();
+  const found = q ? rows.filter((r) => searchKeys.some((k) => String(r[k] ?? '').toLowerCase().includes(q))) : rows;
+  if (sp.get('all') === '1') return { rows: found, total: found.length, page: 1, limit: found.length, pages: 1 };
+  const limit = Math.min(Math.max(Math.floor(Number(sp.get('limit') ?? 25)) || 25, 1), 100);
+  const pages = Math.max(1, Math.ceil(found.length / limit));
+  const page = Math.min(Math.max(Math.floor(Number(sp.get('page') ?? 1)) || 1, 1), pages);
+  return { rows: found.slice((page - 1) * limit, page * limit), total: found.length, page, limit, pages };
+}
