@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,26 +10,28 @@ import { RoleGuard, PageHeader, Section, KV, Badge, Sheet, Field, PhotoInput, Sk
 import { api, submit, openWA } from '@/lib/client';
 import { TAX_LABEL } from '@/lib/gst';
 import { inr, inr2, num, fmtDate, todayISO, daysBetween } from '@/lib/format';
-import { COMPANY } from '@/lib/config';
 
 const STEPS = ['Quotation', 'Order', 'Dispatch', 'GST bill', 'Payment'];
 
 export default function SaleDetail() {
   const { id } = useParams();
   const router = useRouter();
-  const { role } = useApp();
-  const { data: s, loading, reload } = useFetch(`/api/sales/${id}`);
-  const pays = useFetch(`/api/payments?saleId=${id}&sort=date`);
-  const disp = useFetch(`/api/dispatches?saleId=${id}&sort=date`);
+  const company = useApp().session.company;
+  const { can } = useApp();
+  const full = useFetch(`/api/sales/${id}/full`); // sale + payments + dispatches in one round trip
+  const { loading, reload } = full;
+  const s = full.data?.sale;
+  const pays = { data: full.data?.payments || [], reload: () => {} };
+  const disp = { data: full.data?.dispatches || [], reload: () => {} };
+  const lineKey = (l) => String(l.stockItemId || l.name).replace(/[.$]/g, '_');
   const [sheet, setSheet] = useState(null); // 'order' | 'pay' | 'dispatch'
   const [f, setF] = useState({});
   const [busy, setBusy] = useState(false);
   const set = (p) => setF((x) => ({ ...x, ...p }));
 
   if (loading || !s) return <SkeletonList />;
-  const office = ['owner', 'manager', 'accountant'].includes(role);
   const pending = Math.max(0, s.total - (s.paid || 0));
-  const remaining = (s.items || []).map((i) => ({ ...i, left: Math.max(0, i.qty - (s.dispatched?.[String(i.stockItemId || i.name)] || 0)) }));
+  const remaining = (s.items || []).map((i) => ({ ...i, left: Math.max(0, i.qty - (s.dispatchedQty?.[lineKey(i)] || 0)) }));
   const anyLeft = remaining.some((i) => i.left > 0);
   const step = s.stage === 'quotation' ? 0 : s.invoiceNo ? (pending === 0 ? 4 : 3) : s.stage === 'dispatched' ? 2 : 1;
   const link = typeof window !== 'undefined' ? `${location.origin}/sales/${id}/invoice` : '';
@@ -38,15 +41,15 @@ export default function SaleDetail() {
     try { const r = await fn(); toast.success(r?.queued ? 'Saved offline' : ok); setSheet(null); reload(); pays.reload(); disp.reload(); } catch (e) { if (!e.data?.cancelled) toast.error(e.message); }
     setBusy(false);
   }
-  const act = (action, extra = {}) => api('/api/actions', { method: 'POST', body: { action, id, ...extra } });
+  const act = (action, extra = {}) => api(`/api/sales/${id}/${action}`, { method: 'POST', body: extra });
 
   async function pay() {
     const amount = Number(f.amount);
     if (!(amount > 0)) { toast.error('Enter the amount'); return; }
     await run(async () => {
-      const body = { saleId: id, amount, mode: f.mode || 'UPI', date: f.date || todayISO(), ref: f.ref || '', kind: 'payment' };
+      const body = { saleId: id, amount, mode: f.mode || 'UPI', date: f.date || todayISO(), ref: f.ref || '' };
       try { return await submit('/api/payments', body, { label: 'Payment' }); } catch (e) {
-        if (e.status === 409 && e.data?.confirmable && window.confirm(e.message)) return submit('/api/payments', { ...body, _confirmed: true }, { label: 'Payment' });
+        if (e.status === 409 && e.data?.confirmable && await confirmDialog(e.message)) return submit('/api/payments', { ...body, _confirmed: true }, { label: 'Payment' });
         throw e;
       }
     }, 'Payment recorded');
@@ -55,14 +58,19 @@ export default function SaleDetail() {
     if (!f.truckNo) { toast.error('Enter truck number'); return; }
     const items = remaining.filter((i) => i.left > 0).map((i) => ({ stockItemId: i.stockItemId, name: i.name, unit: i.unit, qty: Number(f.qty?.[i.stockItemId || i.name] ?? i.left) })).filter((i) => i.qty > 0);
     if (!items.length) { toast.error('Enter quantity loaded'); return; }
-    await run(() => api('/api/dispatches', { method: 'POST', body: { saleId: id, direction: 'out', status: f.markOut === false ? 'loading' : 'out', date: todayISO(), items, truckNo: f.truckNo, driverName: f.driverName, driverMobile: f.driverMobile, transporter: f.transporter, freight: Number(f.freight) || 0, emptyWeight: Number(f.emptyWeight) || 0, loadedWeight: Number(f.loadedWeight) || 0, photoLoaded: f.photoLoaded, photoCovered: f.photoCovered } }), 'Dispatch saved – stock deducted');
+    await run(async () => {
+      const slip = await api('/api/dispatches', { method: 'POST', body: { saleId: id, direction: 'out', date: todayISO(), items, truckNo: f.truckNo, driverName: f.driverName, driverMobile: f.driverMobile, transporter: f.transporter, freight: Number(f.freight) || 0, emptyWeight: Number(f.emptyWeight) || 0, loadedWeight: Number(f.loadedWeight) || 0, photoLoaded: f.photoLoaded, photoCovered: f.photoCovered } });
+      // the gate pass is issued now; stock leaves only when the guard marks the truck out
+      if (f.markOut !== false && can('dispatches', 'approve')) await api(`/api/dispatches/${slip._id}/out`, { method: 'POST', body: {} });
+      return slip;
+    }, f.markOut !== false && can('dispatches', 'approve') ? 'Truck out – stock deducted' : 'Gate pass issued – the guard marks the truck out');
   }
   async function invoice() {
-    await run(async () => { await act('saleInvoice'); router.push(`/sales/${id}/invoice`); }, 'GST invoice generated');
+    await run(async () => { await act('invoice'); router.push(`/sales/${id}/invoice`); }, 'GST invoice generated');
   }
 
-  const quoteMsg = `*Quotation ${s.saleNo}* – ${COMPANY.name}\nDear ${s.customerName},\n${(s.items || []).map((i) => `• ${i.name}: ${num(i.qty)} ${i.unit} × ₹${num(i.rate)}`).join('\n')}\nTotal: ${inr(s.total)}${s.taxType === 'export' ? ' (export, no GST)' : ' (incl. GST)'}\nView: ${link}?type=quotation`;
-  const billMsg = `*GST Invoice ${s.invoiceNo}* – ${COMPANY.name}\nDear ${s.customerName}, invoice amount ${inr(s.total)}. Paid ${inr(s.paid)}, balance ${inr(pending)}.\nView: ${link}`;
+  const quoteMsg = `*Quotation ${s.saleNo}* – ${company.name}\nDear ${s.customerName},\n${(s.items || []).map((i) => `• ${i.name}: ${num(i.qty)} ${i.unit} × ₹${num(i.rate)}`).join('\n')}\nTotal: ${inr(s.total)}${s.taxType === 'export' ? ' (export, no GST)' : ' (incl. GST)'}\nView: ${link}?type=quotation`;
+  const billMsg = `*GST Invoice ${s.invoiceNo}* – ${company.name}\nDear ${s.customerName}, invoice amount ${inr(s.total)}. Paid ${inr(s.paid)}, balance ${inr(pending)}.\nView: ${link}`;
 
   return (
     <RoleGuard perm="sales">
@@ -88,7 +96,7 @@ export default function SaleDetail() {
             <div className="space-y-2">
               {(s.items || []).map((i, k) => (
                 <div key={k} className="flex justify-between gap-3 text-sm py-1.5 border-b border-sand-100 last:border-0">
-                  <div><div className="font-medium">{i.name}</div><div className="text-xs text-char-500">{num(i.qty)} {i.unit} × ₹{num(i.rate)} · HSN {i.hsn} · GST {i.gstRate}%{s.dispatched ? ` · sent ${num(s.dispatched[String(i.stockItemId || i.name)] || 0)}` : ''}</div></div>
+                  <div><div className="font-medium">{i.name}</div><div className="text-xs text-char-500">{num(i.qty)} {i.unit} × ₹{num(i.rate)} · HSN {i.hsn} · GST {i.gstRate}%{s.dispatchedQty ? ` · sent ${num(s.dispatchedQty[lineKey(i)] || 0)}` : ''}</div></div>
                   <div className="font-semibold shrink-0">{inr2(i.amount)}</div>
                 </div>
               ))}
@@ -119,11 +127,11 @@ export default function SaleDetail() {
 
           <Section title="Next step">
             <div className="space-y-2">
-              {s.stage === 'quotation' && <button className="btn-primary w-full" onClick={() => { setF({ advanceMode: 'UPI' }); setSheet('order'); }}><ShoppingCart size={18} /> Convert to order</button>}
-              {s.stage !== 'quotation' && anyLeft && <button className="btn-primary w-full" onClick={() => { setF({ qty: {}, markOut: true }); setSheet('dispatch'); }}><Truck size={18} /> Dispatch truck</button>}
-              {s.stage !== 'quotation' && office && !s.invoiceNo && <button className="btn-outline w-full" onClick={invoice} disabled={busy}><FileText size={18} /> Generate GST bill</button>}
-              {s.stage !== 'quotation' && pending > 0 && <button className="btn-green w-full" onClick={() => { setF({ amount: String(pending), mode: 'UPI', date: todayISO() }); setSheet('pay'); }}><IndianRupee size={18} /> Add payment</button>}
-              {s.stage !== 'quotation' && pending > 0 && <button className="btn-outline w-full" onClick={() => openWA(`Dear ${s.customerName}, gentle reminder from ${COMPANY.name}: ${inr(pending)} is pending against order ${s.saleNo}${s.invoiceNo ? ` (Invoice ${s.invoiceNo})` : ''}. Kindly arrange the payment. Thank you.`, s.customerMobile)}><MessageCircle size={18} /> Send payment reminder</button>}
+              {s.stage === 'quotation' && can('sales', 'edit') && <button className="btn-primary w-full" onClick={() => { setF({ advanceMode: 'UPI' }); setSheet('order'); }}><ShoppingCart size={18} /> Convert to order</button>}
+              {s.stage !== 'quotation' && anyLeft && can('dispatches', 'create') && <button className="btn-primary w-full" onClick={() => { setF({ qty: {}, markOut: true }); setSheet('dispatch'); }}><Truck size={18} /> Dispatch truck</button>}
+              {s.stage !== 'quotation' && can('invoices', 'create') && !s.invoiceNo && <button className="btn-outline w-full" onClick={invoice} disabled={busy}><FileText size={18} /> Generate GST bill</button>}
+              {s.stage !== 'quotation' && pending > 0 && can('payments', 'create') && <button className="btn-green w-full" onClick={() => { setF({ amount: String(pending), mode: 'UPI', date: todayISO() }); setSheet('pay'); }}><IndianRupee size={18} /> Add payment</button>}
+              {s.stage !== 'quotation' && pending > 0 && <button className="btn-outline w-full" onClick={() => openWA(`Dear ${s.customerName}, gentle reminder from ${company.name}: ${inr(pending)} is pending against order ${s.saleNo}${s.invoiceNo ? ` (Invoice ${s.invoiceNo})` : ''}. Kindly arrange the payment. Thank you.`, s.customerMobile)}><MessageCircle size={18} /> Send payment reminder</button>}
               {s.stage !== 'quotation' && !anyLeft && pending === 0 && s.invoiceNo && <div className="text-sm text-emerald-700 font-semibold flex items-center gap-2"><CheckCircle2 size={18} /> Completed</div>}
             </div>
           </Section>
@@ -131,7 +139,7 @@ export default function SaleDetail() {
       </div>
 
       <Sheet open={sheet === 'order'} onClose={() => setSheet(null)} title="Convert to order"
-        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}>Cancel</button><button className="btn-primary flex-[2]" disabled={busy} onClick={() => run(() => act('saleOrder', { advance: Number(f.advance) || 0, advanceMode: f.advanceMode }), 'Order confirmed')}>Confirm order</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}>Cancel</button><button className="btn-primary flex-[2]" disabled={busy} onClick={() => run(() => act('order', { advance: Number(f.advance) || 0, advanceMode: f.advanceMode }), 'Order confirmed')}>Confirm order</button></>}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Advance received (₹)"><input className="input" type="number" inputMode="decimal" value={f.advance || ''} onChange={(e) => set({ advance: e.target.value })} /></Field>
           <Field label="Mode"><select className="input" value={f.advanceMode} onChange={(e) => set({ advanceMode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m}>{m}</option>)}</select></Field>

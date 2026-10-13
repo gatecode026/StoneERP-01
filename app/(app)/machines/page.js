@@ -1,23 +1,28 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Wrench } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import dynamic from 'next/dynamic';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { MACHINE_TYPES } from '@/lib/config';
-import { todayISO, addDays, fmtDate, monthOf, num, sum, groupBy, daysInMonth, fmtMonth } from '@/lib/format';
+import { todayISO, addDays, fmtDate, monthOf, num, fmtMonth } from '@/lib/format';
+
+const MachineChart = dynamic(() => import('@/components/charts/MachineChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function MachinesPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const [tab, setTab] = useState('entries');
-  const [date, setDate] = useState(todayISO());
+  const sp = useSearchParams();
+  const [date, setDate] = useState(sp.get('date') || todayISO());
   const [mode, setMode] = useState('day');
   const [month, setMonth] = useState(monthOf(todayISO()));
   const today = todayISO();
-  const machines = useFetch('/api/machines?sort=name');
-  const monthEntries = useFetch(tab === 'monthly' ? `/api/machineentries?from=${month}-01&to=${month}-${String(daysInMonth(month)).padStart(2, '0')}&limit=5000` : null, [month]);
-  const canManage = ['owner', 'manager'].includes(role);
+  // monthly output is summed by the server (one aggregate), never by downloading the month's entries
+  const monthEntries = useFetch(tab === 'monthly' ? `/api/machineentries/monthly?month=${month}` : null, [month]);
+  const canManage = can('machines', 'create');
 
   const entryFields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
@@ -55,28 +60,26 @@ export default function MachinesPage() {
 
   const baseQuery = mode === 'day' ? { date } : { from: `${monthOf(date)}-01`, to: date };
 
-  const ms = (machines.data || []).map((m) => ({ ...m, due: m.lastServiceDate && m.serviceIntervalDays ? addDays(m.lastServiceDate, Number(m.serviceIntervalDays)) : null }));
 
-  // monthly chart data
-  const ents = monthEntries.data || [];
-  const byMachine = Object.entries(groupBy(ents, 'machineName')).map(([name, es]) => ({ name, sqft: sum(es, 'outputSqft'), stopped: Math.round(sum(es, 'stoppedMins') / 6) / 10, breakdown: Math.round(sum(es.filter((x) => x.breakdown), 'stoppedMins') / 6) / 10 })).sort((a, b) => b.sqft - a.sqft);
-  const byOperator = Object.entries(groupBy(ents.filter((e) => e.operatorName && e.outputSqft > 0), 'operatorName')).map(([name, es]) => ({ name, sqft: sum(es, 'outputSqft'), shifts: es.length })).sort((a, b) => b.sqft - a.sqft);
+  const byMachine = monthEntries.data?.byMachine || [];
+  const byOperator = monthEntries.data?.byOperator || [];
 
   return (
-    <RoleGuard perm="machines">
+    <RoleGuard perm="machineentries">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'entries', label: 'Shift entries' }, { key: 'machines', label: 'Machine list' }, { key: 'monthly', label: 'Monthly output' }]} />
 
       {tab === 'entries' && (
         <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift" label="Machine entry" addLabel="New entry" wide
-          fields={entryFields} columns={columns} sort="-date,-createdAt" searchKeys={['machineName', 'operatorName', 'workDone']} canEdit={() => false}
+          fields={entryFields} columns={columns} sort="-date,-createdAt" canEdit={() => false}
           exportName={`machine-entries-${date}`} onSaved={() => {}}
-          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">This day</option><option value="month">Month to date</option></select></>}
-          summary={(rows) => (
+          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">This day</option><option value="month">Month to date</option></select></>}
+          facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
+          summary={(rows, { facets: f }) => (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Output" value={`${num(sum(rows, 'outputSqft'))} sq ft`} tone="terra" />
-              <StatCard label="Entries" value={rows.length} />
-              <StatCard label="Idle / stopped" value={`${Math.round(sum(rows, 'stoppedMins') / 6) / 10} h`} tone={sum(rows, 'stoppedMins') ? 'amber' : 'green'} />
-              <StatCard label="Breakdowns" value={rows.filter((r) => r.breakdown).length} tone={rows.some((r) => r.breakdown) ? 'red' : 'green'} />
+              <StatCard label="Output" value={`${num(f?.sums.outputSqft || 0)} sq ft`} tone="terra" />
+              <StatCard label="Entries" value={f?.total ?? 0} />
+              <StatCard label="Idle / stopped" value={`${Math.round((f?.sums.stoppedMins || 0) / 6) / 10} h`} tone={f?.sums.stoppedMins ? 'amber' : 'green'} />
+              <StatCard label="Breakdowns" value={f?.groups?.true?.n || 0} tone={f?.groups?.true?.n ? 'red' : 'green'} />
             </div>
           )}
           rowClass={(r) => (r.breakdown ? 'bg-red-50/60' : '')}
@@ -85,7 +88,7 @@ export default function MachinesPage() {
       )}
 
       {tab === 'machines' && (
-        <CrudPage model="machines" title="Machine list" subtitle="Entered once" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" searchKeys={['name', 'type', 'location']}
+        <CrudPage model="machines" title="Machine list" subtitle="Entered once" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" headerExtra={<ImportData resource="machines" noun="machines" hint="name and type are required" />}
           fields={[
             { name: 'name', label: 'Machine name / number', required: true }, { name: 'type', label: 'Type', type: 'select', options: MACHINE_TYPES, required: true },
             { name: 'location', label: 'Location', type: 'select', options: ['Factory', 'Yard', 'Quarry'], default: 'Factory' }, { name: 'purchaseDate', label: 'Purchase date', type: 'date' },
@@ -99,19 +102,7 @@ export default function MachinesPage() {
       {tab === 'monthly' && (
         <div>
           <PageHeader title="Monthly machine output" subtitle={fmtMonth(month)} actions={<input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />} />
-          <Section title="Output by machine (sq ft)" className="mb-4">
-            <div style={{ height: Math.max(260, byMachine.length * 34) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byMachine} layout="vertical" margin={{ left: 10, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#EADFCF" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v, n) => [n === 'sqft' ? `${num(v)} sq ft` : `${v} h`, n === 'sqft' ? 'Output' : n === 'stopped' ? 'Idle hours' : 'Breakdown hours']} />
-                  <Legend formatter={(v) => (v === 'sqft' ? 'Output (sq ft)' : v === 'stopped' ? 'Idle hours' : 'Breakdown hours')} />
-                  <Bar dataKey="sqft" fill="#B5651D" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Section>
+          <MachineChart byMachine={byMachine} />
           <div className="grid lg:grid-cols-2 gap-4">
             <div><h3 className="font-bold text-sm mb-2">Machine-wise: output, idle and breakdown hours</h3>
               <DataList loading={monthEntries.loading} rows={byMachine} rowKey="name" columns={[{ key: 'name', label: 'Machine', primary: true }, { key: 'sqft', label: 'Output sq ft', align: 'right', render: (r) => <b>{num(r.sqft)}</b> }, { key: 'stopped', label: 'Idle h' }, { key: 'breakdown', label: 'Breakdown h', render: (r) => (r.breakdown ? <span className="text-red-600 font-bold">{r.breakdown}</span> : '—') }]} /></div>

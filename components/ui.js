@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApp } from './Providers';
-import { compressImage } from '@/lib/client';
+import { compressImage, fileUrl, uploadFile } from '@/lib/client';
 
 export const cx = (...a) => a.filter(Boolean).join(' ');
 
 export function PageHeader({ title, subtitle, actions, back }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3 mb-4">
       <div className="min-w-0">
         {back && (
           <Link href={back} className="inline-flex items-center text-xs text-char-500 mb-1 hover:text-terra"><ChevronLeft size={14} /> Back</Link>
@@ -18,7 +18,7 @@ export function PageHeader({ title, subtitle, actions, back }) {
         <h1 className="text-xl md:text-2xl font-bold text-char leading-tight">{title}</h1>
         {subtitle && <p className="text-sm text-char-500 mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2 no-print">{actions}</div>}
+      {actions && <div className="page-actions no-print">{actions}</div>}
     </div>
   );
 }
@@ -61,10 +61,10 @@ export function Badge({ tone = 'gray', children, className }) {
   return <span className={cx(`badge-${tone}`, className)}>{children}</span>;
 }
 
-export function Field({ label, hint, children, className, required }) {
+export function Field({ label, hint, children, className, required, htmlFor }) {
   return (
     <div className={className}>
-      {label && <label className="label">{label}{required && <span className="text-red-500"> *</span>}</label>}
+      {label && <label htmlFor={htmlFor} className="label">{label}{required && <span className="text-red-500"> *</span>}</label>}
       {children}
       {hint && <div className="text-[11px] text-char-500 mt-1">{hint}</div>}
     </div>
@@ -79,17 +79,39 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  const panel = useRef(null);
+  useEffect(() => { // focus moves into the dialog, Tab stays inside, focus returns to the opener on close
+    if (!open) return;
+    const back = document.activeElement;
+    const sel = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    setTimeout(() => (panel.current?.querySelector('input, select, textarea') || panel.current?.querySelector(sel))?.focus(), 30);
+    const trap = (e) => {
+      if (e.key !== 'Tab' || !panel.current) return;
+      const f = [...panel.current.querySelectorAll(sel)];
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    };
+    document.addEventListener('keydown', trap);
+    return () => { document.removeEventListener('keydown', trap); back?.focus?.(); };
+  }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center no-print">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[94vh] rounded-t-3xl md:rounded-2xl shadow-2xl', wide ? 'md:max-w-3xl' : 'md:max-w-xl')}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-sand-200 shrink-0">
-          <h2 className="font-bold text-base truncate pr-2">{title}</h2>
-          <button onClick={onClose} className="p-2 -mr-2 rounded-lg hover:bg-sand-100" aria-label="Close"><X size={20} /></button>
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 no-print" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
+      <div ref={panel} className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[92vh] rounded-t-3xl md:rounded-2xl shadow-2xl border border-sand-200 overflow-hidden', wide ? 'md:max-w-3xl lg:max-w-4xl' : 'md:max-w-xl lg:max-w-2xl')}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-sand-200 shrink-0 bg-sand-50/70">
+          <h2 className="font-bold text-base md:text-lg text-char truncate pr-2">{title}</h2>
+          <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2 rounded-lg text-char-500 hover:text-char hover:bg-sand-200 transition" aria-label="Close"><X size={20} /></button>
         </div>
-        <div className="overflow-y-auto px-4 py-4 flex-1">{children}</div>
-        {footer && <div className="shrink-0 border-t border-sand-200 px-4 py-3 safe-pb bg-white rounded-b-2xl flex gap-2">{footer}</div>}
+        <div className="overflow-y-auto px-5 py-4 flex-1">{children}</div>
+        {footer && <div className="shrink-0 border-t border-sand-200 px-5 py-3.5 safe-pb bg-white flex items-center justify-end gap-3">{footer}</div>}
       </div>
     </div>
   );
@@ -97,7 +119,7 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
 
 export function Tabs({ tabs, value, onChange }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
+    <div className="tabs-row flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
       {tabs.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
           className={cx('shrink-0 min-h-[40px] px-4 rounded-full text-sm font-semibold border transition',
@@ -122,7 +144,8 @@ export function SearchBox({ value, onChange, placeholder }) {
 export function RoleGuard({ perm, children }) {
   const { can, session, t } = useApp();
   if (session === undefined) return <SkeletonList />;
-  if (!can(perm)) {
+  const allowed = Array.isArray(perm) ? perm.some((p) => can(p)) : can(perm);
+  if (!allowed) {
     return (
       <div className="card p-8 text-center">
         <ShieldAlert className="mx-auto text-terra mb-2" />
@@ -133,6 +156,61 @@ export function RoleGuard({ perm, children }) {
     );
   }
   return children;
+}
+
+/** Footer for a paged list: how many are shown, and the button for the next page. */
+export function LoadMore({ list }) {
+  const sentinel = useRef(null);
+  const { hasMore, loadingMore, loadMore } = list;
+  // infinite scroll: the next page loads by itself as the end of the list scrolls into view (the button stays for keyboards and slow phones)
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((en) => { if (en[0].isIntersecting && !loadingMore) loadMore(); }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadingMore, loadMore, list.rows.length]);
+  if (!list.rows.length) return null;
+  const total = list.total == null ? null : list.total > 10000 ? '10,000+' : list.total;
+  return (
+    <div className="mt-3 flex flex-col items-center gap-1.5">
+      <div className="text-xs text-char-500">Showing {list.rows.length}{total != null ? ` of ${total}` : ''}</div>
+      {list.hasMore && <button ref={sentinel} className="btn-outline" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? 'Loading…' : 'Load more'}</button>}
+    </div>
+  );
+}
+
+/** Numbered pages: Previous / 1 2 3 … / Next, "Showing 26–50 of 100", and a page-size choice. */
+export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
+  if (total == null || total === 0) return null;
+  const capped = total > 10000;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const from = (page - 1) * pageSize + 1;
+  const to = (page - 1) * pageSize + shown;
+  const nums = [...new Set([1, 2, page - 1, page, page + 1, pages - 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const btn = 'min-w-[44px] min-h-[44px] rounded-lg border text-sm font-semibold';
+  return (
+    <nav aria-label="Pages" className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="text-xs text-char-500">Showing {from}–{to} of {capped ? '10,000+' : total}</div>
+      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page">Prev</button>
+        {nums.map((n, i) => (
+          <span key={n} className="flex items-center gap-1.5">
+            {i > 0 && n - nums[i - 1] > 1 && <span className="text-char-300">…</span>}
+            <button className={`${btn} ${n === page ? 'bg-terra text-white border-terra' : 'border-sand-300 bg-white'}`} aria-current={n === page ? 'page' : undefined} onClick={() => onPage(n)}>{n}</button>
+          </span>
+        ))}
+        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page">Next</button>
+        <select aria-label="Rows per page" className="input !w-auto !min-h-[44px] ml-1" value={pageSize} onChange={(e) => onSize(Number(e.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n} / page</option>)}</select>
+      </div>
+    </nav>
+  );
+}
+
+/** Pagination bar for a list made with useNumberedList. */
+export function Pager({ list }) {
+  if (list.loading) return null;
+  return <Pagination page={list.page} pageSize={list.size} total={list.total} shown={list.rows.length} onPage={list.setPage} onSize={list.setSize} />;
 }
 
 export function ExportBtn({ onClick, label }) {
@@ -157,18 +235,74 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
   }
   return (
     <div>
-      <div className="flex flex-wrap gap-2 items-center">
-        <button type="button" className="btn-outline" onClick={() => ref.current?.click()}><Camera size={18} /> {label || t('addPhoto')}</button>
+      <div className="flex flex-wrap gap-2.5 items-center">
+        {(!items.length || multiple) && (
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-sm"
+            onClick={() => ref.current?.click()}
+          >
+            <Camera size={16} className="text-terra" /> {label || t('addPhoto')}
+          </button>
+        )}
         {items.map((src, i) => (
-          <div key={i} className="relative">
+          <div key={i} className="relative inline-flex items-center gap-2 p-1.5 rounded-xl border border-sand-200 bg-sand-50/60 shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="h-14 w-14 rounded-lg object-cover border border-sand-300" />
-            <button type="button" onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
-              className="absolute -top-1.5 -right-1.5 bg-char text-white rounded-full p-0.5"><X size={12} /></button>
+            <img src={fileUrl(src, true)} alt="" loading="lazy" className="h-10 w-10 rounded-lg object-cover border border-sand-200" />
+            {!multiple && (
+              <button
+                type="button"
+                className="text-xs text-terra font-semibold hover:underline px-1"
+                onClick={() => ref.current?.click()}
+              >
+                Change
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
+              className="text-char-500 hover:text-red-600 p-1 rounded-md transition"
+              title="Remove"
+            >
+              <X size={15} />
+            </button>
           </div>
         ))}
       </div>
       <input ref={ref} type="file" accept="image/*" capture={capture} multiple={multiple} className="hidden" onChange={pick} />
+    </div>
+  );
+}
+
+// A document (photo or PDF scan) uploaded straight to storage; the record keeps only the file key
+export function DocInput({ value, onChange, resource, kind = 'docs', label }) {
+  const ref = useRef();
+  const [busy, setBusy] = useState(false);
+  async function pick(e) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setBusy(true);
+    try { const r = await uploadFile(f, resource, kind); onChange(r.key); toast.success('Uploaded'); } catch (err) { toast.error(err.message); }
+    setBusy(false);
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-sm disabled:opacity-50"
+        disabled={busy}
+        onClick={() => ref.current?.click()}
+      >
+        <Camera size={16} className="text-terra" /> {busy ? 'Uploading…' : label || 'Upload photo / PDF'}
+      </button>
+      {value && (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+          <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="hover:underline font-semibold">View file</a>
+          <button type="button" className="text-emerald-700 hover:text-red-600 p-0.5" aria-label="Remove file" onClick={() => onChange('')}><X size={14} /></button>
+        </div>
+      )}
+      <input ref={ref} type="file" accept="image/*,application/pdf" className="hidden" onChange={pick} />
     </div>
   );
 }
@@ -233,13 +367,13 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr>{columns.map((c) => <th key={c.key || c.label} className={cx('th', c.align === 'right' && 'text-right')}>{c.label}</th>)}{actions && <th className="th" />}</tr>
+              <tr>{columns.map((c) => <th key={c.key || c.label} className={cx('th', c.align === 'right' && 'text-right')}>{c.label}</th>)}{actions && <th className="th text-right whitespace-nowrap w-px" />}</tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r[rowKey] || i} onClick={() => onRowClick?.(r)} className={cx('hover:bg-sand-50', onRowClick && 'cursor-pointer', rowClass?.(r))}>
                   {columns.map((c) => <td key={c.key || c.label} className={cx('td', c.align === 'right' && 'text-right', c === primary && 'font-semibold')}>{cell(c, r)}</td>)}
-                  {actions && <td className="td text-right" onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
+                  {actions && <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
                 </tr>
               ))}
             </tbody>

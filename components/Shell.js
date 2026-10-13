@@ -1,14 +1,15 @@
 'use client';
+import SyncSheet from '@/components/SyncSheet';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, Plus, X, WifiOff, LogOut, Languages, PanelLeftClose, PanelLeftOpen, MoreHorizontal } from 'lucide-react';
+import { Menu, Plus, X, WifiOff, LogOut, Languages, PanelLeftClose, PanelLeftOpen, MoreHorizontal, Search } from 'lucide-react';
 import { useApp } from './Providers';
 import { NAV_GROUPS, DASH, BOTTOM_TABS, ALL_ITEMS, QUICK_ADD } from '@/lib/nav';
-import { ROLE_USERS } from '@/lib/perm';
-import { cx, SkeletonList } from './ui';
+import { ROLE_LABEL } from '@/lib/roles';
+import { cx, SkeletonList, Sheet } from './ui';
 
-const permOf = (it) => it.perm || it.key;
+const canOpen = (can, it) => (it.res || []).some((r) => can(r));
 const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'));
 
 function Brand({ compact }) {
@@ -29,19 +30,22 @@ function Brand({ compact }) {
 function LangToggle() {
   const { lang, setLang } = useApp();
   return (
-    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center gap-1 h-9 px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label="Language">
+    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1 h-11 min-w-[44px] px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label="Language">
       <Languages size={14} /> {lang === 'en' ? 'हिं' : 'EN'}
     </button>
   );
 }
 
 export default function Shell({ children }) {
-  const { session, t, can, logout, online, queued, lang } = useApp();
+  const { session, t, can, logout, online, queued, queueFailed, lang } = useApp();
+  const [syncOpen, setSyncOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
   const [fab, setFab] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [finder, setFinder] = useState(false);
+  const [fq, setFq] = useState('');
 
   useEffect(() => { setDrawer(false); setFab(false); }, [pathname]);
   useEffect(() => { if (session === null) router.replace('/login'); }, [session, router]);
@@ -50,11 +54,11 @@ export default function Shell({ children }) {
   if (!session) return <div className="p-6 max-w-md mx-auto"><SkeletonList n={5} /></div>;
 
   const role = session.role;
-  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => can(permOf(it))) })).filter((g) => g.items.length);
-  const tabKeys = (BOTTOM_TABS[role] || BOTTOM_TABS.default);
-  const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && can(permOf(i))).slice(0, 4);
-  const quick = QUICK_ADD.filter((q) => can(permOf(ALL_ITEMS.find((i) => i.key === q.key) || { key: q.key })));
-  const showFab = quick.length > 0 && role !== 'worker' ? true : role === 'worker';
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((it) => canOpen(can, it)) })).filter((g) => g.items.length);
+  const tabKeys = (BOTTOM_TABS[session.perm.roleKey] || BOTTOM_TABS[role] || BOTTOM_TABS.default);
+  const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && canOpen(can, i)).slice(0, 4);
+  const quick = QUICK_ADD.filter((q) => can(q.res, 'create'));
+  const showFab = quick.length > 0;
   const hi = lang === 'hi';
 
   const NavLink = ({ it, small }) => {
@@ -70,9 +74,14 @@ export default function Shell({ children }) {
   };
 
   return (
-    <div className="min-h-screen md:flex">
+    <div className="min-h-screen">
       {/* Desktop sidebar */}
-      <aside className={cx('hidden md:flex flex-col shrink-0 bg-white border-r border-sand-200 h-screen sticky top-0 transition-all', collapsed ? 'w-[68px]' : 'w-64')}>
+      <aside
+        className={cx(
+          'hidden md:flex flex-col shrink-0 bg-white border-r border-sand-200 h-screen fixed top-0 left-0 bottom-0 z-30 transition-all duration-200 ease-in-out',
+          collapsed ? 'w-[68px]' : 'w-64'
+        )}
+      >
         <div className="p-2.5 flex items-center justify-between border-b border-sand-100 shrink-0">
           <Brand compact={collapsed} />
           <button className="p-1.5 rounded-lg hover:bg-sand-100 text-char-500" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
@@ -89,36 +98,36 @@ export default function Shell({ children }) {
           ))}
         </nav>
         <div className="p-2.5 border-t border-sand-100 text-xs shrink-0">
-          {!collapsed && <div className="mb-1.5 leading-tight"><span className="font-semibold">{session.name}</span> <span className="text-char-500 capitalize">· {hi ? ROLE_USERS[role].hi : role}</span></div>}
+          {!collapsed && <div className="mb-1.5 leading-tight"><span className="font-semibold">{session.name}</span> <span className="text-char-500 capitalize">· {ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span></div>}
           <button onClick={logout} className="btn-outline btn-sm w-full"><LogOut size={14} />{!collapsed && t('logout')}</button>
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className={cx('min-w-0 flex flex-col transition-all duration-200 ease-in-out', collapsed ? 'md:pl-[68px]' : 'md:pl-64')}>
         {/* Top bar */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-sand-200 no-print">
-          <div className="flex items-center justify-between gap-2 px-4 h-14">
-            <div className="md:hidden"><Brand /></div>
+          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-14">
+            <div className="md:hidden min-w-0 flex-1"><Brand /></div>
             <div className="hidden md:flex items-center gap-2">
               <span className="font-bold">{t('appName')}</span>
-              <span className="badge-amber">{t('demo')}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="md:hidden badge-amber">{t('demo')}</span>
-              <span className="hidden sm:inline-flex badge-gray capitalize">{hi ? ROLE_USERS[role].hi : role}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
+              <button className="h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label="Search screens"><Search size={16} /></button>
               <LangToggle />
-              <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
+              <button className="md:hidden h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
           </div>
           {(!online || queued > 0) && (
-            <div className="bg-amber-100 text-amber-900 text-xs font-semibold px-4 py-1.5 flex items-center gap-2">
-              <WifiOff size={14} /> {!online ? t('offline') : `${queued} saved entries waiting to send`}
-              {queued > 0 && <span className="ml-auto badge-amber">{queued}</span>}
+            <div className={`${queueFailed ? 'bg-red-100 text-red-900' : 'bg-amber-100 text-amber-900'} text-xs font-semibold px-4 flex items-center gap-2 min-h-[44px]`} role="status">
+              <WifiOff size={14} /> {!online ? t('offline') : `${queued} saved entries waiting to send`}{queueFailed > 0 && ` · ${queueFailed} need attention`}
+              {queued > 0 && <button className="ml-auto underline min-h-[44px] px-2" onClick={() => setSyncOpen(true)}>{queued} · Review</button>}
             </div>
           )}
         </header>
+        <SyncSheet open={syncOpen} onClose={() => setSyncOpen(false)} />
 
-        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">{children}</main>
+        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-24 max-w-[1400px] w-full mx-auto">{children}</main>
       </div>
 
       {/* FAB quick add */}
@@ -127,7 +136,7 @@ export default function Shell({ children }) {
           {fab && (
             <div className="absolute bottom-16 right-0 w-56 card p-2 shadow-xl sheet-enter">
               <div className="px-2 py-1 text-[10px] font-bold uppercase text-char-300">{t('quickAdd')}</div>
-              {(role === 'worker' ? [QUICK_ADD[0]] : quick).map((q) => {
+              {quick.map((q) => {
                 const Icon = q.icon;
                 return (
                   <Link key={q.key} href={q.href} className="flex items-center gap-3 rounded-lg px-3 min-h-[44px] hover:bg-sand-100 text-sm font-medium">
@@ -159,6 +168,17 @@ export default function Shell({ children }) {
           <MoreHorizontal size={22} /><span>{t('more')}</span>
         </button>
       </nav>
+
+      {/* Go-to search: only screens this person may open */}
+      <Sheet open={finder} onClose={() => setFinder(false)} title={t('search')}>
+        <input className="input mb-3" autoFocus aria-label={t('search')} placeholder={t('search')} value={fq} onChange={(e) => setFq(e.target.value)} />
+        <div className="space-y-1">
+          {ALL_ITEMS.filter((it) => canOpen(can, it) && (!fq || t(it.key).toLowerCase().includes(fq.toLowerCase()) || it.key.toLowerCase().includes(fq.toLowerCase()))).map((it) => {
+            const Icon = it.icon;
+            return <Link key={it.key} href={it.href} onClick={() => setFinder(false)} className="flex items-center gap-3 rounded-lg px-3 min-h-[44px] hover:bg-sand-100 text-sm font-medium"><Icon size={18} className="text-terra" /> {t(it.key)}</Link>;
+          })}
+        </div>
+      </Sheet>
 
       {/* More drawer */}
       {drawer && (

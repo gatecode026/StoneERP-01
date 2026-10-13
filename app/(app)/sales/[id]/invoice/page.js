@@ -4,13 +4,13 @@ import { Printer, MessageCircle, Download } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, SkeletonList } from '@/components/ui';
 import { openWA } from '@/lib/client';
-import { COMPANY } from '@/lib/config';
 import { TAX_LABEL } from '@/lib/gst';
 import { amountInWords, fmtDate, inr, inr2, num2, num } from '@/lib/format';
 
 export default function Invoice() {
   const { id } = useParams();
   const sp = useSearchParams();
+  const company = useApp().session.company;
   const { data: s, loading } = useFetch(`/api/sales/${id}`);
   if (loading || !s) return <SkeletonList />;
   const isQuote = sp.get('type') === 'quotation' || !s.invoiceNo;
@@ -22,8 +22,8 @@ export default function Invoice() {
   const pending = Math.max(0, s.total - (s.paid || 0));
   const link = typeof window !== 'undefined' ? location.href : '';
   const msg = isQuote
-    ? `*Quotation ${s.saleNo}* – ${COMPANY.name}\n${(s.items || []).map((i) => `• ${i.name}: ${i.qty} ${i.unit} × ₹${i.rate}`).join('\n')}\nTotal ${inr(s.total)}\n${link}`
-    : `*${exp ? 'Export Invoice' : 'GST Invoice'} ${s.invoiceNo}* – ${COMPANY.name}\nAmount ${inr(s.total)} · Balance ${inr(pending)}\n${link}`;
+    ? `*Quotation ${s.saleNo}* – ${company.name}\n${(s.items || []).map((i) => `• ${i.name}: ${i.qty} ${i.unit} × ₹${i.rate}`).join('\n')}\nTotal ${inr(s.total)}\n${link}`
+    : `*${exp ? 'Export Invoice' : 'GST Invoice'} ${s.invoiceNo}* – ${company.name}\nAmount ${inr(s.total)} · Balance ${inr(pending)}\n${link}`;
   const cols = exp ? 7 : igst ? 9 : 10;
 
   return (
@@ -38,9 +38,9 @@ export default function Invoice() {
         <div className="min-w-[640px]">
           <div className="flex justify-between items-start border-b-2 border-black pb-3">
             <div>
-              <div className="text-xl font-extrabold">{COMPANY.name}</div>
-              <div className="text-xs text-gray-600">{COMPANY.brand}</div>
-              <div className="text-xs mt-1">{COMPANY.address}<br />GSTIN: {COMPANY.gstin} · State: {COMPANY.state} (08) · {COMPANY.phone}</div>
+              <div className="text-xl font-extrabold">{company.name}</div>
+              <div className="text-xs text-gray-600">{company.brand}</div>
+              <div className="text-xs mt-1">{company.address}<br />GSTIN: {company.gstin} · State: {company.state} ({company.stateCode}) · {company.phone}</div>
             </div>
             <div className="text-right">
               <div className="text-lg font-extrabold tracking-wide">{docTitle}</div>
@@ -85,7 +85,7 @@ export default function Invoice() {
               <div className="text-[11px] uppercase text-gray-500 font-bold">Amount in words</div>
               <div className="font-semibold">{amountInWords(s.total)}</div>
               {exp && <div className="text-xs mt-2">Supply meant for export under Letter of Undertaking (LUT) without payment of IGST.</div>}
-              {!isQuote && <div className="text-xs mt-3"><b>Bank details:</b> {COMPANY.bank}</div>}
+              {!isQuote && <div className="text-xs mt-3"><b>Bank details:</b> {[company.bankName, company.bankAccount && `A/c ${company.bankAccount}`, company.ifsc && `IFSC ${company.ifsc}`].filter(Boolean).join(' · ')}</div>}
             </div>
             <table className="text-sm self-start ml-auto w-full max-w-xs"><tbody>
               <tr><td className="py-0.5">Taxable value</td><td className="text-right">{inr2(s.taxable)}</td></tr>
@@ -99,7 +99,7 @@ export default function Invoice() {
 
           <div className="mt-6 grid grid-cols-2 gap-6 text-xs">
             <div><b>Terms:</b><ol className="list-decimal pl-4 mt-1 text-gray-600"><li>Goods once sold will not be taken back; breakage in transit is at buyer’s risk unless insured.</li><li>Natural stone may vary in shade and texture.</li><li>Payment as agreed; interest @18% p.a. on overdue.</li><li>Subject to Bhilwara (Rajasthan) jurisdiction.</li></ol></div>
-            <div className="text-right"><div>For <b>{COMPANY.name}</b></div><div className="h-12" /><div className="border-t border-black inline-block pt-1 px-6">Authorised signatory</div></div>
+            <div className="text-right"><div>For <b>{company.name}</b></div><div className="h-12" /><div className="border-t border-black inline-block pt-1 px-6">Authorised signatory</div></div>
           </div>
         </div>
       </div>

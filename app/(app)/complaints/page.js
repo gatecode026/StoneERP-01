@@ -1,10 +1,11 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import toast from 'react-hot-toast';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Badge, Section } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
-import { fmtDate, todayISO, daysBetween, groupBy } from '@/lib/format';
+import { fmtDate, todayISO, daysBetween } from '@/lib/format';
 
 const STATES = [{ value: 'open', label: 'Open' }, { value: 'in_progress', label: 'In progress' }, { value: 'closed', label: 'Closed' }];
 const PROBLEMS = ['Broken pieces', 'Wrong size', 'Colour difference', 'Short quantity', 'Other'];
@@ -18,7 +19,7 @@ export default function ComplaintsPage() {
     { name: 'invoiceNo', label: 'Bill number' },
     { name: 'problem', label: 'Problem', type: 'select', options: PROBLEMS, required: true },
     { name: 'details', label: 'Details', type: 'textarea', wide: true },
-    { name: 'photo', label: 'Photos', type: 'photo' },
+    { name: 'photos', label: 'Photos', type: 'photos' },
     { name: 'action', label: 'Action decided', type: 'select', options: ACTIONS },
     { name: 'actionNote', label: 'Reason / remark', wide: true },
     { name: 'state', label: 'Status', type: 'select', options: STATES, default: 'open' },
@@ -34,11 +35,12 @@ export default function ComplaintsPage() {
   ];
   return (
     <RoleGuard perm="complaints">
-      <CrudPage model="complaints" title={t('complaints')} subtitle="Followed until closed" label="Complaint" fields={fields} columns={columns} sort="-date,-createdAt"
-        searchKeys={['complaintNo', 'customerName', 'problem', 'invoiceNo']} exportName="complaints"
+      <CrudPage model="complaints" headerExtra={<ImportData resource="complaints" perm="complaints" noun="complaints" hint="customer and problem are required" />} title={t('complaints')} subtitle="Followed until closed" label="Complaint" fields={fields} columns={columns} sort="-date,-createdAt"
+        exportName="complaints"
         filters={[{ key: 'state', label: 'All status', options: STATES }, { key: 'problem', label: 'All problems', options: PROBLEMS }]}
-        summary={(rows, all) => {
-          const g = Object.entries(groupBy(all, 'problem')).sort((a, b) => b[1].length - a[1].length);
+        facets={{ by: 'problem' }}
+        summary={(rows, { facets: f }) => {
+          const g = Object.entries(f?.groups || {}).map(([k, v]) => [k, { length: v.n }]).sort((a, b) => b[1].length - a[1].length);
           return (
             <Section title="By problem type (all complaints)">
               <div className="flex flex-wrap gap-2">{g.map(([k, v]) => <Badge key={k} tone="gray">{k}: {v.length}</Badge>)}</div>

@@ -1,22 +1,25 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeftRight, AlertTriangle, Check, X } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
-import { inr, num, fmtDate, sum } from '@/lib/format';
+import { inr, num, fmtDate } from '@/lib/format';
 
 const CAT = [{ value: 'raw', label: 'Raw stone' }, { value: 'finished', label: 'Finished goods' }, { value: 'consumable', label: 'Consumables' }];
 const UNITS = ['sq ft', 'sq m', 'pieces', 'CFT', 'tonne', 'litres', 'kg', 'numbers'];
 
 export default function StockPage() {
-  const { t, role } = useApp();
-  const [tab, setTab] = useState('items');
+  const { t, can, perm } = useApp();
+  const sp = useSearchParams();
+  const [tab, setTab] = useState(sp.get('tab') || 'items');
   const [reloadKey, setReloadKey] = useState(0);
-  const money = role === 'owner' || role === 'manager' || role === 'accountant';
-  const manage = role !== 'salesperson';
+  const money = ['read', 'write'].includes(perm.fields.cost); // purchase / cost rates
+  const manage = can('stockitems', 'create');
 
   const itemFields = [
     { name: 'name', label: 'Item name', required: true, wide: true },
@@ -27,10 +30,10 @@ export default function StockPage() {
     { name: 'finish', label: 'Finish', type: 'select', options: ['Natural', 'Honed', 'Polished', 'Flamed', 'Split face', 'Sandblasted'] },
     { name: 'grade', label: 'Grade', type: 'select', options: ['A', 'B', 'C'] },
     { name: 'location', label: 'Location in yard' },
-    { name: 'balance', label: 'Opening balance', type: 'number', default: 0, readOnlyOnEdit: true, hint: 'Later changes happen through stock movements' },
+    { name: 'openingBalance', label: 'Opening balance', type: 'number', default: 0, createOnly: true, hint: 'Later changes happen through stock movements' },
     { name: 'minLevel', label: 'Minimum level (alert below this)', type: 'number' },
     { name: 'sellRate', label: 'Selling rate (₹)', type: 'number' },
-    ...(money ? [{ name: 'costRate', label: 'Cost rate (₹)', type: 'number' }] : []),
+    ...(money ? [{ name: 'costRate', label: 'Cost rate (₹)', type: 'number', group: 'cost' }] : []),
     { name: 'photo', label: 'Photo', type: 'photo' },
   ];
 
@@ -47,20 +50,22 @@ export default function StockPage() {
   ];
 
   return (
-    <RoleGuard perm="stock">
+    <RoleGuard perm="stockitems">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Balance' }, { key: 'moves', label: 'Movements' }]} />
       {tab === 'items' ? (
-        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="category,name"
-          fields={itemFields} columns={itemCols} searchKeys={['name', 'size', 'location', 'finish']}
+        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="name, type and unit are required; opening balance becomes the first stock-in" />}
+          fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
-          filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }], test: (r) => r.minLevel && r.balance < r.minLevel }]}
-          summary={(rows, all) => {
-            const low = all.filter((r) => r.minLevel && r.balance < r.minLevel);
+          filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }] }]}
+          // counts and stock value come from the server in one aggregate; the low-stock names are the first few rows of the indexed alert list
+          facets={{ sum: money ? 'value' : undefined, named: 'low' }}
+          summary={(rows, { total, facets: f }) => {
+            const low = f?.named?.low ?? 0;
             return (
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="Items" value={all.length} />
-                {money ? <StatCard label="Stock value" value={inr(sum(all, (r) => (r.balance || 0) * (r.costRate || 0)))} /> : <StatCard label="Below minimum" value={low.length} tone={low.length ? 'red' : 'green'} />}
-                {money && <StatCard label="Below minimum" value={low.length} sub={low.map((x) => x.name).join(', ')} tone={low.length ? 'red' : 'green'} />}
+                <StatCard label="Items" value={total ?? '…'} />
+                {money ? <StatCard label="Stock value" value={inr(f?.sums?.value ?? 0)} /> : <StatCard label="Below minimum" value={low} tone={low ? 'red' : 'green'} />}
+                {money && <StatCard label="Below minimum" value={low} sub={low ? 'Use the Alerts filter to see which' : undefined} tone={low ? 'red' : 'green'} />}
               </div>
             );
           }}
@@ -70,7 +75,7 @@ export default function StockPage() {
           rowActions={(row) => manage ? [{ label: 'Move', icon: <ArrowLeftRight size={14} />, onClick: () => { setTab('moves'); toast('Choose "Add" to record a movement for ' + row.name); } }] : []}
         />
       ) : (
-        <CrudPage key={'m' + reloadKey} model="stockmovements" title="Stock movements" subtitle="In · out · transfer · damage (damage needs owner approval)" label="Stock movement"
+        <CrudPage key={'m' + reloadKey} model="stockmovements" headerExtra={<ImportData resource="stockmovements" perm="stockmovements" noun="stock movements" />} title="Stock movements" subtitle="In · out · transfer · damage (damage needs owner approval)" label="Stock movement"
           sort="-date,-createdAt" canAdd={manage} canEdit={() => false} allowVoid={false}
           fields={[
             { name: 'date', label: 'Date', type: 'date', required: true },
@@ -90,10 +95,9 @@ export default function StockPage() {
             { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
             { key: 'createdBy', label: 'By' },
           ]}
-          searchKeys={['itemName', 'ref', 'note']}
           filters={[{ key: 'type', label: 'All movements', options: ['in', 'out', 'transfer', 'damage'] }]}
           onSaved={() => setReloadKey((k) => k + 1)}
-          rowActions={(row, { reload }) => (row.status === 'pending' && (role === 'owner' || role === 'manager') ? [
+          rowActions={(row, { reload }) => (row.status === 'pending' && can('stockmovements', 'approve') ? [
             { label: 'Approve', tone: 'green', icon: <Check size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'stockmovements', id: row._id, action: 'approve' } }); toast.success('Approved'); reload(); } catch (e) { toast.error(e.message); } } },
             { label: 'Reject', icon: <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'stockmovements', id: row._id, action: 'reject' } }); reload(); } catch (e) { toast.error(e.message); } } },
           ] : [])}

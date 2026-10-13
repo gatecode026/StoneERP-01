@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, UserPlus } from 'lucide-react';
-import { useApp, useFetch } from '@/components/Providers';
+import { useApp } from '@/components/Providers';
+import LookupSelect from '@/components/LookupSelect';
 import { RoleGuard, PageHeader, Field, Section, Sheet, Badge } from '@/components/ui';
 import { FormFields, cleanForm, missingRequired } from '@/components/CrudPage';
 import { CUSTOMER_FIELDS } from '@/components/fields';
@@ -15,10 +16,9 @@ const newItem = () => ({ stockItemId: '', name: '', hsn: '6802', qty: '', unit: 
 
 export default function NewSale() {
   const router = useRouter();
-  const { t } = useApp();
-  const customers = useFetch('/api/customers?sort=name&limit=500');
-  const stock = useFetch('/api/stockitems?category=finished&sort=name');
+  const { t, session } = useApp();
   const [customerId, setCustomerId] = useState('');
+  const [customer, setCustomer] = useState(null); // the chosen customer's full record (address, GSTIN, state), fetched when picked
   const [date, setDate] = useState(todayISO());
   const [items, setItems] = useState([newItem()]);
   const [advance, setAdvance] = useState('');
@@ -28,24 +28,30 @@ export default function NewSale() {
   const [custOpen, setCustOpen] = useState(false);
   const [cform, setCform] = useState({});
 
-  const customer = (customers.data || []).find((c) => c._id === customerId);
-  const taxType = taxTypeFor(customer);
+  const taxType = taxTypeFor(customer, session.company);
   const totals = computeTotals(items, taxType);
 
   useEffect(() => {
-    if (!customerId) { setLastRates({}); return; }
-    api(`/api/sales?customerId=${customerId}&sort=date`).then((rows) => {
+    if (!customerId) { setLastRates({}); setCustomer(null); return; }
+    let live = true;
+    api(`/api/customers/${customerId}`).then((c) => live && setCustomer(c)).catch(() => {});
+    // last rate given to THIS customer: only their 50 most recent orders are read (oldest first so the newest rate wins)
+    api(`/api/sales?customerId=${customerId}&sort=-date&limit=50`).then((r) => {
+      if (!live) return;
       const m = {};
-      rows.forEach((s) => (s.items || []).forEach((i) => { m[String(i.stockItemId)] = i.rate; }));
+      (r.data || []).slice().reverse().forEach((s) => (s.items || []).forEach((i) => { m[String(i.stockItemId)] = i.rate; }));
       setLastRates(m);
     }).catch(() => {});
+    return () => { live = false; };
   }, [customerId]);
 
   const setItem = (i, p) => setItems((arr) => arr.map((x, k) => (k === i ? { ...x, ...p } : x)));
-  function pickProduct(i, id) {
-    const s = (stock.data || []).find((x) => x._id === id);
-    if (!s) { setItem(i, { stockItemId: '', name: '' }); return; }
-    setItem(i, { stockItemId: s._id, name: s.name, unit: s.unit, rate: lastRates[s._id] ?? s.sellRate ?? '', rateHint: lastRates[s._id] ? `last rate to this customer` : 'list rate' });
+  async function pickProduct(i, id) {
+    if (!id) { setItem(i, { stockItemId: '', name: '' }); return; }
+    try {
+      const s = await api(`/api/stockitems/${id}`); // unit and list rate of the chosen product
+      setItem(i, { stockItemId: s._id, name: s.name, unit: s.unit, rate: lastRates[s._id] ?? s.sellRate ?? '', rateHint: lastRates[s._id] ? 'last rate to this customer' : 'list rate' });
+    } catch (e) { toast.error(e.message); }
   }
   useEffect(() => { // when customer changes, refresh hints
     setItems((arr) => arr.map((it) => (it.stockItemId && lastRates[it.stockItemId] && !it.rateTouched ? { ...it, rate: lastRates[it.stockItemId], rateHint: 'last rate to this customer' } : it)));
@@ -56,7 +62,7 @@ export default function NewSale() {
     if (miss) { toast.error(`${miss} is required`); return; }
     try {
       const c = await api('/api/customers', { method: 'POST', body: cleanForm(CUSTOMER_FIELDS, cform) });
-      toast.success('Customer added'); customers.reload(); setCustomerId(c._id); setCustOpen(false);
+      toast.success('Customer added'); setCustomerId(c._id); setCustomer(c); setCustOpen(false);
     } catch (e) { toast.error(e.message); }
   }
 
@@ -85,10 +91,7 @@ export default function NewSale() {
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Customer" required className="sm:col-span-2">
                 <div className="flex gap-2">
-                  <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                    <option value="">Select customer…</option>
-                    {(customers.data || []).map((c) => <option key={c._id} value={c._id}>{c.name} · {c.city}</option>)}
-                  </select>
+                  <LookupSelect className="flex-1 min-w-0" kind="customers" value={customerId} valueLabel={customer?.name} onChange={(it) => setCustomerId(it ? it.id : '')} placeholder="Search customer…" />
                   <button className="btn-outline shrink-0" onClick={() => { setCform({ state: 'Rajasthan', country: 'India', type: 'Domestic' }); setCustOpen(true); }}><UserPlus size={18} /> New</button>
                 </div>
               </Field>
@@ -102,10 +105,7 @@ export default function NewSale() {
               {items.map((it, i) => (
                 <div key={i} className="rounded-xl border border-sand-200 p-3 bg-sand-50/50">
                   <div className="flex gap-2 items-start">
-                    <select className="input" value={it.stockItemId} onChange={(e) => pickProduct(i, e.target.value)}>
-                      <option value="">Select product…</option>
-                      {(stock.data || []).map((s) => <option key={s._id} value={s._id}>{s.name} · ₹{s.sellRate}/{s.unit}</option>)}
-                    </select>
+                    <LookupSelect className="flex-1 min-w-0" kind="items" query={{ category: 'finished' }} value={it.stockItemId} valueLabel={it.name} onChange={(x) => pickProduct(i, x ? x.id : '')} placeholder="Search product…" />
                     {items.length > 1 && <button className="p-2.5 text-red-600" onClick={() => setItems(items.filter((_, k) => k !== i))}><Trash2 size={18} /></button>}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">

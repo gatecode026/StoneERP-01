@@ -1,4 +1,5 @@
 'use client';
+import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -23,13 +24,13 @@ const REMINDER_TABLE = [
 ];
 
 export default function TasksPage() {
-  const { t, role } = useApp();
+  const { t, can } = useApp();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') === 'reminders' ? 'reminders' : 'tasks');
   const [doneRow, setDoneRow] = useState(null);
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState('');
-  const canAssign = ['owner', 'manager', 'accountant', 'supervisor'].includes(role);
+  const canAssign = can('tasks', 'create');
   const rem = useFetch(tab === 'reminders' ? '/api/reminders' : null);
   const today = todayISO();
 
@@ -57,11 +58,11 @@ export default function TasksPage() {
 
   return (
     <RoleGuard perm="tasks">
-      {role !== 'worker' && role !== 'salesperson' && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'tasks', label: 'Tasks' }, { key: 'reminders', label: 'Reminder centre' }]} />}
+      {can('reminders') && canAssign && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'tasks', label: 'Tasks' }, { key: 'reminders', label: 'Reminder centre' }]} />}
       {tab === 'tasks' && (
-        <CrudPage model="tasks" title={t('tasks')} subtitle="Give work to anyone, see what is pending and overdue" label="Task" addLabel="Assign task" fields={fields} columns={columns}
-          sort="dueDate" searchKeys={['title', 'assignedName']} canAdd={canAssign} canEdit={(r) => canAssign && r.state !== 'done'}
-          filters={[{ key: 'state', label: 'All tasks', options: [{ value: 'pending', label: 'Pending' }, { value: 'done', label: 'Done' }, { value: 'overdue', label: 'Overdue' }], test: (r, v) => (v === 'overdue' ? r.state !== 'done' && r.dueDate < today : r.state === v) }]}
+        <CrudPage model="tasks" headerExtra={<ImportData resource="tasks" perm="tasks" noun="tasks" />} title={t('tasks')} subtitle="Give work to anyone, see what is pending and overdue" label="Task" addLabel="Assign task" fields={fields} columns={columns}
+          sort="dueDate" canAdd={canAssign} canEdit={(r) => canAssign && r.state !== 'done'}
+          filters={[{ key: 'state', label: 'All tasks', options: [{ value: 'pending', label: 'Pending' }, { value: 'done', label: 'Done' }, { value: 'overdue', label: 'Overdue' }], toQuery: (v) => (v === 'overdue' ? { overdue: '1' } : { state: v }) }]}
           rowClass={(r) => (r.state !== 'done' && r.dueDate < today ? 'bg-red-50/50' : '')}
           rowActions={(row, { reload }) => (row.state !== 'done' ? [{ label: 'Mark done', tone: 'green', icon: <CheckCircle2 size={14} />, onClick: () => { setDoneRow({ ...row, reload }); } }] : [])}
           onSaved={() => {}} />
