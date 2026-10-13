@@ -1,4 +1,5 @@
 'use client';
+import SyncSheet from '@/components/SyncSheet';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -36,7 +37,8 @@ function LangToggle() {
 }
 
 export default function Shell({ children }) {
-  const { session, t, can, logout, online, queued, lang } = useApp();
+  const { session, t, can, logout, online, queued, queueFailed, lang } = useApp();
+  const [syncOpen, setSyncOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
@@ -72,9 +74,14 @@ export default function Shell({ children }) {
   };
 
   return (
-    <div className="min-h-screen md:flex">
+    <div className="min-h-screen">
       {/* Desktop sidebar */}
-      <aside className={cx('hidden md:flex flex-col shrink-0 bg-white border-r border-sand-200 h-screen sticky top-0 transition-all', collapsed ? 'w-[68px]' : 'w-64')}>
+      <aside
+        className={cx(
+          'hidden md:flex flex-col shrink-0 bg-white border-r border-sand-200 h-screen fixed top-0 left-0 bottom-0 z-30 transition-all duration-200 ease-in-out',
+          collapsed ? 'w-[68px]' : 'w-64'
+        )}
+      >
         <div className="p-2.5 flex items-center justify-between border-b border-sand-100 shrink-0">
           <Brand compact={collapsed} />
           <button className="p-1.5 rounded-lg hover:bg-sand-100 text-char-500" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
@@ -96,7 +103,7 @@ export default function Shell({ children }) {
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className={cx('min-w-0 flex flex-col transition-all duration-200 ease-in-out', collapsed ? 'md:pl-[68px]' : 'md:pl-64')}>
         {/* Top bar */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-sand-200 no-print">
           <div className="flex items-center justify-between gap-2 px-4 h-14">
@@ -106,18 +113,19 @@ export default function Shell({ children }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
-              <button className="h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label="Search screens"><Search size={16} /></button>
+              <button className="h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label="Search screens"><Search size={16} /></button>
               <LangToggle />
               <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
           </div>
           {(!online || queued > 0) && (
-            <div className="bg-amber-100 text-amber-900 text-xs font-semibold px-4 py-1.5 flex items-center gap-2">
-              <WifiOff size={14} /> {!online ? t('offline') : `${queued} saved entries waiting to send`}
-              {queued > 0 && <span className="ml-auto badge-amber">{queued}</span>}
+            <div className={`${queueFailed ? 'bg-red-100 text-red-900' : 'bg-amber-100 text-amber-900'} text-xs font-semibold px-4 flex items-center gap-2 min-h-[44px]`} role="status">
+              <WifiOff size={14} /> {!online ? t('offline') : `${queued} saved entries waiting to send`}{queueFailed > 0 && ` · ${queueFailed} need attention`}
+              {queued > 0 && <button className="ml-auto underline min-h-[44px] px-2" onClick={() => setSyncOpen(true)}>{queued} · Review</button>}
             </div>
           )}
         </header>
+        <SyncSheet open={syncOpen} onClose={() => setSyncOpen(false)} />
 
         <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">{children}</main>
       </div>

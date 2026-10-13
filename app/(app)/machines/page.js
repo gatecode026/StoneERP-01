@@ -2,12 +2,14 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Wrench } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import dynamic from 'next/dynamic';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { MACHINE_TYPES } from '@/lib/config';
 import { todayISO, addDays, fmtDate, monthOf, num, fmtMonth } from '@/lib/format';
+
+const MachineChart = dynamic(() => import('@/components/charts/MachineChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function MachinesPage() {
   const { t, can } = useApp();
@@ -99,19 +101,7 @@ export default function MachinesPage() {
       {tab === 'monthly' && (
         <div>
           <PageHeader title="Monthly machine output" subtitle={fmtMonth(month)} actions={<input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />} />
-          <Section title="Output by machine (sq ft)" className="mb-4">
-            <div style={{ height: Math.max(260, byMachine.length * 34) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byMachine} layout="vertical" margin={{ left: 10, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#EADFCF" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v, n) => [n === 'sqft' ? `${num(v)} sq ft` : `${v} h`, n === 'sqft' ? 'Output' : n === 'stopped' ? 'Idle hours' : 'Breakdown hours']} />
-                  <Legend formatter={(v) => (v === 'sqft' ? 'Output (sq ft)' : v === 'stopped' ? 'Idle hours' : 'Breakdown hours')} />
-                  <Bar dataKey="sqft" fill="#B5651D" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Section>
+          <MachineChart byMachine={byMachine} />
           <div className="grid lg:grid-cols-2 gap-4">
             <div><h3 className="font-bold text-sm mb-2">Machine-wise: output, idle and breakdown hours</h3>
               <DataList loading={monthEntries.loading} rows={byMachine} rowKey="name" columns={[{ key: 'name', label: 'Machine', primary: true }, { key: 'sqft', label: 'Output sq ft', align: 'right', render: (r) => <b>{num(r.sqft)}</b> }, { key: 'stopped', label: 'Idle h' }, { key: 'breakdown', label: 'Breakdown h', render: (r) => (r.breakdown ? <span className="text-red-600 font-bold">{r.breakdown}</span> : '—') }]} /></div>

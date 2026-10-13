@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     if (isProd) common.push({ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' });
     return [
       { source: '/:path*', headers: common },
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }, { key: 'Service-Worker-Allowed', value: '/' }] },
       // /api responses default to `private, no-store`; lib/api/route.ts sets it (masters opt into ETag revalidation)
     ];
   },

@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -74,8 +75,8 @@ export default function SalaryPage() {
                 {data?.approvedBy && <span className="text-xs text-char-500">approved by {data.approvedBy}</span>}
                 <div className="flex-1" />
                 {office && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-outline" disabled={busy} onClick={() => act('salarySave', {}, 'Draft saved')}><Save size={16} /> Save draft</button>}
-                {can('salarysheets', 'approve') && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-primary" disabled={busy} onClick={() => { if (confirm(`Approve salary sheet for ${fmtMonth(month)}? Net payable ${inr(tot.net)}. Advance recoveries will be applied.`)) act('salaryApprove', {}, 'Salary sheet approved'); }}><BadgeCheck size={16} /> {t('approveSheet')}</button>}
-                {mayPay && ['approved'].includes(sheetStatus) && <button className="btn-green" disabled={busy} onClick={() => { const mode = window.prompt('Pay all unpaid salaries by: Bank / Cash / UPI', 'Bank'); if (mode) act('salaryPay', { mode: normMode(mode) }, 'Salaries marked paid'); }}><Banknote size={16} /> Pay all</button>}
+                {can('salarysheets', 'approve') && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-primary" disabled={busy} onClick={async () => { if (await confirmDialog(`Approve salary sheet for ${fmtMonth(month)}? Net payable ${inr(tot.net)}. Advance recoveries will be applied.`)) act('salaryApprove', {}, 'Salary sheet approved'); }}><BadgeCheck size={16} /> {t('approveSheet')}</button>}
+                {mayPay && ['approved'].includes(sheetStatus) && <button className="btn-green" disabled={busy} onClick={async () => { const mode = await promptDialog('Pay all unpaid salaries by: Bank / Cash / UPI', 'Bank'); if (mode) act('salaryPay', { mode: normMode(mode) }, 'Salaries marked paid'); }}><Banknote size={16} /> Pay all</button>}
               </div>
             </>
           )}
@@ -112,7 +113,7 @@ export default function SalaryPage() {
             <KV label="PF">− {inr(sel.pf)}</KV><KV label="ESI">− {inr(sel.esi)}</KV><KV label="Advance recovery">− {inr(sel.advanceRecovery)}</KV>
             <KV label={<b>Net salary</b>}><b className="text-lg text-terra">{inr(sel.net)}</b></KV>
             {sel.bank && <KV label="Bank / UPI">{sel.bank}</KV>}
-            {mayPay && ['approved', 'paid'].includes(sheetStatus) && !sel.paid && <button className="btn-outline w-full mt-3" onClick={() => { const mode = window.prompt('Paid by: Bank / Cash / UPI', 'Bank'); if (mode) { act('salaryPay', { mode: normMode(mode), empCode: sel.empCode }, 'Marked paid'); setSel(null); } }}>Mark this salary paid</button>}
+            {mayPay && ['approved', 'paid'].includes(sheetStatus) && !sel.paid && <button className="btn-outline w-full mt-3" onClick={async () => { const mode = await promptDialog('Paid by: Bank / Cash / UPI', 'Bank'); if (mode) { act('salaryPay', { mode: normMode(mode), empCode: sel.empCode }, 'Marked paid'); setSel(null); } }}>Mark this salary paid</button>}
           </div>
         )}
       </Sheet>

@@ -1,8 +1,9 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Check, X, Plus } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
+import dynamic from 'next/dynamic';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, StatCard, Section, DataList, Badge } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
@@ -11,7 +12,7 @@ import DocViewer from '@/components/DocViewer';
 import { EXPENSE_HEADS, LIMITS } from '@/lib/config';
 import { inr, fmtDate, todayISO, monthOf, fmtMonth, daysInMonth } from '@/lib/format';
 
-const COLORS = ['#B5651D', '#2B2B2B', '#D9A066', '#7F4412', '#A8A8A8', '#E3C79F', '#6B6B6B', '#9A5416', '#C98A4B', '#4B4B4B'];
+const ExpenseCharts = dynamic(() => import('@/components/charts/ExpenseCharts'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function ExpensesPage() {
   const { t, can } = useApp();
@@ -29,7 +30,7 @@ export default function ExpensesPage() {
     try { const full = await api(`/api/expenses/${r._id}`); setViewer(full.billPhoto); } catch (e) { toast.error(e.message); }
   }
   async function addHead() {
-    const name = window.prompt('New expense head name:');
+    const name = await promptDialog('New expense head name:');
     if (!name?.trim()) return;
     try { await api('/api/expenseheads', { method: 'POST', body: { name: name.trim() } }); toast.success('Head added'); ov.reload(); } catch (e) { toast.error(e.message); }
   }
@@ -91,8 +92,7 @@ export default function ExpensesPage() {
           <div className="flex items-center justify-between mb-3 gap-2"><div><h1 className="text-xl font-bold">Monthly expense report</h1><div className="text-sm text-char-500">{fmtMonth(month)}</div></div><input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} /></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"><StatCard label="Month total" value={inr(md?.total ?? 0)} tone="terra" /><StatCard label="Entries" value={md?.count ?? 0} /><StatCard label="Top head" value={byHead[0]?.name || '—'} sub={byHead[0] ? inr(byHead[0].amount) : ''} /><StatCard label="Pending approval" value={rows.filter((r) => r.status === 'pending').length} /></div>
           <div className="grid lg:grid-cols-2 gap-4">
-            <Section title="By head"><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={byHead} dataKey="amount" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>{byHead.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip formatter={(v) => inr(v)} /><Legend wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer></div></Section>
-            <Section title="By machine / site"><div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={bySite.slice(0, 8)} layout="vertical" margin={{ left: 10 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#EADFCF" /><XAxis type="number" tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} /><Tooltip formatter={(v) => inr(v)} /><Bar dataKey="amount" fill="#B5651D" radius={[0, 6, 6, 0]} /></BarChart></ResponsiveContainer></div></Section>
+            <ExpenseCharts byHead={byHead} bySite={bySite} />
           </div>
           <div className="grid lg:grid-cols-2 gap-4 mt-4">
             <div><h3 className="font-bold text-sm mb-2">By head</h3><DataList loading={monthData.loading} rows={byHead} rowKey="name" columns={[{ key: 'name', label: 'Head', primary: true }, { key: 'amount', label: 'Amount', align: 'right', render: (r) => <b>{inr(r.amount)}</b> }]} /></div>

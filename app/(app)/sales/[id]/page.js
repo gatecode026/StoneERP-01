@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -48,7 +49,7 @@ export default function SaleDetail() {
     await run(async () => {
       const body = { saleId: id, amount, mode: f.mode || 'UPI', date: f.date || todayISO(), ref: f.ref || '' };
       try { return await submit('/api/payments', body, { label: 'Payment' }); } catch (e) {
-        if (e.status === 409 && e.data?.confirmable && window.confirm(e.message)) return submit('/api/payments', { ...body, _confirmed: true }, { label: 'Payment' });
+        if (e.status === 409 && e.data?.confirmable && await confirmDialog(e.message)) return submit('/api/payments', { ...body, _confirmed: true }, { label: 'Payment' });
         throw e;
       }
     }, 'Payment recorded');

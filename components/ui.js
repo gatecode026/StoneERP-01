@@ -85,17 +85,33 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+  const panel = useRef(null);
+  useEffect(() => { // focus moves into the dialog, Tab stays inside, focus returns to the opener on close
+    if (!open) return;
+    const back = document.activeElement;
+    const sel = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    setTimeout(() => (panel.current?.querySelector('input, select, textarea') || panel.current?.querySelector(sel))?.focus(), 30);
+    const trap = (e) => {
+      if (e.key !== 'Tab' || !panel.current) return;
+      const f = [...panel.current.querySelectorAll(sel)];
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    };
+    document.addEventListener('keydown', trap);
+    return () => { document.removeEventListener('keydown', trap); back?.focus?.(); };
+  }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center no-print" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[94vh] rounded-t-3xl md:rounded-2xl shadow-2xl', wide ? 'md:max-w-3xl' : 'md:max-w-xl')}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-sand-200 shrink-0">
-          <h2 className="font-bold text-base truncate pr-2">{title}</h2>
-          <button onClick={onClose} className="p-2 -mr-2 rounded-lg hover:bg-sand-100" aria-label="Close"><X size={20} /></button>
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 no-print" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
+      <div ref={panel} className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[92vh] rounded-t-3xl md:rounded-2xl shadow-2xl border border-sand-200 overflow-hidden', wide ? 'md:max-w-3xl lg:max-w-4xl' : 'md:max-w-xl lg:max-w-2xl')}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-sand-200 shrink-0 bg-sand-50/70">
+          <h2 className="font-bold text-base md:text-lg text-char truncate pr-2">{title}</h2>
+          <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2 rounded-lg text-char-500 hover:text-char hover:bg-sand-200 transition" aria-label="Close"><X size={20} /></button>
         </div>
-        <div className="overflow-y-auto px-4 py-4 flex-1">{children}</div>
-        {footer && <div className="shrink-0 border-t border-sand-200 px-4 py-3 safe-pb bg-white rounded-b-2xl flex gap-2">{footer}</div>}
+        <div className="overflow-y-auto px-5 py-4 flex-1">{children}</div>
+        {footer && <div className="shrink-0 border-t border-sand-200 px-5 py-3.5 safe-pb bg-white flex items-center justify-end gap-3">{footer}</div>}
       </div>
     </div>
   );
@@ -144,12 +160,22 @@ export function RoleGuard({ perm, children }) {
 
 /** Footer for a paged list: how many are shown, and the button for the next page. */
 export function LoadMore({ list }) {
+  const sentinel = useRef(null);
+  const { hasMore, loadingMore, loadMore } = list;
+  // infinite scroll: the next page loads by itself as the end of the list scrolls into view (the button stays for keyboards and slow phones)
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((en) => { if (en[0].isIntersecting && !loadingMore) loadMore(); }, { rootMargin: '300px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadingMore, loadMore, list.rows.length]);
   if (!list.rows.length) return null;
   const total = list.total == null ? null : list.total > 10000 ? '10,000+' : list.total;
   return (
     <div className="mt-3 flex flex-col items-center gap-1.5">
       <div className="text-xs text-char-500">Showing {list.rows.length}{total != null ? ` of ${total}` : ''}</div>
-      {list.hasMore && <button className="btn-outline" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? 'Loading…' : 'Load more'}</button>}
+      {list.hasMore && <button ref={sentinel} className="btn-outline" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? 'Loading…' : 'Load more'}</button>}
     </div>
   );
 }
@@ -176,14 +202,37 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
   }
   return (
     <div>
-      <div className="flex flex-wrap gap-2 items-center">
-        <button type="button" className="btn-outline" onClick={() => ref.current?.click()}><Camera size={18} /> {label || t('addPhoto')}</button>
+      <div className="flex flex-wrap gap-2.5 items-center">
+        {(!items.length || multiple) && (
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-sm"
+            onClick={() => ref.current?.click()}
+          >
+            <Camera size={16} className="text-terra" /> {label || t('addPhoto')}
+          </button>
+        )}
         {items.map((src, i) => (
-          <div key={i} className="relative">
+          <div key={i} className="relative inline-flex items-center gap-2 p-1.5 rounded-xl border border-sand-200 bg-sand-50/60 shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={fileUrl(src, true)} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover border border-sand-300" />
-            <button type="button" onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
-              className="absolute -top-1.5 -right-1.5 bg-char text-white rounded-full p-0.5"><X size={12} /></button>
+            <img src={fileUrl(src, true)} alt="" loading="lazy" className="h-10 w-10 rounded-lg object-cover border border-sand-200" />
+            {!multiple && (
+              <button
+                type="button"
+                className="text-xs text-terra font-semibold hover:underline px-1"
+                onClick={() => ref.current?.click()}
+              >
+                Change
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
+              className="text-char-500 hover:text-red-600 p-1 rounded-md transition"
+              title="Remove"
+            >
+              <X size={15} />
+            </button>
           </div>
         ))}
       </div>
@@ -206,9 +255,20 @@ export function DocInput({ value, onChange, resource, kind = 'docs', label }) {
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" className="btn-outline" disabled={busy} onClick={() => ref.current?.click()}><Camera size={18} /> {busy ? 'Uploading…' : label || 'Upload photo / PDF'}</button>
-      {value && <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="text-terra font-semibold text-sm">View file</a>}
-      {value && <button type="button" className="icon-btn" aria-label="Remove file" onClick={() => onChange('')}><X size={16} /></button>}
+      <button
+        type="button"
+        className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-sm disabled:opacity-50"
+        disabled={busy}
+        onClick={() => ref.current?.click()}
+      >
+        <Camera size={16} className="text-terra" /> {busy ? 'Uploading…' : label || 'Upload photo / PDF'}
+      </button>
+      {value && (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+          <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="hover:underline font-semibold">View file</a>
+          <button type="button" className="text-emerald-700 hover:text-red-600 p-0.5" aria-label="Remove file" onClick={() => onChange('')}><X size={14} /></button>
+        </div>
+      )}
       <input ref={ref} type="file" accept="image/*,application/pdf" className="hidden" onChange={pick} />
     </div>
   );
@@ -274,13 +334,13 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr>{columns.map((c) => <th key={c.key || c.label} className={cx('th', c.align === 'right' && 'text-right')}>{c.label}</th>)}{actions && <th className="th" />}</tr>
+              <tr>{columns.map((c) => <th key={c.key || c.label} className={cx('th', c.align === 'right' && 'text-right')}>{c.label}</th>)}{actions && <th className="th text-right whitespace-nowrap w-px" />}</tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r[rowKey] || i} onClick={() => onRowClick?.(r)} className={cx('hover:bg-sand-50', onRowClick && 'cursor-pointer', rowClass?.(r))}>
                   {columns.map((c) => <td key={c.key || c.label} className={cx('td', c.align === 'right' && 'text-right', c === primary && 'font-semibold')}>{cell(c, r)}</td>)}
-                  {actions && <td className="td text-right" onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
+                  {actions && <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
                 </tr>
               ))}
             </tbody>

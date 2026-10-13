@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -53,7 +54,7 @@ export default function DispatchPage() {
     return body;
   };
   const markOut = async (row, reload) => {
-    if (!window.confirm(`Mark truck ${row.truckNo} OUT? Stock will be deducted.`)) return;
+    if (!await confirmDialog(`Mark truck ${row.truckNo} OUT? Stock will be deducted.`)) return;
     try { await api(`/api/dispatches/${row._id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out ✔'); reload(); } catch (e) { toast.error(e.message); }
   };
   const waMsg = (r) => `Dear ${r.customerName}, your order ${r.saleNo || ''} has left our Bijoliya factory.\nTruck: ${r.truckNo}\nDriver: ${r.driverName || '-'} ${r.driverMobile || ''}\nInvoice: ${r.invoiceNo || '-'}\nE-way bill: ${r.eway || '-'}\n— Vipul Stone Suppliers`;
@@ -97,7 +98,7 @@ export default function DispatchPage() {
         <div>
           <div className="grid grid-cols-2 gap-3 mb-3"><StatCard label="Freight pending" value={inr(sum(freight, 'pending'))} tone="amber" /><StatCard label="Freight paid" value={inr(sum(freight, 'paid'))} tone="green" /></div>
           <DataList loading={fr.loading} rows={freight} rowKey="name" empty="No freight entered" columns={[{ key: 'name', label: 'Transporter', primary: true }, { key: 'trips', label: 'Trips' }, { key: 'total', label: 'Total', render: (r) => inr(r.total) }, { key: 'paid', label: 'Paid', render: (r) => inr(r.paid) }, { key: 'pending', label: 'Pending', render: (r) => <b className={r.pending ? 'text-amber-700' : ''}>{inr(r.pending)}</b> }]}
-            actions={(r) => r.pending > 0 && can('cashentries', 'create') && <button className="btn-outline btn-sm" onClick={async () => { if (!confirm(`Mark ${inr(r.pending)} freight as paid to ${r.name}?`)) return; try { await api('/api/bulk/freight-paid', { method: 'POST', body: { ...(r.transporter ? { transporter: r.transporter } : {}), mode: 'Bank' } }); toast.success('Marked paid'); fr.reload(); } catch (e) { toast.error(e.message); } }}>Mark paid</button>} />
+            actions={(r) => r.pending > 0 && can('cashentries', 'create') && <button className="btn-outline btn-sm" onClick={async () => { if (!await confirmDialog(`Mark ${inr(r.pending)} freight as paid to ${r.name}?`)) return; try { await api('/api/bulk/freight-paid', { method: 'POST', body: { ...(r.transporter ? { transporter: r.transporter } : {}), mode: 'Bank' } }); toast.success('Marked paid'); fr.reload(); } catch (e) { toast.error(e.message); } }}>Mark paid</button>} />
         </div>
       )}
     </RoleGuard>

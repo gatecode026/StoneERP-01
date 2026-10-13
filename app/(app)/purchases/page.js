@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -17,9 +18,9 @@ export default function PurchasesPage() {
 
   const payable = (p) => Math.max(0, p.outstanding ?? (p.total || 0) - (p.paidAmount || 0));
   async function pay(p, reload) {
-    const amt = window.prompt(`Pay supplier ${p.supplierName}. Amount (pending ${inr(payable(p))}):`, String(payable(p)));
+    const amt = await promptDialog(`Pay supplier ${p.supplierName}. Amount (pending ${inr(payable(p))}):`, String(payable(p)));
     if (!amt) return;
-    const m = (window.prompt('Mode: Cash / UPI / Bank', 'Bank') || 'Bank').trim().toLowerCase();
+    const m = (await promptDialog('Mode: Cash / UPI / Bank', 'Bank') || 'Bank').trim().toLowerCase();
     const mode = m === 'cash' ? 'Cash' : m === 'upi' ? 'UPI' : 'Bank';
     try { await api(`/api/purchases/${p._id}/pay`, { method: 'POST', body: { amount: Number(amt), mode } }); toast.success('Payment recorded'); reload(); } catch (e) { toast.error(e.message); }
   }

@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import LookupSelect from '@/components/LookupSelect';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -42,7 +43,7 @@ export default function UsersPage() {
     setBusy(false);
   }
   async function reset(u) {
-    if (!window.confirm(`Give ${u.name} a new temporary password? They will be signed out everywhere.`)) return;
+    if (!await confirmDialog(`Give ${u.name} a new temporary password? They will be signed out everywhere.`)) return;
     try { const r = await api(`/api/users/${u.id}/reset-password`, { method: 'POST', body: {} }); setSecret({ name: u.name, username: u.username, password: r.temporaryPassword }); } catch (e) { toast.error(e.message); }
   }
   async function toggle(u) {

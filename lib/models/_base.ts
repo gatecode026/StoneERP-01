@@ -41,7 +41,7 @@ export function defineModel(name: string, fields: SchemaDefinition, opts: ModelO
   const schema = new Schema({ ...(opts.noBase ? {} : baseFields), ...fields }, { timestamps: true, strict: true, versionKey: false, minimize: false });
   for (const [def, o] of opts.indexes ?? []) schema.index(def, o);
   schema.plugin(trackQueries);
-  return mongoose.model(name, schema) as AnyModel;
+  return mongoose.model(name, schema) as unknown as AnyModel;
 }
 
 /** Partial unique index helper: unique only among non-void records. */

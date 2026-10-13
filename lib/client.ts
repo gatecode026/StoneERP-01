@@ -4,7 +4,7 @@
 
 import { CSV_BOM, csvCell } from './export/csv';
 
-const QKEY = 'vss_queue';
+import { enqueue, flushQueue as flushStored } from './offlineQueue';
 
 export class ApiError extends Error {
   status: number;
@@ -12,17 +12,18 @@ export class ApiError extends Error {
   constructor(message: string, status: number, data?: any) { super(message); this.status = status; this.data = data; }
 }
 
-export async function api(path: string, { method = 'GET', body }: { method?: string; body?: unknown } = {}): Promise<any> {
+export async function api(path: string, { method = 'GET', body, headers }: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<any> {
   let res: Response;
   try {
     res = await fetch(path.startsWith('/') ? path : '/' + path, {
       method, cache: 'no-store',
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: body !== undefined ? { 'Content-Type': 'application/json', ...(headers ?? {}) } : headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (e) {
     throw new ApiError('Network error', 0, { network: true });
   }
+  if (res.status === 503 && res.headers.get('x-offline')) throw new ApiError('Offline', 0, { network: true }); // answered by the service worker: no network and no stored copy
   let data: any = null;
   try { data = await res.json(); } catch {}
   if (res.status === 401 && typeof window !== 'undefined' && !location.pathname.startsWith('/login')) {
@@ -40,14 +41,7 @@ export async function api(path: string, { method = 'GET', body }: { method?: str
   return data;
 }
 
-export function getQueue(): any[] {
-  try { return JSON.parse(localStorage.getItem(QKEY) || '[]'); } catch { return []; }
-}
-function setQueue(q: any[]) {
-  try { localStorage.setItem(QKEY, JSON.stringify(q)); window.dispatchEvent(new Event('vss-queue')); } catch {}
-}
-
-// Save-and-send: if offline (or network fails), queue in localStorage and send later.
+// Save-and-send: when offline (or the network drops mid-request) the entry goes into the IndexedDB queue and is sent later.
 export async function submit(path: string, body: unknown, { method = 'POST', label = 'Entry' }: { method?: string; label?: string } = {}): Promise<any> {
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (!offline) {
@@ -57,33 +51,13 @@ export async function submit(path: string, body: unknown, { method = 'POST', lab
       if (!e.data?.network) throw e;
     }
   }
-  const q = getQueue();
-  q.push({ id: Date.now() + Math.random(), path, method, body, label, ts: Date.now() });
-  setQueue(q);
+  await enqueue({ path, method, body, label });
   return { queued: true };
 }
 
-let flushing = false;
-export async function flushQueue(onSent?: (item: any, ok: boolean, e?: any) => void) {
-  if (flushing) return 0;
-  flushing = true;
-  let sent = 0;
-  try {
-    let q = getQueue();
-    for (const item of q) {
-      try {
-        await api(item.path, { method: item.method, body: item.body });
-        sent++;
-        onSent?.(item, true);
-      } catch (e: any) {
-        if (e.data?.network) break; // still offline
-        onSent?.(item, false, e);
-      }
-      q = getQueue().filter((x) => x.id !== item.id);
-      setQueue(q);
-    }
-  } finally { flushing = false; }
-  return sent;
+/** Deliver queued entries (each with its own Idempotency-Key). Failures the server rejects stay visible in the sync panel. */
+export function flushQueue(onResult?: (it: any, ok: boolean, message?: string) => void) {
+  return flushStored((it) => api(it.path, { method: it.method, body: it.body, headers: { 'Idempotency-Key': it.idemKey } }), onResult);
 }
 
 // ---------- CSV export (opens in Excel) ----------

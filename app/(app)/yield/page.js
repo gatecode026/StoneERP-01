@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
+import dynamic from 'next/dynamic';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Section, Badge, ExportBtn } from '@/components/ui';
 import { downloadCSV } from '@/lib/client';
 import { inr, num, num2, fmtDate } from '@/lib/format';
+
+const YieldChart = dynamic(() => import('@/components/charts/YieldChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function YieldPage() {
   const { t } = useApp();
@@ -29,22 +31,7 @@ export default function YieldPage() {
     ] : []),
   ];
 
-  const barData = (rows) => rows.map((r) => ({ name: r.name.length > 14 ? r.name.slice(0, 13) + '…' : r.name, yield: r.yieldPct, full: r.name }));
-  const chart = (rows) => (
-    <div className="h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={barData(rows)} margin={{ left: -10, right: 6, top: 6 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EADFCF" />
-          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={60} />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-          <Tooltip formatter={(v) => [`${v}%`, 'Yield']} labelFormatter={(l, p) => p?.[0]?.payload?.full || l} />
-          <Bar dataKey="yield" radius={[6, 6, 0, 0]}>
-            {rows.map((r, i) => <Cell key={i} fill={r.yieldPct < (d?.threshold || 0) ? '#DC2626' : '#B5651D'} />)}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
+  const chart = (rows) => <YieldChart rows={rows} threshold={d?.threshold || 0} />;
 
   return (
     <RoleGuard perm="yield">

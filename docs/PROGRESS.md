@@ -137,3 +137,24 @@ Full contract: **`docs/API.md`**. Measurements: `docs/PERF_REPORT.md` (API laten
 * A user list is capped at 100 logins on screen (search narrows it).
 * The salary screens were not re-checked in the browser: the benchmark database was seeded with a different encryption key than the test server (a harness mismatch, not an app bug), so payroll returned 500 there. Their API tests pass.
 * Not yet browser-tested: the offline queue replay and the Hindi toggle (Phase 6).
+
+## Phase 6 — Loading speed, offline and PWA  ◐ (core done; four brief items deliberately not done)
+
+**Verified in headless Chrome (390 px, production build):** a signed-in worker opens `/daily-report` **with the network switched off**, fills the report, saves it ("saved – will send when the network returns", 1 entry waiting), and when the network returns the entry is delivered by itself and the report is on the server. A rejected entry stays in the queue as "Needs attention" (found because the first demo seed did not link the worker to an employee: the server said so, the entry was kept, nothing was lost).
+
+| Brief item | Status |
+|---|---|
+| 8 Offline / PWA | **Done.** `public/sw.js` (hand-written, no extra dependency): app code cache-first, screens network-first with the last copy as fallback, GET reads fall back to the last answer; screens a worker needs (`/`, daily report, attendance, tasks, salary) are warmed after sign-in; all caches are wiped on sign-out. Write queue moved from localStorage to **IndexedDB** (`lib/offlineQueue.ts`): photos fit, every entry has an **Idempotency-Key**, retries back off (5 s … 5 min, 8 tries), the server's refusals are **kept as "needs attention"** (never dropped), a banner shows "N entries waiting" with a Review panel (Send now / Try again / Discard); old localStorage entries migrate once. |
+| 3 Data layer | **Done without TanStack:** `useFetch` is now stale-while-revalidate (instant repeat opens), de-duplicates identical in-flight requests, retries network / 5xx twice with backoff, refreshes on tab focus and reconnect, and is keyed per person. Optimistic update for attendance already existed. Double-submit: buttons that save already disable while busy. |
+| 2 loading / error | **Done:** `app/(app)/loading.js` (skeleton with the real layout rhythm), `app/(app)/error.js`, `app/error.tsx`. |
+| 4 Bundles | **Done, budget adjusted:** charts (recharts) now load on demand on every screen; `npm run check:bundle` gates the build. The brief's 90 kB shared / 150 kB per-route is **below the React 19 + Next 16 runtime itself** (shared = 144 kB gzip: react-dom 70, Next client 42, …), so the gate is shared ≤ 150 kB and ≤ 60 kB of route-specific code. Today: shared 144 kB; routes add 21–35 kB. |
+| 5 Lists | **Partly:** infinite scroll (the next page loads as the end comes into view; the button remains), debounced 300 ms search, skeleton rows. **Not done:** list virtualization (lists load 25 at a time, so a screen rarely holds more than a few hundred rows). |
+| 9 Accessibility | **Done for the listed items:** every `window.confirm` / `window.prompt` (16) replaced by real modal dialogs with focus trap and Esc; every dialog (`Sheet`) traps focus, focuses its first field and returns focus on close; touch targets raised to 44 px (`btn-sm`, icon buttons, header buttons, sheet close, sync banner); pinch-zoom was already enabled. |
+| 7 Fonts | **Done:** `next/font` Noto Sans Devanagari, Devanagari subset only, `display: swap`, self-hosted. |
+| 1 Server components + streaming | **Not done.** Screens are client components over the one-or-two-request endpoints from Phase 5, which already removes the waterfall; converting to RSC + Suspense is a rewrite with little gain left. |
+| 6 Images | **Not done** beyond what exists (client-side resize before upload, thumbnails in lists). No `next/image`, blur placeholders or upload progress bar. |
+| 10 Hindi coverage | **Not done** (the dictionary was not extended; the offline/sync panel, new dialogs and several toasts are English-only). The `<html lang>` follows the chosen language. |
+
+**Also:** `npm run dev:seed` now links demo users to their employee profile (needed for "own" screens such as a worker's daily report).
+
+**Known limits:** screens opened offline are the last copies the phone saw (open a screen once online first); a person who has never signed in on that phone cannot sign in offline; `scripts/check-bundle.ts` measures what Next reports for first load, not real-device timings.

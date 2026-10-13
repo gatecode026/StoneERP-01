@@ -52,7 +52,10 @@ async function main() {
     ['9000000007', 'Mahesh Mali', 'worker', 'guard', 'E006'], ['9000000008', 'Hanuman Teli', 'worker', 'store_keeper', 'E009'], ['9000000009', 'Bhanwar Nayak', 'worker', 'mechanic', 'E010'], ['9000000010', 'Shankar Bairwa', 'worker', 'driver', 'E012'],
   ];
   const pw = await hashPassword('Demo@1234');
-  for (const [username, name, role, preset, empCode] of demo) await User.create({ username, name, role, preset, empCode, passwordHash: pw, mustChangePassword: false });
+  for (const [username, name, role, preset, empCode] of demo) {
+    const emp: any = empCode ? await Employee.findOne({ empCode }).select('_id').lean() : null; // "own" records (report, attendance, slip) are found through this link
+    await User.create({ username, name, role, preset, empCode, employeeId: emp?._id ?? null, passwordHash: pw, mustChangePassword: false });
+  }
 
   const m = (name: string, type: string) => ({ name, type, location: 'Factory', serviceIntervalDays: 90, lastServiceDate: addDays(today, -30), supervisorCode: 'E004', mechanicCodes: ['E010'], ...stamp });
   await Machine.insertMany([m('Gang saw 1', 'Gang saw'), m('Gang saw 2', 'Gang saw'), m('Block cutter 1', 'Block cutter'), m('Polishing line 1', 'Polishing')]);

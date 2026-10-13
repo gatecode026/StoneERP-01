@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/client';
@@ -52,7 +53,7 @@ export default function BlocksPage() {
           fields={fields} columns={columns} sort="-blockNo"
           canEdit={() => false} addLabel="New block"
           rowActions={(row, { reload }) => (row.stage !== 'cut' && can('blocks', 'edit') ? [{ label: 'Mark cut', onClick: async () => {
-            if (!window.confirm(`Mark block #${row.blockNo} as fully cut? Its yield % will then be worked out.`)) return;
+            if (!await confirmDialog(`Mark block #${row.blockNo} as fully cut? Its yield % will then be worked out.`)) return;
             try { await api(`/api/blocks/${row._id}/cut`, { method: 'POST', body: {} }); toast.success('Block marked cut – see Yield'); reload(); } catch (e) { toast.error(e.message); } } }] : [])}
           filters={[{ key: 'stage', label: 'All stages', options: STAGES }, { key: 'source', label: 'All sources', options: [{ value: 'own', label: 'Own quarry' }, { value: 'supplier', label: 'Supplier' }] }]}
           facets={{ by: 'stage' }}

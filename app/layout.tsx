@@ -1,5 +1,9 @@
 import './globals.css';
 import { headers } from 'next/headers';
+import { Noto_Sans_Devanagari } from 'next/font/google';
+
+// Hindi text: self-hosted, Devanagari subset only, shown at once in the fallback font and swapped in when loaded (never blocks rendering)
+const deva = Noto_Sans_Devanagari({ subsets: ['devanagari'], display: 'swap', weight: ['400', '600', '700'], variable: '--font-deva' });
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/Providers';
 import { getSessionUser } from '@/lib/auth/session';
@@ -31,10 +35,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';
   return (
-    <html lang={lang}>
-      <body>
+    <html lang={lang} className={deva.variable} suppressHydrationWarning>
+      <head>
         {/* react-hot-toast (goober) injects a <style> at runtime; it reads its CSP nonce from window.__nonce__ */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__nonce__=${JSON.stringify(nonce ?? '')}` }} />
+      </head>
+      <body suppressHydrationWarning>
         <Providers initialSession={session} initialLang={lang}>{children}</Providers>
       </body>
     </html>

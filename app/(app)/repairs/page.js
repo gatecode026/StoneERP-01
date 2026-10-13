@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -62,8 +63,8 @@ export default function RepairsPage() {
           filters={[{ key: 'status', label: 'All', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }] }, { key: 'kind', label: 'All types', options: ['breakdown', 'service'] }]}
           rowClass={(r) => (r.status === 'open' ? 'bg-red-50/60' : '')} exportName="repairs"
           rowActions={(row, { reload }) => (row.status === 'open' ? [{ label: 'Close', tone: 'green', icon: <CheckCircle2 size={14} />, onClick: async () => {
-            const action = window.prompt('What was done? (optional)', row.action || '') ?? null; if (action === null) return;
-            const cost = window.prompt('Repair cost ₹ (optional)', row.cost || '');
+            const action = await promptDialog('What was done? (optional)', row.action || '') ?? null; if (action === null) return;
+            const cost = await promptDialog('Repair cost ₹ (optional)', row.cost || '');
             try { await api(`/api/repairs/${row._id}`, { method: 'PATCH', body: { status: 'closed', action, cost: Number(cost) || 0 } }); toast.success('Repair closed'); reload(); machines.reload(); } catch (e) { toast.error(e.message); } } }] : [])}
         />
       )}

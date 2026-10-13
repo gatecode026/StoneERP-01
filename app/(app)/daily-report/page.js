@@ -1,4 +1,5 @@
 'use client';
+import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -56,7 +57,7 @@ export default function DailyReportPage() {
   }
 
   async function check(r, supCheck) {
-    const remark = supCheck === 'not_ok' ? window.prompt('Remark (what is wrong?)', r.supRemark || '') : r.supRemark || '';
+    const remark = supCheck === 'not_ok' ? await promptDialog('Remark (what is wrong?)', r.supRemark || '') : r.supRemark || '';
     if (remark === null) return;
     try { await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck, supRemark: remark } }); toast.success(supCheck === 'ok' ? 'Marked OK' : 'Marked not OK'); reload(); } catch (e) { toast.error(e.message); }
   }
