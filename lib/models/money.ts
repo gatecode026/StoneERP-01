@@ -23,7 +23,7 @@ export const Expense = defineModel(
     cashEntryId: OID,
     pettyCashUserId: OID, // paid out of this person's petty-cash float
   },
-  { indexes: [[{ date: -1, createdAt: -1 }], [{ status: 1, date: -1 }], [{ createdById: 1, date: -1 }], [{ head: 1, date: -1 }], [{ site: 1, date: -1 }], [{ spentByCode: 1, date: -1 }]] }
+  { indexes: [[{ isVoid: 1, date: 1, _id: 1 }], [{ isVoid: 1, status: 1, date: 1, _id: 1 }], [{ isVoid: 1, createdById: 1, date: 1, _id: 1 }], [{ isVoid: 1, head: 1, date: 1, _id: 1 }], [{ isVoid: 1, site: 1, date: 1, _id: 1 }], [{ spentByCode: 1, date: -1 }]] }
 );
 
 export const CashEntry = defineModel(
@@ -42,7 +42,7 @@ export const CashEntry = defineModel(
     reversed: { type: B, default: false },
     transferId: OID, // both legs of a bank<->cash transfer share this
   },
-  { indexes: [[{ account: 1, date: -1 }], [{ refModel: 1, refId: 1 }], [{ date: -1, createdAt: -1 }]] }
+  { indexes: [[{ isVoid: 1, date: 1, _id: 1 }], [{ isVoid: 1, account: 1, date: 1, _id: 1 }], [{ refModel: 1, refId: 1 }], [{ account: 1, date: -1 }]] }
 );
 
 export const CashClosing = defineModel(

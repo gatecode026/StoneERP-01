@@ -11,6 +11,7 @@ import type { AnyModel } from '../models/_base';
 import { buildFilter, encodeCursor, parseListQuery, type ListSpec } from './query';
 import type { AuthCtx } from './withAuth';
 import { oid, type SvcCtx } from '../services/core';
+import { ingestPhotos } from '../storage/files';
 
 /**
  * A resource = a model + the contract for talking to it over HTTP. Business rules live in `lifecycle`
@@ -98,6 +99,7 @@ export async function createResource(auth: AuthCtx, def: ResourceDef) {
   rejectServerOnly(def, body);
   const input = parseWith(def.create, body, 'Creating');
   assertWritable(auth.perm, def.key, Object.keys(input));
+  await ingestPhotos(input, def.key, auth.user.id); // inline photos become stored files; the database keeps only keys
   const ctx = await auth.svc({ confirmed });
   const { doc: created, status } = await withTxn(async (session) => {
     const c: SvcCtx = { ...ctx, session };
@@ -135,6 +137,7 @@ export async function updateResource(auth: AuthCtx, def: ResourceDef, id: string
   const patch = parseWith(def.update, body, 'Editing');
   const keys = Object.keys(patch);
   if (!keys.length) throw badRequest('Nothing to change');
+  await ingestPhotos(patch, def.key, auth.user.id);
   const f = await scopedIdFilter(auth.user, auth.perm, def.key, 'edit', id);
   if (!f) throw notFound();
   const ctx = await auth.svc({ confirmed });

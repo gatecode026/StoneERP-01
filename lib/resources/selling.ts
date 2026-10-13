@@ -9,6 +9,7 @@ import { accountFor, applyStock, nextSeq, oid, postCash, reverseCashFor, reverse
 import { customerById, saleById } from '../services/lookup';
 import { dateStr, empCode, enumOf, gstin, MODES, mobile, num, oidStr, photo, photos, posNum, req, text } from './zod';
 import { scopeFilter } from '../perm/engine';
+import * as roll from '../rollup/dailySummary';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
 /** Key of an order line inside Sale.dispatchedQty (Mongo keys cannot contain '.' or '$'). */
@@ -74,6 +75,7 @@ export const sales: ResourceDef = {
         createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name,
       }], { session: ctx.session });
       if (stage === 'order') {
+        await roll.saleCounted(date, priced.total, 1, ctx.session);
         await Customer.updateOne({ _id: c._id }, { $inc: { outstanding: priced.total } }, { session: ctx.session });
         if (advance > 0) await receivePayment(ctx, sale.toObject(), { amount: advance, mode: input.advanceMode ?? 'UPI', date, kind: 'advance' });
       }
@@ -92,7 +94,10 @@ export const sales: ResourceDef = {
       if (d.invoiceNo) throw conflict(`Invoice ${d.invoiceNo} has been issued. Raise a credit note instead of cancelling.`);
       if (d.paid > 0) throw conflict('Payments exist for this order. Cancel the payments first.');
       if (await Dispatch.exists({ saleId: d._id, isVoid: false, status: { $in: ['loading', 'out'] } }).session(s(ctx))) throw conflict('Trucks are loaded or dispatched for this order. Cancel the dispatch first.');
-      if (d.stage !== 'quotation') await Customer.updateOne({ _id: d.customerId }, { $inc: { outstanding: -d.total } }, { session: ctx.session });
+      if (d.stage !== 'quotation') {
+        await Customer.updateOne({ _id: d.customerId }, { $inc: { outstanding: -d.total } }, { session: ctx.session });
+        await roll.saleCounted(d.date, d.total, -1, ctx.session);
+      }
     },
   },
 };
@@ -109,6 +114,7 @@ export async function confirmOrder(ctx: SvcCtx, saleId: string, advance: number,
   if (adv > sale.total) throw badRequest('Advance is more than the order total');
   await Sale.updateOne({ _id: sale._id }, { $set: { outstanding: sale.total } }, { session: ctx.session });
   await Customer.updateOne({ _id: sale.customerId }, { $inc: { outstanding: sale.total } }, { session: ctx.session });
+  await roll.saleCounted(sale.date, sale.total, 1, ctx.session);
   if (adv > 0) await receivePayment(ctx, { ...sale, outstanding: sale.total }, { amount: adv, mode, date: todayIST(), kind: 'advance' });
   return sale;
 }
@@ -142,6 +148,7 @@ export async function receivePayment(ctx: SvcCtx, sale: any, p: PayIn) {
   const r = await Sale.updateOne({ _id: sale._id, isVoid: false, stage: { $ne: 'quotation' }, outstanding: { $gte: amt } }, { $inc: { paid: amt, outstanding: -amt } }, { session: ctx.session });
   if (!r.matchedCount) throw conflict(`This order has only ₹${Number(sale.outstanding ?? 0).toLocaleString('en-IN')} pending`);
   await Customer.updateOne({ _id: sale.customerId }, { $inc: { outstanding: -amt } }, { session: ctx.session });
+  await roll.receipt(p.date, amt, 1, ctx.session);
   const [pay] = await Payment.create([{
     saleId: sale._id, saleNo: sale.saleNo, customerId: sale.customerId, customerName: sale.customerName, amount: amt, mode: p.mode, date: p.date, kind: p.kind ?? 'payment', ref: p.ref,
     receivedById: oid(ctx.actor.id), createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name,
@@ -171,6 +178,7 @@ export const payments: ResourceDef = {
     },
     async beforeVoid(ctx, d) {
       await reverseCashFor(ctx, 'payments', d._id, 'Payment cancelled');
+      await roll.receipt(d.date, d.amount, -1, ctx.session);
       await Sale.updateOne({ _id: d.saleId }, { $inc: { paid: -d.amount, outstanding: d.amount } }, { session: ctx.session });
       await Customer.updateOne({ _id: d.customerId }, { $inc: { outstanding: d.amount } }, { session: ctx.session });
     },
@@ -217,6 +225,7 @@ export const dispatches: ResourceDef = {
       doc.gatePassNo = 'GP-' + String(await nextSeq('gatepass', ctx.session, 40)).padStart(4, '0');
       return doc;
     },
+    async afterCreate(ctx, d) { if (d.direction === 'in') await roll.truck(d.date, 'in', 1, ctx.session); },
     async prepareUpdate(ctx, prev, patch) {
       if (prev.status === 'out') throw conflict('This truck has already left. Its record is fixed.');
       const w1 = patch.emptyWeight ?? prev.emptyWeight;
@@ -225,7 +234,9 @@ export const dispatches: ResourceDef = {
       return patch;
     },
     async beforeVoid(ctx, d) {
+      if (d.direction === 'in') await roll.truck(d.date, 'in', -1, ctx.session);
       if (d.status === 'out' && d.direction === 'out') {
+        await roll.truck(d.date, 'out', -1, ctx.session);
         await reverseStockFor(ctx, 'dispatches', d._id, 'Dispatch cancelled');
         const inc: Record<string, number> = {};
         for (const it of d.items ?? []) inc[`dispatchedQty.${lineKey(it)}`] = -it.qty;
@@ -243,6 +254,7 @@ export async function markTruckOut(ctx: SvcCtx, id: string) {
     { returnDocument: 'after', session: ctx.session, lean: true }
   );
   if (!d) throw conflict('This truck is not waiting at the gate (already out or cancelled)');
+  await roll.truck(d.date, 'out', 1, ctx.session);
   for (const it of d.items ?? []) {
     if (it.stockItemId) await applyStock(ctx, { itemId: it.stockItemId, delta: -it.qty, type: 'out', date: d.date, ref: `Gate pass ${d.gatePassNo}`, note: d.customerName, refModel: 'dispatches', refId: d._id });
   }

@@ -77,3 +77,31 @@ One entry per phase. Every phase ends with: `npm run lint`, `npm run typecheck`,
 * Sales now store `costTotal` (cost group) at write time, which is what makes profit per order possible without exposing cost to roles that cannot see it.
 
 **Verification:** 11 new API tests (every role's home returns 200 with the right shape and < 50 KB; Owner has comparison/approvals/profit; supervisor home contains no money/cost/profit key anywhere; salesperson cannot see another's customers; worker payload is exactly `date, denied, kind, self`; presets' first card; "denied" marker after the Owner removes a right; 401 when signed out; future dates rejected).
+
+## Phase 4 — Database and query optimization  ✅
+
+**Measured on a separate production-scale database (`vss_perf`, never the real one):** 100 employees, 181,873 attendance rows (5 years), 80,546 daily reports, 50,000 stock movements, 200,000 cash entries, 40,000 expenses, 20,000 sales, 24,000 dispatches, 1,000,000 audit logs. Full numbers: `docs/PERF_REPORT.md`, raw plans in `docs/perf/`.
+
+| Result | Before indexes | After |
+|---|---|---|
+| Collection scans on 44 hot queries | 40 | **0** |
+| Audit log latest list (1M rows) | 2,442 ms, 1,000,000 docs examined | 2.6 ms, 26 docs |
+| Cash book latest list (200k rows) | 785 ms | 4 ms |
+| Attendance for one day (182k rows) | 392 ms | 6 ms |
+| Scorecards (month of reports) | 524 ms | 16 ms |
+| API p50 / p95 on the production build, every role's home | – | owner 61/95 ms, manager 53/66, accountant 95/115, supervisor 30/35, salesperson 33/59, worker 16/27 (single user, local MongoDB) |
+| API p50 on 8 busiest lists | – | 15–18 ms |
+
+**What was built**
+* **Indexes**: every keyset list has a `{isVoid, [filters], sortField, _id}` index that serves ascending and descending; partial/unique indexes use `liveUnique()` so a voided record frees its code. `npm run db:indexes` also covers `DailySummary`, `FileObject`, `PerfSnapshot`.
+* **Rollups** (`lib/rollup/dailySummary.ts`): one `DailySummary` per date updated with `$inc` inside the same transaction as the change (attendance, reports, machine output, sales, receipts, expenses, trucks, cash). Owner report and trends read one document instead of scanning the day. Running balances for cash/bank accounts; `outstanding` on sales/customers/purchases; `belowMin` flag on stock items (one pipeline update in `incBalance`, the only place a stock balance changes).
+* **Self-checking**: `rebuildDay` / `diffDay` / `reconcile`; `npm run job:reconcile -- --days=N` repairs drift and exits 2 if it had to. Run on 30 days of the perf data: no drift. A test proves a void leaves the rollup exactly equal to a rebuild.
+* **Photos out of MongoDB**: `lib/storage` (S3-compatible incl. R2/MinIO, Cloudinary, local for dev only — refused in production); inline data-URL images are re-encoded (sharp, EXIF stripped, 1600 px + thumbnail) and stored by key; `FileObject` holds owner/resource so `GET /api/files/<key>` is permission-checked (404 outside scope) with short-lived signed URLs when the driver supports them. `npm run migrate:photos` (idempotent, `--dry-run`) moves legacy base64 out.
+* **Caching**: tag-invalidated in-memory cache for yield; scorecards computed once for everyone, cached a minute for the current month and stored permanently for closed months.
+* **Connection tuning**: pool size, read preference, separate `MONGO_REPORT_READ` for reports (use `secondaryPreferred` on Atlas), DNS override refused in production.
+* **Retention**: TTL only on sessions, OTPs, rate limits, idempotency keys; financial data and the audit log never expire. Archive plan in `docs/DATA_RETENTION.md`.
+* **Tools**: `npm run perf:seed`, `perf:bench` (`dataset`, `explain`, `http`, `report`), `migrate:photos`, `job:reconcile`. `.env.example` lists every new variable.
+
+**Verification:** typecheck clean · lint 0 errors · build OK (0 warnings; only scripts/docs changed after it) · `npm test`: **465 tests pass** (19 new in `rollup.test.ts` and `storage.test.ts`: rollup equals live numbers after attendance/report/machine/expense/sale/payment/dispatch/cash changes and reversals; team-scoped report bypasses the global rollup; corrupted day and drifted cash balance are detected and repaired; `belowMin` flips with stock-out/in and a changed minimum; inline photo becomes a key; lists carry no photo field; owner-only download, other supervisor 404, anonymous 401; non-image uploads rejected; EXIF stripped; PII documents need personal-data access; migration dry-run/apply/idempotent; production refuses local storage), plus updated flow/home/permission-matrix tests.
+
+**Honest limits:** latency is single-user on a local MongoDB — network and Atlas tier add to it. Lists still load pages of 100 via cursor-follow shims (true infinite scroll → Phase 6). No browser E2E yet (Phase 8). The "daily reports / machine entries (a day)" bench rows return empty bodies because the chosen date has no seeded rows; their plans (4.5 ms, 26 docs) are in the explain table. The accountant home is the slowest (p50 95 ms; one run measured 209 ms) — it runs the receivables-ageing aggregate; Phase 5 will look at it.

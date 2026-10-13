@@ -55,6 +55,10 @@ export const Sale = defineModel(
   },
   {
     indexes: [
+      [{ isVoid: 1, date: 1, _id: 1 }],
+      [{ isVoid: 1, stage: 1, date: 1, _id: 1 }],
+      [{ isVoid: 1, salespersonUserId: 1, date: 1, _id: 1 }],
+      [{ isVoid: 1, customerId: 1, date: 1, _id: 1 }],
       [{ saleNo: 1 }, liveUnique()],
       [{ invoiceNo: 1 }, { unique: true, partialFilterExpression: { invoiceNo: { $gt: '' } } }],
       [{ customerId: 1, stage: 1, date: -1 }],
@@ -120,6 +124,8 @@ export const Dispatch = defineModel(
   {
     indexes: [
       [{ gatePassNo: 1 }, { unique: true, partialFilterExpression: { gatePassNo: { $gt: '' } } }],
+      [{ isVoid: 1, date: 1, _id: 1 }],
+      [{ isVoid: 1, direction: 1, status: 1, date: 1, _id: 1 }],
       [{ saleId: 1, status: 1 }],
       [{ direction: 1, date: -1 }],
       [{ status: 1, date: -1 }],

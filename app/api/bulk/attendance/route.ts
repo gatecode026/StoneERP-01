@@ -7,6 +7,7 @@ import { writeAudit } from '@/lib/audit';
 import { badRequest } from '@/lib/errors';
 import { scopeFilter } from '@/lib/perm/engine';
 import { oid } from '@/lib/services/core';
+import * as roll from '@/lib/rollup/dailySummary';
 import { todayIST } from '@/lib/time';
 import { dateStr, empCode, enumOf, num } from '@/lib/resources/zod';
 
@@ -28,6 +29,8 @@ export const POST = withAuth('attendance', 'create', async (auth) => {
     const emps: any[] = await Employee.find({ $and: [{ empCode: { $in: b.marks.map((m) => m.empCode) }, status: 'active', isVoid: false }, teamSf] }).session(session ?? null).select('empCode name').lean();
     const byCode = new Map(emps.map((e) => [e.empCode, e]));
     const skipped = b.marks.filter((m) => !byCode.has(m.empCode)).map((m) => m.empCode);
+    const before: any[] = await Attendance.find({ date, empCode: { $in: [...byCode.keys()] }, isVoid: false }).session(session ?? null).select('empCode state').lean();
+    const was = new Map(before.map((x) => [x.empCode, x.state as string]));
     const now = new Date();
     const ops = b.marks.filter((m) => byCode.has(m.empCode)).map((m) => ({
       updateOne: {
@@ -41,6 +44,14 @@ export const POST = withAuth('attendance', 'create', async (auth) => {
     }));
     if (!ops.length) throw badRequest('None of these employees are in your team');
     const r = await Attendance.bulkWrite(ops as any, { session: session as any, ordered: false });
+    const net: Record<string, number> = {};
+    for (const m of b.marks.filter((x) => byCode.has(x.empCode))) {
+      const old = was.get(m.empCode);
+      if (old === m.state) continue;
+      if (old) net[`attendance.${old}`] = (net[`attendance.${old}`] ?? 0) - 1;
+      net[`attendance.${m.state}`] = (net[`attendance.${m.state}`] ?? 0) + 1;
+    }
+    await roll.bump(date, net, session);
     await writeAudit({ resource: 'attendance', refId: date, action: 'bulk_mark', label: `${ops.length} employees ${date}`, changes: { marked: { to: ops.length }, skipped: { to: skipped.length } }, requestId: auth.requestId }, base.actor, session);
     return { ok: true, date, marked: ops.length, created: r.upsertedCount, updated: r.modifiedCount, skipped };
   });

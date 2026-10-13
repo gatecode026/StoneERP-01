@@ -9,6 +9,7 @@ const schema = z.object({
   MONGODB_DB: z.string().optional(),
   MONGO_MAX_POOL: z.coerce.number().int().min(1).max(200).default(20),
   MONGO_READ_PREFERENCE: z.enum(['primary', 'primaryPreferred', 'secondary', 'secondaryPreferred', 'nearest']).default('primary'),
+  MONGO_REPORT_READ: z.enum(['primary', 'primaryPreferred', 'secondary', 'secondaryPreferred', 'nearest']).default('primary'), // where report/analytics reads go (use secondaryPreferred on Atlas)
   MONGO_AUTO_INDEX: bool.optional(),
   MONGO_DNS_FALLBACK: bool.default(false), // dev-only workaround for ISPs that refuse SRV lookups
   ALLOW_NO_TXN: bool.default(false), // dev-only: run on a standalone mongod without transactions

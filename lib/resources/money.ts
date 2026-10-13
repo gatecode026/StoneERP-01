@@ -8,6 +8,7 @@ import { accountBalance, accountFor, oid, postCash, reverseCashFor, round2, type
 import { withinApprovalLimit } from '../perm/engine';
 import { dateStr, empCode, enumOf, num, oidStr, photo, posNum, req, text, PAY_BY } from './zod';
 import { Types } from 'mongoose';
+import * as roll from '../rollup/dailySummary';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
 
@@ -38,8 +39,14 @@ export const expenses: ResourceDef = {
       return doc;
     },
     async prepareUpdate(ctx, prev, patch) { if ('billPhoto' in patch) patch.hasBill = Boolean(patch.billPhoto); return patch; },
-    async afterCreate(ctx, d) { if (d.status === 'approved') await postExpenseCash(ctx, d); },
-    async beforeVoid(ctx, d) { await reverseCashFor(ctx, 'expenses', d._id, 'Expense cancelled'); },
+    async afterCreate(ctx, d) {
+      await roll.expenseCounted(d.date, d.head, d.amount, 1, ctx.session);
+      if (d.status === 'approved') await postExpenseCash(ctx, d);
+    },
+    async beforeVoid(ctx, d) {
+      if (['approved', 'pending'].includes(d.status)) await roll.expenseCounted(d.date, d.head, d.amount, -1, ctx.session);
+      await reverseCashFor(ctx, 'expenses', d._id, 'Expense cancelled');
+    },
   },
 };
 

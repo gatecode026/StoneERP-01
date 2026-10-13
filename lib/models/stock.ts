@@ -18,8 +18,9 @@ export const StockItem = defineModel(
     sellRate: money(),
     costRate: money(), // cost
     allowNegative: { type: B, default: false },
+    belowMin: { type: B, default: false }, // maintained with every balance / minimum change => the low-stock alert is an index lookup, not a scan
   },
-  { indexes: [[{ category: 1, name: 1 }], [{ name: 1 }], [{ name: 1, size: 1, finish: 1 }, { unique: true, partialFilterExpression: { isVoid: false } }]] }
+  { indexes: [[{ belowMin: 1 }, { partialFilterExpression: { belowMin: true } }], [{ category: 1, name: 1 }], [{ name: 1 }], [{ name: 1, size: 1, finish: 1 }, { unique: true, partialFilterExpression: { isVoid: false } }]] }
 );
 
 export const StockMovement = defineModel(
@@ -40,7 +41,7 @@ export const StockMovement = defineModel(
     approvedBy: S,
     approvedAt: Date,
   },
-  { indexes: [[{ itemId: 1, date: -1 }], [{ refModel: 1, refId: 1 }], [{ status: 1, createdAt: -1 }], [{ date: -1, createdAt: -1 }]] }
+  { indexes: [[{ isVoid: 1, date: 1, _id: 1 }], [{ isVoid: 1, itemId: 1, date: 1, _id: 1 }], [{ refModel: 1, refId: 1 }], [{ status: 1, createdAt: -1 }], [{ date: -1, createdAt: -1 }]] }
 );
 
 const countLine = new Schema({ itemId: OID, name: S, unit: S, systemQty: N, countedQty: N, diff: N, reason: S }, { _id: false });
@@ -99,6 +100,7 @@ export const Purchase = defineModel(
   },
   {
     indexes: [
+      [{ isVoid: 1, date: 1, _id: 1 }],
       [{ supplierId: 1, billNo: 1 }, liveUnique({ billNo: { $gt: '' } })],
       [{ status: 1, dueDate: 1 }],
       [{ supplierId: 1, status: 1 }],

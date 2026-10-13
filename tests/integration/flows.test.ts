@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { useTestDb } from '../helpers';
-import { api, call, makeUser, resetCaches, type Who } from '../api';
+import { api, call, makeUser, resetCaches, PNG, type Who } from '../api';
 import { Account, Advance, AuditLog, CashEntry, Customer, Settings, StockItem, Supplier } from '@/lib/models';
 import { todayIST, addDays } from '@/lib/time';
 import * as orderRoute from '@/app/api/sales/[id]/order/route';
@@ -56,7 +56,7 @@ afterAll(async () => { await db.close(); });
 
 describe('mass assignment and server-owned fields (audit S-03)', () => {
   it('rejects client-supplied status / balance / totals', async () => {
-    const e = await api.create(supervisor, 'expenses', { head: 'Tea & food', amount: 100, paidBy: 'Cash', billPhoto: 'data:image/png;base64,AAAA', status: 'approved' });
+    const e = await api.create(supervisor, 'expenses', { head: 'Tea & food', amount: 100, paidBy: 'Cash', billPhoto: PNG, status: 'approved' });
     expect(e.status).toBe(400);
     expect(e.json.error.message).toMatch(/set by the server/);
     const s = await api.patch(owner, 'stockitems', pavers._id, { balance: 999999 });
@@ -166,13 +166,13 @@ describe('row scope: own and team', () => {
   it('a worker marks only today, only themself, with a selfie; a supervisor’s mark is not overwritten', async () => {
     const noSelfie = await api.create(worker, 'attendance', { state: 'present' });
     expect(noSelfie.status).toBe(400);
-    const r = await api.create(worker, 'attendance', { selfie: 'data:image/png;base64,AAAA', state: 'absent', date: addDays(today, -1), empCode: 'E002' });
+    const r = await api.create(worker, 'attendance', { selfie: PNG, state: 'absent', date: addDays(today, -1), empCode: 'E002' });
     expect(r.status).toBe(403);
-    const mine = await api.create(worker, 'attendance', { selfie: 'data:image/png;base64,AAAA', location: { text: 'Gate' } });
+    const mine = await api.create(worker, 'attendance', { selfie: PNG, location: { text: 'Gate' } });
     expect(mine.status, JSON.stringify(mine.json)).toBe(201);
     expect(mine.json.state).toBe('present');
     expect(mine.json.date).toBe(today);
-    expect((await api.create(worker, 'attendance', { selfie: 'data:image/png;base64,AAAA' })).status).toBe(409);
+    expect((await api.create(worker, 'attendance', { selfie: PNG })).status).toBe(409);
     expect((await api.patch(worker, 'attendance', mine.json._id, { state: 'overtime' })).status).toBe(403);
   });
 });
@@ -323,7 +323,7 @@ describe('purchases, approvals and supplier payments', () => {
   let big: any;
   it('over the limit => pending, no stock or payable until approved; manager is capped, owner is not', async () => {
     const before = (await item(blocksItem._id)).balance;
-    const r = await api.create(accountant, 'purchases', { supplierId: supplier._id, itemId: blocksItem._id, qty: 200, rate: 300, billNo: 'B-1', billPhoto: 'data:image/png;base64,AAAA' });
+    const r = await api.create(accountant, 'purchases', { supplierId: supplier._id, itemId: blocksItem._id, qty: 200, rate: 300, billNo: 'B-1', billPhoto: PNG });
     expect(r.status, JSON.stringify(r.json)).toBe(201);
     big = r.json;
     expect(big).toMatchObject({ total: 60000, status: 'pending', outstanding: 60000 });
@@ -372,11 +372,11 @@ describe('expenses and the cash book', () => {
     const noBill = await api.create(supervisor, 'expenses', { head: 'Tea & food', amount: 120, paidBy: 'Cash' });
     expect(noBill.status).toBe(409);
     expect(noBill.json.error.code).toBe('CONFIRM_REQUIRED');
-    const cashBig = await api.create(supervisor, 'expenses', { head: 'Diesel', amount: 12000, paidBy: 'Cash', billPhoto: 'data:image/png;base64,AAAA' });
+    const cashBig = await api.create(supervisor, 'expenses', { head: 'Diesel', amount: 12000, paidBy: 'Cash', billPhoto: PNG });
     expect(cashBig.status).toBe(409);
     const cashBefore = await bal('cash');
     const bankBefore = await bal('bank');
-    const e = await api.create(supervisor, 'expenses', { head: 'Diesel', amount: 7000, paidBy: 'UPI', paidTo: 'Depot', billPhoto: 'data:image/png;base64,AAAA' });
+    const e = await api.create(supervisor, 'expenses', { head: 'Diesel', amount: 7000, paidBy: 'UPI', paidTo: 'Depot', billPhoto: PNG });
     expect(e.status).toBe(201);
     expect(e.json.status).toBe('pending');
     expect(await bal('bank')).toBe(bankBefore); // nothing posted yet
@@ -385,7 +385,7 @@ describe('expenses and the cash book', () => {
     expect(ok.status, JSON.stringify(ok.json)).toBe(200);
     expect(await bal('bank')).toBe(bankBefore - 7000); // bank-paid expenses now reach the bank balance
     expect(await bal('cash')).toBe(cashBefore);
-    const small = await api.create(supervisor, 'expenses', { head: 'Tea & food', amount: 90, paidBy: 'Cash', billPhoto: 'data:image/png;base64,AAAA' });
+    const small = await api.create(supervisor, 'expenses', { head: 'Tea & food', amount: 90, paidBy: 'Cash', billPhoto: PNG });
     expect(small.json.status).toBe('approved');
     expect(await bal('cash')).toBe(cashBefore - 90);
     expect((await api.void(supervisor, 'expenses', small.json._id)).status).toBe(403); // cancelling is for office roles

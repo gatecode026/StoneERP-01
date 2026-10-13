@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import mongoose from 'mongoose';
+import { cached, invalidate } from '../cache';
+import { reportRead } from '../db';
 import { Advance, Attendance, Block, Complaint, DailyReport, Employee, Leave, Machine, MachineEntry, PaperDoc, Payment, PerfRemark, Purchase, SafetyRecord, Sale, StockItem, Task, User, Vehicle } from '../models';
 import { scopeFilter, type EffectivePerm } from '../perm/engine';
 import type { SessionUser } from '../auth/session';
 import type { AppSettings } from '../settings';
-import { addDays, daysBetween, daysInMonth, monthEnd, monthStart, todayIST } from '../time';
+import { addDays, daysBetween, daysInMonth, monthEnd, monthOf, monthStart, todayIST } from '../time';
 import { fmtInr } from '../fmt';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
@@ -17,22 +20,20 @@ function group<T>(a: T[], k: (x: T) => string): Record<string, T[]> {
 }
 
 // ---------------------------------------------------------------- PERFORMANCE (Part 20)
-export async function computePerformance(month: string, user: U, perm: EffectivePerm) {
+async function performanceAll(month: string) {
   const D = daysInMonth(month);
   const from = monthStart(month), to = monthEnd(month);
   const today = todayIST();
   const elapsed = today < from ? 0 : today > to ? D : Number(today.slice(8, 10));
-  const sf = await scopeFilter(user, perm, 'performance', 'view');
-  const emps: any[] = await Employee.find({ $and: [{ status: 'active', isVoid: false }, sf] }).select('empCode name job').lean();
+  const emps: any[] = await Employee.find({ status: 'active', isVoid: false }).select('empCode name job').lean();
   const codes = emps.map((e) => e.empCode);
   const dr = { $gte: from, $lte: to };
-  const [att, reps, entries, tasks, comps, remarks, users] = await Promise.all([
+  const [att, reps, entries, tasks, comps, users] = await Promise.all([
     Attendance.find({ date: dr, empCode: { $in: codes }, isVoid: false }).select('empCode state late').lean(),
     DailyReport.find({ date: dr, empCode: { $in: codes }, isVoid: false }).select('empCode quantity onTime').lean(),
     MachineEntry.find({ date: dr, operatorCode: { $in: codes }, isVoid: false }).select('operatorCode breakdown').lean(),
     Task.find({ dueDate: dr, assignedCode: { $in: codes }, isVoid: false }).select('assignedCode state').lean(),
     Complaint.find({ date: dr, linkedCode: { $in: codes }, isVoid: false }).select('linkedCode').lean(),
-    PerfRemark.find({ month, isVoid: false }).lean(),
     User.find({ empCode: { $in: codes }, role: 'salesperson', active: true }).select('_id empCode').lean(),
   ]);
   // sales & collections for salespeople
@@ -46,7 +47,6 @@ export async function computePerformance(month: string, user: U, perm: Effective
 
   const attBy = group(att as any[], (x) => x.empCode), repBy = group(reps as any[], (x) => x.empCode), entBy = group(entries as any[], (x) => x.operatorCode);
   const taskBy = group(tasks as any[], (x) => x.assignedCode), compBy = group(comps as any[], (x) => x.linkedCode);
-  const remBy = Object.fromEntries((remarks as any[]).map((r) => [r.empCode, r]));
   const base = emps.map((e) => {
     const a = (attBy[e.empCode] ?? []) as any[];
     const rr = (repBy[e.empCode] ?? []) as any[];
@@ -74,11 +74,49 @@ export async function computePerformance(month: string, user: U, perm: Effective
     return {
       empCode: b.e.empCode, name: b.e.name, job: b.e.job, presentDays: b.presentDays, absent: b.absent, late: b.late, reports: b.reports, onTime: b.onTime, qty: r0(b.qty),
       breakdowns: b.breakdowns, tasks: b.tasks, tasksDone: b.tasksDone, complaints: b.complaints, attScore: r0(attScore), repScore: r0(repScore), workScore: r0(workScore), score,
-      sales: b.sc?.sales, collected: b.sc?.collected, remark: remBy[b.e.empCode]?.remark ?? '', remarkId: remBy[b.e.empCode] ? String(remBy[b.e.empCode]._id) : null,
+      sales: b.sc?.sales, collected: b.sc?.collected,
     };
   });
   rows.sort((a, b) => b.score - a.score);
   return { month, workingDays: elapsed, rows };
+}
+
+const perfSnapSchema = new mongoose.Schema({ _id: String, workingDays: Number, rows: mongoose.Schema.Types.Mixed }, { timestamps: true, versionKey: false });
+const PerfSnapshot = mongoose.models.PerfSnapshot || mongoose.model('PerfSnapshot', perfSnapSchema);
+
+/**
+ * Monthly scorecards. Computed once for everybody (so scores do not depend on who is looking), kept for a minute in memory for the
+ * current month, and stored permanently once the month is closed. The viewer's scope and the Owner's remarks are applied on read.
+ */
+export async function computePerformance(month: string, user: U, perm: EffectivePerm) {
+  const closed = month < monthOf(todayIST());
+  const base = await cached(`perf:${month}`, closed ? 3_600_000 : 60_000, ['perf'], async () => {
+    if (closed) {
+      const snap: any = await PerfSnapshot.findById(month).lean();
+      if (snap) return { month, workingDays: snap.workingDays, rows: snap.rows as any[] };
+    }
+    const r = await performanceAll(month);
+    if (closed) await PerfSnapshot.updateOne({ _id: month }, { $set: { rows: r.rows, workingDays: r.workingDays } }, { upsert: true });
+    return r;
+  });
+  const sf = await scopeFilter(user, perm, 'performance', 'view');
+  const [allowed, remarks] = await Promise.all([
+    Employee.find({ $and: [{ status: 'active', isVoid: false }, sf] }).select('empCode').lean(),
+    PerfRemark.find({ month, isVoid: false }).select('empCode remark').lean(),
+  ]);
+  const ok = new Set((allowed as any[]).map((e) => e.empCode));
+  const rem = Object.fromEntries((remarks as any[]).map((r) => [r.empCode, r]));
+  const rows = (base.rows as any[]).filter((r) => ok.has(r.empCode)).map((r) => ({ ...r, remark: rem[r.empCode]?.remark ?? '', remarkId: rem[r.empCode] ? String(rem[r.empCode]._id) : null }));
+  return { month, workingDays: base.workingDays, rows };
+}
+
+/** Nightly job: (re)compute and store the scorecards of a month. */
+export async function precomputeScorecards(month: string) {
+  await PerfSnapshot.deleteOne({ _id: month });
+  const r = await performanceAll(month);
+  await PerfSnapshot.updateOne({ _id: month }, { $set: { rows: r.rows, workingDays: r.workingDays } }, { upsert: true });
+  invalidate('perf');
+  return r.rows.length;
 }
 
 // ---------------------------------------------------------------- YIELD + COST PER SQ FT (Part 11)
@@ -87,10 +125,14 @@ export async function computePerformance(month: string, user: U, perm: Effective
 const SLAB_TYPES = ['Gang saw', 'Multi-cutter'];
 
 export async function computeYield(settings: AppSettings, opts: { blockNo?: number } = {}) {
-  const match: any = { isVoid: false, blockNo: { $gt: 0 } };
-  if (opts.blockNo) match.blockNo = opts.blockNo;
-  const [blocks, perBlock, perMachine] = await Promise.all([
-    Block.find({ isVoid: false, ...(opts.blockNo ? { blockNo: opts.blockNo } : {}) }).sort({ blockNo: -1 }).limit(400).lean(),
+  return cached(`yield:${opts.blockNo ?? 'all'}:${JSON.stringify(settings.costRates)}`, 60_000, ['yield'], () => computeYieldUncached(settings, opts));
+}
+
+async function computeYieldUncached(settings: AppSettings, opts: { blockNo?: number } = {}) {
+  // the newest 400 blocks only, and the machine-entry aggregates are bounded to exactly those block numbers (index on blockNo)
+  const blocks = await Block.find({ isVoid: false, ...(opts.blockNo ? { blockNo: opts.blockNo } : {}) }).sort({ blockNo: -1 }).limit(400).lean();
+  const match: any = { isVoid: false, blockNo: { $in: (blocks as any[]).map((b) => b.blockNo) } };
+  const [perBlock, perMachine] = await Promise.all([
     MachineEntry.aggregate([{ $match: match }, { $group: {
       _id: '$blockNo',
       cut: { $sum: { $cond: [{ $in: ['$machineType', SLAB_TYPES] }, '$outputSqft', 0] } }, waste: { $sum: { $ifNull: ['$wasteSqft', 0] } },
@@ -160,7 +202,7 @@ export async function computeReminders(user: U, perm: EffectivePerm, settings: A
     for (const p of rows) out.push({ type: 'supplier_payment', to: 'Accountant', title: `${p.supplierName}: ${fmtInr(p.outstanding)} due ${p.dueDate}`, severity: p.dueDate < today ? 'high' : 'med', link: '/purchases' });
   })());
   if (v('stockitems')) jobs.push((async () => {
-    const rows: any[] = await StockItem.find({ isVoid: false, minLevel: { $gt: 0 }, $expr: { $lt: ['$balance', '$minLevel'] } }).limit(100).select('name balance unit minLevel').lean();
+    const rows: any[] = await StockItem.find({ belowMin: true, isVoid: false }).limit(100).select('name balance unit minLevel').lean();
     for (const i of rows) out.push({ type: 'stock_low', to: 'Store keeper, owner', title: `${i.name}: ${r0(i.balance)} ${i.unit} (min ${r0(i.minLevel)})`, severity: 'high', link: '/stock' });
   })());
   if (v('machines')) jobs.push((async () => {

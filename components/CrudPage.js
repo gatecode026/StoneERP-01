@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Plus, History as HistoryIcon, Pencil, Ban } from 'lucide-react';
 import { useApp, useFetch } from './Providers';
-import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, ExportBtn, Badge, cx } from './ui';
+import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, Badge, cx } from './ui';
 import { api, submit, downloadCSV, ApiError } from '@/lib/client';
 import { todayISO, fmtDate, fmtDateTime } from '@/lib/format';
 
@@ -69,6 +69,7 @@ export function FormFields({ fields, form, set, mode }) {
             ); break;
           case 'ref': input = <RefSelect field={f} form={form} set={set} />; break;
           case 'photo': input = <PhotoInput value={v} onChange={(x) => set({ [f.name]: x })} label={f.buttonLabel} />; break;
+          case 'doc': input = <DocInput value={v} onChange={(x) => set({ [f.name]: x })} resource={f.resource} kind={f.kind} label={f.buttonLabel} />; break;
           case 'photos': input = <PhotoInput multiple value={v} onChange={(x) => set({ [f.name]: x })} />; break;
           case 'checkbox':
             input = (

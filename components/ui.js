@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApp } from './Providers';
-import { compressImage } from '@/lib/client';
+import { compressImage, fileUrl, uploadFile } from '@/lib/client';
 
 export const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -169,13 +169,35 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
         {items.map((src, i) => (
           <div key={i} className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="h-14 w-14 rounded-lg object-cover border border-sand-300" />
+            <img src={fileUrl(src, true)} alt="" loading="lazy" className="h-14 w-14 rounded-lg object-cover border border-sand-300" />
             <button type="button" onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
               className="absolute -top-1.5 -right-1.5 bg-char text-white rounded-full p-0.5"><X size={12} /></button>
           </div>
         ))}
       </div>
       <input ref={ref} type="file" accept="image/*" capture={capture} multiple={multiple} className="hidden" onChange={pick} />
+    </div>
+  );
+}
+
+// A document (photo or PDF scan) uploaded straight to storage; the record keeps only the file key
+export function DocInput({ value, onChange, resource, kind = 'docs', label }) {
+  const ref = useRef();
+  const [busy, setBusy] = useState(false);
+  async function pick(e) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setBusy(true);
+    try { const r = await uploadFile(f, resource, kind); onChange(r.key); toast.success('Uploaded'); } catch (err) { toast.error(err.message); }
+    setBusy(false);
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" className="btn-outline" disabled={busy} onClick={() => ref.current?.click()}><Camera size={18} /> {busy ? 'Uploading…' : label || 'Upload photo / PDF'}</button>
+      {value && <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="text-terra font-semibold text-sm">View file</a>}
+      {value && <button type="button" className="icon-btn" aria-label="Remove file" onClick={() => onChange('')}><X size={16} /></button>}
+      <input ref={ref} type="file" accept="image/*,application/pdf" className="hidden" onChange={pick} />
     </div>
   );
 }

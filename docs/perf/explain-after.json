@@ -1,0 +1,771 @@
+[
+  {
+    "name": "employees: active list (sort empCode)",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "status_1_job_1",
+      "status_1_name_1"
+    ],
+    "keys": 95,
+    "docs": 95,
+    "returned": 26,
+    "ms": 3,
+    "wallMs": 5.8
+  },
+  {
+    "name": "employees: name prefix search",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "empCode_1",
+      "name_1",
+      "mobile_1"
+    ],
+    "keys": 13,
+    "docs": 12,
+    "returned": 12,
+    "ms": 1,
+    "wallMs": 4.3
+  },
+  {
+    "name": "dailyreports: one day (owner screen)",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_date_1_empName_1__id_1",
+      "date_1_supCheck_1",
+      "isVoid_1_empCode_1_date_1__id_1",
+      "date_1_empCode_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 19,
+    "wallMs": 4.5
+  },
+  {
+    "name": "dailyreports: worker \"my recent\"",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_empCode_1_date_1__id_1",
+      "isVoid_1_date_1_empName_1__id_1"
+    ],
+    "keys": 10,
+    "docs": 10,
+    "returned": 10,
+    "ms": 1,
+    "wallMs": 3.8
+  },
+  {
+    "name": "attendance: one day",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "date_1_empCode_1",
+      "date_1_state_1",
+      "isVoid_1_empCode_1_date_1__id_1"
+    ],
+    "keys": 95,
+    "docs": 95,
+    "returned": 95,
+    "ms": 16,
+    "wallMs": 6.4
+  },
+  {
+    "name": "attendance: one employee, one month",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_empCode_1_date_1__id_1",
+      "date_1_state_1",
+      "date_1_empCode_1"
+    ],
+    "keys": 12,
+    "docs": 12,
+    "returned": 12,
+    "ms": 1,
+    "wallMs": 2.9
+  },
+  {
+    "name": "sales: latest list",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_stage_1_date_1__id_1",
+      "isVoid_1_salespersonUserId_1_date_1__id_1",
+      "isVoid_1_customerId_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 13,
+    "wallMs": 4.4
+  },
+  {
+    "name": "sales: stage filter + latest",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_stage_1_date_1__id_1",
+      "stage_1_outstanding_1",
+      "isVoid_1_date_1__id_1",
+      "stage_1_date_-1",
+      "isVoid_1_salespersonUserId_1_date_1__id_1",
+      "isVoid_1_customerId_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 3,
+    "wallMs": 5.3
+  },
+  {
+    "name": "sales: salesperson \"my sales\"",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_salespersonUserId_1_date_1__id_1",
+      "salespersonUserId_1_date_-1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_stage_1_date_1__id_1",
+      "salespersonUserId_1",
+      "isVoid_1_customerId_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 4,
+    "wallMs": 4.4
+  },
+  {
+    "name": "sales: one customer",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_customerId_1_date_1__id_1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_stage_1_date_1__id_1",
+      "isVoid_1_salespersonUserId_1_date_1__id_1",
+      "customerId_1_stage_1_date_-1"
+    ],
+    "keys": 22,
+    "docs": 22,
+    "returned": 22,
+    "ms": 2,
+    "wallMs": 4.3
+  },
+  {
+    "name": "sales: overdue receivables (reminders)",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN",
+      "SORT_MERGE"
+    ],
+    "indexes": [
+      "stage_1_outstanding_1",
+      "stage_1_date_-1",
+      "date_-1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_stage_1_date_1__id_1",
+      "isVoid_1_salespersonUserId_1_date_1__id_1",
+      "isVoid_1_customerId_1_date_1__id_1"
+    ],
+    "keys": 576,
+    "docs": 576,
+    "returned": 100,
+    "ms": 26,
+    "wallMs": 12
+  },
+  {
+    "name": "sales: receivables ageing (aggregate)",
+    "stages": [
+      "GROUP",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "stage_1_outstanding_1",
+      "stage_1_date_-1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_stage_1_date_1__id_1",
+      "isVoid_1_salespersonUserId_1_date_1__id_1",
+      "isVoid_1_customerId_1_date_1__id_1"
+    ],
+    "keys": 576,
+    "docs": 576,
+    "returned": 1,
+    "ms": 12,
+    "wallMs": 6.6
+  },
+  {
+    "name": "payments: for one sale",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "saleId_1_date_1"
+    ],
+    "keys": 1,
+    "docs": 1,
+    "returned": 1,
+    "ms": 0,
+    "wallMs": 2.8
+  },
+  {
+    "name": "payments: one day (report)",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "date_-1",
+      "_id_"
+    ],
+    "keys": 11,
+    "docs": 11,
+    "returned": 11,
+    "ms": 0,
+    "wallMs": 3.1
+  },
+  {
+    "name": "dispatches: for one sale",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "saleId_1_status_1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_direction_1_status_1_date_1__id_1"
+    ],
+    "keys": 1,
+    "docs": 1,
+    "returned": 1,
+    "ms": 6,
+    "wallMs": 3.7
+  },
+  {
+    "name": "dispatches: trucks waiting at gate",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "isVoid_1_direction_1_status_1_date_1__id_1",
+      "status_1_date_-1",
+      "isVoid_1_date_1__id_1",
+      "direction_1_date_-1"
+    ],
+    "keys": 0,
+    "docs": 0,
+    "returned": 0,
+    "ms": 2,
+    "wallMs": 3.3
+  },
+  {
+    "name": "dispatches: latest list",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_direction_1_status_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 1,
+    "wallMs": 4.4
+  },
+  {
+    "name": "stockmovements: latest list",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_itemId_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 11,
+    "wallMs": 3.1
+  },
+  {
+    "name": "stockmovements: one item",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "isVoid_1_itemId_1_date_1__id_1",
+      "isVoid_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 1,
+    "wallMs": 2.9
+  },
+  {
+    "name": "stockitems: below minimum (alert)",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "belowMin_1",
+      "name_1",
+      "name_1_size_1_finish_1"
+    ],
+    "keys": 6,
+    "docs": 6,
+    "returned": 6,
+    "ms": 1,
+    "wallMs": 3
+  },
+  {
+    "name": "cashentries: latest list",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_account_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 17,
+    "wallMs": 4
+  },
+  {
+    "name": "cashentries: one account",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_account_1_date_1__id_1",
+      "isVoid_1_date_1__id_1",
+      "account_1_date_-1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 1,
+    "wallMs": 3.7
+  },
+  {
+    "name": "auditlogs: history of one record",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "refId_1_at_-1__id_-1"
+    ],
+    "keys": 1,
+    "docs": 1,
+    "returned": 1,
+    "ms": 3,
+    "wallMs": 2
+  },
+  {
+    "name": "auditlogs: latest list",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "at_-1__id_-1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 3,
+    "wallMs": 2.6
+  },
+  {
+    "name": "auditlogs: one resource, latest",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "model_1_at_-1__id_-1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 0,
+    "wallMs": 2.6
+  },
+  {
+    "name": "machineentries: one day",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "date_-1",
+      "date_1_shift_1_machineId_1"
+    ],
+    "keys": 5,
+    "docs": 5,
+    "returned": 5,
+    "ms": 1,
+    "wallMs": 2.7
+  },
+  {
+    "name": "machineentries: one machine, one month",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "machineId_1_date_-1",
+      "date_1_shift_1_machineId_1",
+      "date_-1"
+    ],
+    "keys": 9,
+    "docs": 9,
+    "returned": 9,
+    "ms": 1,
+    "wallMs": 2.9
+  },
+  {
+    "name": "yield: output per block (aggregate, 400 blocks)",
+    "stages": [
+      "GROUP",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "blockNo_1"
+    ],
+    "keys": 48,
+    "docs": 48,
+    "returned": 44,
+    "ms": 7,
+    "wallMs": 7.3
+  },
+  {
+    "name": "expenses: latest list",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_status_1_date_1__id_1",
+      "isVoid_1_createdById_1_date_1__id_1",
+      "isVoid_1_head_1_date_1__id_1",
+      "isVoid_1_site_1_date_1__id_1"
+    ],
+    "keys": 26,
+    "docs": 26,
+    "returned": 26,
+    "ms": 19,
+    "wallMs": 3.2
+  },
+  {
+    "name": "expenses: pending approval",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "isVoid_1_status_1_date_1__id_1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_createdById_1_date_1__id_1",
+      "isVoid_1_head_1_date_1__id_1",
+      "isVoid_1_site_1_date_1__id_1"
+    ],
+    "keys": 39,
+    "docs": 39,
+    "returned": 20,
+    "ms": 5,
+    "wallMs": 3.8
+  },
+  {
+    "name": "expenses: supervisor “my expenses”",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "isVoid_1_createdById_1_date_1__id_1",
+      "isVoid_1_date_1__id_1",
+      "isVoid_1_status_1_date_1__id_1",
+      "createdById_1",
+      "isVoid_1_head_1_date_1__id_1",
+      "isVoid_1_site_1_date_1__id_1"
+    ],
+    "keys": 0,
+    "docs": 0,
+    "returned": 0,
+    "ms": 2,
+    "wallMs": 2.6
+  },
+  {
+    "name": "purchases: payable this week",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "status_1_dueDate_1",
+      "isVoid_1_date_1__id_1"
+    ],
+    "keys": 622,
+    "docs": 622,
+    "returned": 8,
+    "ms": 13,
+    "wallMs": 5.8
+  },
+  {
+    "name": "tasks: overdue",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "state_1_dueDate_1"
+    ],
+    "keys": 50,
+    "docs": 50,
+    "returned": 50,
+    "ms": 0,
+    "wallMs": 4.3
+  },
+  {
+    "name": "tasks: my open tasks",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "assignedCode_1_state_1_dueDate_1",
+      "state_1_dueDate_1"
+    ],
+    "keys": 2,
+    "docs": 2,
+    "returned": 2,
+    "ms": 0,
+    "wallMs": 2.5
+  },
+  {
+    "name": "advances: employee’s open advances",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "empCode_1_status_1",
+      "status_1_createdAt_-1"
+    ],
+    "keys": 7,
+    "docs": 7,
+    "returned": 7,
+    "ms": 1,
+    "wallMs": 3.5
+  },
+  {
+    "name": "leaves: pending",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "status_1_createdAt_-1"
+    ],
+    "keys": 19,
+    "docs": 19,
+    "returned": 19,
+    "ms": 0,
+    "wallMs": 2.3
+  },
+  {
+    "name": "complaints: open",
+    "stages": [
+      "SORT",
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "state_1_date_-1"
+    ],
+    "keys": 50,
+    "docs": 49,
+    "returned": 6,
+    "ms": 1,
+    "wallMs": 2.9
+  },
+  {
+    "name": "repairs: open",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "status_1_date_-1"
+    ],
+    "keys": 15,
+    "docs": 15,
+    "returned": 15,
+    "ms": 0,
+    "wallMs": 2.5
+  },
+  {
+    "name": "safety: check-ups due",
+    "stages": [
+      "FETCH",
+      "IXSCAN",
+      "SORT"
+    ],
+    "indexes": [
+      "kind_1_dueDate_1",
+      "kind_1_date_-1"
+    ],
+    "keys": 50,
+    "docs": 50,
+    "returned": 50,
+    "ms": 1,
+    "wallMs": 3
+  },
+  {
+    "name": "documents: expiring papers",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "expiryDate_1"
+    ],
+    "keys": 4,
+    "docs": 4,
+    "returned": 4,
+    "ms": 0,
+    "wallMs": 2.3
+  },
+  {
+    "name": "customers: who owes most",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "outstanding_-1"
+    ],
+    "keys": 6,
+    "docs": 6,
+    "returned": 6,
+    "ms": 0,
+    "wallMs": 2.4
+  },
+  {
+    "name": "daily summary: today (owner report)",
+    "stages": [
+      "EXPRESS_IXSCAN"
+    ],
+    "indexes": [
+      "_id_"
+    ],
+    "keys": 1,
+    "docs": 1,
+    "returned": 1,
+    "ms": 0,
+    "wallMs": 1.6
+  },
+  {
+    "name": "daily summary: 7-day trend",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "_id_"
+    ],
+    "keys": 7,
+    "docs": 7,
+    "returned": 7,
+    "ms": 0,
+    "wallMs": 1.9
+  },
+  {
+    "name": "performance: month of reports",
+    "stages": [
+      "FETCH",
+      "SORT",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "isVoid_1_date_1_empName_1__id_1",
+      "date_1_supCheck_1",
+      "isVoid_1_empCode_1_date_1__id_1",
+      "date_1_empCode_1",
+      "_id_"
+    ],
+    "keys": 517,
+    "docs": 517,
+    "returned": 517,
+    "ms": 28,
+    "wallMs": 16.5
+  }
+]

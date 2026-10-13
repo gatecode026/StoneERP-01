@@ -58,6 +58,9 @@ export async function connect(): Promise<typeof mongoose> {
   return cache.conn;
 }
 
+/** Read preference for report / analytics queries: they may be a few ms behind, so they can run on a secondary and spare the primary. */
+export const reportRead = () => getEnv().MONGO_REPORT_READ;
+
 export async function disconnect() {
   if (cache.conn) await cache.conn.disconnect();
   cache.conn = null;

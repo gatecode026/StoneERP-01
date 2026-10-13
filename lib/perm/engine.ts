@@ -75,6 +75,11 @@ async function getTeam(user: Pick<SessionUser, 'id' | 'empCode'>): Promise<Team>
   return team;
 }
 
+/** User ids of the people in this user's team (themself included). */
+export async function teamUserIds(user: Pick<SessionUser, 'id' | 'empCode'>): Promise<string[]> {
+  return (await getTeam(user)).userIds.map(String);
+}
+
 const NONE = { _id: { $in: [] } } as const;
 
 /** The Mongo filter that restricts `resource` to the rows `user` may touch for `action`. Fails closed. */

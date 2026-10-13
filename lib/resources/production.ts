@@ -7,6 +7,8 @@ import { badRequest, conflict } from '../errors';
 import { minutesBetween, todayIST } from '../time';
 import { applyStock, nextSeq, oid, reverseStockFor, round2 } from '../services/core';
 import { employeeByCode, machineById } from '../services/lookup';
+import * as roll from '../rollup/dailySummary';
+import { invalidate } from '../cache';
 import { dateStr, empCode, enumOf, monthStr, num, oidStr, photo, posNum, req, text, timeStr } from './zod';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
@@ -73,6 +75,8 @@ export const machineentries: ResourceDef = {
       return { ...input, date, machineId: m._id, machineName: m.name, machineType: m.type, operatorName: op.name, hoursRun, stoppedMins: stopped };
     },
     async afterCreate(ctx, d) {
+      await roll.machineEntry(d.date, d, 1, ctx.session);
+      invalidate('yield', 'perf');
       if (d.stockItemId && d.outputSqft > 0) {
         await applyStock(ctx, { itemId: d.stockItemId, delta: d.outputSqft, type: 'in', date: d.date, ref: `Production – ${d.machineName}`, note: `Block ${d.blockNo ?? '-'}`, refModel: 'machineentries', refId: d._id });
       }
@@ -92,6 +96,8 @@ export const machineentries: ResourceDef = {
       }
     },
     async beforeVoid(ctx, d) {
+      await roll.machineEntry(d.date, d, -1, ctx.session);
+      invalidate('yield', 'perf');
       await reverseStockFor(ctx, 'machineentries', d._id, 'Machine entry cancelled');
     },
   },

@@ -8,6 +8,7 @@ import { addDays, daysBetween, todayIST } from '../time';
 import { employeeByCode } from '../services/lookup';
 import { nextSeq, oid, postCash, accountFor, round2 } from '../services/core';
 import { withinApprovalLimit } from '../perm/engine';
+import * as roll from '../rollup/dailySummary';
 import { dateStr, empCode, enumOf, mobile, optMobile, photo, photos, posNum, req, text, num, monthStr } from './zod';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
@@ -98,6 +99,8 @@ export const dailyreports: ResourceDef = {
       const doc: any = { ...input, date, empCode: e.empCode, empName: e.name, job: e.job, quantity: input.quantity ?? 0, hours: input.hours ?? 0, submittedAt: new Date(), onTime: date === today, filledBy: ctx.actor.name, photoCount: input.photos?.length ?? 0 };
       return doc;
     },
+    async afterCreate(ctx, d) { await roll.reportFiled(d.date, 1, ctx.session); },
+    async beforeVoid(ctx, d) { await roll.reportFiled(d.date, -1, ctx.session); },
     async prepareUpdate(ctx, prev, patch, auth) {
       const isCheck = checkKeys.some((k) => k in patch);
       const isContent = Object.keys(patch).some((k) => !(checkKeys as readonly string[]).includes(k));
@@ -152,11 +155,15 @@ export const attendance: ResourceDef = {
       if (existing) {
         if (own) throw conflict('Your attendance is already marked for today');
         const doc: any = await Attendance.findOneAndUpdate({ _id: existing._id }, { $set: { ...base, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name } }, { returnDocument: 'after', session: ctx.session, lean: true });
+        await roll.att(date, existing.state, state, ctx.session);
         return { doc, action: 'update', changes: { state: { from: existing.state, to: state } }, status: 200 };
       }
       const [doc] = await Attendance.create([{ ...base, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
+      await roll.att(date, null, state, ctx.session);
       return { doc: doc.toObject() };
     },
+    async afterUpdate(ctx, doc, prev) { await roll.att(doc.date, prev.state, doc.state, ctx.session); },
+    async beforeVoid(ctx, d) { await roll.att(d.date, d.state, null, ctx.session); },
   },
 };
 

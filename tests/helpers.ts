@@ -1,3 +1,5 @@
+import path from 'node:path';
+import os from 'node:os';
 import mongoose from 'mongoose';
 import { connect, disconnect } from '@/lib/db';
 import { resetEnvCache } from '@/lib/env';
@@ -9,6 +11,8 @@ export async function useTestDb(name: string) {
   process.env.SESSION_SECRET = 'test-secret-test-secret-test-secret-123456';
   process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
   process.env.MONGO_AUTO_INDEX = 'yes';
+  process.env.STORAGE_DRIVER = 'local';
+  process.env.STORAGE_LOCAL_DIR = path.join(os.tmpdir(), `vss-test-files-${process.pid}`);
   resetEnvCache();
   await connect();
   return {

@@ -81,7 +81,7 @@ type Handler = (ctx: Ctx) => Promise<Response | Record<string, unknown> | unknow
 
 export function route(opts: Opts, fn: Handler) {
   const auth = opts.auth ?? 'required';
-  return async (req: NextRequest, c?: { params?: Promise<Record<string, string>> }): Promise<Response> => {
+  return async (req: NextRequest, c?: { params?: Promise<Record<string, string | string[]>> }): Promise<Response> => {
     const requestId = req.headers.get('x-request-id') ?? crypto.randomUUID();
     const t0 = Date.now();
     let status = 500;
@@ -95,7 +95,7 @@ export function route(opts: Opts, fn: Handler) {
       }
       const ctx: Ctx = {
         req, requestId, user, ip: clientIp(req.headers), query: req.nextUrl.searchParams,
-        params: (await c?.params) ?? {},
+        params: ((await c?.params) ?? {}) as Record<string, string>,
         async json<T>(schema: ZodType<T>, maxBytes = MAX_JSON_BYTES) {
           const body = await readBody(req, maxBytes);
           assertSafeKeys(body);

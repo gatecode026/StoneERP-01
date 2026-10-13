@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Advance, Expense, Leave, Purchase, StockItem, StockMovement } from '../models';
+import { Advance, Expense, Leave, Purchase, StockMovement } from '../models';
 import { AppError, badRequest, conflict, forbidden } from '../errors';
 import { writeAudit } from '../audit';
 import { scopeFilter, withinApprovalLimit, type EffectivePerm } from '../perm/engine';
 import type { SessionUser } from '../auth/session';
 import type { Resource } from '../perm/resources';
-import { oid, postCash, type SvcCtx } from './core';
+import { incBalance, oid, postCash, type SvcCtx } from './core';
 import { applyPurchase } from '../resources/stock';
 import { postExpenseCash } from '../resources/money';
 import { fmtInr } from '../fmt';
+import { expenseCounted } from '../rollup/dailySummary';
 
 type Spec = { resource: Resource; model: any; amount: (d: any) => number; kind: string; title: (d: any) => string; sub: (d: any) => string; date: (d: any) => string };
 
@@ -60,13 +61,15 @@ export async function decide(ctx: SvcCtx, user: Pick<SessionUser, 'id' | 'empCod
     else if (model === 'purchases') await applyPurchase(ctx, doc);
     else if (model === 'stockmovements') {
       // the movement row already exists (pending); approving it is what finally takes the stock out
-      const r = await StockItem.updateOne({ _id: doc.itemId, balance: { $gte: doc.qty } }, { $inc: { balance: -doc.qty } }, { session: ctx.session });
-      if (!r.matchedCount) throw conflict('Not enough stock left to write this damage off');
+      const ok = await incBalance(ctx.session, doc.itemId, -doc.qty, { requireEnough: true });
+      if (!ok) throw conflict('Not enough stock left to write this damage off');
     } else if (model === 'advances') {
       await postCash(ctx, { account: 'cash', type: 'out', amount: doc.amount, head: 'Salary advance', ref: doc.empName, note: doc.reason, date: doc.date, refModel: 'advances', refId: doc._id });
     }
   } else if (model === 'stockmovements') {
     await StockMovement.updateOne({ _id: doc._id }, { $set: { status: 'rejected' } }, { session: ctx.session });
+  } else if (model === 'expenses') {
+    await expenseCounted(doc.date, doc.head, doc.amount, -1, ctx.session); // a rejected expense no longer counts
   }
   await writeAudit({ resource: model, refId: doc._id, action: action === 'approve' ? 'approve' : 'reject', label: spec.title(doc), changes: { status: { from: 'pending', to: status }, remark: { to: remark } }, requestId: ctx.requestId }, ctx.actor, ctx.session);
   return doc;

@@ -3,6 +3,7 @@ import type { ClientSession } from 'mongoose';
 import { Types } from 'mongoose';
 import { Account, CashEntry, Counter, StockItem, StockMovement } from '../models';
 import { AppError, conflict } from '../errors';
+import { cashMove } from '../rollup/dailySummary';
 import type { Actor } from '../audit';
 import type { EffectivePerm } from '../perm/engine';
 import type { AppSettings } from '../settings';
@@ -39,6 +40,24 @@ export async function nextSeq(key: string, session: ClientSession | undefined, s
 
 // ------------------------------------------------------------------ stock
 /**
+ * The ONLY place a stock balance changes. One atomic pipeline update: the balance moves (conditionally, so it can never go
+ * below zero) and the indexed `belowMin` flag is recomputed from the new balance in the same write.
+ */
+export async function incBalance(session: ClientSession | undefined, itemId: unknown, delta: number, opts: { requireEnough?: boolean } = {}): Promise<boolean> {
+  const filter: Record<string, unknown> = { _id: itemId };
+  if (opts.requireEnough && delta < 0) filter.balance = { $gte: -delta };
+  const r = await StockItem.updateOne(
+    filter,
+    [
+      { $set: { balance: { $add: ['$balance', delta] } } },
+      { $set: { belowMin: { $and: [{ $gt: [{ $ifNull: ['$minLevel', 0] }, 0] }, { $lt: ['$balance', '$minLevel'] }] } } },
+    ],
+    { session, updatePipeline: true }
+  );
+  return r.matchedCount > 0;
+}
+
+/**
  * Change an item's balance atomically. Taking stock out is a conditional update ({balance: {$gte: qty}}),
  * so two simultaneous dispatches can never drive the balance negative (unless the item allows it).
  */
@@ -51,10 +70,8 @@ export async function applyStock(
   const item: any = await StockItem.findOne({ _id: m.itemId, isVoid: false }).session(ctx.session ?? null).lean();
   if (!item) throw new AppError(400, 'BAD_REQUEST', 'Stock item not found');
   if (m.status !== 'pending' && m.type !== 'transfer') {
-    const filter: Record<string, unknown> = { _id: item._id };
-    if (m.delta < 0 && !item.allowNegative) filter.balance = { $gte: qty };
-    const r = await StockItem.updateOne(filter, { $inc: { balance: m.delta } }, { session: ctx.session });
-    if (r.matchedCount === 0) throw conflict(`Only ${Number(item.balance).toLocaleString('en-IN')} ${item.unit} of "${item.name}" in stock — cannot take out ${qty.toLocaleString('en-IN')}`);
+    const ok = await incBalance(ctx.session, item._id, m.delta, { requireEnough: m.delta < 0 && !item.allowNegative });
+    if (!ok) throw conflict(`Only ${Number(item.balance).toLocaleString('en-IN')} ${item.unit} of "${item.name}" in stock — cannot take out ${qty.toLocaleString('en-IN')}`);
   } else if (m.type === 'transfer' && m.location) {
     await StockItem.updateOne({ _id: item._id }, { $set: { location: m.location } }, { session: ctx.session });
   }
@@ -98,6 +115,7 @@ export async function postCash(
     { session: ctx.session }
   );
   await Account.updateOne({ _id: e.account }, { $inc: { balance: e.type === 'in' ? amount : -amount }, $setOnInsert: { label: e.account } }, { upsert: true, session: ctx.session });
+  await cashMove(e.date ?? todayIST(), e.account, e.type, amount, ctx.session);
   return entry;
 }
 

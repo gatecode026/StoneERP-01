@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { useTestDb } from '../helpers';
-import { api, call, makeUser, resetCaches, type Who } from '../api';
+import { api, call, makeUser, resetCaches, PNG, type Who } from '../api';
 import { Settings } from '@/lib/models';
 import { addDays, todayIST } from '@/lib/time';
 import * as home from '@/app/api/home/route';
@@ -39,7 +39,7 @@ beforeAll(async () => {
   await call(who.salesperson, orderRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(sale._id) }).catch(() => undefined);
   const slip = (await api.create(who.supervisor, 'dispatches', { saleId: sale._id, truckNo: 'RJ1', items: [{ stockItemId: item._id, name: item.name, qty: 40 }] })).json;
   void outRoute;
-  await api.create(who.supervisor, 'expenses', { head: 'Diesel', amount: 7000, paidBy: 'UPI', billPhoto: 'data:image/png;base64,AAAA' });
+  await api.create(who.supervisor, 'expenses', { head: 'Diesel', amount: 7000, paidBy: 'UPI', billPhoto: PNG });
   await api.create(who.worker, 'dailyreports', { narration: 'Cut blocks', quantity: 300, problem: 'Power cut' });
   await api.create(who.accountant, 'purchases', { supplierId: (await api.create(who.owner, 'suppliers', { name: 'Kota' })).json._id, itemId: item._id, qty: 100, rate: 300, billNo: 'X1', dueDate: addDays(today, 2) });
   void slip;

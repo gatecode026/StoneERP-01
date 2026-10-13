@@ -4,7 +4,7 @@ import { Printer, MessageCircle, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApp, useFetch } from '@/components/Providers';
 import { PageHeader, SkeletonList, RoleGuard } from '@/components/ui';
-import { api, openWA } from '@/lib/client';
+import { api, openWA, fileUrl } from '@/lib/client';
 import { fmtDate, fmtDateTime, num, inr } from '@/lib/format';
 
 export default function GatePass() {
@@ -49,7 +49,7 @@ export default function GatePass() {
         {(d.photoLoaded || d.photoCovered) && (
           <div className="mt-4 grid grid-cols-2 gap-3 no-print">
             {[['Loaded truck', d.photoLoaded], ['Covered truck', d.photoCovered]].map(([l, p]) => p && (
-              <div key={l}><div className="text-xs text-gray-500 mb-1">{l}</div>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={p} alt={l} className="rounded border w-full" /></div>
+              <div key={l}><div className="text-xs text-gray-500 mb-1">{l}</div>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={fileUrl(p)} alt={l} className="rounded border w-full" /></div>
             ))}
           </div>
         )}

@@ -63,7 +63,7 @@ export const Attendance = defineModel(
     location: { lat: N, lng: N, text: { type: S, maxlength: 120 } },
     markedBy: { type: S },
   },
-  { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ empCode: 1, date: -1 }], [{ date: 1, state: 1 }]] }
+  { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ isVoid: 1, empCode: 1, date: 1, _id: 1 }], [{ date: 1, state: 1 }]] }
 );
 
 export const DailyReport = defineModel(
@@ -88,7 +88,7 @@ export const DailyReport = defineModel(
     submittedAt: { type: Date },
     filledBy: { type: S },
   },
-  { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ empCode: 1, date: -1 }], [{ date: 1, supCheck: 1 }]] }
+  { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ isVoid: 1, empCode: 1, date: 1, _id: 1 }], [{ isVoid: 1, date: 1, empName: 1, _id: 1 }], [{ date: 1, supCheck: 1 }]] }
 );
 
 export const Leave = defineModel(

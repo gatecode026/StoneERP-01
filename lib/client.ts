@@ -163,3 +163,22 @@ export function getLocation(timeoutMs = 6000): Promise<{ lat?: number; lng?: num
     );
   });
 }
+
+/** URL to show a stored file. Accepts a storage key, a just-taken inline photo (data URL) or an absolute path. */
+export function fileUrl(v: string | null | undefined, thumb = false): string {
+  if (!v) return '';
+  if (v.startsWith('data:') || v.startsWith('blob:') || v.startsWith('/')) return v;
+  return `/api/files/${v}${thumb ? '?thumb=1' : ''}`;
+}
+
+/** Upload a file straight to storage (multipart). Returns the stored key. */
+export async function uploadFile(file: File, resource: string, kind = 'docs'): Promise<{ key: string; contentType: string; size: number }> {
+  const form = new FormData();
+  form.set('file', file);
+  form.set('resource', resource);
+  form.set('kind', kind);
+  const res = await fetch('/api/files', { method: 'POST', body: form });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(data?.error?.message || `Upload failed (${res.status})`, res.status, data);
+  return data;
+}

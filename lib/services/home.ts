@@ -10,6 +10,7 @@ import { addDays, addMonths, daysBetween, monthEnd, monthOf, monthStart, todayIS
 import { buildDailyReport, workerHome } from './report';
 import { computeReminders, computeYield } from './analytics';
 import { listPending } from './approvals';
+import { getDay } from '../rollup/dailySummary';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const sum = (a: any[], f: (x: any) => number) => a.reduce((t, x) => t + (Number(f(x)) || 0), 0);
@@ -28,14 +29,9 @@ const canCost = (perm: EffectivePerm) => ['read', 'write'].includes(perm.fields.
 
 // ------------------------------------------------------------------ shared pieces
 async function daySnapshot(date: string) {
-  const [sales, recv, exp, sq, reps] = await Promise.all([
-    Sale.aggregate([{ $match: { date, stage: { $ne: 'quotation' }, isVoid: false } }, { $group: { _id: null, t: { $sum: '$total' } } }]),
-    Payment.aggregate([{ $match: { date, isVoid: false } }, { $group: { _id: null, t: { $sum: '$amount' } } }]),
-    Expense.aggregate([{ $match: { date, status: { $in: ['approved', 'pending'] }, isVoid: false } }, { $group: { _id: null, t: { $sum: '$amount' } } }]),
-    MachineEntry.aggregate([{ $match: { date, isVoid: false } }, { $group: { _id: null, t: { $sum: '$outputSqft' } } }]),
-    DailyReport.countDocuments({ date, isVoid: false }),
-  ]);
-  return { sales: sales[0]?.t ?? 0, received: recv[0]?.t ?? 0, expenses: exp[0]?.t ?? 0, sqft: sq[0]?.t ?? 0, reports: reps };
+  const d = await getDay(date); // one document from the rollup, not five aggregations
+  const n = (v: unknown) => Number(v) || 0;
+  return { sales: n(d?.sales?.total), received: n(d?.receipts?.total), expenses: n(d?.expenses?.total), sqft: n(d?.machines?.sqft), reports: n(d?.reports?.filled) };
 }
 
 /** Profit per order (taxable value − cost of goods) and per block (estimated value of saleable stone − total cost). Cost-group data only. */
@@ -188,7 +184,7 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
     }
     case 'store_keeper': {
       const [low, pending, moves, recentBuys] = await Promise.all([
-        StockItem.find({ isVoid: false, minLevel: { $gt: 0 }, $expr: { $lt: ['$balance', '$minLevel'] } }).sort({ name: 1 }).limit(12).select('name balance minLevel unit').lean(),
+        StockItem.find({ belowMin: true, isVoid: false }).sort({ name: 1 }).limit(12).select('name balance minLevel unit').lean(),
         StockMovement.countDocuments({ status: 'pending', isVoid: false }),
         StockMovement.find({ isVoid: false, date }).sort({ createdAt: -1 }).limit(8).select('itemName type qty ref status').lean(),
         perm.can('purchases', 'view') ? Purchase.find({ isVoid: false }).sort({ date: -1 }).limit(5).select('itemName qty supplierName date status').lean() : [],

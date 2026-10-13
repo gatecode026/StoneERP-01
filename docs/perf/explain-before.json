@@ -1,0 +1,581 @@
+[
+  {
+    "name": "employees: active list (sort empCode)",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 100,
+    "returned": 26,
+    "ms": 8,
+    "wallMs": 5.5
+  },
+  {
+    "name": "employees: name prefix search",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 100,
+    "returned": 12,
+    "ms": 15,
+    "wallMs": 3.9
+  },
+  {
+    "name": "dailyreports: one day (owner screen)",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 80546,
+    "returned": 26,
+    "ms": 192,
+    "wallMs": 171.5
+  },
+  {
+    "name": "dailyreports: worker \"my recent\"",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 80546,
+    "returned": 10,
+    "ms": 200,
+    "wallMs": 178.4
+  },
+  {
+    "name": "attendance: one day",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 181873,
+    "returned": 95,
+    "ms": 429,
+    "wallMs": 391.9
+  },
+  {
+    "name": "attendance: one employee, one month",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 181873,
+    "returned": 12,
+    "ms": 455,
+    "wallMs": 378.6
+  },
+  {
+    "name": "sales: latest list",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 26,
+    "ms": 109,
+    "wallMs": 99.9
+  },
+  {
+    "name": "sales: stage filter + latest",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 26,
+    "ms": 136,
+    "wallMs": 115.1
+  },
+  {
+    "name": "sales: salesperson \"my sales\"",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 26,
+    "ms": 86,
+    "wallMs": 77.7
+  },
+  {
+    "name": "sales: one customer",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 22,
+    "ms": 53,
+    "wallMs": 47.4
+  },
+  {
+    "name": "sales: overdue receivables (reminders)",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 100,
+    "ms": 77,
+    "wallMs": 75.4
+  },
+  {
+    "name": "sales: receivables ageing (aggregate)",
+    "stages": [
+      "GROUP",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 1,
+    "ms": 74,
+    "wallMs": 34.6
+  },
+  {
+    "name": "payments: for one sale",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 20000,
+    "returned": 1,
+    "ms": 53,
+    "wallMs": 49.2
+  },
+  {
+    "name": "payments: one day (report)",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "_id_"
+    ],
+    "keys": 20000,
+    "docs": 20000,
+    "returned": 11,
+    "ms": 96,
+    "wallMs": 109.4
+  },
+  {
+    "name": "dispatches: for one sale",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 24000,
+    "returned": 1,
+    "ms": 70,
+    "wallMs": 58.6
+  },
+  {
+    "name": "dispatches: trucks waiting at gate",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 24000,
+    "returned": 0,
+    "ms": 75,
+    "wallMs": 65.7
+  },
+  {
+    "name": "dispatches: latest list",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 24000,
+    "returned": 26,
+    "ms": 118,
+    "wallMs": 113.6
+  },
+  {
+    "name": "stockmovements: latest list",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 50000,
+    "returned": 26,
+    "ms": 186,
+    "wallMs": 167.1
+  },
+  {
+    "name": "stockmovements: one item",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 50000,
+    "returned": 26,
+    "ms": 137,
+    "wallMs": 135.7
+  },
+  {
+    "name": "stockitems: below minimum (alert)",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 60,
+    "returned": 6,
+    "ms": 1,
+    "wallMs": 4
+  },
+  {
+    "name": "cashentries: latest list",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 200000,
+    "returned": 26,
+    "ms": 870,
+    "wallMs": 785.4
+  },
+  {
+    "name": "cashentries: one account",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 200000,
+    "returned": 26,
+    "ms": 624,
+    "wallMs": 546.8
+  },
+  {
+    "name": "auditlogs: history of one record",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 1000000,
+    "returned": 1,
+    "ms": 2272,
+    "wallMs": 2010
+  },
+  {
+    "name": "auditlogs: latest list",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 1000000,
+    "returned": 26,
+    "ms": 2957,
+    "wallMs": 2442.2
+  },
+  {
+    "name": "auditlogs: one resource, latest",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 1000000,
+    "returned": 26,
+    "ms": 2413,
+    "wallMs": 2012.3
+  },
+  {
+    "name": "machineentries: one day",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 8933,
+    "returned": 5,
+    "ms": 18,
+    "wallMs": 21.9
+  },
+  {
+    "name": "machineentries: one machine, one month",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 8933,
+    "returned": 9,
+    "ms": 26,
+    "wallMs": 24.5
+  },
+  {
+    "name": "yield: output per block (aggregate, 400 blocks)",
+    "stages": [
+      "GROUP",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 8933,
+    "returned": 44,
+    "ms": 40,
+    "wallMs": 17.9
+  },
+  {
+    "name": "expenses: latest list",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 40000,
+    "returned": 26,
+    "ms": 151,
+    "wallMs": 130.9
+  },
+  {
+    "name": "expenses: pending approval",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 40000,
+    "returned": 20,
+    "ms": 108,
+    "wallMs": 100.9
+  },
+  {
+    "name": "expenses: supervisor “my expenses”",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 40000,
+    "returned": 0,
+    "ms": 104,
+    "wallMs": 88.8
+  },
+  {
+    "name": "purchases: payable this week",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 3000,
+    "returned": 8,
+    "ms": 13,
+    "wallMs": 30.6
+  },
+  {
+    "name": "tasks: overdue",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 3000,
+    "returned": 50,
+    "ms": 10,
+    "wallMs": 13.2
+  },
+  {
+    "name": "tasks: my open tasks",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 3000,
+    "returned": 2,
+    "ms": 15,
+    "wallMs": 12.9
+  },
+  {
+    "name": "advances: employee’s open advances",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 600,
+    "returned": 7,
+    "ms": 1,
+    "wallMs": 4.5
+  },
+  {
+    "name": "leaves: pending",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 800,
+    "returned": 19,
+    "ms": 1,
+    "wallMs": 5
+  },
+  {
+    "name": "complaints: open",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 1500,
+    "returned": 6,
+    "ms": 28,
+    "wallMs": 3.7
+  },
+  {
+    "name": "repairs: open",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 1500,
+    "returned": 15,
+    "ms": 2,
+    "wallMs": 4.7
+  },
+  {
+    "name": "safety: check-ups due",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 1000,
+    "returned": 50,
+    "ms": 2,
+    "wallMs": 4.7
+  },
+  {
+    "name": "documents: expiring papers",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 40,
+    "returned": 4,
+    "ms": 0,
+    "wallMs": 2.4
+  },
+  {
+    "name": "customers: who owes most",
+    "stages": [
+      "SORT",
+      "COLLSCAN"
+    ],
+    "indexes": [],
+    "keys": 0,
+    "docs": 800,
+    "returned": 6,
+    "ms": 3,
+    "wallMs": 4.8
+  },
+  {
+    "name": "daily summary: today (owner report)",
+    "stages": [
+      "EXPRESS_IXSCAN"
+    ],
+    "indexes": [
+      "_id_"
+    ],
+    "keys": 1,
+    "docs": 1,
+    "returned": 1,
+    "ms": 36,
+    "wallMs": 1.4
+  },
+  {
+    "name": "daily summary: 7-day trend",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "_id_"
+    ],
+    "keys": 7,
+    "docs": 7,
+    "returned": 7,
+    "ms": 6,
+    "wallMs": 2
+  },
+  {
+    "name": "performance: month of reports",
+    "stages": [
+      "FETCH",
+      "IXSCAN"
+    ],
+    "indexes": [
+      "_id_"
+    ],
+    "keys": 80546,
+    "docs": 80546,
+    "returned": 517,
+    "ms": 571,
+    "wallMs": 524.2
+  }
+]

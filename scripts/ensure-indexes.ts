@@ -7,6 +7,9 @@ import { connect, disconnect } from '../lib/db';
 import '../lib/models/auth';
 import '../lib/models/settings';
 import '../lib/models';
+import '../lib/rollup/dailySummary';
+import '../lib/storage/files';
+import '../lib/services/analytics';
 
 async function main() {
   await connect();

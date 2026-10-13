@@ -20,16 +20,20 @@ export const stockitems: ResourceDef = {
   listFields: ['name', 'category', 'unit', 'size', 'thickness', 'finish', 'grade', 'location', 'balance', 'minLevel', 'sellRate', 'costRate', 'allowNegative'],
   sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish'],
   filters: { category: { enum: ['raw', 'finished', 'consumable'] }, grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
-  serverOnly: ['balance'],
+  serverOnly: ['balance', 'belowMin'],
   create: z.object({ ...itemFields, openingBalance: num(0, 1e9).optional() }).strict(),
   update: z.object(itemFields).partial().strict(),
   lifecycle: {
     async create(ctx, input) {
       const { openingBalance, ...rest } = input;
-      const [doc] = await StockItem.create([{ ...rest, balance: 0, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
+      const [doc] = await StockItem.create([{ ...rest, balance: 0, belowMin: Number(rest.minLevel) > 0, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
       if (openingBalance > 0) await applyStock(ctx, { itemId: doc._id, delta: openingBalance, type: 'in', ref: 'Opening balance', refModel: 'stockitems', refId: doc._id });
       const fresh: any = await StockItem.findById(doc._id).session(s(ctx)).lean();
       return { doc: fresh };
+    },
+    async prepareUpdate(ctx, prev, patch) {
+      if ('minLevel' in patch) patch.belowMin = Number(patch.minLevel) > 0 && prev.balance < Number(patch.minLevel);
+      return patch;
     },
     async beforeVoid(ctx, d) {
       if (d.balance) throw conflict(`Stock is not zero (${d.balance} ${d.unit}). Move it out before cancelling this item.`);

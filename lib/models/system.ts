@@ -28,7 +28,7 @@ export const AuditLog = defineModel(
     requestId: S,
     at: { type: Date, default: Date.now },
   },
-  { noBase: true, indexes: [[{ refId: 1, at: -1 }], [{ at: -1 }], [{ model: 1, at: -1 }], [{ byId: 1, at: -1 }]] }
+  { noBase: true, indexes: [[{ refId: 1, at: -1, _id: -1 }], [{ at: -1, _id: -1 }], [{ model: 1, at: -1, _id: -1 }], [{ byId: 1, at: -1, _id: -1 }]] }
 );
 
 export const Counter = defineModel('Counter', { _id: { type: S }, seq: { type: N, default: 0 } }, { noBase: true });

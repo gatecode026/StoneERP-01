@@ -10,6 +10,8 @@ import { invalidate } from '@/lib/perm/store';
 import * as generic from '@/app/api/[resource]/route';
 import * as genericId from '@/app/api/[resource]/[id]/route';
 
+/** A real 1x1 PNG: uploads are validated by content, so test photos must be genuine images. */
+export const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 export type Who = { cookie: string; id: string; username: string; role: string; preset: string | null };
 let n = 0;
 
