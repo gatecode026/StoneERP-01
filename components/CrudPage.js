@@ -69,13 +69,23 @@ export function FormFields({ fields, form, set, mode }) {
         input = (
           <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value })}>
             {!f.required || !v ? <option value="">Select…</option> : null}
-            {optList(f.options).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {v && !optList(f.options).some((o) => String(o.value) === String(v)) && <option value={v}>{v}</option>}
+                {optList(f.options).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         ); break;
       case 'ref': input = <RefSelect id={id} field={f} form={form} set={set} />; break;
       case 'photo': input = <PhotoInput value={v} onChange={(x) => set({ [f.name]: x })} label={f.buttonLabel} />; break;
       case 'doc': input = <DocInput value={v} onChange={(x) => set({ [f.name]: x })} resource={f.resource} kind={f.kind} label={f.buttonLabel} />; break;
       case 'photos': input = <PhotoInput multiple value={v} onChange={(x) => set({ [f.name]: x })} />; break;
+      case 'password': {
+        const gen = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a = new Uint32Array(10); crypto.getRandomValues(a); return [...a].map((n) => c[n % c.length]).join('') + '7'; };
+        input = (
+          <div className="flex gap-2">
+            <input id={id} className="input flex-1 min-w-0" type="text" autoComplete="new-password" value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={f.placeholder} disabled={disabled} />
+            {!f.noGenerate && <button type="button" className="btn-outline shrink-0" onClick={() => set({ [f.name]: gen() })} disabled={disabled}>Generate</button>}
+          </div>
+        ); break;
+      }
       case 'checkbox':
         input = (
           <label className="flex items-center gap-3 min-h-[42px] px-3.5 rounded-xl border border-sand-300 bg-sand-50/40 hover:bg-sand-50 cursor-pointer transition">
@@ -155,7 +165,7 @@ export async function saveWithConfirm(path, body, opts) {
 const same = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
 export default function CrudPage({
-  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination = 25,
+  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination = 25, mapBody, loadExtra,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
 }) {
@@ -206,7 +216,8 @@ export default function CrudPage({
   async function startEdit(row) {
     try {
       const full = await api(`/api/${model}/${row._id}`);
-      setEditing(full); setForm({ ...full }); setOpen(true);
+      const extra = loadExtra ? await loadExtra(full) : {};
+      setEditing(full); setForm({ ...full, ...extra }); setOpen(true);
     } catch (e) { toast.error(e.message); }
   }
 
@@ -221,6 +232,7 @@ export default function CrudPage({
     } else {
       body = Object.fromEntries(Object.entries(body).filter(([k]) => names.has(k) && !(fields.find((f) => f.name === k)?.createOnly && editing)));
     }
+    if (mapBody) body = mapBody(body, editing ? 'edit' : 'new', form);
     if (editing) {
       // send only what changed: unchanged fields (a pay rate the form merely displayed) never reach the server
       body = Object.fromEntries(Object.entries(body).filter(([k, v]) => !same(v, editing[k])));

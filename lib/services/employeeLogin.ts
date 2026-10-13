@@ -1,0 +1,84 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { z } from 'zod';
+import { Employee, User } from '../models';
+import { BASE_ROLES, PRESETS } from '../roles';
+import { badRequest, conflict, forbidden } from '../errors';
+import { hashPassword, mobileSchema, passwordSchema } from '../auth/password';
+import { destroyUserSessions } from '../auth/session';
+import { clearTeamCache } from '../perm/engine';
+import { extraAccessSchema } from '../api/userView';
+import type { AuthCtx } from '../api/withAuth';
+import type { SvcCtx } from './core';
+
+/**
+ * A person's sign-in lives on their employee profile: tick "can sign in", choose the role and set a password.
+ * One profile = one person = at most one login (the login's user name is the profile's mobile number).
+ */
+export const loginSchema = z.object({
+  enabled: z.boolean(),
+  role: z.enum(BASE_ROLES).optional(),
+  preset: z.enum(PRESETS).nullable().optional(),
+  password: passwordSchema.optional(),
+  extraAccess: extraAccessSchema.optional(),
+}).strict();
+export type LoginInput = z.infer<typeof loginSchema>;
+
+/** Create / update / disable the login that belongs to this employee profile. Runs inside the same transaction as the profile change. */
+export async function applyLogin(ctx: SvcCtx, auth: AuthCtx, emp: any, login: LoginInput) {
+  const session = ctx.session ?? null;
+  const existing: any = await User.findOne({ $or: [{ employeeId: emp._id }, { empCode: emp.empCode }] }).session(session).lean();
+  const need = existing ? 'edit' : 'create';
+  if (!auth.perm.can('users', need)) throw forbidden('You are not allowed to manage sign-ins');
+
+  if (!login.enabled) {
+    if (existing) {
+      if (String(existing._id) === auth.user.id) throw badRequest('You cannot disable your own sign-in');
+      if (existing.role === 'owner' && (await User.countDocuments({ role: 'owner', active: true }).session(session)) <= 1) throw badRequest('There must be at least one active Owner');
+      await User.updateOne({ _id: existing._id }, { $set: { active: false } }, { session: ctx.session });
+      await destroyUserSessions(existing._id);
+    }
+    await Employee.updateOne({ _id: emp._id }, { $set: { hasLogin: false } }, { session: ctx.session });
+    clearTeamCache();
+    return;
+  }
+
+  const role = login.role ?? existing?.role;
+  if (!role) throw badRequest('Choose the role for this sign-in');
+  if ((role === 'owner' || existing?.role === 'owner') && auth.user.role !== 'owner') throw badRequest('Only an Owner can give or change the Owner role');
+  const mobile = mobileSchema.safeParse(emp.mobile ?? '');
+  if (!mobile.success) throw badRequest('Add a valid 10-digit mobile number to this employee first: it is the sign-in ID');
+  if (existing && String(existing._id) === auth.user.id && (role !== existing.role || login.preset)) throw badRequest('You cannot reduce your own access');
+  const preset = role === 'worker' ? (login.preset === undefined ? existing?.preset ?? null : login.preset) : null;
+
+  const taken: any = await User.findOne({ username: mobile.data }).session(session).lean();
+  if (taken && (!existing || String(taken._id) !== String(existing._id))) throw conflict('Another sign-in already uses this mobile number');
+
+  const base = { username: mobile.data, name: emp.name, role, preset, empCode: emp.empCode, employeeId: emp._id, active: true, ...(login.extraAccess ? { extraAccess: login.extraAccess } : {}) };
+  if (existing) {
+    const set: any = { ...base };
+    if (login.password) { set.passwordHash = await hashPassword(login.password); set.mustChangePassword = true; }
+    await User.updateOne({ _id: existing._id }, { $set: set }, { session: ctx.session });
+    if (login.password || role !== existing.role || preset !== (existing.preset ?? null) || !existing.active) await destroyUserSessions(existing._id);
+  } else {
+    if (!login.password) throw badRequest('Set a password for the new sign-in');
+    await User.create([{ ...base, extraAccess: login.extraAccess ?? [], lang: 'hi', passwordHash: await hashPassword(login.password), mustChangePassword: true, createdBy: auth.user.name }], { session: session as any });
+  }
+  await Employee.updateOne({ _id: emp._id }, { $set: { hasLogin: true, loginRole: role } }, { session: ctx.session });
+  clearTeamCache();
+}
+
+/** Keep the sign-in in step when the profile's name or mobile changes. */
+export async function syncLoginIdentity(ctx: SvcCtx, doc: any, prev: any) {
+  if (!doc.hasLogin || (doc.mobile === prev.mobile && doc.name === prev.name)) return;
+  const session = ctx.session ?? null;
+  const u: any = await User.findOne({ employeeId: doc._id }).session(session).lean();
+  if (!u) return;
+  const set: any = { name: doc.name };
+  if (doc.mobile !== prev.mobile) {
+    const m = mobileSchema.safeParse(doc.mobile ?? '');
+    if (!m.success) throw badRequest('This employee can sign in, so the mobile number must stay a valid 10-digit number');
+    if (await User.exists({ username: m.data, _id: { $ne: u._id } }).session(session)) throw conflict('Another sign-in already uses this mobile number');
+    set.username = m.data;
+  }
+  await User.updateOne({ _id: u._id }, { $set: set }, { session: ctx.session });
+}

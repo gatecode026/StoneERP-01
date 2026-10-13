@@ -9,6 +9,8 @@ import { employeeByCode } from '../services/lookup';
 import { nextSeq, oid, postCash, accountFor, round2 } from '../services/core';
 import { withinApprovalLimit } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
+import { applyLogin, loginSchema, syncLoginIdentity, type LoginInput } from '../services/employeeLogin';
+import type { AuthCtx } from '../api/withAuth';
 import { dateStr, empCode, enumOf, mobile, optMobile, photo, photos, posNum, req, text, num, monthStr } from './zod';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
@@ -39,19 +41,23 @@ function sealEmployee(doc: Record<string, any>, prev?: any) {
   return doc;
 }
 
+const pendingLogin = new WeakMap<object, { login: LoginInput; auth: AuthCtx }>(); // the sign-in part of a request, from prepare* to after*
+
 export const employees: ResourceDef = {
   key: 'employees', model: Employee,
   label: (d) => `${d.name} (${d.empCode})`,
-  listFields: ['empCode', 'name', 'mobile', 'job', 'site', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
+  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'site', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
   sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
   filters: { status: { enum: ['active', 'left'] }, job: 'string', site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
   named: { docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}) }, // same rule as the profile's "missing documents" badge
-  serverOnly: ['docFlags', 'isVoid'],
-  create: z.object({ empCode: empCode.optional(), ...employeeFields }).strict(),
-  update: z.object(employeeFields).partial().strict(),
+  serverOnly: ['docFlags', 'isVoid', 'hasLogin', 'loginRole'],
+  create: z.object({ empCode: empCode.optional(), ...employeeFields, login: loginSchema.optional() }).strict(),
+  update: z.object({ ...employeeFields, login: loginSchema.optional() }).partial().strict(),
   lifecycle: {
-    async prepareCreate(ctx, input) {
-      const doc: any = { ...input };
+    async prepareCreate(ctx, input, auth) {
+      const { login, ...rest } = input as any;
+      if (login) pendingLogin.set(ctx, { login, auth });
+      const doc: any = { ...rest };
       if (!doc.empCode) doc.empCode = 'E' + String(await nextSeq('emp', ctx.session, 45)).padStart(3, '0');
       doc.status ??= 'active';
       doc.payType ??= 'monthly';
@@ -59,12 +65,20 @@ export const employees: ResourceDef = {
       if (doc.status === 'left' && !doc.leavingDate) doc.leavingDate = todayIST();
       return sealEmployee(doc);
     },
-    async prepareUpdate(ctx, prev, patch) {
+    async prepareUpdate(ctx, prev, patch, auth) {
+      if ('login' in patch) { pendingLogin.set(ctx, { login: patch.login, auth }); delete patch.login; } // never stored on the profile; applied in afterUpdate
       if (patch.status === 'left' && !patch.leavingDate && !prev.leavingDate) patch.leavingDate = todayIST();
       if (patch.status === 'active') patch.leavingDate = '';
       return sealEmployee(patch, prev);
     },
+    async afterCreate(ctx, doc) {
+      const p = pendingLogin.get(ctx);
+      if (p) await applyLogin(ctx, p.auth, doc, p.login);
+    },
     async afterUpdate(ctx, doc, prev) {
+      const p = pendingLogin.get(ctx);
+      if (p) { await applyLogin(ctx, p.auth, doc, p.login); doc = (await Employee.findById(doc._id).session(ctx.session ?? null).lean()) ?? doc; }
+      await syncLoginIdentity(ctx, doc, prev);
       // keep the sign-in account in step: a leaver can no longer sign in
       if (prev.status !== 'left' && doc.status === 'left') {
         const { User } = await import('../models');

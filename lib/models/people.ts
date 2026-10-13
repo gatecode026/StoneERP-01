@@ -35,6 +35,8 @@ export const Employee = defineModel(
     emergencyName: { type: S, maxlength: 120 }, // pii
     emergencyMobile: { type: S, maxlength: 20 }, // pii
     docFlags: { aadhaar: { type: B, default: false }, pan: { type: B, default: false }, passbook: { type: B, default: false }, license: { type: B, default: false } }, // lists show these, never the images
+    hasLogin: { type: B, default: false }, // this person can sign in (the User is linked by employeeId); kept by lib/services/employeeLogin.ts
+    loginRole: { type: S },
     supervisorCode: { type: S, uppercase: true, index: true }, // empCode of the supervisor => "team" scope
     teamId: { type: S, maxlength: 40 },
   },

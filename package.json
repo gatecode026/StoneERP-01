@@ -17,7 +17,8 @@
     "migrate:photos": "tsx scripts/migrate-photos.ts",
     "job:reconcile": "tsx scripts/reconcile.ts",
     "job": "tsx scripts/job.ts",
-    "check:bundle": "tsx scripts/check-bundle.ts"
+    "check:bundle": "tsx scripts/check-bundle.ts",
+    "link:logins": "tsx scripts/link-logins.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",

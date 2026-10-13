@@ -37,7 +37,7 @@ function tenDigits(v: string): string {
 export const COLUMNS: Col[] = [
   { key: 'empCode', label: 'Employee code', aliases: ['code', 'empcode', 'employeeid', 'empid', 'id'], example: 'E101', note: 'Leave empty to number automatically' },
   { key: 'name', label: 'Name', aliases: ['employeename', 'fullname'], example: 'Ramesh Meena', note: 'Required' },
-  { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Gang saw operator', note: 'Required' },
+  { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / operator', note: 'Manager / Accountant / Supervisor / Salesperson / Worker / operator' },
   { key: 'mobile', label: 'Mobile', aliases: ['phone', 'mobileno', 'mobilenumber', 'phonenumber', 'contact'], example: '9829012345', parse: tenDigits },
   { key: 'site', label: 'Site', aliases: ['location', 'place'], example: 'Factory', note: SITES.join(' / '), parse: (v) => SITES.find((s) => s.toLowerCase() === v.trim().toLowerCase()) ?? v.trim() },
   { key: 'joiningDate', label: 'Joining date', aliases: ['doj', 'dateofjoining', 'joined', 'joindate'], example: '01-04-2024', parse: parseDate },
