@@ -1,4 +1,5 @@
 import './globals.css';
+import { headers } from 'next/headers';
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/Providers';
 import { getSessionUser } from '@/lib/auth/session';
@@ -27,10 +28,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const [perm, st] = await Promise.all([getEffectivePerm(user), getSettings()]);
     session = { ...publicUser(user), perm: describePerm(perm), company: st.company } as ClientSession;
   }
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';
   return (
     <html lang={lang}>
       <body>
+        {/* react-hot-toast (goober) injects a <style> at runtime; it reads its CSP nonce from window.__nonce__ */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__nonce__=${JSON.stringify(nonce ?? '')}` }} />
         <Providers initialSession={session} initialLang={lang}>{children}</Providers>
       </body>
     </html>

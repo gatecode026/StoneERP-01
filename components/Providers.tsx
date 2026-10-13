@@ -32,7 +32,8 @@ export const useApp = (): AppCtx => useContext(Ctx) as AppCtx;
 export function Providers({ children, initialSession = null, initialLang = 'en' }: { children: ReactNode; initialSession?: ClientSession | null; initialLang?: 'en' | 'hi' }) {
   const router = useRouter();
   const [lang, setLangState] = useState<'en' | 'hi'>(initialLang);
-  const [session] = useState<ClientSession | null>(initialSession);
+  // Always follow the server's answer: signing in/out re-renders the root layout (router.refresh) without remounting this component.
+  const session = initialSession;
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
 
@@ -60,6 +61,7 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); window.removeEventListener('vss-queue', upd); };
   }, [initialSession]);
 
+  useEffect(() => { if (initialSession) setLangState(initialLang); }, [initialSession?.id, initialLang]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
   const setLang = useCallback((l: 'en' | 'hi') => {
