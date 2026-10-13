@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { Employee, User } from '../models';
 import { BASE_ROLES, PRESETS } from '../roles';
+export { roleOfJob } from '../roles';
 import { badRequest, conflict, forbidden } from '../errors';
 import { hashPassword, mobileSchema, passwordSchema } from '../auth/password';
 import { destroyUserSessions } from '../auth/session';

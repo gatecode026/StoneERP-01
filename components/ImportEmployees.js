@@ -36,7 +36,7 @@ export default function ImportEmployees() {
     setBusy(true);
     try {
       const r = await post(file, true);
-      toast.success(`${r.imported} employee${r.imported === 1 ? '' : 's'} imported`);
+      toast.success(`${r.imported} employee${r.imported === 1 ? '' : 's'} imported${r.logins ? ` · ${r.logins} can sign in with their mobile number and password ${r.defaultPassword}` : ''}`, { duration: 9000 });
       window.dispatchEvent(new Event('vss-data-changed'));
       setOpen(false); reset();
     } catch (e) { toast.error(e.message); }
@@ -56,6 +56,7 @@ export default function ImportEmployees() {
             <li>Download the sheet and fill one row per person (only <b>Name</b> and <b>Job</b> are required).</li>
             <li>Choose the filled file (.xlsx or .csv). It is checked first — nothing is saved yet.</li>
             <li>Fix any red rows in the file and choose it again, or import the good rows.</li>
+            <li>Everyone with a valid mobile number can then sign in with that number and the password <b>123456</b>. Change a password any time from Employees → edit → Password.</li>
           </ol>
           <a className="btn-outline btn-sm inline-flex" href="/api/import/employees" download><Download size={14} /> Download Excel template</a>
           <div>

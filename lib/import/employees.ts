@@ -8,6 +8,8 @@ import { badRequest } from '../errors';
 // Employee import from an Excel (.xlsx) or CSV sheet. The file is read on the server, every row is checked with the SAME rules as the
 // "add employee" form (the resource's Zod schema), and nothing is written until the person confirms the preview.
 
+/** Everyone imported with a valid mobile number can sign in with this password; change it later from Employees → edit → Password. */
+export const DEFAULT_IMPORT_PASSWORD = process.env.IMPORT_DEFAULT_PASSWORD || '123456';
 export const MAX_ROWS = 2000;
 export const MAX_BYTES = 5 * 1024 * 1024;
 

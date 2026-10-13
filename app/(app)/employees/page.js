@@ -13,7 +13,9 @@ export default function EmployeesPage() {
   const { t, can, perm } = useApp();
   const showPay = ['read', 'write'].includes(perm?.fields?.money);
   const mayLogin = can('users', 'create') || can('users', 'edit'); // managing sign-ins is part of the profile now
-  const fields = [...EMPLOYEE_FIELDS, ...(mayLogin ? loginFields() : [])];
+  // the password sits right below the mobile number: mobile = sign-in ID, password = how they sign in
+  const at = EMPLOYEE_FIELDS.findIndex((f) => f.name === 'mobile') + 1;
+  const fields = mayLogin ? [...EMPLOYEE_FIELDS.slice(0, at), ...loginFields(), ...EMPLOYEE_FIELDS.slice(at)] : EMPLOYEE_FIELDS;
   const columns = [
     { key: 'name', label: 'Name', primary: true, render: (r) => <span>{r.name} <span className="text-char-500 font-normal text-xs">{r.empCode}</span></span> },
     { key: 'job', label: 'Job' },
@@ -32,13 +34,25 @@ export default function EmployeesPage() {
     <RoleGuard perm="employees">
       <CrudPage
         model="employees" title={t('employees')} subtitle="One profile per person, with documents" label="Employee"
-        fields={fields} columns={columns}
+        fields={fields} columns={columns} sort="empCode" pagination={25} wide headerExtra={<ImportEmployees />}
         loadExtra={async (full) => ({ _job0: full.job, loginPassword: '' })}
         mapBody={(body, mode, form) => {
           const { loginPassword, ...rest } = body;
           if (!mayLogin) return rest;
           const login = toLogin({ loginPassword, job: rest.job ?? form.job }, { hasLogin: form.hasLogin, originalJob: form._job0 });
           return login ? { ...rest, login } : rest;
+        }}
+        
+        filters={[
+          { key: 'job', label: 'All jobs', options: JOBS },
+          { key: 'site', label: 'All sites', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] },
+          { key: 'docs', label: 'Documents', options: [{ value: 'missing', label: 'Missing documents' }] },
+          { key: 'status', label: 'Working + left', options: [{ value: 'active', label: 'Working' }, { value: 'left', label: 'Left' }] },
+        ]}
+        facets={{ by: 'status', query: { docs: 'missing', status: 'active' } }}
+        summary={(rows, { facets: f }) => {
+          const miss = f?.total || 0; // active employees without Aadhaar or passbook on file, counted by the server
+          return miss ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> {miss} working employees have a missing document</div> : null;
         }}
         exportName="employees"
         exportColumns={[{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'site', label: 'Site' }, { key: 'mobile', label: 'Mobile' }, { key: 'payType', label: 'Pay type' }, { key: 'rate', label: 'Rate' }, { key: 'joiningDate', label: 'Joining date' }]}

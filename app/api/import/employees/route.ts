@@ -7,7 +7,11 @@ import { assertWritable } from '@/lib/perm/engine';
 import { writeAudit } from '@/lib/audit';
 import { badRequest, conflict, payloadTooLarge } from '@/lib/errors';
 import { stamp, type SvcCtx } from '@/lib/services/core';
-import { buildTemplate, checkRows, MAX_BYTES, readSheet, type Checked } from '@/lib/import/employees';
+import { Types } from 'mongoose';
+import { User } from '@/lib/models';
+import { hashPassword, mobileSchema } from '@/lib/auth/password';
+import { roleOfJob } from '@/lib/roles';
+import { buildTemplate, checkRows, DEFAULT_IMPORT_PASSWORD, MAX_BYTES, readSheet, type Checked } from '@/lib/import/employees';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,13 +63,30 @@ export const POST = withAuth('employees', 'create', async (auth) => {
     const ctx: SvcCtx = { ...base, session };
     // supervisors may be created in the same file, so order does not matter: codes are only text links
     const docs: any[] = [];
-    for (const r of good) docs.push({ ...(await def.lifecycle!.prepareCreate!(ctx, r.data!, auth)), ...stamp(base.actor) });
+    for (const r of good) docs.push({ _id: new Types.ObjectId(), ...(await def.lifecycle!.prepareCreate!(ctx, r.data!, auth)), ...stamp(base.actor) });
     const codes = docs.map((d) => d.empCode);
     if (new Set(codes).size !== codes.length) throw conflict('Two rows ended up with the same employee code');
     if (await Employee.exists({ empCode: { $in: codes }, isVoid: false }).session(session ?? null)) throw conflict('An employee code in the file was just taken — check the file again');
+    // everybody with a valid mobile number also gets a sign-in (user name = mobile, role from the Job, password = the default one)
+    let logins = 0;
+    if (auth.perm.can('users', 'create')) {
+      const mobiles = docs.map((d) => mobileSchema.safeParse(d.mobile ?? '')).map((m) => (m.success ? m.data : null));
+      const taken = new Set((await User.find({ username: { $in: mobiles.filter(Boolean) as string[] } }, 'username').session(session ?? null).lean() as any[]).map((u) => u.username));
+      const hash = await hashPassword(DEFAULT_IMPORT_PASSWORD); // one hash is enough: they all start with the same password
+      const users: any[] = [];
+      docs.forEach((d, i) => {
+        const m = mobiles[i];
+        if (!m || taken.has(m)) return;
+        taken.add(m);
+        d.hasLogin = true; d.loginRole = roleOfJob(d.job);
+        users.push({ username: m, name: d.name, role: d.loginRole, preset: null, empCode: d.empCode, employeeId: d._id, extraAccess: [], lang: 'hi', passwordHash: hash, mustChangePassword: false, createdBy: base.actor.name });
+      });
+      if (users.length) await User.insertMany(users, { session: session as any });
+      logins = users.length;
+    }
     await Employee.insertMany(docs, { session: session as any });
-    await writeAudit({ resource: 'employees', refId: file.name, action: 'bulk_import', label: `${docs.length} employees from ${file.name}`, changes: { imported: { to: docs.length }, skipped: { to: checked.length - docs.length } }, requestId: auth.requestId }, base.actor, session);
-    return docs.length;
+    await writeAudit({ resource: 'employees', refId: file.name, action: 'bulk_import', label: `${docs.length} employees from ${file.name}`, changes: { imported: { to: docs.length }, signIns: { to: logins }, skipped: { to: checked.length - docs.length } }, requestId: auth.requestId }, base.actor, session);
+    return { n: docs.length, logins };
   });
-  return { committed: true, imported, skipped: checked.length - imported, ...preview };
+  return { committed: true, imported: imported.n, logins: imported.logins, defaultPassword: imported.logins ? DEFAULT_IMPORT_PASSWORD : undefined, skipped: checked.length - imported.n, ...preview };
 });

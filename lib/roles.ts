@@ -23,3 +23,7 @@ export const ROLE_LABEL: Record<BaseRole | Preset, { en: string; hi: string }> =
   cashier: { en: 'Cashier', hi: 'कैशियर' },
   driver: { en: 'Driver', hi: 'ड्राइवर' },
 };
+
+/** The role a person gets from the Job chosen on their employee profile (jobs offered: Manager, Accountant, Supervisor, Salesperson, Worker / operator). */
+export const roleOfJob = (job: string | null | undefined): (typeof BASE_ROLES)[number] =>
+  ({ Manager: 'manager', Accountant: 'accountant', Supervisor: 'supervisor', Salesperson: 'salesperson' } as Record<string, (typeof BASE_ROLES)[number]>)[String(job ?? '')] ?? 'worker';

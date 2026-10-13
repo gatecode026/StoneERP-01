@@ -4,7 +4,8 @@ import { NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
 import { useTestDb } from '../helpers';
 import { api, makeUser, resetCaches, type Who } from '../api';
-import { AuditLog, Employee } from '@/lib/models';
+import { AuditLog, Employee, User } from '@/lib/models';
+import { loginWithPassword } from '@/lib/auth/login';
 import { isEncrypted } from '@/lib/crypto';
 import * as route from '@/app/api/import/employees/route';
 
@@ -86,6 +87,14 @@ describe('employee import from Excel', () => {
     expect(isEncrypted(ram.aadhaarNo)).toBe(true);
     expect(ram.createdByName).toBeTruthy();
     expect((await Employee.findOne({ empCode: 'E050' }).lean() as any).supervisorCode).toBe('E001');
+    // everyone with a valid mobile number can sign in with the default password; the role follows the Job
+    expect(r.json).toMatchObject({ logins: 2, defaultPassword: '123456' });
+    const login: any = await loginWithPassword({ username: '9829012345', password: '123456' });
+    expect(login.user).toMatchObject({ role: 'worker', mustChangePassword: false });
+    expect(login.user.empCode).toBe(ram.empCode);
+    expect(((await User.findOne({ username: '9829011111' }).lean()) as any).employeeId).toBeTruthy();
+    expect(((await Employee.findOne({ name: 'Ramesh Meena' }).lean()) as any)).toMatchObject({ hasLogin: true, loginRole: 'worker' });
+    await expect(loginWithPassword({ username: '9829012345', password: 'wrong-pass-1' })).rejects.toThrow();
     expect(await Employee.countDocuments()).toBe(3);
     expect(await AuditLog.countDocuments({ action: 'bulk_import' })).toBe(1);
     // importing the same file again must not overwrite or duplicate anybody
