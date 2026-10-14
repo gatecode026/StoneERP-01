@@ -45,7 +45,7 @@ export default function ImportEmployees() {
 
   return (
     <>
-      <button className="btn-outline btn-sm" onClick={() => setOpen(true)}><FileSpreadsheet size={14} /> <span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importExcel')}</span></button>
+      <button className="btn-outline btn-sm" onClick={() => setOpen(true)} title={t('importExcel')} aria-label={t('importExcel')}><FileSpreadsheet size={14} /> <span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importExcel')}</span></button>
       <Sheet open={open} onClose={() => { setOpen(false); reset(); }} title={t('impTitle', { noun: t('employees').toLowerCase() })} wide
         footer={<>
           <button className="btn-outline" onClick={() => { setOpen(false); reset(); }}>{t('close')}</button>

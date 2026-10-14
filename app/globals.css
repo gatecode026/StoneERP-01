@@ -90,7 +90,22 @@ img, video, canvas, svg { max-width: 100%; }
   .filter-row > div:first-child { flex: 1 1 100%; }
   .filter-row > select { flex: 1 1 calc(50% - .25rem); width: auto !important; min-width: 0 !important; }
 }
-/* phones: the main action ("New quotation", "Add") is one wide, easy-to-hit button above the tools, never a lone button pushed to the right */
+/* phones: the whole action bar is ONE small row — the main action ("Add", "New quotation", "New entry") first, then Import, the date and Excel.
+   Everything shrinks to fit; on a very narrow phone the row scrolls sideways instead of wrapping to a second line. */
 @media (max-width: 639px) {
-  .page-actions > .btn-primary { order: -1; flex: 1 1 100%; margin-left: 0; justify-content: center; }
+  .page-actions { flex-wrap: nowrap; gap: .375rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
+  .page-actions::-webkit-scrollbar { display: none; }
+  .page-actions > .btn-primary { order: -1; flex: 0 0 auto; margin-left: 0; }
+  .page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 40px; padding: 0 .7rem; font-size: .75rem; gap: .3rem; white-space: nowrap; flex: 0 0 auto; border-radius: .6rem; }
+  .page-actions > button svg, .page-actions > a svg { width: 14px; height: 14px; }
+  .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input {
+    min-height: 40px; padding: 0 .55rem; font-size: .75rem; border-radius: .6rem; flex: 1 1 auto; min-width: 118px; max-width: 160px;
+  }
+  .page-actions input[type='month'] { min-width: 118px; }
+  .page-actions input[type='date'] { min-width: 118px; }
+  /* four or more controls in the bar: Import / Excel keep only their icon, the date and filter shrink, so it still fits in one row */
+  .page-actions:has(> :nth-child(4)) > .btn-outline > span, .page-actions:has(> :nth-child(4)) > .btn-sm > span { display: none; }
+  .page-actions:has(> :nth-child(4)) > .btn, .page-actions:has(> :nth-child(4)) > .btn-sm, .page-actions:has(> :nth-child(4)) > button { padding: 0 .6rem; }
+  .page-actions:has(> :nth-child(4)) input[type='date'], .page-actions:has(> :nth-child(4)) input[type='month'] { min-width: 98px; padding: 0 .4rem; }
+  .page-actions:has(> :nth-child(4)) select { min-width: 76px; padding: 0 .4rem; }
 }
