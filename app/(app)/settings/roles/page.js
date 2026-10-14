@@ -8,6 +8,8 @@ import { RoleGuard, PageHeader, Section, Sheet, Badge, Field, SkeletonList, cx }
 import { api } from '@/lib/client';
 import { NAV_GROUPS } from '@/lib/nav';
 
+// Only the five roles people are given through their Job are shown. The Owner always has every right (fixed, nothing to edit), and the older job presets are no longer assigned.
+const EDITABLE_ROLES = ['manager', 'accountant', 'supervisor', 'salesperson', 'worker'];
 const SCOPE_LABEL = { '': '—', own: 'Own', team: 'Team', all: 'All' };
 const ACT_LABEL = { view: 'See', create: 'Add', edit: 'Edit', void: 'Cancel', approve: 'Approve', export: 'Export' };
 const LEVELS = [['none', 'Hidden'], ['masked', 'Masked'], ['read', 'See'], ['write', 'See + change']];
@@ -58,7 +60,7 @@ function RolesEditor() {
   return (
     <div>
       <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Roles">
-        {data.roles.map((r) => (
+        {data.roles.filter((r) => EDITABLE_ROLES.includes(r.key)).map((r) => (
           <button key={r.key} role="tab" aria-selected={sel === r.key} onClick={() => setSel(r.key)}
             className={cx('shrink-0 min-h-[44px] px-4 rounded-full text-sm font-semibold border transition', sel === r.key ? 'bg-terra text-white border-terra' : 'bg-white text-char-700 border-sand-300')}>
             {r.label[lang] || r.label.en}{r.custom && <span className="ml-1.5 text-[10px] opacity-80">edited</span>}
