@@ -19,14 +19,14 @@ export default function Home() {
   const canDecide = ['expenses', 'purchases', 'advances', 'leaves', 'stockmovements'].some((r) => can(r, 'approve'));
   const title = kind === 'owner' ? t('ownerReport') : TITLES[kind] || `Namaste, ${session?.name}`;
 
+  const subtitle = [data?.self?.me?.job, fmtDate(date)].filter(Boolean).join(' · ');
   const header = (
-    <PageHeader title={title} subtitle={fmtDate(date)}
+    <PageHeader title={title} subtitle={subtitle}
       actions={WITH_DATE.includes(kind) ? <input type="date" aria-label="Date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} /> : null} />
   );
 
   if (error) return <>{header}<HomeError error={error} onRetry={reload} /></>;
   if (loading || !data) return <>{header}<HomeSkeleton /></>;
-  if (data.empty) return <>{header}<Empty text="No data yet. Add employees, machines and stock items to start, or use Import in Settings." /></>;
 
   const body = (() => {
     switch (data.kind) {

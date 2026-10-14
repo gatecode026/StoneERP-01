@@ -226,7 +226,6 @@ export function WorkerCards({ self, reload }) {
   const { can } = useApp();
   const [selfie, setSelfie] = useState('');
   const [busy, setBusy] = useState(false);
-  const date = todayISO();
   async function markAtt() {
     if (!selfie) return toast.error('Take a selfie first');
     setBusy(true);
@@ -239,39 +238,93 @@ export function WorkerCards({ self, reload }) {
     setBusy(false);
   }
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2">
       {can('attendance', 'create') && (
-        <Card title={<span className="text-base">{h('markAtt')}</span>}>
-          {self.attendance ? <div className="flex items-center gap-2"><Badge tone="green">{self.attendance.state}</Badge><span className="text-sm">{h('marked')} ✔</span></div> : (
-            <div className="space-y-3"><PhotoInput value={selfie} onChange={setSelfie} label={h('takeSelfie')} capture="user" />
-              <button className="btn-primary w-full !min-h-[56px] text-base" disabled={busy} onClick={markAtt}><CalendarCheck size={20} /> {h('markAtt')}</button></div>
+        <Card title={<span className="text-base font-bold flex items-center gap-2"><CalendarCheck className="text-terra" size={18} /> {h('markAtt')}</span>}>
+          {self?.attendance ? (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <Check size={20} strokeWidth={2.5} />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-emerald-950 flex items-center gap-2">
+                  {h('marked')} ✔
+                  <Badge tone="green">{self.attendance.state}</Badge>
+                </div>
+                <div className="text-xs text-emerald-700 mt-0.5">Today's attendance recorded</div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <PhotoInput value={selfie} onChange={setSelfie} label={h('takeSelfie')} capture="user" />
+              <button
+                type="button"
+                className="btn-primary w-full !min-h-[50px] text-base font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={busy}
+                onClick={markAtt}
+              >
+                <CalendarCheck size={18} /> {busy ? 'Marking…' : h('markAtt')}
+              </button>
+            </div>
           )}
         </Card>
       )}
       {can('dailyreports', 'create') && (
-        <Card title={<span className="text-base">{h('writeReport')}</span>}>
-          {self.report ? (
-            <div className="text-sm"><Badge tone="green">{h('submitted')} ✔</Badge><p className="mt-2 text-char-700 line-clamp-3">{self.report.narration}</p><Link href="/daily-report" className="btn-outline btn-sm mt-3">{h('viewEdit')}</Link></div>
+        <Card title={<span className="text-base font-bold flex items-center gap-2"><ClipboardList className="text-terra" size={18} /> {h('writeReport')}</span>}>
+          {self?.report ? (
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                <div className="flex items-center justify-between mb-1">
+                  <Badge tone="green">{h('submitted')} ✔</Badge>
+                  {self.report.shift && <span className="text-[11px] font-semibold text-emerald-800 uppercase">{self.report.shift} shift</span>}
+                </div>
+                <p className="mt-1 text-sm text-char-700 line-clamp-3 leading-relaxed">{self.report.narration}</p>
+              </div>
+              <Link href="/daily-report" className="btn-outline w-full !min-h-[44px] text-sm font-semibold justify-center">
+                {h('viewEdit')}
+              </Link>
+            </div>
           ) : (
-            <div><p className="text-sm text-char-500 mb-3">{h('notFilled')}</p><Link href="/daily-report?new=1" className="btn-primary w-full !min-h-[56px] text-base"><ClipboardList size={20} /> {h('writeReport')}</Link></div>
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 text-xs text-char-600">
+                {h('notFilled')}
+              </div>
+              <Link href="/daily-report?new=1" className="btn-primary w-full !min-h-[50px] text-base font-semibold shadow-sm justify-center">
+                <ClipboardList size={18} /> {h('writeReport')}
+              </Link>
+            </div>
           )}
         </Card>
       )}
-      {can('salaryslips') && <Card title={<span className="text-base">{h('mySlip')}</span>}><Link href="/salary" className="btn-outline w-full !min-h-[56px] text-base"><FileText size={20} /> {h('mySlip')}</Link></Card>}
+      {can('salaryslips') && (
+        <Card title={<span className="text-base font-bold flex items-center gap-2"><FileText className="text-terra" size={18} /> {h('mySlip')}</span>}>
+          <div className="space-y-3">
+            <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 text-xs text-char-600">
+              View your monthly wages, attendance days, and salary slip
+            </div>
+            <Link href="/salary" className="btn-outline w-full !min-h-[50px] text-sm font-semibold justify-center">
+              <FileText size={18} /> {h('mySlip')}
+            </Link>
+          </div>
+        </Card>
+      )}
       {can('tasks') && (
-        <Card title={<span className="text-base">{h('myTasks')} ({self.tasks?.length || 0})</span>} href="/tasks" empty={!self.tasks?.length} emptyText={h('noTasks')}>
-          {self.tasks.slice(0, 4).map((k) => <div key={k._id} className="text-sm py-1.5 border-b border-sand-100 last:border-0">{k.title} <span className="text-char-500">· {fmtDate(k.dueDate)}</span></div>)}
+        <Card title={<span className="text-base font-bold flex items-center gap-2"><ListChecks className="text-terra" size={18} /> {h('myTasks')} ({self?.tasks?.length || 0})</span>} href="/tasks" empty={!self?.tasks?.length} emptyText={h('noTasks')}>
+          {self?.tasks?.slice(0, 4).map((k) => (
+            <div key={k._id} className="text-sm py-2 border-b border-sand-100 last:border-0 flex justify-between items-center">
+              <span className="font-medium truncate pr-2">{k.title}</span>
+              <span className="text-char-500 text-xs shrink-0">{fmtDate(k.dueDate)}</span>
+            </div>
+          ))}
         </Card>
       )}
     </div>
   );
 }
 
-export function WorkerHome({ data, reload, name }) {
-  const h = useH();
+export function WorkerHome({ data, reload }) {
   return (
     <div>
-      <div className="mb-3"><div className="text-xl font-bold">{h('hello')}, {data.self?.me?.name || name}</div><div className="text-sm text-char-500">{data.self?.me?.job} · {fmtDate(data.date)}</div></div>
       <WorkerCards self={data.self} reload={reload} />
     </div>
   );

@@ -138,7 +138,7 @@ export function parseListQuery(sp: URLSearchParams, spec: ListSpec, opts: { hidd
   const cursorRaw = sp.get('cursor');
   const requested = sp.get('fields')?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
   for (const f of requested) if (!spec.listFields.includes(f)) throw badRequest(`Field "${f}" is not available in lists`);
-  const select = (requested.length ? requested : [...spec.listFields]).filter((f) => !hidden.has(f));
+  const select = (requested.length ? requested : [...spec.listFields, 'isVoid']).filter((f) => !hidden.has(f));
 
   const pageRaw = sp.get('page');
   let page: number | undefined;
