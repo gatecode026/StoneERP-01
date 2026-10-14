@@ -3,8 +3,8 @@
  * and the FIRST OWNER (only if no Owner exists). Never deletes anything.
  *
  *   MONGODB_URI=... BOOTSTRAP_OWNER_MOBILE=98XXXXXXXX BOOTSTRAP_OWNER_NAME="Vipul Jain" npm run bootstrap
- *   (optional BOOTSTRAP_OWNER_PASSWORD; otherwise a random temporary password is printed once)
- * The Owner must change the password at first sign-in.
+ *   (optional BOOTSTRAP_OWNER_EMAIL to sign in with an email too; optional BOOTSTRAP_OWNER_PASSWORD, kept as given —
+ *    otherwise a random temporary password is printed once and must be changed at first sign-in)
  */
 import { connect, disconnect } from '../lib/db';
 import { User } from '../lib/models/auth';
@@ -35,10 +35,12 @@ async function main() {
     const supplied = process.env.BOOTSTRAP_OWNER_PASSWORD;
     const password = supplied ?? generatePassword();
     if (supplied) passwordSchema.parse(supplied);
-    await User.create({ username: mobile, name, role: 'owner', passwordHash: await hashPassword(password), mustChangePassword: true, createdBy: 'bootstrap' });
+    const email = (process.env.BOOTSTRAP_OWNER_EMAIL ?? '').trim().toLowerCase() || undefined;
+    // a password chosen by the owner is kept as is; a generated one must be changed at first sign-in
+    await User.create({ username: mobile, ...(email ? { email } : {}), name, role: 'owner', passwordHash: await hashPassword(password), mustChangePassword: !supplied, createdBy: 'bootstrap' });
     console.log(`Created Owner ${name} (${mobile}).`);
     if (!supplied) console.log(`Temporary password (shown once): ${password}`);
-    console.log(`Settings ensured, ${heads} expense heads added. The Owner must change the password at first sign-in.`);
+    console.log(`Settings ensured, ${heads} expense heads added.${supplied ? '' : ' The Owner must change the password at first sign-in.'}`);
   }
   await disconnect();
 }

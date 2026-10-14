@@ -59,8 +59,8 @@ const TEXTS = {
     f4Desc: 'Better decisions',
     welcomeBack: 'Welcome Back',
     signInSubtitle: 'Sign in to your account to continue',
-    phoneLabel: 'Phone Number',
-    phonePlaceholder: 'e.g. +91 98765 43210',
+    phoneLabel: 'Mobile number or email',
+    phonePlaceholder: 'Mobile number or email',
     passwordLabel: 'Password',
     passwordPlaceholder: 'Enter your password',
     rememberMe: 'Remember me',
@@ -88,8 +88,8 @@ const TEXTS = {
     f4Desc: 'सटीक और तेज़ निर्णय',
     welcomeBack: 'वापसी पर स्वागत है',
     signInSubtitle: 'जारी रखने के लिए अपने खाते में साइन इन करें',
-    phoneLabel: 'मोबाइल नंबर',
-    phonePlaceholder: 'उदा. 98765 43210',
+    phoneLabel: 'मोबाइल नंबर या ईमेल',
+    phonePlaceholder: 'मोबाइल नंबर या ईमेल',
     passwordLabel: 'पासवर्ड',
     passwordPlaceholder: 'अपना पासवर्ड दर्ज करें',
     rememberMe: 'मुझे याद रखें',
@@ -304,10 +304,11 @@ export default function LoginPage() {
                   <input
                     id="username"
                     name="username"
-                    type="tel"
-                    inputMode="numeric"
+                    type="text"
                     autoComplete="username"
-                    maxLength={14}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    maxLength={120}
                     placeholder={t.phonePlaceholder}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}

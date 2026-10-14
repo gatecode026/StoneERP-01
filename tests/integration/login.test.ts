@@ -92,3 +92,15 @@ describe('sign-in belongs to the employee profile', () => {
     await expect(loginWithPassword({ username: '9829055555', password: PW })).rejects.toThrow();
   });
 });
+
+describe('sign-in with an email', () => {
+  it('an account with an email signs in with it (any letter case) or with its mobile; others cannot use it', async () => {
+    await User.create({ username: '9000000099', email: 'Admin@Example.com', name: 'Admin', role: 'owner', passwordHash: await (await import('@/lib/auth/password')).hashPassword('admin@1234'), mustChangePassword: false });
+    expect(((await loginWithPassword({ username: 'admin@example.com', password: 'admin@1234' })) as any).user.username).toBe('9000000099');
+    expect(((await loginWithPassword({ username: ' ADMIN@example.com ', password: 'admin@1234' })) as any).user.username).toBe('9000000099');
+    expect(((await loginWithPassword({ username: '9000000099', password: 'admin@1234' })) as any).user.username).toBe('9000000099');
+    await expect(loginWithPassword({ username: 'admin@example.com', password: 'wrong-pass-1' })).rejects.toMatchObject({ status: 401 });
+    await expect(loginWithPassword({ username: 'nobody@example.com', password: 'admin@1234' })).rejects.toMatchObject({ status: 401 });
+    await expect(loginWithPassword({ username: 'not-an-email@', password: 'admin@1234' })).rejects.toMatchObject({ status: 401 });
+  });
+});

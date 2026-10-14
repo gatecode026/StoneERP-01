@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { User } from '../models/auth';
 import { connect } from '../db';
 import { AppError, badRequest } from '../errors';
@@ -8,13 +9,16 @@ import { enforce } from './ratelimit';
 export const MAX_FAILED = 5;
 export const LOCK_MINUTES = 15;
 
-const invalid = () => new AppError(401, 'INVALID_CREDENTIALS', 'Mobile number or password is wrong');
+const invalid = () => new AppError(401, 'INVALID_CREDENTIALS', 'Mobile number / email or password is wrong');
+const emailSchema = z.string().trim().toLowerCase().email().max(120);
 
 export type LoginMeta = { ip?: string | null; userAgent?: string | null };
 
 export async function loginWithPassword(input: { username: string; password: string }, meta: LoginMeta = {}) {
   await connect();
-  const parsed = mobileSchema.safeParse(input.username ?? '');
+  const raw = String(input.username ?? '').trim();
+  const byEmail = raw.includes('@');
+  const parsed = byEmail ? emailSchema.safeParse(raw) : mobileSchema.safeParse(raw);
   const password = String(input.password ?? '');
   const ip = meta.ip ?? 'unknown';
   await enforce(`login:ip:${ip}`, 30, 600);
@@ -25,7 +29,7 @@ export async function loginWithPassword(input: { username: string; password: str
   const username = parsed.data;
   await enforce(`login:user:${username}`, 10, 900);
 
-  const user = await User.findOne({ username }).select('+passwordHash');
+  const user = await User.findOne(byEmail ? { email: username } : { username }).select('+passwordHash');
   if (!user || !user.active) {
     await burnVerify(password);
     throw invalid();
