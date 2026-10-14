@@ -17,7 +17,7 @@ export type ClientSession = {
 type AppCtx = {
   lang: 'en' | 'hi';
   setLang: (l: 'en' | 'hi') => void;
-  t: (k: string) => string;
+  t: (k: string, vars?: Record<string, string | number>) => string;
   session: ClientSession | null;
   logout: () => Promise<void>;
   online: boolean;
@@ -80,7 +80,7 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
     try { localStorage.setItem('vss_lang', l); } catch {}
     if (initialSession) api('/api/auth/me', { method: 'PATCH', body: { lang: l } }).catch(() => {});
   }, [initialSession]);
-  const t = useCallback((k: string) => translate(lang, k), [lang]);
+  const t = useCallback((k: string, vars?: Record<string, string | number>) => translate(lang, k, vars), [lang]);
 
   const logout = useCallback(async () => {
     try { await api('/api/auth/logout', { method: 'POST', body: {} }); } catch {}

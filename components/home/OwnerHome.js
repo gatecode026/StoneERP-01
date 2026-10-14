@@ -62,9 +62,9 @@ export function AlertsCard({ d }) {
   const h = useH();
   return (
     <Card title={<span className="flex items-center gap-2"><Bell size={16} /> {h('alerts')}</span>} right={<Link href="/tasks?tab=reminders" className="text-xs text-terra font-semibold">{h('all')} {d.reminderCount ?? 0} →</Link>} empty={!(d.alerts || []).length} emptyText={h('noAlerts')}>
-      {(d.alerts || []).map((a, i) => (
+      {(d.alerts || []).slice(0, 6).map((a, i) => (
         <Link key={i} href={a.link || '/'} className="flex items-start gap-2 py-2.5 border-b border-sand-100 last:border-0 text-sm min-h-[44px]">
-          <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" /><span className="font-medium">{a.title}</span>
+          <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" /><span className="font-medium min-w-0">{String(a.title).replace(/([0-9]{4})-([0-9]{2})-([0-9]{2})/g, '$1‑$2‑$3')}</span>
         </Link>
       ))}
     </Card>
@@ -81,7 +81,7 @@ export function ProfitCard({ profit }) {
         <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500">Cost</div><div className="font-bold">{inrShort(profit.orderTotals.cost)}</div></div>
         <div className="rounded-xl bg-emerald-50 p-2"><div className="text-[10px] uppercase text-emerald-800">{h('profit')}</div><div className="font-bold text-emerald-800">{inrShort(profit.orderTotals.profit)}</div></div>
       </div>
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div>
           <div className="text-xs font-bold uppercase text-char-500 mb-1">{h('profitOrders')}</div>
           {profit.orders.map((o) => (
@@ -118,12 +118,12 @@ export function ReportCards({ d, compare }) {
       {d.machines && <StatCard icon={AlertTriangle} label={h('breakdowns')} value={d.machines.breakdowns.length} sub={d.machines.breakdowns.map((m) => m.name).join(', ') || h('allRunning')} tone={d.machines.breakdowns.length ? 'red' : 'green'} valueClass={d.machines.breakdowns.length ? 'text-red-700' : ''} href="/repairs?status=open" />}
       {d.stock && <StatCard icon={PackageX} label={h('lowStock')} value={d.stock.lowStock.length} sub={d.stock.lowStock[0]?.name || h('allAbove')} tone={d.stock.lowStock.length ? 'red' : 'green'} valueClass={d.stock.lowStock.length ? 'text-red-700' : ''} href="/stock?low=1" />}
       {d.sales && <>
-        <StatCard icon={Receipt} label={t('todaySales')} value={inrShort(d.sales.today)} sub={<>{d.sales.orders} · {cur && <Delta now={cur.sales} before={prev.sales} />}</>} href="/sales" />
+        <StatCard icon={Receipt} label={t('todaySales')} value={inrShort(d.sales.today)} sub={<>{d.sales.orders} {h('orders')}{cur && <> · <Delta now={cur.sales} before={prev.sales} /></>}</>} href="/sales" />
         <StatCard icon={Truck} label={t('dispatches')} value={d.sales.dispatches} sub={h('trucks')} href="/dispatch?status=out" />
         <StatCard icon={HandCoins} label={h('received')} value={inrShort(d.sales.received)} tone="green" sub={cur && <Delta now={cur.received} before={prev.received} />} href="/sales?tab=pending" />
         <StatCard icon={Hourglass} label={h('pending')} value={inrShort(d.sales.pending)} tone="amber" href="/sales?tab=pending" />
       </>}
-      {d.expenses && <StatCard icon={IndianRupee} label={t('expensesToday')} value={inr(d.expenses.total)} sub={<>{d.expenses.count} · {cur && <Delta now={cur.expenses} before={prev.expenses} goodWhenUp={false} />}</>} href="/expenses" />}
+      {d.expenses && <StatCard icon={IndianRupee} label={t('expensesToday')} value={inr(d.expenses.total)} sub={<>{d.expenses.count} {h('entries')}{cur && <> · <Delta now={cur.expenses} before={prev.expenses} goodWhenUp={false} /></>}</>} href="/expenses" />}
       {d.cash && <>
         <StatCard icon={Wallet} label={h('cash')} value={inr(d.cash.inHand)} sub={d.cash.closed ? h('closingOk') : h('closingNo')} tone={d.cash.closed ? 'default' : 'amber'} href="/cash" />
         <StatCard icon={Landmark} label={h('bank')} value={inrShort(d.cash.bank)} href="/cash" />
@@ -175,18 +175,18 @@ export function OwnerHome({ data, reload, canDecide }) {
   return (
     <div>
       <ReportCards d={d} compare={data.compare} />
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <div className="lg:col-span-1 order-last lg:order-none"><ReportPreview d={d} /></div>
         <Card className="lg:col-span-2" title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}>
           <Approvals items={d.approvals || []} reload={reload} canDecide={canDecide} />
         </Card>
       </div>
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         {d.trend && <Card title={h('trend')}><TrendChart data={d.trend} /></Card>}
         {d.expenses && <Card title={h('byHead')} empty={!d.expenses.byHead.length}><ExpensePie data={d.expenses.byHead} /></Card>}
         <StockCard d={d} />
       </div>
-      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
         <AlertsCard d={d} />
         {d.reports && (
           <Card title={`${h('reports')} · ${h('missing')} (${d.reports.missing})`} empty={!d.reports.missing && !d.reports.problems.length} emptyText="✔">

@@ -7,7 +7,7 @@ import { publicUser } from '@/lib/auth/public';
 
 export const dynamic = 'force-dynamic';
 
-const body = z.object({ username: z.string().max(20), password: z.string().max(128) });
+const body = z.object({ username: z.string().max(120), password: z.string().max(128) });
 
 export const POST = route({ auth: 'none' }, async (ctx) => {
   const input = await ctx.json(body);

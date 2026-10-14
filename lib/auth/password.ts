@@ -31,6 +31,9 @@ export const passwordSchema = z
   .refine((p) => /[a-zA-Z]/.test(p) && /\d/.test(p), 'Use letters and numbers')
   .refine((p) => !COMMON.has(p.toLowerCase()), 'This password is too common');
 
+/** The starting password the Owner types in the employee form (same idea as the import's default 123456). The person is asked to choose a strong one (passwordSchema) when they change it. */
+export const initialPasswordSchema = z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password is too long');
+
 export const mobileSchema = z
   .string()
   .transform((s) => s.replace(/[\s-]/g, '').replace(/^(\+91|91|0)(?=\d{10}$)/, ''))

@@ -35,7 +35,19 @@ export async function api(path: string, { method = 'GET', body, headers }: { met
   if (!res.ok) {
     // standard envelope: { error: { code, message, details } }; details (e.g. { confirmable: true }) is flattened into .data
     const e = data?.error;
-    const message = (typeof e === 'string' ? e : e?.message) || `Error ${res.status}`;
+    let message = (typeof e === 'string' ? e : e?.message) || `Error ${res.status}`;
+    // a rejected form: say WHICH field and why ("Password: Password must be at least 8 characters"), not just "Some fields are not valid"
+    if (e?.code === 'VALIDATION' && Array.isArray(e.details) && e.details.length) {
+      const words = (p: string) => { const w = String(p).split('.').pop()!.replace(/([A-Z])/g, ' $1').toLowerCase().trim(); return w.charAt(0).toUpperCase() + w.slice(1); };
+      const seen = new Set<string>();
+      const parts: string[] = [];
+      for (const d of e.details as { path?: string; message?: string }[]) {
+        const label = words(d.path ?? '');
+        const text = d.message && label && !d.message.toLowerCase().includes(label.toLowerCase()) ? `${label}: ${d.message}` : d.message || label;
+        if (text && !seen.has(text)) { seen.add(text); parts.push(text); }
+      }
+      if (parts.length) message = parts.slice(0, 3).join(' · ') + (parts.length > 3 ? ` · +${parts.length - 3} more` : '');
+    }
     throw new ApiError(message, res.status, { ...(typeof e === 'object' && e ? { code: e.code, ...(e.details && typeof e.details === 'object' && !Array.isArray(e.details) ? e.details : { details: e.details }) } : {}) });
   }
   return data;
@@ -123,13 +135,29 @@ export function fileUrl(v: string | null | undefined, thumb = false): string {
 }
 
 /** Upload a file straight to storage (multipart). Returns the stored key. */
-export async function uploadFile(file: File, resource: string, kind = 'docs'): Promise<{ key: string; contentType: string; size: number }> {
+export async function uploadFile(file: File, resource: string, kind = 'docs', onProgress?: (percent: number) => void): Promise<{ key: string; contentType: string; size: number }> {
   const form = new FormData();
   form.set('file', file);
   form.set('resource', resource);
   form.set('kind', kind);
-  const res = await fetch('/api/files', { method: 'POST', body: form });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(data?.error?.message || `Upload failed (${res.status})`, res.status, data);
-  return data;
+  if (!onProgress) {
+    const res = await fetch('/api/files', { method: 'POST', body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(data?.error?.message || `Upload failed (${res.status})`, res.status, data);
+    return data;
+  }
+  // fetch cannot report upload progress, XMLHttpRequest can
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/files');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100))); };
+    xhr.onerror = () => reject(new ApiError('Network problem — check your connection and try again', 0, null));
+    xhr.onload = () => {
+      let data: any = null;
+      try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) { onProgress(100); resolve(data); }
+      else reject(new ApiError(data?.error?.message || `Upload failed (${xhr.status})`, xhr.status, data));
+    };
+    xhr.send(form);
+  });
 }

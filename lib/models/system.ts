@@ -90,7 +90,7 @@ export const Notification = defineModel(
     to: { type: S, required: true },
     kind: { type: S, required: true },
     text: { type: S, required: true, maxlength: 4000 },
-    status: { type: S, enum: ['queued', 'sent', 'failed', 'skipped'], default: 'queued' },
+    status: { type: S, enum: ['queued', 'sending', 'sent', 'manual', 'failed', 'skipped'], default: 'queued' }, // manual = waiting for the Owner to send it by hand
     attempts: { type: N, default: 0 },
     sentAt: Date,
     error: S,

@@ -19,23 +19,24 @@ export function ManagerHome({ data, reload, canDecide }) {
   return (
     <div>
       <ReportCards d={d} />
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card className="lg:col-span-2" title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}>
           <Approvals items={d.approvals || []} reload={reload} canDecide={canDecide} />
         </Card>
         <AlertsCard d={d} />
       </div>
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card title={h('opsBoard')} denied={den('machines')} empty={!data.board.machinesWithoutEntry.length} emptyText={`✔ ${h('noEntry')}: 0`}>
           <div className="text-xs font-bold uppercase text-char-500 mb-1">{h('noEntry')}</div>
-          <div className="flex flex-wrap gap-1.5">{data.board.machinesWithoutEntry.map((m) => <Link key={m.id} href="/machines?new=1" className="badge-amber min-h-[32px]">{m.name}</Link>)}</div>
+          <div className="flex flex-wrap gap-1.5">{data.board.machinesWithoutEntry.slice(0, 12).map((m) => <Link key={m.id} href="/machines?new=1" className="badge-amber min-h-[32px]">{m.name}</Link>)}
+            {data.board.machinesWithoutEntry.length > 12 && <Link href="/machines" className="badge-gray min-h-[32px]">+{data.board.machinesWithoutEntry.length - 12} {h('more')} →</Link>}</div>
         </Card>
         <Card title={h('toCheck')} href="/daily-report" empty={!data.board.reportsToCheck}><div className="text-3xl font-extrabold">{data.board.reportsToCheck}</div></Card>
         <Card title={h('overdue')} href="/tasks" empty={!data.board.overdueTasks.length}>
           {data.board.overdueTasks.map((t) => <div key={t._id} className="text-sm py-1.5 border-b border-sand-100 last:border-0"><b>{t.title}</b> <span className="text-char-500">· {t.assignedName} · {fmtDate(t.dueDate)}</span></div>)}
         </Card>
       </div>
-      <div className="grid lg:grid-cols-2 gap-4 mt-4"><StockCard d={d} /></div>
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4"><StockCard d={d} /></div>
     </div>
   );
 }
@@ -50,7 +51,7 @@ export function AccountantHome({ data, reload, canDecide }) {
   return (
     <div>
       <ReportCards d={{ sales: d.sales, expenses: d.expenses, cash: d.cash }} />
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card title={h('ageing')} denied={den('ageing')} empty={!m.ageing || !m.ageing.total} className="lg:col-span-2">
           {m.ageing && <>
             <AgeingChart data={m.ageing.buckets} />
@@ -68,7 +69,7 @@ export function AccountantHome({ data, reload, canDecide }) {
           {m.payables.map((p, i) => <div key={i} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span className="truncate">{p.supplierName}<div className="text-[11px] text-char-500">{p.billNo} · {fmtDate(p.dueDate)}</div></span><b>{inr(p.outstanding)}</b></div>)}
         </Card>
       </div>
-      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card title={h('unbilled')} href="/sales" empty={!m.invoicesPending.length} emptyText="✔">
           {m.invoicesPending.map((s) => <Link key={s._id} href={`/sales/${s._id}`} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0 min-h-[40px]"><span className="truncate">{s.saleNo} · {s.customerName}</span><b>{inr(s.total)}</b></Link>)}
           {m.deliveredWithoutEway > 0 && <div className="mt-2 text-xs text-amber-800">{h('noEway')}: <b>{m.deliveredWithoutEway}</b></div>}
@@ -80,7 +81,7 @@ export function AccountantHome({ data, reload, canDecide }) {
           {m.checklist.map((c) => <div key={c.key} className="flex items-center gap-2 text-sm py-1"><span className={c.ok ? 'text-emerald-600' : 'text-red-500'}>{c.ok ? '✔' : '✘'}</span><span className="flex-1">{c.key}</span><span className="text-[11px] text-char-500">{c.detail}</span></div>)}
         </Card>
       </div>
-      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
         <Card title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}><Approvals items={d.approvals || []} reload={reload} canDecide={canDecide} /></Card>
         <Card title={h('exports')}>
           <div className="flex flex-wrap gap-2">
@@ -152,7 +153,7 @@ export function SupervisorHome({ data, reload }) {
         </div>
         <p className="text-[11px] text-char-500 mt-3">P = {h('present')} · A = {h('absent')} · ½ · OT · L = {h('leave')}</p>
       </Card>
-      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
         <Card title={h('toCheck')} denied={den('reports')} empty={!data.reports?.toCheck?.length} emptyText="✔">
           {(data.reports?.toCheck || []).map((r) => (
             <div key={r._id} className="border-b border-sand-100 last:border-0 py-2.5">
@@ -192,7 +193,7 @@ export function SalespersonHome({ data }) {
         <StatCard label={h('myToday')} value={inrShort(data.mine?.today ?? 0)} sub={`${data.mine?.todayOrders ?? 0} orders`} tone="terra" href="/sales" />
         <StatCard label={h('myMonth')} value={inrShort(data.mine?.month ?? 0)} sub={`${data.mine?.monthOrders ?? 0} orders`} href="/sales" />
       </div>
-      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
         <Card title={h('openQuotes')} href="/sales" empty={!data.open.length}>
           {data.open.map((s) => <Link key={s._id} href={`/sales/${s._id}`} className="flex justify-between gap-2 text-sm py-2 border-b border-sand-100 last:border-0 min-h-[44px]"><span className="truncate">{s.saleNo} · {s.customerName}<div className="text-[11px] text-char-500">{fmtDate(s.date)}</div></span><span className="text-right shrink-0"><b>{inr(s.total)}</b><div><Badge tone={s.stage === 'order' ? 'blue' : 'gray'}>{s.stage}</Badge></div></span></Link>)}
         </Card>
@@ -206,7 +207,7 @@ export function SalespersonHome({ data }) {
           ))}
         </Card>
       </div>
-      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
         <Card title={h('stock')} denied={den('stock')}>
           <div className="relative mb-2"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-char-300" /><input className="input pl-9" aria-label={h('searchStock')} placeholder={h('searchStock')} value={q} onChange={(e) => setQ(e.target.value)} /></div>
           {stock.loading && q.trim().length >= 2 && <div className="text-sm text-char-500">…</div>}
@@ -357,7 +358,7 @@ export function PresetHome({ data, reload }) {
     first = (
       <>
         <Link href="/stock" className="btn-primary w-full !min-h-[52px] mb-3"><Plus size={18} /> {h('newMove')}</Link>
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4 items-start">
           <Card title={`${h('store')} (${s?.low?.length ?? 0})`} denied={den('store')} empty={!s?.low?.length} emptyText="✔" href="/stock?low=1">{s?.low?.map((i) => <div key={i._id} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{i.name}</span><b className="text-red-600">{num(i.balance)} / {num(i.minLevel)} {i.unit}</b></div>)}</Card>
           <Card title={h('moveToday')} empty={!s?.movementsToday?.length}>{s?.movementsToday?.map((m, i) => <div key={i} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{m.itemName}</span><span>{m.type} {num(m.qty)} {m.status === 'pending' && <Badge tone="amber">pending</Badge>}</span></div>)}</Card>
         </div>
@@ -366,7 +367,7 @@ export function PresetHome({ data, reload }) {
   } else if (k === 'mechanic') {
     const w = data.workshop;
     first = (
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
         <Card title={`${h('workshop')} (${w?.open?.length ?? 0})`} denied={den('workshop')} empty={!w?.open?.length} emptyText="✔" href="/repairs?status=open">{w?.open?.map((r) => <div key={r._id} className="text-sm py-2 border-b border-sand-100 last:border-0"><b>{r.machineName}</b> <span className="text-char-500">· {fmtDate(r.date)}</span><div>{r.problem}</div></div>)}</Card>
         <Card title={h('serviceDue')} href="/repairs" empty={!w?.serviceDue?.length} emptyText="✔">{w?.serviceDue?.map((m, i) => <div key={i} className="flex justify-between text-sm py-1.5"><span>{m.name}</span><b>{fmtDate(m.due)}</b></div>)}</Card>
       </div>
@@ -394,7 +395,7 @@ export function PresetHome({ data, reload }) {
     first = (
       <>
         <Link href="/blocks" className="btn-primary w-full !min-h-[52px] mb-3"><Plus size={18} /> {h('newBlock')}</Link>
-        <div className="grid lg:grid-cols-2 gap-4">
+        <div className="grid lg:grid-cols-2 gap-4 items-start">
           <Card title={`${h('yard')} (${y?.inYard?.length ?? 0})`} denied={den('yard')} empty={!y?.inYard?.length} href="/blocks">{y?.inYard?.map((b) => <div key={b.blockNo} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>#{b.blockNo} · {b.rawanna}</span><b>{num(b.cft)} CFT</b></div>)}</Card>
           <Card title={h('trucksIn')} empty={!y?.trucksInToday?.length}>{y?.trucksInToday?.map((t, i) => <div key={i} className="text-sm py-1.5">{t.truckNo} · {t.kind}</div>)}</Card>
         </div>

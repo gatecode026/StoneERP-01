@@ -62,9 +62,10 @@ describe('sign-in belongs to the employee profile', () => {
     expect(await User.findOne({ username: '9829055555' }).lean()).toMatchObject({ name: 'Ramesh K Meena' });
     await api.create(owner, 'employees', emp({ name: 'Other', mobile: '9829099999' }));
     const other = (await api.list(owner, 'employees', 'q=Other')).json.data[0];
-    expect((await api.patch(owner, 'employees', other._id, { mobile: '9829055555' })).status).toBe(200); // fine: Other has no sign-in
-    const clash = await api.create(owner, 'employees', emp({ name: 'Third', mobile: '9829055555', login: { enabled: true, role: 'worker', password: PW } }));
+    expect((await api.patch(owner, 'employees', other._id, { mobile: '9829055555', _confirmed: true })).status).toBe(200); // fine once confirmed: Other has no sign-in
+    const clash = await api.create(owner, 'employees', emp({ name: 'Third', mobile: '9829055555', _confirmed: true, login: { enabled: true, role: 'worker', password: PW } }));
     expect(clash.status).toBe(409); // that mobile is already someone's sign-in ID
+    expect(clash.json.error.code).not.toBe('CONFIRM_REQUIRED'); // a real conflict, not just the shared-mobile warning
     expect(await Employee.countDocuments({ name: 'Third' })).toBe(0); // all-or-nothing: no half-created profile
   });
 
@@ -79,7 +80,7 @@ describe('sign-in belongs to the employee profile', () => {
   it('rules: needs a mobile and a password; only those allowed to manage sign-ins; Owner role is Owner-only', async () => {
     expect((await api.create(owner, 'employees', emp({ name: 'No Mobile', mobile: undefined, login: { enabled: true, role: 'worker', password: PW } }))).status).toBe(400);
     expect((await api.create(owner, 'employees', emp({ name: 'No Pass', mobile: '9829011111', login: { enabled: true, role: 'worker' } }))).status).toBe(400);
-    expect((await api.create(owner, 'employees', emp({ name: 'Weak', mobile: '9829022222', login: { enabled: true, role: 'worker', password: 'password' } }))).status).toBe(400);
+    expect((await api.create(owner, 'employees', emp({ name: 'Too short', mobile: '9829022222', login: { enabled: true, role: 'worker', password: '12345' } }))).status).toBe(400);
     const m = await api.create(mgr, 'employees', ({ name: 'By Manager', job: 'Helper', mobile: '9829033333', login: { enabled: true, role: 'worker', password: PW } } as any));
     expect(m.status).toBe(403); // a manager cannot create sign-ins
     expect((await api.create(mgr, 'employees', { name: 'Plain By Manager', job: 'Helper', mobile: '9829044444' })).status).toBe(201); // but can add the profile
@@ -90,5 +91,57 @@ describe('sign-in belongs to the employee profile', () => {
   it('a leaver can no longer sign in', async () => {
     expect((await api.patch(owner, 'employees', id, { status: 'left' })).status).toBe(200);
     await expect(loginWithPassword({ username: '9829055555', password: PW })).rejects.toThrow();
+  });
+});
+
+describe('sign-in with an email', () => {
+  it('an account with an email signs in with it (any letter case) or with its mobile; others cannot use it', async () => {
+    await User.create({ username: '9000000099', email: 'Admin@Example.com', name: 'Admin', role: 'owner', passwordHash: await (await import('@/lib/auth/password')).hashPassword('admin@1234'), mustChangePassword: false });
+    expect(((await loginWithPassword({ username: 'admin@example.com', password: 'admin@1234' })) as any).user.username).toBe('9000000099');
+    expect(((await loginWithPassword({ username: ' ADMIN@example.com ', password: 'admin@1234' })) as any).user.username).toBe('9000000099');
+    expect(((await loginWithPassword({ username: '9000000099', password: 'admin@1234' })) as any).user.username).toBe('9000000099');
+    await expect(loginWithPassword({ username: 'admin@example.com', password: 'wrong-pass-1' })).rejects.toMatchObject({ status: 401 });
+    await expect(loginWithPassword({ username: 'nobody@example.com', password: 'admin@1234' })).rejects.toMatchObject({ status: 401 });
+    await expect(loginWithPassword({ username: 'not-an-email@', password: 'admin@1234' })).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe('the starting password in the employee form', () => {
+  it('can be a simple one such as 123456, but not shorter than 6; the person must change it to a strong one', async () => {
+    const short = await api.create(owner, 'employees', emp({ name: 'Short Pass', mobile: '9829077001', login: { enabled: true, role: 'worker', password: '12345' } }));
+    expect(short.status).toBe(400);
+    expect(JSON.stringify(short.json.error.details)).toContain('at least 6');
+    const ok = await api.create(owner, 'employees', emp({ name: 'Simple Pass', mobile: '9829077002', login: { enabled: true, role: 'worker', password: '123456' } }));
+    expect(ok.status).toBe(201);
+    const session: any = await loginWithPassword({ username: '9829077002', password: '123456' });
+    expect(session.user.mustChangePassword).toBe(true); // forced to choose a strong password at first sign-in
+  });
+});
+
+describe('cancelling an employee profile', () => {
+  it('switches off their sign-in at once, including a session that is already open', async () => {
+    const r = await api.create(owner, 'employees', emp({ name: 'Cancelled By Mistake', mobile: '9829088001', login: { enabled: true, role: 'worker', password: PW } }));
+    expect(r.status).toBe(201);
+    const session: any = await loginWithPassword({ username: '9829088001', password: PW });
+    const who = { cookie: `${(await import('@/lib/auth/session')).cookieName()}=${session.cookieValue}`, id: String(session.user._id), username: '9829088001', role: 'worker', preset: null };
+    expect((await api.void(owner, 'employees', r.json._id)).status).toBe(200);
+    await expect(loginWithPassword({ username: '9829088001', password: PW })).rejects.toThrow();
+    expect((await api.get(who as any, 'employees', r.json._id)).status).toBe(401); // the open session stops working too
+  });
+});
+
+describe('the same mobile on two employee profiles', () => {
+  it('asks before saving, and saves when confirmed', async () => {
+    const a = await api.create(owner, 'employees', emp({ name: 'First Phone', mobile: '9829099001' }));
+    expect(a.status).toBe(201);
+    const dup = await api.create(owner, 'employees', emp({ name: 'Second Phone', mobile: '9829099001' }));
+    expect(dup.status).toBe(409);
+    expect(dup.json.error).toMatchObject({ code: 'CONFIRM_REQUIRED' });
+    expect(dup.json.error.message).toContain('First Phone');
+    expect((await api.create(owner, 'employees', emp({ name: 'Second Phone', mobile: '9829099001', _confirmed: true }))).status).toBe(201);
+    const c = await api.create(owner, 'employees', emp({ name: 'Third Phone', mobile: '9829099002' }));
+    expect((await api.patch(owner, 'employees', c.json._id, { mobile: '9829099001' })).status).toBe(409); // changing to a used number asks too
+    expect((await api.patch(owner, 'employees', c.json._id, { name: 'Third Renamed' })).status).toBe(200); // other edits do not
+    expect((await api.patch(owner, 'employees', a.json._id, { rate: 600 })).status).toBe(200); // and a profile never clashes with itself
   });
 });

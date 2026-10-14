@@ -9,6 +9,8 @@ function model<T>(name: string, schema: Schema<T>): Model<T> {
 const userSchema = new Schema(
   {
     username: { type: String, required: true, unique: true, match: /^[6-9]\d{9}$/ },
+    // optional: lets the person sign in with this email instead of the mobile number
+    email: { type: String, lowercase: true, trim: true, maxlength: 120 },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: BASE_ROLES, required: true },
@@ -33,6 +35,7 @@ const userSchema = new Schema(
   { timestamps: true }
 );
 userSchema.index({ role: 1, active: 1 });
+userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
 
 /** Server-side session. The cookie carries a random token; only its SHA-256 is stored, so a DB leak cannot be replayed. */
 const sessionSchema = new Schema(

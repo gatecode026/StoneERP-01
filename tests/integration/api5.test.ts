@@ -285,7 +285,7 @@ describe('scheduled jobs', () => {
     expect(a.json.result.queued).toBe(1);
     const n = await Notification.findOne({ kind: 'daily-report' }).lean() as any;
     expect(n.to).toBe(owner.username);
-    expect(n.status).toBe('queued');
+    expect(n.status).toBe('manual'); // no WhatsApp account in tests, so the job parks it for a manual send
     expect(n.text).toMatch(/VSS daily report/);
     await run('daily-report', '?force=1');
     expect(await Notification.countDocuments({ kind: 'daily-report', _id: new RegExp(day) })).toBe(1); // dedupe key

@@ -43,7 +43,7 @@ beforeAll(async () => {
     ['E001', 'Ramesh Meena', 'Gang saw operator', 'E900', 'monthly', 16000], ['E002', 'Sunil Gurjar', 'Helper', 'E900', 'daily', 500], ['E003', 'Mohan Jat', 'Polisher', 'E999', 'piece', 2],
     ['E900', 'Sup Visor', 'Supervisor', undefined, 'monthly', 21000], ['E901', 'Sales Man', 'Salesperson', undefined, 'monthly', 19000],
   ] as const) {
-    const r = await api.create(owner, 'employees', { empCode, name, job, supervisorCode, payType, rate, pieceUnit: payType === 'piece' ? 'sqft' : undefined, mobile: '9829000000', bankAccount: '123456789012', aadhaarNo: '123412341234' });
+    const r = await api.create(owner, 'employees', { empCode, name, job, supervisorCode, payType, rate, pieceUnit: payType === 'piece' ? 'sqft' : undefined, mobile: '9829000000', bankAccount: '123456789012', aadhaarNo: '123412341234', _confirmed: true }); // the fixtures share one phone number
     expect(r.status, JSON.stringify(r.json)).toBe(201);
   }
   const mk = async (body: any) => (await api.create(owner, 'stockitems', body)).json;

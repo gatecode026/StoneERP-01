@@ -8,6 +8,8 @@ import { getEffectivePerm } from '../perm/engine';
 import { buildDailyReport } from '../services/report';
 import { computeReminders, precomputeScorecards } from '../services/analytics';
 import { reconcile } from '../rollup/dailySummary';
+import { runBackup } from '../backup';
+import { sendQueued } from '../notify/whatsapp';
 import { addDays, daysBetween, monthOf, monthStart, todayIST } from '../time';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore  plain-JS module shared with the browser
@@ -45,7 +47,7 @@ export const JOBS: Record<string, JobDef> = {
       const { user, mobile, perm } = await owner();
       const data = await buildDailyReport(date, user, perm, await getSettings());
       const queued = await queue([{ _id: `daily-report:${date}:${mobile}`, to: mobile, kind: 'daily-report', text: reportText(data, 'en'), meta: { date } }]);
-      return { date, queued };
+      return { date, queued, delivery: await sendQueued() };
     },
   },
   'payment-reminders': {
@@ -59,9 +61,13 @@ export const JOBS: Record<string, JobDef> = {
         text: `Namaste ${r.customerName}, a payment of ₹${Math.round(r.amount ?? 0).toLocaleString('en-IN')} is pending with Vipul Stone Suppliers. Please arrange it at your earliest. Thank you.`,
         meta: { saleId: r.ref },
       }));
-      return { due: rows.length, queued: await queue(rows) };
+      const queued = await queue(rows);
+      return { due: rows.length, queued, delivery: await sendQueued() };
     },
   },
+  // retries messages that could not be delivered the first time; period is the hour, so it can run every hour
+  'send-notifications': { period: () => `${todayIST()}T${new Date(Date.now() + 19_800_000).toISOString().slice(11, 13)}`, run: async () => ({ ...(await sendQueued()) }) },
+  backup: { period: todayIST, run: (date) => runBackup(date) as Promise<Record<string, unknown>> },
   reconcile: {
     period: todayIST,
     async run(date) {

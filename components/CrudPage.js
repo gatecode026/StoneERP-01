@@ -310,7 +310,7 @@ export default function CrudPage({
         <PageHeader title={title} subtitle={subtitle}
           actions={<>
             {headerExtra}
-            {exportName && rows.length > 0 && can(model, 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/${model}?${toQuery(params)}`)} />}
+            {exportName && rows.length > 0 && can(model, 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/${model}?format=xlsx&${toQuery(params)}`)} />}
             {mayAdd && <button className="btn-primary" onClick={openNew}><Plus size={18} /> {addLabel || t('add')}</button>}
           </>} />
       )}
