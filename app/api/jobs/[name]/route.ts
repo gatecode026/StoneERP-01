@@ -24,7 +24,7 @@ const handler = route({ auth: 'none', csrf: false }, async (ctx) => {
   const name = ctx.params.name;
   if (name === 'status') return { runs: await recentRuns() };
   const period = ctx.query.get('period') ?? undefined;
-  if (period && !/^\d{4}-\d{2}(-\d{2})?$/.test(period)) throw badRequest('period must be YYYY-MM-DD or YYYY-MM');
+  if (period && !/^\d{4}-\d{2}(-\d{2}(T\d{2})?)?$/.test(period)) throw badRequest('period must be YYYY-MM-DD, YYYY-MM-DDThh or YYYY-MM');
   if (period?.length === 10 && !isISODate(period)) throw badRequest('Invalid period');
   return runJob(name, { period, force: ctx.query.get('force') === '1', trigger: ctx.query.has('period') || ctx.query.has('force') ? 'manual' : 'cron' });
 });

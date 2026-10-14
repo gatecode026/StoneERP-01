@@ -18,7 +18,7 @@ export default function AuditPage() {
   return (
     <RoleGuard perm="auditlogs">
       <PageHeader title={t('audit')} subtitle="Nothing is deleted. Every change shows who changed it and when."
-        actions={can('auditlogs', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/auditlogs?${toQuery(params)}`)} />} />
+        actions={can('auditlogs', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/auditlogs?format=xlsx&${toQuery(params)}`)} />} />
       <div className="mb-3"><select aria-label="Record type" className="input !w-auto min-w-[180px]" value={model} onChange={(e) => setModel(e.target.value)}><option value="">All records</option>{MODELS.map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
       <DataList loading={loading} rows={rows} columns={[
         { key: 'at', label: 'When', primary: true, render: (r) => fmtDateTime(r.at) },

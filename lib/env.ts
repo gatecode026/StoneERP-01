@@ -19,6 +19,7 @@ const schema = z.object({
   OTP_PROVIDER: z.enum(['none', 'console', 'msg91', 'twilio']).default('none'),
   OTP_API_KEY: z.string().optional(),
   CRON_SECRET: z.string().optional(),
+  BACKUP_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14), // nightly backups older than this are removed from storage
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

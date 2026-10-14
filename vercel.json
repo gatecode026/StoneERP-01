@@ -13,6 +13,10 @@
       "schedule": "30 20 * * *"
     },
     {
+      "path": "/api/jobs/backup",
+      "schedule": "0 21 * * *"
+    },
+    {
       "path": "/api/jobs/scorecards",
       "schedule": "30 21 1 * *"
     }
