@@ -78,7 +78,7 @@ body { font-family: system-ui, 'Segoe UI', var(--font-deva), 'Noto Sans Devanaga
 /* tab rows scroll sideways; a soft edge shows there is more */
 @media (max-width: 767px) { .tabs-row { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); scroll-snap-type: x proximity; } .tabs-row > * { scroll-snap-align: start; } }
 /* nothing may push the page wider than the phone */
-html, body { max-width: 100%; overflow-x: hidden; }
+html, body { max-width: 100%; overflow-x: clip; }
 img, video, canvas, svg { max-width: 100%; }
 @media (max-width: 480px) { .card { border-radius: 1rem; } }
 .tabs-row { scroll-padding-left: 1rem; scroll-padding-right: 1rem; }
