@@ -35,7 +35,19 @@ export async function api(path: string, { method = 'GET', body, headers }: { met
   if (!res.ok) {
     // standard envelope: { error: { code, message, details } }; details (e.g. { confirmable: true }) is flattened into .data
     const e = data?.error;
-    const message = (typeof e === 'string' ? e : e?.message) || `Error ${res.status}`;
+    let message = (typeof e === 'string' ? e : e?.message) || `Error ${res.status}`;
+    // a rejected form: say WHICH field and why ("Password: Password must be at least 8 characters"), not just "Some fields are not valid"
+    if (e?.code === 'VALIDATION' && Array.isArray(e.details) && e.details.length) {
+      const words = (p: string) => { const w = String(p).split('.').pop()!.replace(/([A-Z])/g, ' $1').toLowerCase().trim(); return w.charAt(0).toUpperCase() + w.slice(1); };
+      const seen = new Set<string>();
+      const parts: string[] = [];
+      for (const d of e.details as { path?: string; message?: string }[]) {
+        const label = words(d.path ?? '');
+        const text = d.message && label && !d.message.toLowerCase().includes(label.toLowerCase()) ? `${label}: ${d.message}` : d.message || label;
+        if (text && !seen.has(text)) { seen.add(text); parts.push(text); }
+      }
+      if (parts.length) message = parts.slice(0, 3).join(' · ') + (parts.length > 3 ? ` · +${parts.length - 3} more` : '');
+    }
     throw new ApiError(message, res.status, { ...(typeof e === 'object' && e ? { code: e.code, ...(e.details && typeof e.details === 'object' && !Array.isArray(e.details) ? e.details : { details: e.details }) } : {}) });
   }
   return data;

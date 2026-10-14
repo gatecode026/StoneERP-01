@@ -208,3 +208,15 @@ Checked at 360 px on all 23 sidebar screens (no horizontal overflow anywhere) an
 | PDF gaps | **Not built.** Invoices, salary slips and gate passes have print pages (browser "Save as PDF") and WhatsApp text sharing. Generating PDFs on the server needs a PDF library plus Devanagari text shaping; it is a separate piece of work and was left out rather than shipped with broken Hindi. |
 
 **Tests:** settings (5), backup/restore (4), health (2), notifications (8), Excel export (2), Tally (3 + 3 unit), error alerts (3).
+
+## Live end-to-end pass and fixes  ✅
+
+A scripted end-to-end run against the live site as the Owner (read sweep of 25 screens and every list; then employee + sign-in, customer, supplier, stock item + stock out, machine, task, expense and the books, permission and tampering checks, each test record voided afterwards) found:
+
+| Finding | Fix |
+|---|---|
+| Employee form with starting password `123456` was refused (8+ letters and numbers) while the Excel import hands out `123456`; the screen only said "Some fields are not valid" | The starting password only needs 6+ characters (the person must choose a strong one at first sign-in); every refused form now names the field and reason ("Password must be at least 6 characters"). |
+| A cancelled (voided) employee could still sign in | Cancelling a profile switches the sign-in off at once, including open sessions. |
+| Two employee profiles could share a mobile number silently | The form asks "<name> (E046) already has this mobile number. Save anyway?" (imports confirm automatically). |
+
+Also seen on live, not bugs: `/settings` and `/api/notifications` return 404 because live runs the pre-Phase-7 `main`; every request takes about 1.1 s (see the Phase 8 latency check). The run left only voided test records (and their audit entries) on live.

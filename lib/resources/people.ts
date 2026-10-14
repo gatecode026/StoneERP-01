@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { Advance, Attendance, DailyReport, Employee, Leave, PerfRemark, SafetyRecord, Task } from '../models';
 import type { ResourceDef } from '../api/resource';
-import { badRequest, conflict, forbidden } from '../errors';
+import { badRequest, confirmable, conflict, forbidden } from '../errors';
 import { encryptField } from '../crypto';
 import { addDays, daysBetween, todayIST } from '../time';
 import { employeeByCode } from '../services/lookup';
@@ -43,6 +43,13 @@ function sealEmployee(doc: Record<string, any>, prev?: any) {
 
 const pendingLogin = new WeakMap<object, { login: LoginInput; auth: AuthCtx }>(); // the sign-in part of a request, from prepare* to after*
 
+/** The same mobile on two profiles is sometimes right (a shared family phone) but usually a slip: ask before saving. */
+async function warnSharedMobile(ctx: any, mobile: string | undefined, selfId?: unknown) {
+  if (!mobile || ctx.confirmed) return;
+  const other: any = await Employee.findOne({ mobile, isVoid: false, ...(selfId ? { _id: { $ne: selfId } } : {}) }).select('empCode name').session(ctx.session ?? null).lean();
+  if (other) throw confirmable(`${other.name} (${other.empCode}) already has this mobile number. Save anyway?`);
+}
+
 export const employees: ResourceDef = {
   key: 'employees', model: Employee,
   label: (d) => `${d.name} (${d.empCode})`,
@@ -56,6 +63,7 @@ export const employees: ResourceDef = {
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const { login, ...rest } = input as any;
+      await warnSharedMobile(ctx, rest.mobile);
       if (login) pendingLogin.set(ctx, { login, auth });
       const doc: any = { ...rest };
       if (!doc.empCode) doc.empCode = 'E' + String(await nextSeq('emp', ctx.session, 45)).padStart(3, '0');
@@ -67,6 +75,7 @@ export const employees: ResourceDef = {
     },
     async prepareUpdate(ctx, prev, patch, auth) {
       if ('login' in patch) { pendingLogin.set(ctx, { login: patch.login, auth }); delete patch.login; } // never stored on the profile; applied in afterUpdate
+      if (patch.mobile && patch.mobile !== prev.mobile) await warnSharedMobile(ctx, patch.mobile, prev._id);
       if (patch.status === 'left' && !patch.leavingDate && !prev.leavingDate) patch.leavingDate = todayIST();
       if (patch.status === 'active') patch.leavingDate = '';
       return sealEmployee(patch, prev);
@@ -84,6 +93,11 @@ export const employees: ResourceDef = {
         const { User } = await import('../models');
         await User.updateMany({ empCode: doc.empCode }, { $set: { active: false } }, { session: ctx.session });
       }
+    },
+    // a profile cancelled by mistake must not leave a working sign-in behind (sessions check "active" on every request)
+    async beforeVoid(ctx, d) {
+      const { User } = await import('../models');
+      await User.updateMany({ $or: [{ employeeId: d._id }, { empCode: d.empCode }] }, { $set: { active: false } }, { session: ctx.session });
     },
   },
 };

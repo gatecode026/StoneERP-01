@@ -4,7 +4,7 @@ import { Employee, User } from '../models';
 import { BASE_ROLES, PRESETS } from '../roles';
 export { roleOfJob } from '../roles';
 import { badRequest, conflict, forbidden } from '../errors';
-import { hashPassword, mobileSchema, passwordSchema } from '../auth/password';
+import { hashPassword, initialPasswordSchema, mobileSchema } from '../auth/password';
 import { destroyUserSessions } from '../auth/session';
 import { clearTeamCache } from '../perm/engine';
 import { extraAccessSchema } from '../api/userView';
@@ -19,7 +19,7 @@ export const loginSchema = z.object({
   enabled: z.boolean(),
   role: z.enum(BASE_ROLES).optional(),
   preset: z.enum(PRESETS).nullable().optional(),
-  password: passwordSchema.optional(),
+  password: initialPasswordSchema.optional(),
   extraAccess: extraAccessSchema.optional(),
 }).strict();
 export type LoginInput = z.infer<typeof loginSchema>;

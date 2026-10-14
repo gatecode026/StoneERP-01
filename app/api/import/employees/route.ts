@@ -58,7 +58,7 @@ export const POST = withAuth('employees', 'create', async (auth) => {
   const good = checked.filter((r) => r.data);
   if (!good.length) throw badRequest('No valid rows to import');
   for (const r of good) assertWritable(auth.perm, 'employees', Object.keys(r.data!)); // e.g. pay rate or bank account need those rights
-  const base = await auth.svc();
+  const base = await auth.svc({ confirmed: true }); // choosing to import is the confirmation for warnings such as "this mobile is already used"
   const imported = await withTxn(async (session) => {
     const ctx: SvcCtx = { ...base, session };
     // supervisors may be created in the same file, so order does not matter: codes are only text links
