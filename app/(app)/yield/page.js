@@ -10,7 +10,7 @@ import { inr, num, num2, fmtDate } from '@/lib/format';
 const YieldChart = dynamic(() => import('@/components/charts/YieldChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function YieldPage() {
-  const { t } = useApp();
+  const { t, can } = useApp();
   const { data, loading } = useFetch('/api/yield');
   const [tab, setTab] = useState('blocks');
   const d = data;
@@ -36,7 +36,7 @@ export default function YieldPage() {
   return (
     <RoleGuard perm="yield">
       <PageHeader title={t('yield')} subtitle="Stone we got from each block, and what each sq ft really cost"
-        actions={d && <ExportBtn onClick={() => downloadCSV('yield-report', d.rows.filter((r) => r.cut), [{ key: 'blockNo', label: 'Block' }, { key: 'supplierName', label: 'Supplier' }, { key: 'cft', label: 'CFT' }, { key: 'saleable', label: 'Saleable sq ft' }, { key: 'yieldPct', label: 'Yield %' }, ...(showCost ? [{ key: 'totalCost', label: 'Total cost' }, { key: 'costPerSqft', label: 'Cost per sq ft' }] : [])])} />} />
+        actions={d && can('yield', 'export') && <ExportBtn onClick={() => downloadCSV('yield-report', d.rows.filter((r) => r.cut), [{ key: 'blockNo', label: 'Block' }, { key: 'supplierName', label: 'Supplier' }, { key: 'cft', label: 'CFT' }, { key: 'saleable', label: 'Saleable sq ft' }, { key: 'yieldPct', label: 'Yield %' }, ...(showCost ? [{ key: 'totalCost', label: 'Total cost' }, { key: 'costPerSqft', label: 'Cost per sq ft' }] : [])])} />} />
       {d && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <StatCard label="Average yield" value={`${d.avg}%`} tone="terra" />

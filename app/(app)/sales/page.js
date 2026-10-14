@@ -49,7 +49,7 @@ export default function SalesPage() {
       <PageHeader title={t('sales')} subtitle="Quotation → order → dispatch → GST bill → payment"
         actions={<><ImportData resource="sales" perm="sales" noun="orders and quotations" hint="one row per item line; rows with the same Order ref make one order" />
           {can('sales', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/sales?format=xlsx&${toQuery({ ...listParams, ...(dq ? { q: dq } : {}) })}`)} />}
-          <Link href="/sales/new" className="btn-primary"><Plus size={18} /> {t('newQuotation')}</Link>
+          {can('sales', 'create') && <Link href="/sales/new" className="btn-primary"><Plus size={18} /> {t('newQuotation')}</Link>}
         </>} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <StatCard label="Today's sales" value={o?.today?.total != null ? inrShort(o.today.total) : (o?.today?.orders ?? '…')} sub={`${o?.today?.orders ?? 0} orders`} tone="terra" />

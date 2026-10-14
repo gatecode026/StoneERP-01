@@ -24,19 +24,28 @@ const STATES = [
 
 export default function AttendancePage() {
   const { t, can, perm } = useApp();
-  const isWorker = scopeOf(perm, 'attendance', 'create') === 'own';
+  // The screen follows the Roles & permissions exactly:
+  //   See = Own  -> only their own attendance, never a list of other people
+  //   Add = Own  -> they mark themselves (selfie); Add = Team / All -> they mark other people; no Add -> nothing to mark
+  const ownOnly = scopeOf(perm, 'attendance', 'view') === 'own';
+  const isWorker = scopeOf(perm, 'attendance', 'create') === 'own'; // marks only themselves
+  const canMarkOthers = can('attendance', 'create') && !isWorker;
+  const canSelfie = can('attendance', 'create');
+  const leavesOn = can('leaves', 'view');
+  const leaveOwn = scopeOf(perm, 'leaves', 'create') === 'own'; // may only apply for themselves: no "employee" choice
+  const canImportLeaves = can('leaves', 'create') && !leaveOwn;
   const [tab, setTab] = useState('mark');
   const sp = useSearchParams();
   const [date, setDate] = useState(sp.get('date') || todayISO());
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
   // one request builds the whole sheet: a page of people with today's marks merged in, plus exact counts for the whole team
-  const sheet = useNumberedList(isWorker ? null : '/api/attendance/sheet', { date, q: dq }, { size: 25 });
-  const att = useFetch(isWorker ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
+  const sheet = useNumberedList(ownOnly ? null : '/api/attendance/sheet', { date, q: dq }, { size: 25 });
+  const att = useFetch(ownOnly ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
   const [over, setOver] = useState({}); // marks tapped on this screen, shown at once (optimistic)
   const [selfie, setSelfie] = useState(false);
   const [sf, setSf] = useState({ empCode: '', photo: '', loc: '' });
-  const canMark = can('attendance', 'create') && !isWorker;
+  const canMark = canMarkOthers;
 
   useEffect(() => { setOver({}); }, [sheet.rows, date]);
   const view = (e) => ({ ...e, ...(over[e.empCode] || {}) });
@@ -65,14 +74,14 @@ export default function AttendancePage() {
     getLocation().then((l) => setSf((x) => ({ ...x, loc: l.text, geo: l })));
   }
   async function saveSelfie() {
-    if (!isWorker && !sf.empCode) { toast.error('Choose the employee'); return; }
+    if (canMarkOthers && !sf.empCode) { toast.error('Choose the employee'); return; }
     if (!sf.photo) { toast.error('Take a selfie'); return; }
     try {
       const location = sf.geo || { text: sf.loc || 'Location not shared' };
       const body = isWorker ? { selfie: sf.photo, location } : { date, empCode: sf.empCode, state: 'present', selfie: sf.photo, location };
       const r = await submit('/api/attendance', body, { label: 'Selfie attendance' });
       toast.success(r.queued ? t('offline') : 'Attendance marked with selfie ✔');
-      setSelfie(false); setSf({ empCode: '', photo: '', loc: '' }); isWorker ? att.reload() : sheet.reload();
+      setSelfie(false); setSf({ empCode: '', photo: '', loc: '' }); ownOnly ? att.reload() : sheet.reload?.();
     } catch (e) { toast.error(e.message); }
   }
 
@@ -82,26 +91,30 @@ export default function AttendancePage() {
 
   const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> <span className="sm:hidden">Selfie</span><span className="hidden sm:inline">{t('selfie')}</span></button>;
 
+  const tabsEl = leavesOn && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Attendance' }, { key: 'leaves', label: 'Leave requests' }]} />;
+  const showMark = tab === 'mark' || !leavesOn;
+
   return (
     <RoleGuard perm="attendance">
-      <PageHeader title={t('attendance')} subtitle={isWorker ? 'Your attendance this month' : 'Mark your team — present, absent, half day, overtime or leave'}
-        actions={<>{!isWorker && (tab === 'leaves' ? <ImportData resource="leaves" perm="leaves" noun="leave requests" /> : <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />)}{!isWorker && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}{selfieBtn}</>} />
+      {tabsEl}
+      {showMark && (
+        <PageHeader title={t('attendance')} subtitle={ownOnly ? 'Your attendance this month' : canMarkOthers ? 'Mark your team — present, absent, half day, overtime or leave' : 'Your team\'s attendance (view only)'}
+          actions={<>{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}{canSelfie && selfieBtn}</>} />
+      )}
 
-      {!isWorker && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Mark attendance' }, { key: 'leaves', label: 'Leave requests' }]} />}
-
-      {isWorker && (
+      {showMark && ownOnly && (
         att.loading ? <SkeletonList /> : (att.data || []).length ? (
           <DataList rows={att.data} columns={[{ key: 'date', label: 'Date', primary: true, render: (r) => fmtDate(r.date) }, { key: 'state', label: 'Status', render: (r) => <Badge tone={r.state === 'absent' ? 'red' : r.state === 'leave' ? 'blue' : r.state === 'half' ? 'amber' : 'green'}>{r.state}</Badge> }, { key: 'method', label: 'How', render: (r) => r.method || '—' }]} />
         ) : <Empty text="No attendance marked yet this month" />
       )}
 
-      {!isWorker && tab === 'mark' && (
+      {showMark && !ownOnly && (
         <>
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
             {STATES.map((s) => <StatCard key={s.v} label={s.label} value={counts(s.v)} />)}
             <StatCard label="Not marked" value={unmarked} tone={unmarked ? 'amber' : 'green'} />
           </div>
-          <div className="flex gap-2 mb-3 flex-wrap"><SearchBox value={q} onChange={setQ} placeholder="Search name or job…" />{canMark && <button className="btn-green" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}</div>
+          <div className="flex gap-2 mb-3 flex-wrap"><SearchBox value={q} onChange={setQ} placeholder="Search name or job…" />{canMark && unmarked > 0 && <button className="btn-green" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}</div>
           {sheet.loading ? <SkeletonList n={6} /> : (
             <div className="space-y-2.5">
               {sheet.rows.map((r) => {
@@ -117,14 +130,18 @@ export default function AttendancePage() {
                         {!m.state && <Badge tone="amber">not marked</Badge>}
                       </div>
                     </div>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {STATES.map((s) => (
-                        <button key={s.v} aria-label={s.label} disabled={!canMark} onClick={() => mark(e, s.v)}
-                          className={cx('min-h-[46px] rounded-xl border text-sm font-bold transition active:scale-95 disabled:opacity-60', m?.state === s.v ? s.on : 'bg-white border-sand-300 text-char-700')}>
-                          <span className="md:hidden">{s.short}</span><span className="hidden md:inline">{s.label}</span>
-                        </button>
-                      ))}
-                    </div>
+                    {canMark && r.markable ? (
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {STATES.map((s) => (
+                          <button key={s.v} aria-label={s.label} onClick={() => mark(e, s.v)}
+                            className={cx('min-h-[46px] rounded-xl border text-sm font-bold transition active:scale-95', m?.state === s.v ? s.on : 'bg-white border-sand-300 text-char-700')}>
+                            <span className="md:hidden">{s.short}</span><span className="hidden md:inline">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm">{m?.state ? <Badge tone={m.state === 'absent' ? 'red' : m.state === 'leave' ? 'blue' : m.state === 'half' ? 'amber' : 'green'}>{STATES.find((x) => x.v === m.state)?.label || m.state}</Badge> : <span className="text-char-500">Not marked</span>}</div>
+                    )}
                   </div>
                 );
               })}
@@ -135,9 +152,9 @@ export default function AttendancePage() {
         </>
       )}
 
-      {!isWorker && tab === 'leaves' && (
-        <CrudPage model="leaves" title="Leave requests" label="Leave request" noHeader sort="-createdAt" searchKeys={['empName', 'reason']}
-          fields={[{ name: 'empCode', label: 'Employee', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'empName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } }, { name: 'from', label: 'From', type: 'date', required: true }, { name: 'to', label: 'To', type: 'date', required: true }, { name: 'reason', label: 'Reason', wide: true }]}
+      {leavesOn && tab === 'leaves' && (
+        <CrudPage model="leaves" title="Leave requests" label="Leave request" subtitle={leaveOwn ? 'Apply for leave and see your requests' : 'Requests from your team'} headerExtra={canImportLeaves && <ImportData resource="leaves" perm="leaves" noun="leave requests" />} addLabel={leaveOwn ? 'Apply for leave' : undefined} canEdit={(r) => r.status === 'pending'} sort="-createdAt" searchKeys={['empName', 'reason']}
+          fields={[...(leaveOwn ? [] : [{ name: 'empCode', label: 'Employee', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'empName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } }]), { name: 'from', label: 'From', type: 'date', required: true }, { name: 'to', label: 'To', type: 'date', required: true }, { name: 'reason', label: 'Reason', wide: true }]}
           columns={[{ key: 'empName', label: 'Employee', primary: true }, { key: 'from', label: 'From', render: (r) => fmtDate(r.from) }, { key: 'to', label: 'To', render: (r) => fmtDate(r.to) }, { key: 'reason', label: 'Reason' }, { key: 'status', label: 'Status', render: (r) => <Badge tone={r.status === 'approved' ? 'green' : r.status === 'rejected' ? 'red' : 'amber'}>{r.status}</Badge> }]}
           rowActions={(row, { reload }) => (row.status === 'pending' && can('leaves', 'approve') ? ['approve', 'reject'].map((a) => ({ label: a === 'approve' ? 'Approve' : 'Reject', tone: a === 'approve' ? 'green' : undefined, icon: a === 'approve' ? <Check size={14} /> : <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'leaves', id: row._id, action: a } }); toast.success(a === 'approve' ? 'Leave approved' : 'Rejected'); reload(); } catch (e) { toast.error(e.message); } } })) : [])} />
       )}
@@ -145,7 +162,7 @@ export default function AttendancePage() {
       <Sheet open={selfie} onClose={() => setSelfie(false)} title={t('selfie')}
         footer={<><button className="btn-outline flex-1" onClick={() => setSelfie(false)}>Cancel</button><button className="btn-primary flex-[2]" onClick={saveSelfie}>Mark present</button></>}>
         <div className="space-y-4">
-          {!isWorker && (
+          {canMarkOthers && (
             <Field label="Employee" required><LookupSelect kind="employees" by="empCode" value={sf.empCode} onChange={(it) => setSf({ ...sf, empCode: it ? it.id : '' })} /></Field>
           )}
           <Field label="Selfie" required><PhotoInput value={sf.photo} onChange={(p) => setSf({ ...sf, photo: p })} label="Take selfie" capture="user" /></Field>
