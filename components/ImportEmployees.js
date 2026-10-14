@@ -1,9 +1,11 @@
 'use client';
 import { useRef, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { Sheet, Badge } from '@/components/ui';
 import { useApp } from '@/components/Providers';
+import T from '@/components/T';
+import { trNow } from '@/lib/trNow';
 
 // "Import from Excel": download the template, pick the filled file, check it (nothing is saved yet), then import the good rows.
 async function post(file, commit) {
@@ -36,7 +38,7 @@ export default function ImportEmployees() {
     setBusy(true);
     try {
       const r = await post(file, true);
-      toast.success(`${r.imported} employee${r.imported === 1 ? '' : 's'} imported${r.logins ? ` · ${r.logins} can sign in with their mobile number and password ${r.defaultPassword}` : ''}`, { duration: 9000 });
+      toast.success((r.imported === 1 ? trNow('1 employee imported') : trNow('{n} employees imported', { n: r.imported })) + (r.logins ? ' · ' + trNow('{n} can sign in with their mobile number and password {p}', { n: r.logins, p: r.defaultPassword }) : ''), { duration: 9000 });
       window.dispatchEvent(new Event('vss-data-changed'));
       setOpen(false); reset();
     } catch (e) { toast.error(e.message); }
@@ -53,10 +55,10 @@ export default function ImportEmployees() {
         </>}>
         <div className="space-y-4">
           <ol className="text-sm text-char-700 list-decimal pl-5 space-y-1">
-            <li>Download the sheet and fill one row per person (only <b>Name</b> and <b>Job</b> are required).</li>
-            <li>Choose the filled file (.xlsx or .csv). It is checked first — nothing is saved yet.</li>
+            <li><T>Download the sheet and fill one row per person (only Name and Job are required).</T></li>
+            <li><T>Choose the filled file (.xlsx or .csv). It is checked first — nothing is saved yet.</T></li>
             <li>{t('imp3')}</li>
-            <li>Everyone with a valid mobile number can then sign in with that number and the password <b>123456</b>. Change a password any time from Employees → edit → Password.</li>
+            <li><T>Everyone with a valid mobile number can then sign in with that number and the password 123456. Change a password any time from Employees → edit → Password.</T></li>
           </ol>
           <a className="btn-outline btn-sm inline-flex" href="/api/import/employees" download><Download size={14} /> {t('impTemplate')}</a>
           <div>
@@ -69,10 +71,10 @@ export default function ImportEmployees() {
               <div className="flex flex-wrap gap-2 mb-2">
                 <Badge tone="gray">{t('impRows', { n: res.total })}</Badge>
                 <Badge tone="green">{t('impReady', { n: res.valid })}</Badge>
-                {res.invalid > 0 && <Badge tone="red">{res.invalid} need fixing</Badge>}
+                {res.invalid > 0 && <Badge tone="red"><T vars={{ n: res.invalid }}>{'{n} need fixing'}</T></Badge>}
               </div>
               {res.unknownColumns?.length > 0 && <p className="text-xs text-amber-700 mb-2">{t('impIgnored')}: {res.unknownColumns.join(', ')}</p>}
-              {res.invalid > 0 && <p className="text-xs text-char-500 mb-2">Rows with a problem are skipped. Existing employee codes are never overwritten.</p>}
+              {res.invalid > 0 && <p className="text-xs text-char-500 mb-2"><T>Rows with a problem are skipped. Existing employee codes are never overwritten.</T></p>}
               <div className="max-h-72 overflow-auto rounded-xl border border-sand-200 divide-y divide-sand-100">
                 {res.rows.map((r) => (
                   <div key={r.row} className={`px-3 py-2 text-sm ${r.ok ? '' : 'bg-red-50/60'}`}>

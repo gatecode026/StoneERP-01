@@ -3,7 +3,7 @@ import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { CheckCircle2 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, DataList, Pager } from '@/components/ui';
@@ -12,6 +12,7 @@ import { useNumberedList } from '@/lib/usePaged';
 import { useApp, useFetch } from '@/components/Providers';
 import { api } from '@/lib/client';
 import { addDays, todayISO, fmtDate, inr, monthOf, daysInMonth } from '@/lib/format';
+import T from '@/components/T';
 
 const serviceDue = (m) => (m.lastServiceDate && m.serviceIntervalDays ? addDays(m.lastServiceDate, Number(m.serviceIntervalDays)) : null);
 
@@ -78,7 +79,7 @@ export default function RepairsPage() {
             { key: 'serviceIntervalDays', label: 'Interval', render: (r) => `${r.serviceIntervalDays} days` },
             { key: 'due', label: 'Next due', render: (r) => (r.due ? <Badge tone={r.due < today ? 'red' : r.due <= addDays(today, 7) ? 'amber' : 'green'}>{fmtDate(r.due)}{r.due < today ? ' – overdue' : r.due <= addDays(today, 7) ? ' – due soon' : ''}</Badge> : '—') },
           ]} actions={(r) => can('repairs', 'create') && (
-            <button className="btn-outline btn-sm" onClick={async () => { try { await api('/api/repairs', { method: 'POST', body: { kind: 'service', status: 'closed', date: today, machineId: r._id, problem: 'Routine service', action: 'Oil change, belt check, greasing', cost: 0 } }); toast.success('Service recorded'); machines.reload(); } catch (e) { toast.error(e.message); } }}>Mark serviced</button>
+            <button className="btn-outline btn-sm" onClick={async () => { try { await api('/api/repairs', { method: 'POST', body: { kind: 'service', status: 'closed', date: today, machineId: r._id, problem: 'Routine service', action: 'Oil change, belt check, greasing', cost: 0 } }); toast.success('Service recorded'); machines.reload(); } catch (e) { toast.error(e.message); } }}><T>Mark serviced</T></button>
           )} />
         </div>
       )}

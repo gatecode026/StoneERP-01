@@ -3,7 +3,7 @@ import { useApp } from '@/components/Providers';
 
 // Home-screen text, English + Hindi side by side. (Phase 6 moves every dictionary into messages/*.json.)
 export const H = {
-  more: { en: 'more', hi: 'और' }, orders: { en: 'orders', hi: 'ऑर्डर' }, entries: { en: 'entries', hi: 'एंट्री' },
+  more: { en: 'more', hi: 'और' }, trips: { en: 'trips', hi: 'फेरे' }, orders: { en: 'orders', hi: 'ऑर्डर' }, entries: { en: 'entries', hi: 'एंट्री' },
   today: { en: 'Today', hi: 'आज' }, yesterday: { en: 'vs yesterday', hi: 'कल से' },
   attendance: { en: 'Attendance', hi: 'हाज़िरी' }, present: { en: 'present', hi: 'उपस्थित' }, absent: { en: 'absent', hi: 'अनुपस्थित' }, leave: { en: 'on leave', hi: 'छुट्टी' }, notMarked: { en: 'not marked', hi: 'बाकी' },
   reports: { en: 'Daily work reports', hi: 'दैनिक कार्य रिपोर्ट' }, filled: { en: 'filled', hi: 'भरी' }, missing: { en: 'missing', hi: 'बाकी' }, problems: { en: 'Problems raised today', hi: 'आज उठी दिक्कतें' },

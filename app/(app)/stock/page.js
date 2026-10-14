@@ -2,7 +2,7 @@
 import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { ArrowLeftRight, AlertTriangle, Check, X } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';

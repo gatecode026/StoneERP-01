@@ -8,9 +8,16 @@ import { useApp } from './Providers';
 import { NAV_GROUPS, DASH, BOTTOM_TABS, ALL_ITEMS, QUICK_ADD } from '@/lib/nav';
 import { ROLE_LABEL } from '@/lib/roles';
 import { cx, SkeletonList, Sheet } from './ui';
+import T from '@/components/T';
 
 const canOpen = (can, it) => (it.res || []).some((r) => can(r));
-const isActive = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'));
+const isActive = (pathname, href) => {
+  if (href === '/') return pathname === '/';
+  if (pathname === href) return true;
+  if (!pathname.startsWith(href + '/')) return false;
+  // If another navigation item has a more specific href that also matches pathname, prefer that one
+  return !ALL_ITEMS.some((other) => other.href !== href && other.href.startsWith(href + '/') && (pathname === other.href || pathname.startsWith(other.href + '/')));
+};
 
 function Brand({ compact }) {
   const { t } = useApp();
@@ -20,7 +27,7 @@ function Brand({ compact }) {
       {!compact && (
         <div className="min-w-0 leading-tight">
           <div className="font-bold text-sm truncate">{t('appName')}</div>
-          <div className="text-[10px] text-char-500 truncate">RD Natural Stones · Bijoliya</div>
+          <div className="text-[10px] text-char-500 truncate"><T>RD Natural Stones · Bijoliya</T></div>
         </div>
       )}
     </div>
@@ -28,16 +35,16 @@ function Brand({ compact }) {
 }
 
 function LangToggle() {
-  const { lang, setLang } = useApp();
+  const { lang, setLang, tr } = useApp();
   return (
-    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1 h-11 min-w-[44px] px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label="Language">
+    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1 h-11 min-w-[44px] px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label={tr('Language')}>
       <Languages size={14} /> {lang === 'en' ? 'हिं' : 'EN'}
     </button>
   );
 }
 
 export default function Shell({ children }) {
-  const { session, t, can, logout, online, queued, queueFailed, lang } = useApp();
+  const { session, t, tr, can, logout, online, queued, queueFailed, lang } = useApp();
   const [syncOpen, setSyncOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -66,7 +73,7 @@ export default function Shell({ children }) {
     const active = isActive(pathname, it.href);
     return (
       <Link href={it.href} title={t(it.key)}
-        className={cx('flex items-center gap-3 rounded-xl px-3 min-h-[40px] md:min-h-[31px] md:py-0 text-sm md:text-[13px] font-medium transition', active ? 'bg-terra text-white' : 'text-char-700 hover:bg-sand-200', small && 'min-h-[44px]')}>
+        className={cx('flex items-center gap-3 rounded-xl px-3 min-h-[40px] md:min-h-[34px] md:py-1 text-sm md:text-[13px] font-medium transition', active ? 'bg-terra text-white shadow-sm' : 'text-char-700 hover:bg-sand-200', small && 'min-h-[44px]')}>
         <Icon size={18} className="shrink-0" />
         {!(collapsed && !small) && <span className="truncate">{t(it.key)}</span>}
       </Link>
@@ -88,12 +95,12 @@ export default function Shell({ children }) {
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
-        <nav className="flex-1 p-2 space-y-1.5 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 p-2 space-y-2 overflow-y-auto no-scrollbar">
           <NavLink it={DASH} />
           {groups.map((g) => (
-            <div key={g.key}>
-              {!collapsed && <div className="px-3 pt-1 text-[10px] font-bold uppercase tracking-wider text-char-300">{t(g.key)}</div>}
-              <div>{g.items.map((it) => <NavLink key={it.key} it={it} />)}</div>
+            <div key={g.key} className="pt-1">
+              {!collapsed && <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-char-400">{t(g.key)}</div>}
+              <div className="space-y-0.5">{g.items.map((it) => <NavLink key={it.key} it={it} />)}</div>
             </div>
           ))}
         </nav>
@@ -113,7 +120,7 @@ export default function Shell({ children }) {
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
-              <button className="h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label="Search screens"><Search size={16} /></button>
+              <button className="h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label={tr('Search screens')}><Search size={16} /></button>
               <LangToggle />
               <button className="md:hidden h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
@@ -127,12 +134,12 @@ export default function Shell({ children }) {
         </header>
         <SyncSheet open={syncOpen} onClose={() => setSyncOpen(false)} />
 
-        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-24 max-w-[1400px] w-full mx-auto">{children}</main>
+        <main className="flex-1 px-4 py-4 md:px-6 md:py-6 pb-28 md:pb-8 max-w-[1400px] w-full mx-auto">{children}</main>
       </div>
 
-      {/* FAB quick add */}
+      {/* FAB quick add (mobile only; desktop uses header actions) */}
       {showFab && (
-        <div className="fab fixed right-4 bottom-[88px] md:bottom-6 z-40 no-print">
+        <div className="fab md:hidden fixed right-4 bottom-[88px] z-40 no-print">
           {fab && (
             <div className="absolute bottom-16 right-0 w-56 card p-2 shadow-xl sheet-enter">
               <div className="px-2 py-1 text-[10px] font-bold uppercase text-char-300">{t('quickAdd')}</div>

@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { FileSpreadsheet, Download, Upload } from 'lucide-react';
 import { Sheet, Badge } from '@/components/ui';
 import { useApp } from '@/components/Providers';

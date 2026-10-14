@@ -3,13 +3,14 @@ import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { CheckCircle2, MessageCircle, AlertTriangle } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, Sheet, Field, PhotoInput, Section, SkeletonList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { api, openWA } from '@/lib/client';
 import { fmtDate, todayISO, inr, groupBy } from '@/lib/format';
+import T from '@/components/T';
 
 const REMINDER_TABLE = [
   ['customer_payment', 'Customer payment overdue', 'Salesperson, accountant, customer'],
@@ -24,7 +25,7 @@ const REMINDER_TABLE = [
 ];
 
 export default function TasksPage() {
-  const { t, can } = useApp();
+  const { t, tr, can } = useApp();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') === 'reminders' ? 'reminders' : 'tasks');
   const [doneRow, setDoneRow] = useState(null);
@@ -46,10 +47,10 @@ export default function TasksPage() {
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];
   const columns = [
-    { key: 'title', label: 'Task', primary: true, render: (r) => <span>{r.title}{r.priority === 'High' && <Badge tone="red" className="ml-1.5">High</Badge>}<div className="text-[11px] text-char-500 font-normal">{r.details}</div></span> },
+    { key: 'title', label: 'Task', primary: true, render: (r) => <span>{r.title}{r.priority === 'High' && <Badge tone="red" className="ml-1.5"><T>High</T></Badge>}<div className="text-[11px] text-char-500 font-normal">{r.details}</div></span> },
     { key: 'assignedName', label: 'Assigned to' },
     { key: 'dueDate', label: 'Due', render: (r) => <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>{fmtDate(r.dueDate)}</span> },
-    { key: 'state', label: 'Status', render: (r) => (r.state === 'done' ? <Badge tone="green">Done</Badge> : r.dueDate < today ? <Badge tone="red">Overdue</Badge> : <Badge tone="amber">Pending</Badge>) },
+    { key: 'state', label: 'Status', render: (r) => (r.state === 'done' ? <Badge tone="green"><T>Done</T></Badge> : r.dueDate < today ? <Badge tone="red"><T>Overdue</T></Badge> : <Badge tone="amber"><T>Pending</T></Badge>) },
     { key: 'doneNote', label: 'Done note', render: (r) => r.doneNote || '—' },
   ];
 
@@ -69,7 +70,7 @@ export default function TasksPage() {
       )}
       {tab === 'reminders' && (
         <div>
-          <p className="text-sm text-char-500 mb-3">The app reminds the right person before anything important is missed. Live counts below.</p>
+          <p className="text-sm text-char-500 mb-3"><T>The app reminds the right person before anything important is missed. Live counts below.</T></p>
           {rem.loading ? <SkeletonList /> : (
             <div className="space-y-3">
               {REMINDER_TABLE.map(([type, label, to]) => {
@@ -80,10 +81,10 @@ export default function TasksPage() {
                       <div key={i} className="flex items-start justify-between gap-2 py-2 border-b border-sand-100 last:border-0 text-sm">
                         <Link href={x.link || '/'} className="flex-1"><AlertTriangle size={13} className={`inline mr-1 -mt-0.5 ${x.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`} />{x.title}{x.detail && <div className="text-xs text-char-500">{x.detail}</div>}</Link>
                         {x.type === 'customer_payment' && (
-                          <button className="btn-green btn-sm shrink-0" onClick={() => openWA(`Dear ${x.customerName}, this is a gentle reminder from Vipul Stone Suppliers: payment of ${inr(x.amount)} is pending against your order. Kindly arrange the payment at the earliest. Thank you.`, x.mobile)}><MessageCircle size={14} /> Remind</button>
+                          <button className="btn-green btn-sm shrink-0" onClick={() => openWA(`Dear ${x.customerName}, this is a gentle reminder from Vipul Stone Suppliers: payment of ${inr(x.amount)} is pending against your order. Kindly arrange the payment at the earliest. Thank you.`, x.mobile)}><MessageCircle size={14} /><T> Remind</T></button>
                         )}
                       </div>
-                    )) : <div className="text-sm text-char-500">Nothing pending ✔</div>}
+                    )) : <div className="text-sm text-char-500"><T>Nothing pending ✔</T></div>}
                   </Section>
                 );
               })}
@@ -91,10 +92,10 @@ export default function TasksPage() {
           )}
         </div>
       )}
-      <Sheet open={!!doneRow} onClose={() => setDoneRow(null)} title={`Done: ${doneRow?.title || ''}`}
-        footer={<><button className="btn-outline flex-1" onClick={() => setDoneRow(null)}>Cancel</button><button className="btn-green flex-[2]" onClick={() => markDone(doneRow.reload)}>Mark done</button></>}>
+      <Sheet open={!!doneRow} onClose={() => setDoneRow(null)} title={tr('Done: {t}', { t: doneRow?.title || '' })}
+        footer={<><button className="btn-outline flex-1" onClick={() => setDoneRow(null)}><T>Cancel</T></button><button className="btn-green flex-[2]" onClick={() => markDone(doneRow.reload)}><T>Mark done</T></button></>}>
         <div className="space-y-3">
-          <Field label="Note"><textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was done?" /></Field>
+          <Field label="Note"><textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr('What was done?')} /></Field>
           <Field label="Photo"><PhotoInput value={photo} onChange={setPhoto} /></Field>
         </div>
       </Sheet>

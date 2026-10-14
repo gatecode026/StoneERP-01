@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { AlertTriangle, Bell, Check, ClipboardList, Cog, HandCoins, Hourglass, IndianRupee, Landmark, MessageCircle, PackageX, Receipt, Truck, Users, Wallet, X } from 'lucide-react';
 import { StatCard, Badge, cx } from '@/components/ui';
 import { api, openWA } from '@/lib/client';
@@ -10,6 +10,8 @@ import { reportLines, reportText } from '@/lib/report';
 import { useApp } from '@/components/Providers';
 import { Card, Delta, ExpensePie, TrendChart } from './parts';
 import { useH } from './strings';
+import T from '@/components/T';
+import { trNow } from '@/lib/trNow';
 
 /** The 8 pm report from the PDF, plus approvals inbox, profit and a day-vs-yesterday comparison. Used by the Owner and (with fewer sections) the Manager. */
 export function Approvals({ items, reload, canDecide }) {
@@ -25,7 +27,7 @@ export function Approvals({ items, reload, canDecide }) {
     setBusy(true);
     try {
       const r = await api('/api/bulk/approvals', { method: 'POST', body: { action, items: items.filter((a) => sel[key(a)]).map((a) => ({ model: a.model, id: a.id })) } });
-      toast.success(`${r.done} done${r.failed ? `, ${r.failed} could not be processed` : ''}`);
+      toast.success(trNow('{n} done', { n: r.done }) + (r.failed ? ', ' + trNow('{n} could not be processed', { n: r.failed }) : ''));
       setSel({}); reload();
     } catch (e) { toast.error(e.message); }
     setBusy(false);
@@ -77,8 +79,8 @@ export function ProfitCard({ profit }) {
   return (
     <Card title={`${h('profit')} · ${h('last30')}`} className="mt-4" empty={!profit.orders.length && !profit.blocks.length}>
       <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-        <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500">Revenue</div><div className="font-bold">{inrShort(profit.orderTotals.revenue)}</div></div>
-        <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500">Cost</div><div className="font-bold">{inrShort(profit.orderTotals.cost)}</div></div>
+        <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500"><T>Revenue</T></div><div className="font-bold">{inrShort(profit.orderTotals.revenue)}</div></div>
+        <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500"><T>Cost</T></div><div className="font-bold">{inrShort(profit.orderTotals.cost)}</div></div>
         <div className="rounded-xl bg-emerald-50 p-2"><div className="text-[10px] uppercase text-emerald-800">{h('profit')}</div><div className="font-bold text-emerald-800">{inrShort(profit.orderTotals.profit)}</div></div>
       </div>
       <div className="grid lg:grid-cols-2 gap-4 items-start">
@@ -95,7 +97,7 @@ export function ProfitCard({ profit }) {
           <div className="text-xs font-bold uppercase text-char-500 mb-1">{h('profitBlocks')}</div>
           {profit.blocks.map((b) => (
             <div key={b.blockNo} className="flex justify-between gap-2 text-sm py-1.5 border-b border-sand-100 last:border-0">
-              <div className="min-w-0"><div className="font-medium">Block #{b.blockNo}</div><div className="text-[11px] text-char-500">{num(b.saleable)} sq ft · {b.yieldPct}% yield · ₹{b.costPerSqft}/sq ft</div></div>
+              <div className="min-w-0"><div className="font-medium"><T vars={{ n: b.blockNo }}>{'Block #{n}'}</T></div><div className="text-[11px] text-char-500"><T vars={{ a: num(b.saleable), y: b.yieldPct, c: b.costPerSqft }}>{'{a} sq ft · {y}% yield · ₹{c}/sq ft'}</T></div></div>
               <b className={b.profit < 0 ? 'text-red-600' : 'text-emerald-700'}>{inr(b.profit)}</b>
             </div>
           ))}
@@ -159,7 +161,7 @@ export function ReportPreview({ d }) {
     <Card title="WhatsApp · 8 pm">
       <div className="rounded-2xl bg-[#E7F0D8] p-3 shadow-inner">
         <div className="bg-white rounded-xl rounded-tl-sm p-3 text-[13px] leading-6 shadow-sm border border-black/5">
-          <div className="text-[11px] font-bold text-emerald-700 mb-1">VSS ERP</div>
+          <div className="text-[11px] font-bold text-emerald-700 mb-1"><T>VSS ERP</T></div>
           {lines.map((l, i) => <div key={i} className={cx(l.problem ? 'font-bold text-red-600' : i === 0 ? 'font-bold' : 'text-char')}>{l.text}</div>)}
         </div>
       </div>

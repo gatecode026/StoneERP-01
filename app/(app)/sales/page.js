@@ -7,11 +7,12 @@ import { Plus, MessageCircle } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, ExportBtn, Pager, SearchBox } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
-import { toQuery, useDebounced, useNumberedList } from '@/lib/usePaged';
+import { toQuery, useDebounced, useNumberedList, usePagedList } from '@/lib/usePaged';
 import { useApp, useFetch } from '@/components/Providers';
 import { CUSTOMER_FIELDS } from '@/components/fields';
 import { openWA } from '@/lib/client';
 import { inr, inrShort, num, fmtDate, todayISO, daysBetween } from '@/lib/format';
+import T from '@/components/T';
 
 const STAGE = { quotation: ['gray', 'Quotation'], order: ['blue', 'Order'], dispatched: ['green', 'Dispatched'] };
 
@@ -20,7 +21,7 @@ export default function SalesPage() {
   const router = useRouter();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'orders');
-  const { can } = useApp();
+  const { can, tr } = useApp();
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
   // the numbers on top: one request. The lists below page by themselves and are searched / filtered by the server.
@@ -39,7 +40,7 @@ export default function SalesPage() {
     { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
     { key: 'items', label: 'Items', wide: true, render: (r) => (r.items || []).map((i) => `${i.name} × ${num(i.qty)}`).join(', ') },
     { key: 'total', label: 'Total', align: 'right', render: (r) => <b>{inr(r.total)}</b> },
-    { key: 'paid', label: 'Pending', align: 'right', render: (r) => (r.stage === 'quotation' ? '—' : pend(r) > 0 ? <span className="text-amber-700 font-semibold">{inr(pend(r))}</span> : <Badge tone="green">Paid</Badge>) },
+    { key: 'paid', label: 'Pending', align: 'right', render: (r) => (r.stage === 'quotation' ? '—' : pend(r) > 0 ? <span className="text-amber-700 font-semibold">{inr(pend(r))}</span> : <Badge tone="green"><T>Paid</T></Badge>) },
     { key: 'stage', label: 'Stage', render: (r) => <Badge tone={STAGE[r.stage]?.[0]}>{STAGE[r.stage]?.[1]}{r.invoiceNo ? ' · Billed' : ''}</Badge> },
     { key: 'salesperson', label: 'Salesperson' },
   ];
@@ -52,10 +53,10 @@ export default function SalesPage() {
           {can('sales', 'create') && <Link href="/sales/new" className="btn-primary"><Plus size={18} /> {t('newQuotation')}</Link>}
         </>} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <StatCard label="Today's sales" value={o?.today?.total != null ? inrShort(o.today.total) : (o?.today?.orders ?? '…')} sub={`${o?.today?.orders ?? 0} orders`} tone="terra" />
+        <StatCard label="Today's sales" value={o?.today?.total != null ? inrShort(o.today.total) : (o?.today?.orders ?? '…')} sub={tr('{n} orders', { n: o?.today?.orders ?? 0 })} tone="terra" />
         <StatCard label="Open orders" value={o?.openOrders ?? '…'} />
         <StatCard label="Quotations" value={o?.quotations ?? '…'} />
-        <StatCard label="Pending from customers" value={o?.pending?.total != null ? inrShort(o.pending.total) : (o?.pending?.customers ?? '…')} tone="amber" sub={`${o?.pending?.customers ?? 0} bills`} />
+        <StatCard label="Pending from customers" value={o?.pending?.total != null ? inrShort(o.pending.total) : (o?.pending?.customers ?? '…')} tone="amber" sub={tr('{n} bills', { n: o?.pending?.customers ?? 0 })} />
       </div>
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'orders', label: 'Orders' }, { key: 'quotations', label: 'Quotations' }, { key: 'pending', label: 'Pending payments', count: o?.pending?.customers }, { key: 'customers', label: 'Customers' }, { key: 'rates', label: 'Rate list' }, { key: 'team', label: 'By salesperson' }]} />
 
@@ -72,10 +73,10 @@ export default function SalesPage() {
         <DataList loading={sales.loading} rows={pendingList} empty="No pending payments 🎉" onRowClick={(r) => router.push(`/sales/${r._id}`)} columns={[
           { key: 'customerName', label: 'Customer', primary: true, render: (r) => <span>{r.customerName}<div className="text-[11px] text-char-500 font-normal">{r.saleNo}{r.invoiceNo ? ` · ${r.invoiceNo}` : ''}</div></span> },
           { key: 'pending', label: 'Pending', align: 'right', render: (r) => <b className="text-amber-700">{inr(r.pending)}</b> },
-          { key: 'age', label: 'Days old', render: (r) => <Badge tone={r.age > 30 ? 'red' : r.age > 15 ? 'amber' : 'gray'}>{r.age} days</Badge> },
+          { key: 'age', label: 'Days old', render: (r) => <Badge tone={r.age > 30 ? 'red' : r.age > 15 ? 'amber' : 'gray'}><T vars={{ n: r.age }}>{'{n} days'}</T></Badge> },
           { key: 'total', label: 'Order value', render: (r) => inr(r.total) },
         ]} actions={(r) => (
-          <button className="btn-green btn-sm" onClick={() => openWA(`Dear ${r.customerName}, gentle reminder from Vipul Stone Suppliers: ${inr(r.pending)} is pending against order ${r.saleNo}${r.invoiceNo ? ` (Invoice ${r.invoiceNo})` : ''}. Kindly arrange the payment at the earliest. Thank you.`, r.customerMobile)}><MessageCircle size={14} /> Remind</button>
+          <button className="btn-green btn-sm" onClick={() => openWA(`Dear ${r.customerName}, gentle reminder from Vipul Stone Suppliers: ${inr(r.pending)} is pending against order ${r.saleNo}${r.invoiceNo ? ` (Invoice ${r.invoiceNo})` : ''}. Kindly arrange the payment at the earliest. Thank you.`, r.customerMobile)}><MessageCircle size={14} /><T> Remind</T></button>
         )} />
         <Pager list={sales} />
       </>)}
@@ -91,7 +92,7 @@ export default function SalesPage() {
 
       {tab === 'team' && (
         <>
-          <p className="text-xs text-char-500 mb-2">Last 30 days</p>
+          <p className="text-xs text-char-500 mb-2"><T>Last 30 days</T></p>
           <DataList loading={ov.loading} rows={o?.team || []} rowKey="name" columns={[{ key: 'name', label: 'Salesperson', primary: true }, { key: 'orders', label: 'Orders' }, ...(o?.team?.some((x) => x.total != null) ? [{ key: 'total', label: 'Sales value', align: 'right', render: (r) => <b>{inr(r.total)}</b> }] : [])]} />
         </>
       )}

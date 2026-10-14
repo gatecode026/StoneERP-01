@@ -6,6 +6,7 @@ import { flushQueue } from '@/lib/client';
 import { confirmDialog } from '@/components/Dialogs';
 import { fmtDateTime } from '@/lib/format';
 import { useApp } from '@/components/Providers';
+import T from '@/components/T';
 
 // "N entries waiting to sync": what is queued on this phone, what the server refused and why, with Retry / Discard.
 export default function SyncSheet({ open, onClose }) {
@@ -28,7 +29,7 @@ export default function SyncSheet({ open, onClose }) {
               {it.error && <div className="text-xs text-red-700 mt-1">{it.error}</div>}
               <div className="flex gap-2 mt-2">
                 {it.status === 'failed' && <button className="btn-outline btn-sm" onClick={() => retryNow(it.id).then(() => flushQueue()).then(load)}>{t('tryAgain')}</button>}
-                <button className="btn-outline btn-sm text-red-600" onClick={async () => { if (await confirmDialog(t('syncDiscardQ'), { danger: true, okLabel: t('discard') })) discard(it.id); }}>Discard</button>
+                <button className="btn-outline btn-sm text-red-600" onClick={async () => { if (await confirmDialog(t('syncDiscardQ'), { danger: true, okLabel: t('discard') })) discard(it.id); }}><T>Discard</T></button>
               </div>
             </div>
           ))}

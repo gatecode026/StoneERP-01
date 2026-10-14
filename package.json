@@ -19,7 +19,8 @@
     "job": "tsx scripts/job.ts",
     "check:bundle": "tsx scripts/check-bundle.ts",
     "link:logins": "tsx scripts/link-logins.ts",
-    "restore": "tsx scripts/restore.ts"
+    "restore": "tsx scripts/restore.ts",
+    "admin:set": "tsx scripts/set-admin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",

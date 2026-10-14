@@ -1,17 +1,18 @@
 'use client';
 import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Trophy, MessageSquare } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, DataList, Section, Badge, Sheet, Field, KV, ExportBtn, Pagination } from '@/components/ui';
 import { api, downloadCSV } from '@/lib/client';
 import { todayISO, monthOf, fmtMonth, num } from '@/lib/format';
+import T from '@/components/T';
 
 const tone = (s) => (s >= 80 ? 'green' : s >= 60 ? 'amber' : 'red');
 
 export default function PerformancePage() {
-  const { t, can } = useApp();
+  const { t, tr, can } = useApp();
   const [month, setMonth] = useState(monthOf(todayISO()));
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(25);
@@ -35,7 +36,7 @@ export default function PerformancePage() {
     <RoleGuard perm="performance">
       <PageHeader title={t('performance')} subtitle="Monthly scorecard from what was already entered"
         actions={<><ImportData resource="perfremarks" perm="perfremarks" noun="performance remarks" /><input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />{can('performance', 'export') && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/performance?month=${month}&all=1`); downloadCSV(`performance-${month}`, all.rows, [{ key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'presentDays', label: 'Days present' }, { key: 'absent', label: 'Absent' }, { key: 'onTime', label: 'Reports on time' }, { key: 'qty', label: 'Output' }, { key: 'breakdowns', label: 'Breakdowns' }, { key: 'score', label: 'Score' }, { key: 'remark', label: 'Owner remark' }]); } catch (e) { toast.error(e.message); } }} />}</>} />
-      <Section title={<span className="flex items-center gap-2"><Trophy size={16} className="text-terra" /> Best workers – {fmtMonth(month)}</span>} className="mb-4">
+      <Section title={<span className="flex items-center gap-2"><Trophy size={16} className="text-terra" /> <T vars={{ m: fmtMonth(month) }}>{'Best workers – {m}'}</T></span>} className="mb-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {(data?.top || []).map((r, i) => (
             <div key={r.empCode} className={`rounded-xl p-3 border ${i === 0 ? 'bg-terra-50 border-terra-100' : 'bg-sand-50 border-sand-200'}`}>
@@ -45,7 +46,7 @@ export default function PerformancePage() {
               <div className="text-2xl font-extrabold text-terra mt-1">{r.score}</div>
             </div>
           ))}
-          {!(data?.top || []).length && !loading && <div className="text-sm text-char-500 col-span-full">No data for this month</div>}
+          {!(data?.top || []).length && !loading && <div className="text-sm text-char-500 col-span-full"><T>No data for this month</T></div>}
         </div>
       </Section>
       <DataList loading={loading} rows={rows} rowKey="empCode" onRowClick={(r) => { setSel(r); setRemark(r.remark || ''); }} columns={[
@@ -58,15 +59,15 @@ export default function PerformancePage() {
         { key: 'remark', label: 'Owner remark', wide: true, render: (r) => r.remark || <span className="text-char-300">—</span> },
       ]} />
       <Pagination page={page} pageSize={size} total={data?.total} shown={rows.length} onPage={setPage} onSize={setSize} />
-      <p className="text-[11px] text-char-500 mt-4">Score (0–100) = attendance 35% (late counts ¼ day less) + daily reports on time 25% + work done 30% (sq ft vs best in the same job, or tasks done) + discipline 10% (−30 for each breakdown while operating or complaint linked to the person).</p>
+      <p className="text-[11px] text-char-500 mt-4"><T>Score (0–100) = attendance 35% (late counts ¼ day less) + daily reports on time 25% + work done 30% (sq ft vs best in the same job, or tasks done) + discipline 10% (−30 for each breakdown while operating or complaint linked to the person).</T></p>
       <Sheet open={!!sel} onClose={() => setSel(null)} title={`${sel?.name} – ${fmtMonth(month)}`}
-        footer={canRemark ? <><button className="btn-outline flex-1" onClick={() => setSel(null)}>Close</button><button className="btn-primary flex-[2]" onClick={saveRemark}>Save remark</button></> : <button className="btn-outline flex-1" onClick={() => setSel(null)}>Close</button>}>
+        footer={canRemark ? <><button className="btn-outline flex-1" onClick={() => setSel(null)}><T>Close</T></button><button className="btn-primary flex-[2]" onClick={saveRemark}><T>Save remark</T></button></> : <button className="btn-outline flex-1" onClick={() => setSel(null)}><T>Close</T></button>}>
         {sel && <>
-          <div className="text-center mb-3"><div className="text-5xl font-extrabold text-terra">{sel.score}</div><div className="text-xs text-char-500">out of 100</div></div>
+          <div className="text-center mb-3"><div className="text-5xl font-extrabold text-terra">{sel.score}</div><div className="text-xs text-char-500"><T>out of 100</T></div></div>
           <KV label="Attendance score">{sel.attScore}</KV><KV label="Days present / absent / late">{sel.presentDays} / {sel.absent} / {sel.late}</KV>
-          <KV label="Daily reports on time">{sel.onTime} of {data?.workingDays} ({sel.repScore})</KV><KV label="Work score">{sel.workScore}</KV>
-          <KV label="Output">{num(sel.qty)} sq ft</KV><KV label="Tasks done">{sel.tasksDone} / {sel.tasks}</KV><KV label="Breakdowns while operating">{sel.breakdowns}</KV><KV label="Complaints linked">{sel.complaints}</KV>
-          <Field label="Owner remark" className="mt-4"><textarea className="input" rows={3} value={remark} disabled={!canRemark} onChange={(e) => setRemark(e.target.value)} placeholder="Short remark on this scorecard" /></Field>
+          <KV label="Daily reports on time"><T vars={{ a: sel.onTime, b: data?.workingDays, c: sel.repScore }}>{'{a} of {b} ({c})'}</T></KV><KV label="Work score">{sel.workScore}</KV>
+          <KV label="Output"><T vars={{ n: num(sel.qty) }}>{'{n} sq ft'}</T></KV><KV label="Tasks done">{sel.tasksDone} / {sel.tasks}</KV><KV label="Breakdowns while operating">{sel.breakdowns}</KV><KV label="Complaints linked">{sel.complaints}</KV>
+          <Field label="Owner remark" className="mt-4"><textarea className="input" rows={3} value={remark} disabled={!canRemark} onChange={(e) => setRemark(e.target.value)} placeholder={tr('Short remark on this scorecard')} /></Field>
         </>}
       </Sheet>
     </RoleGuard>

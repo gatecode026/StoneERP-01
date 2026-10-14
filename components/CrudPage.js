@@ -2,14 +2,16 @@
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Plus, History as HistoryIcon, Pencil, Ban } from 'lucide-react';
-import { useApp, useFetch } from './Providers';
+import { useApp, useFetch, useTx } from './Providers';
+import { trNow } from '@/lib/trNow';
 import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, LoadMore, Pagination, Badge, cx } from './ui';
 import LookupSelect from './LookupSelect';
 import { api, submit, ApiError } from '@/lib/client';
 import { toQuery, useDebounced, usePagedList } from '@/lib/usePaged';
 import { todayISO, fmtDate, fmtDateTime } from '@/lib/format';
+import T from '@/components/T';
 
 const TONE = {
   active: 'gray', approved: 'green', applied: 'green', paid: 'green', closed: 'green', done: 'green', ok: 'green', in: 'blue', out: 'green',
@@ -53,6 +55,7 @@ const visible = (perm, f) => ['read', 'write'].includes(level(perm, f));
 
 export function FormFields({ fields, form, set, mode }) {
   const { perm } = useApp();
+  const tx = useTx();
   const visibleFields = fields.filter((f) => (!f.show || f.show(form)) && visible(perm, f) && !(f.createOnly && mode === 'edit'));
   const hasSections = visibleFields.some((f) => f.section);
 
@@ -64,13 +67,13 @@ export function FormFields({ fields, form, set, mode }) {
     let input;
     switch (f.type) {
       case 'textarea':
-        input = <textarea id={id} className="input" rows={f.rows || 3} value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={f.placeholder} disabled={disabled} />; break;
+        input = <textarea id={id} className="input" rows={f.rows || 3} value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={tx(f.placeholder)} disabled={disabled} />; break;
       case 'select':
         input = (
           <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value })}>
-            {!f.required || !v ? <option value="">Select…</option> : null}
+            {!f.required || !v ? <option value="">{tx('Select…')}</option> : null}
             {v && !optList(f.options).some((o) => String(o.value) === String(v)) && <option value={v}>{v}</option>}
-                {optList(f.options).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
           </select>
         ); break;
       case 'ref': input = <RefSelect id={id} field={f} form={form} set={set} />; break;
@@ -81,8 +84,8 @@ export function FormFields({ fields, form, set, mode }) {
         const gen = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a = new Uint32Array(10); crypto.getRandomValues(a); return [...a].map((n) => c[n % c.length]).join('') + '7'; };
         input = (
           <div className="flex gap-2">
-            <input id={id} className="input flex-1 min-w-0" type="text" autoComplete="new-password" value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={f.placeholder} disabled={disabled} />
-            {!f.noGenerate && <button type="button" className="btn-outline shrink-0" onClick={() => set({ [f.name]: gen() })} disabled={disabled}>Generate</button>}
+            <input id={id} className="input flex-1 min-w-0" type="text" autoComplete="new-password" value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={tx(f.placeholder)} disabled={disabled} />
+            {!f.noGenerate && <button type="button" className="btn-outline shrink-0" onClick={() => set({ [f.name]: gen() })} disabled={disabled}>{tx('Generate')}</button>}
           </div>
         ); break;
       }
@@ -90,13 +93,13 @@ export function FormFields({ fields, form, set, mode }) {
         input = (
           <label className="flex items-center gap-3 min-h-[42px] px-3.5 rounded-xl border border-sand-300 bg-sand-50/40 hover:bg-sand-50 cursor-pointer transition">
             <input id={id} type="checkbox" className="w-4 h-4 rounded text-terra accent-terra" checked={!!form[f.name]} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.checked })} />
-            <span className="text-sm font-medium text-char-700">{f.checkLabel || f.label}</span>
+            <span className="text-sm font-medium text-char-700">{tx(f.checkLabel || f.label)}</span>
           </label>
         ); break;
       default:
         input = (
           <input id={id} className="input" type={f.type || 'text'} inputMode={f.type === 'number' ? 'decimal' : undefined} step={f.type === 'number' ? 'any' : undefined}
-            value={v} disabled={disabled} placeholder={f.placeholder} onChange={(e) => set({ [f.name]: e.target.value })} />
+            value={v} disabled={disabled} placeholder={tx(f.placeholder)} onChange={(e) => set({ [f.name]: e.target.value })} />
         );
     }
     return <Field key={f.name} htmlFor={id} className={span} label={f.type === 'checkbox' ? '' : f.label} required={f.required} hint={f.hint}>{input}</Field>;
@@ -124,7 +127,7 @@ export function FormFields({ fields, form, set, mode }) {
       {sections.map((sec) => (
         <div key={sec.name} className="p-4 sm:p-5 rounded-2xl bg-sand-50/60 border border-sand-200/90 shadow-sm space-y-3.5">
           <div className="flex items-center gap-2 pb-2 border-b border-sand-200">
-            <span className="text-xs font-bold tracking-wider uppercase text-char-700">{sec.name}</span>
+            <span className="text-xs font-bold tracking-wider uppercase text-char-700">{tx(sec.name)}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {sec.fields.map(renderField)}
@@ -170,6 +173,7 @@ export default function CrudPage({
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
 }) {
   const { t, can, perm } = useApp();
+  const tx = useTx();
   const sp = useSearchParams();
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
@@ -224,7 +228,7 @@ export default function CrudPage({
   async function save() {
     if (savingRef.current) return;
     const miss = missingRequired(fields, form);
-    if (miss) { toast.error(`${miss} is required`); return; }
+    if (miss) { toast.error(trNow('{f} is required', { f: trNow(miss) })); return; }
     const names = new Set([...fields.filter((f) => visible(perm, f) && level(perm, f) === 'write').map((f) => f.name), ...Object.keys(defaults)]);
     let body = cleanForm(fields, form);
     if (beforeSave) {
@@ -244,7 +248,7 @@ export default function CrudPage({
       const res = editing
         ? await saveWithConfirm(`/api/${model}/${editing._id}`, body, { method: 'PATCH', label })
         : await saveWithConfirm(`/api/${model}`, body, { label });
-      toast.success(res?.queued ? t('offline') : `${label} saved`);
+      toast.success(res?.queued ? t('offline') : trNow('{label} saved', { label: trNow(label) }));
       setOpen(false);
       onSaved?.(res, editing);
       reload();
@@ -311,16 +315,16 @@ export default function CrudPage({
           actions={<>
             {headerExtra}
             {exportName && rows.length > 0 && can(model, 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/${model}?format=xlsx&${toQuery(params)}`)} />}
-            {mayAdd && <button className="btn-primary" onClick={openNew}><Plus size={18} /> {addLabel || t('add')}</button>}
+            {mayAdd && <button className="btn-primary" onClick={openNew}><Plus size={18} /> {tx(addLabel) || t('add')}</button>}
           </>} />
       )}
       {topContent}
       <div className="filter-row flex flex-wrap gap-2 mb-3">
         <SearchBox value={q} onChange={setQ} />
         {filters.map((f) => (
-          <select key={f.key} aria-label={f.label} className="input !w-auto min-w-[130px]" value={fv[f.key] || ''} onChange={(e) => setFv({ ...fv, [f.key]: e.target.value })}>
-            <option value="">{f.label}</option>
-            {optList(f.options).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <select key={f.key} aria-label={tx(f.label)} className="input !w-auto min-w-[130px]" value={fv[f.key] || ''} onChange={(e) => setFv({ ...fv, [f.key]: e.target.value })}>
+            <option value="">{tx(f.label)}</option>
+            {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
           </select>
         ))}
       </div>
@@ -332,7 +336,7 @@ export default function CrudPage({
         </>
       )}
 
-      <Sheet open={open} onClose={() => setOpen(false)} wide={wide || fields.length > 8} title={editing ? `${t('edit')} – ${label}` : formTitle || `${t('newEntry')} – ${label}`}
+      <Sheet open={open} onClose={() => setOpen(false)} wide={wide || fields.length > 8} title={editing ? `${t('edit')} – ${tx(label)}` : tx(formTitle) || `${t('newEntry')} – ${tx(label)}`}
         footer={<>
           <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[110px]" onClick={() => setOpen(false)}>{t('cancel')}</button>
           <button type="button" className="btn-primary flex-1 sm:flex-initial sm:min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed" onClick={save} disabled={saving}>{saving ? '…' : editing ? t('save') : t('submit')}</button>
@@ -349,25 +353,25 @@ export default function CrudPage({
             disabled={voidBusy}
             onClick={confirmVoid}
           >
-            {voidBusy ? 'Cancelling…' : t('cancelEntry')}
+            {voidBusy ? tx('Cancelling…') : t('cancelEntry')}
           </button>
         </>}>
-        <p className="text-sm text-char-700 mb-3">Nothing is deleted — the entry stays in the audit trail, and any stock or money it moved is reversed.</p>
+        <p className="text-sm text-char-700 mb-3">{tx('Nothing is deleted — the entry stays in the audit trail, and any stock or money it moved is reversed.')}</p>
         <Field label="Reason" htmlFor="void_reason">
           <input id="void_reason" className="input" value={reason} disabled={voidBusy} onChange={(e) => setReason(e.target.value)} autoFocus />
         </Field>
       </Sheet>
 
-      <Sheet open={!!hist} onClose={() => setHist(null)} title={`${t('history')} – ${hist?.row?.name || hist?.row?.title || label}`}>
+      <Sheet open={!!hist} onClose={() => setHist(null)} title={`${t('history')} – ${hist?.row?.name || hist?.row?.title || tx(label)}`}>
         {hist && (hist.logs.length ? hist.logs.map((l) => (
           <div key={l._id} className="py-2 border-b border-sand-100 text-sm">
             <div className="flex justify-between gap-2"><b className="capitalize">{l.action}</b><span className="text-char-500 text-xs">{fmtDateTime(l.at)}</span></div>
-            <div className="text-xs text-char-500">by {l.by} ({l.role})</div>
+            <div className="text-xs text-char-500"><T vars={{ b: l.by, r: l.role }}>{'by {b} ({r})'}</T></div>
             {l.changes && Object.entries(l.changes).map(([k, v]) => (
               <div key={k} className="text-xs mt-0.5"><span className="font-semibold">{k}:</span> {v?.from !== undefined && <span className="text-red-600 line-through mr-1">{String(v.from)}</span>}<span className="text-emerald-700">{String(v?.to ?? '')}</span></div>
             ))}
           </div>
-        )) : <div className="text-sm text-char-500">No history</div>)}
+        )) : <div className="text-sm text-char-500"><T>No history</T></div>)}
       </Sheet>
     </div>
   );

@@ -3,7 +3,7 @@ import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { BadgeCheck, Save, Banknote, FileText, MessageCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, Sheet, KV, ExportBtn, Section, SkeletonList, Empty, Pagination } from '@/components/ui';
@@ -11,12 +11,13 @@ import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { api, downloadCSV, openWA } from '@/lib/client';
 import { inr, num, fmtMonth, todayISO, monthOf, addDays, fmtDate } from '@/lib/format';
 import { SALARY } from '@/lib/config';
+import T from '@/components/T';
 
 const prevMonth = () => monthOf(addDays(`${monthOf(todayISO())}-01`, -1));
 const PT = { monthly: 'Monthly', daily: 'Daily', piece: 'Piece rate' };
 
 export default function SalaryPage() {
-  const { t, can } = useApp();
+  const { t, tr, can } = useApp();
   const isWorker = !can('salarysheets'); // people without the sheet only ever see their own slip
   const [tab, setTab] = useState('sheet');
   const [month, setMonth] = useState(prevMonth());
@@ -77,11 +78,11 @@ export default function SalaryPage() {
               </div>
               <div className="card p-3 mb-3 flex flex-wrap items-center gap-2">
                 <Badge tone={sheetStatus === 'paid' ? 'green' : sheetStatus === 'approved' ? 'blue' : 'amber'}>{sheetStatus === 'preview' ? 'Preview – not approved' : sheetStatus}</Badge>
-                {data?.approvedBy && <span className="text-xs text-char-500">approved by {data.approvedBy}</span>}
+                {data?.approvedBy && <span className="text-xs text-char-500"><T vars={{ n: data.approvedBy }}>{'approved by {n}'}</T></span>}
                 <div className="flex-1" />
-                {office && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-outline" disabled={busy} onClick={() => act('salarySave', {}, 'Draft saved')}><Save size={16} /> Save draft</button>}
+                {office && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-outline" disabled={busy} onClick={() => act('salarySave', {}, 'Draft saved')}><Save size={16} /><T> Save draft</T></button>}
                 {can('salarysheets', 'approve') && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-primary" disabled={busy} onClick={async () => { if (await confirmDialog(`Approve salary sheet for ${fmtMonth(month)}? Net payable ${inr(tot.net)}. Advance recoveries will be applied.`)) act('salaryApprove', {}, 'Salary sheet approved'); }}><BadgeCheck size={16} /> {t('approveSheet')}</button>}
-                {mayPay && ['approved'].includes(sheetStatus) && <button className="btn-green" disabled={busy} onClick={async () => { const mode = await promptDialog('Pay all unpaid salaries by: Bank / Cash / UPI', 'Bank'); if (mode) act('salaryPay', { mode: normMode(mode) }, 'Salaries marked paid'); }}><Banknote size={16} /> Pay all</button>}
+                {mayPay && ['approved'].includes(sheetStatus) && <button className="btn-green" disabled={busy} onClick={async () => { const mode = await promptDialog('Pay all unpaid salaries by: Bank / Cash / UPI', 'Bank'); if (mode) act('salaryPay', { mode: normMode(mode) }, 'Salaries marked paid'); }}><Banknote size={16} /><T> Pay all</T></button>}
               </div>
             </>
           )}
@@ -92,8 +93,7 @@ export default function SalaryPage() {
             </>
           ) : <Empty text="No salary data for this month" />}
           <p className="text-[11px] text-char-500 mt-3">
-            Monthly = salary ÷ days in month × days present (paid leave counts) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime = {SALARY.otMultiplier}× hourly rate ·
-            PF {SALARY.pfRate * 100}% (wages capped ₹{num(SALARY.pfWageCap)}), ESI {SALARY.esiRate * 100}% (gross up to ₹{num(SALARY.esiGrossCap)}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.
+            <T vars={{ o: SALARY.otMultiplier, p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Monthly = salary ÷ days in month × days present (paid leave counts) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime = {o}× hourly rate · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.'}</T>
           </p>
         </>
       )}
@@ -108,20 +108,20 @@ export default function SalaryPage() {
       )}
 
       <Sheet open={!!sel} onClose={() => setSel(null)} title={`${sel?.name} · ${fmtMonth(month)}`}
-        footer={sel && <><Link href={`/salary/slip/${month}/${sel.empCode}`} className="btn-primary flex-1"><FileText size={16} /> {t('slip')}</Link>{office && <button className="btn-green flex-1" onClick={() => openWA(slipMsg(sel), sel.mobile)}><MessageCircle size={16} /> WhatsApp</button>}</>}>
+        footer={sel && <><Link href={`/salary/slip/${month}/${sel.empCode}`} className="btn-primary flex-1"><FileText size={16} /> {t('slip')}</Link>{office && <button className="btn-green flex-1" onClick={() => openWA(slipMsg(sel), sel.mobile)}><MessageCircle size={16} /><T> WhatsApp</T></button>}</>}>
         {sel && (
           <div>
-            <div className="rounded-xl bg-sand-100 p-3 text-sm mb-3"><div className="text-[11px] uppercase font-bold text-char-500 mb-1">How wages were worked out</div><div className="font-mono text-[13px]">{sel.formula}</div></div>
+            <div className="rounded-xl bg-sand-100 p-3 text-sm mb-3"><div className="text-[11px] uppercase font-bold text-char-500 mb-1"><T>How wages were worked out</T></div><div className="font-mono text-[13px]">{sel.formula}</div></div>
             <KV label="Pay type">{PT[sel.payType]} · ₹{num(sel.rate)}</KV>
-            {sel.unmarked > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2">{sel.unmarked} day(s) have no attendance marked — they are not paid.</div>}
+            {sel.unmarked > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.unmarked }}>{'{n} day(s) have no attendance marked — they are not paid.'}</T></div>}
             {sel.payType !== 'piece' && <><KV label="Present / overtime days">{sel.present} / {sel.overtime}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV></>}
             <KV label="Wages">{inr(sel.wages)}</KV>
-            <KV label={`Overtime (${sel.otHours} h × ${SALARY.otMultiplier}×)`}>+ {inr(sel.otPay)}</KV>
+            <KV label={tr('Overtime ({h} h × {m}×)', { h: sel.otHours, m: SALARY.otMultiplier })}>+ {inr(sel.otPay)}</KV>
             <KV label="Gross">{inr(sel.gross)}</KV>
             <KV label="PF">− {inr(sel.pf)}</KV><KV label="ESI">− {inr(sel.esi)}</KV><KV label="Advance recovery">− {inr(sel.advanceRecovery)}</KV>
-            <KV label={<b>Net salary</b>}><b className="text-lg text-terra">{inr(sel.net)}</b></KV>
+            <KV label={<b><T>Net salary</T></b>}><b className="text-lg text-terra">{inr(sel.net)}</b></KV>
             {sel.bank && <KV label="Bank / UPI">{sel.bank}</KV>}
-            {mayPay && ['approved', 'paid'].includes(sheetStatus) && !sel.paid && <button className="btn-outline w-full mt-3" onClick={async () => { const mode = await promptDialog('Paid by: Bank / Cash / UPI', 'Bank'); if (mode) { act('salaryPay', { mode: normMode(mode), empCode: sel.empCode }, 'Marked paid'); setSel(null); } }}>Mark this salary paid</button>}
+            {mayPay && ['approved', 'paid'].includes(sheetStatus) && !sel.paid && <button className="btn-outline w-full mt-3" onClick={async () => { const mode = await promptDialog('Paid by: Bank / Cash / UPI', 'Bank'); if (mode) { act('salaryPay', { mode: normMode(mode), empCode: sel.empCode }, 'Marked paid'); setSel(null); } }}><T>Mark this salary paid</T></button>}
           </div>
         )}
       </Sheet>

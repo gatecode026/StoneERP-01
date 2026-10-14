@@ -6,12 +6,13 @@ import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { fmtDate, todayISO, addDays, num2 } from '@/lib/format';
+import T from '@/components/T';
 
 const KINDS = ['Truck', 'Tractor', 'Loader', 'Crane', 'Other'];
 const EXP = [['insuranceExpiry', 'Insurance'], ['fitnessExpiry', 'Fitness'], ['permitExpiry', 'Permit'], ['pucExpiry', 'PUC']];
 
 export default function VehiclesPage() {
-  const { t } = useApp();
+  const { t, tr } = useApp();
   const [tab, setTab] = useState('vehicles');
   const today = todayISO();
   const expBadge = (d) => (d ? <Badge tone={d < today ? 'red' : d <= addDays(today, 7) ? 'red' : d <= addDays(today, 30) ? 'amber' : 'green'}>{fmtDate(d)}</Badge> : <span className="text-char-300">—</span>);
@@ -29,13 +30,13 @@ export default function VehiclesPage() {
         <CrudPage model="vehicles" title={t('vehicles')} subtitle="Every truck, tractor, loader and crane — papers and expiry dates" label="Vehicle" sort="name" headerExtra={<ImportData resource="vehicles" noun="vehicles" hint="name and type are required" />}
           fields={[
             { name: 'name', label: 'Name', required: true, placeholder: 'Truck RJ06 GA 4521' }, { name: 'regNo', label: 'Registration no.' }, { name: 'kind', label: 'Type', type: 'select', options: KINDS, required: true },
-            ...EXP.map(([k, l]) => ({ name: k, label: `${l} expiry`, type: 'date' })),
+            ...EXP.map(([k, l]) => ({ name: k, label: tr('{l} expiry', { l }), type: 'date' })),
             { name: 'rcPhoto', label: 'RC photo', type: 'photo' }, { name: 'notes', label: 'Notes', wide: true },
           ]}
           columns={[{ key: 'name', label: 'Vehicle', primary: true }, { key: 'kind', label: 'Type' }, ...EXP.map(([k, l]) => ({ key: k, label: l, render: (r) => expBadge(r[k]) }))]}
           summary={() => {
             const soon = (soonQ.data || []).flatMap((v) => EXP.filter(([k]) => v[k] && v[k] <= addDays(today, 30)).map(([k, l]) => `${v.name}: ${l} ${fmtDate(v[k])}`));
-            return soon.length ? <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /> Expiring within 30 days</div>{soon.map((s) => <div key={s}>{s}</div>)}</div> : null;
+            return soon.length ? <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /><T> Expiring within 30 days</T></div>{soon.map((s) => <div key={s}>{s}</div>)}</div> : null;
           }} />
       ) : (
         <CrudPage model="vehicletrips" headerExtra={<ImportData resource="vehicletrips" perm="vehicletrips" noun="trips and diesel" />} title="Trips & diesel" subtitle="Diesel used per hour or per km — extra use stands out" label="Trip" sort="-date,-createdAt"

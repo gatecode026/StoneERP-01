@@ -18,7 +18,7 @@ export const confirmDialog = (message, opts = {}) => open({ kind: 'confirm', mes
 export const promptDialog = (message, defaultValue = '', opts = {}) => open({ kind: 'prompt', message, defaultValue, ...opts });
 
 export function DialogHost() {
-  const { t } = useApp();
+  const { t, tr } = useApp();
   const [cur, setCur] = useState(null);
   const [val, setVal] = useState('');
   const box = useRef(null);
@@ -56,16 +56,16 @@ export function DialogHost() {
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={() => close(isPrompt ? null : false)} />
       <div ref={box} role={isPrompt ? 'dialog' : 'alertdialog'} aria-modal="true" aria-labelledby="dlg_msg" className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-sand-200">
-        <p id="dlg_msg" className="text-sm text-char whitespace-pre-line">{cur.message}</p>
+        <p id="dlg_msg" className="text-sm text-char whitespace-pre-line">{tr(cur.message)}</p>
         {isPrompt && (
           <form onSubmit={(e) => { e.preventDefault(); close(val); }}>
-            <label htmlFor="dlg_input" className="sr-only">{cur.message}</label>
+            <label htmlFor="dlg_input" className="sr-only">{tr(cur.message)}</label>
             <input id="dlg_input" className="input mt-3" value={val} onChange={(e) => setVal(e.target.value)} />
           </form>
         )}
         <div className="mt-4 flex gap-3 justify-end">
-          <button className="btn-outline min-w-[96px]" onClick={() => close(isPrompt ? null : false)}>{cur.cancelLabel || t('cancel')}</button>
-          <button className={cur.danger ? 'btn-danger min-w-[96px]' : 'btn-primary min-w-[96px]'} onClick={() => close(isPrompt ? val : true)}>{cur.okLabel || t('ok')}</button>
+          <button className="btn-outline min-w-[96px]" onClick={() => close(isPrompt ? null : false)}>{tr(cur.cancelLabel) || t('cancel')}</button>
+          <button className={cur.danger ? 'btn-danger min-w-[96px]' : 'btn-primary min-w-[96px]'} onClick={() => close(isPrompt ? val : true)}>{tr(cur.okLabel) || t('ok')}</button>
         </div>
       </div>
     </div>

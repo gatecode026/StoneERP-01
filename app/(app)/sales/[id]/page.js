@@ -3,13 +3,14 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { FileText, MessageCircle, Truck, IndianRupee, Printer, CheckCircle2, ShoppingCart } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Section, KV, Badge, Sheet, Field, PhotoInput, SkeletonList, DataList, cx } from '@/components/ui';
 import { api, submit, openWA } from '@/lib/client';
 import { TAX_LABEL } from '@/lib/gst';
 import { inr, inr2, num, fmtDate, todayISO, daysBetween } from '@/lib/format';
+import T from '@/components/T';
 
 const STEPS = ['Quotation', 'Order', 'Dispatch', 'GST bill', 'Payment'];
 
@@ -17,7 +18,7 @@ export default function SaleDetail() {
   const { id } = useParams();
   const router = useRouter();
   const company = useApp().session.company;
-  const { can } = useApp();
+  const { can, tr } = useApp();
   const full = useFetch(`/api/sales/${id}/full`); // sale + payments + dispatches in one round trip
   const { loading, reload } = full;
   const s = full.data?.sale;
@@ -77,7 +78,7 @@ export default function SaleDetail() {
       <PageHeader title={`${s.saleNo} · ${s.customerName}`} back="/sales" subtitle={`${fmtDate(s.date)} · ${s.salesperson}`}
         actions={<>
           <Link href={`/sales/${id}/invoice${s.invoiceNo ? '' : '?type=quotation'}`} className="btn-outline"><Printer size={16} /> {s.invoiceNo ? 'Invoice / PDF' : 'Quotation PDF'}</Link>
-          <button className="btn-green" onClick={() => openWA(s.invoiceNo ? billMsg : quoteMsg, s.customerMobile)}><MessageCircle size={16} /> WhatsApp</button>
+          <button className="btn-green" onClick={() => openWA(s.invoiceNo ? billMsg : quoteMsg, s.customerMobile)}><MessageCircle size={16} /><T> WhatsApp</T></button>
         </>} />
 
       {/* stage stepper */}
@@ -104,11 +105,11 @@ export default function SaleDetail() {
           </Section>
           <div className="grid sm:grid-cols-2 gap-4">
             <Section title="Payments" right={<Badge tone={pending ? 'amber' : 'green'}>{pending ? `Pending ${inr(pending)}` : 'Fully paid'}</Badge>}>
-              {(pays.data || []).length ? pays.data.map((p) => <div key={p._id} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{fmtDate(p.date)} · {p.mode}{p.kind === 'advance' ? ' (advance)' : ''}</span><b className="text-emerald-700">{inr(p.amount)}</b></div>) : <div className="text-sm text-char-500">No payments yet</div>}
-              {pending > 0 && s.stage !== 'quotation' && <div className="text-xs text-char-500 mt-2">{daysBetween(s.invoiceDate || s.date, todayISO())} days since {s.invoiceDate ? 'invoice' : 'order'}</div>}
+              {(pays.data || []).length ? pays.data.map((p) => <div key={p._id} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{fmtDate(p.date)} · {p.mode}{p.kind === 'advance' ? ' (advance)' : ''}</span><b className="text-emerald-700">{inr(p.amount)}</b></div>) : <div className="text-sm text-char-500"><T>No payments yet</T></div>}
+              {pending > 0 && s.stage !== 'quotation' && <div className="text-xs text-char-500 mt-2"><T vars={{ n: daysBetween(s.invoiceDate || s.date, todayISO()) }}>{s.invoiceDate ? '{n} days since invoice' : '{n} days since order'}</T></div>}
             </Section>
             <Section title="Dispatches">
-              {(disp.data || []).length ? disp.data.map((d) => <Link key={d._id} href={`/dispatch/${d._id}`} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{d.gatePassNo} · {d.truckNo}</span><Badge tone={d.status === 'out' ? 'green' : 'amber'}>{d.status === 'out' ? 'Out' : 'Loading'}</Badge></Link>) : <div className="text-sm text-char-500">Nothing dispatched yet</div>}
+              {(disp.data || []).length ? disp.data.map((d) => <Link key={d._id} href={`/dispatch/${d._id}`} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{d.gatePassNo} · {d.truckNo}</span><Badge tone={d.status === 'out' ? 'green' : 'amber'}>{d.status === 'out' ? 'Out' : 'Loading'}</Badge></Link>) : <div className="text-sm text-char-500"><T>Nothing dispatched yet</T></div>}
             </Section>
           </div>
         </div>
@@ -119,7 +120,7 @@ export default function SaleDetail() {
             {s.taxType === 'cgst_sgst' && <><KV label="CGST">{inr2(s.cgst)}</KV><KV label="SGST">{inr2(s.sgst)}</KV></>}
             {s.taxType === 'igst' && <KV label="IGST">{inr2(s.igst)}</KV>}
             <KV label="Tax type"><span className="text-xs">{TAX_LABEL[s.taxType]}</span></KV>
-            <KV label={<b>Total</b>}><b className="text-lg">{inr(s.total)}</b></KV>
+            <KV label={<b><T>Total</T></b>}><b className="text-lg">{inr(s.total)}</b></KV>
             <KV label="Received">{inr(s.paid)}</KV>
             <KV label="Pending"><b className={pending ? 'text-amber-700' : 'text-emerald-700'}>{inr(pending)}</b></KV>
             {s.invoiceNo && <KV label="Invoice no.">{s.invoiceNo}</KV>}
@@ -127,43 +128,43 @@ export default function SaleDetail() {
 
           <Section title="Next step">
             <div className="space-y-2">
-              {s.stage === 'quotation' && can('sales', 'edit') && <button className="btn-primary w-full" onClick={() => { setF({ advanceMode: 'UPI' }); setSheet('order'); }}><ShoppingCart size={18} /> Convert to order</button>}
-              {s.stage !== 'quotation' && anyLeft && can('dispatches', 'create') && <button className="btn-primary w-full" onClick={() => { setF({ qty: {}, markOut: true }); setSheet('dispatch'); }}><Truck size={18} /> Dispatch truck</button>}
-              {s.stage !== 'quotation' && can('invoices', 'create') && !s.invoiceNo && <button className="btn-outline w-full" onClick={invoice} disabled={busy}><FileText size={18} /> Generate GST bill</button>}
-              {s.stage !== 'quotation' && pending > 0 && can('payments', 'create') && <button className="btn-green w-full" onClick={() => { setF({ amount: String(pending), mode: 'UPI', date: todayISO() }); setSheet('pay'); }}><IndianRupee size={18} /> Add payment</button>}
-              {s.stage !== 'quotation' && pending > 0 && <button className="btn-outline w-full" onClick={() => openWA(`Dear ${s.customerName}, gentle reminder from ${company.name}: ${inr(pending)} is pending against order ${s.saleNo}${s.invoiceNo ? ` (Invoice ${s.invoiceNo})` : ''}. Kindly arrange the payment. Thank you.`, s.customerMobile)}><MessageCircle size={18} /> Send payment reminder</button>}
-              {s.stage !== 'quotation' && !anyLeft && pending === 0 && s.invoiceNo && <div className="text-sm text-emerald-700 font-semibold flex items-center gap-2"><CheckCircle2 size={18} /> Completed</div>}
+              {s.stage === 'quotation' && can('sales', 'edit') && <button className="btn-primary w-full" onClick={() => { setF({ advanceMode: 'UPI' }); setSheet('order'); }}><ShoppingCart size={18} /><T> Convert to order</T></button>}
+              {s.stage !== 'quotation' && anyLeft && can('dispatches', 'create') && <button className="btn-primary w-full" onClick={() => { setF({ qty: {}, markOut: true }); setSheet('dispatch'); }}><Truck size={18} /><T> Dispatch truck</T></button>}
+              {s.stage !== 'quotation' && can('invoices', 'create') && !s.invoiceNo && <button className="btn-outline w-full" onClick={invoice} disabled={busy}><FileText size={18} /><T> Generate GST bill</T></button>}
+              {s.stage !== 'quotation' && pending > 0 && can('payments', 'create') && <button className="btn-green w-full" onClick={() => { setF({ amount: String(pending), mode: 'UPI', date: todayISO() }); setSheet('pay'); }}><IndianRupee size={18} /><T> Add payment</T></button>}
+              {s.stage !== 'quotation' && pending > 0 && <button className="btn-outline w-full" onClick={() => openWA(`Dear ${s.customerName}, gentle reminder from ${company.name}: ${inr(pending)} is pending against order ${s.saleNo}${s.invoiceNo ? ` (Invoice ${s.invoiceNo})` : ''}. Kindly arrange the payment. Thank you.`, s.customerMobile)}><MessageCircle size={18} /><T> Send payment reminder</T></button>}
+              {s.stage !== 'quotation' && !anyLeft && pending === 0 && s.invoiceNo && <div className="text-sm text-emerald-700 font-semibold flex items-center gap-2"><CheckCircle2 size={18} /><T> Completed</T></div>}
             </div>
           </Section>
         </div>
       </div>
 
       <Sheet open={sheet === 'order'} onClose={() => setSheet(null)} title="Convert to order"
-        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}>Cancel</button><button className="btn-primary flex-[2]" disabled={busy} onClick={() => run(() => act('order', { advance: Number(f.advance) || 0, advanceMode: f.advanceMode }), 'Order confirmed')}>Confirm order</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-primary flex-[2]" disabled={busy} onClick={() => run(() => act('order', { advance: Number(f.advance) || 0, advanceMode: f.advanceMode }), 'Order confirmed')}><T>Confirm order</T></button></>}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Advance received (₹)"><input className="input" type="number" inputMode="decimal" value={f.advance || ''} onChange={(e) => set({ advance: e.target.value })} /></Field>
-          <Field label="Mode"><select className="input" value={f.advanceMode} onChange={(e) => set({ advanceMode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m}>{m}</option>)}</select></Field>
+          <Field label="Mode"><select className="input" value={f.advanceMode} onChange={(e) => set({ advanceMode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></Field>
         </div>
       </Sheet>
 
       <Sheet open={sheet === 'pay'} onClose={() => setSheet(null)} title="Payment received"
-        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}>Cancel</button><button className="btn-green flex-[2]" disabled={busy} onClick={pay}>Save payment</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-green flex-[2]" disabled={busy} onClick={pay}><T>Save payment</T></button></>}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Amount (₹)" className="col-span-2"><input className="input text-lg" type="number" inputMode="decimal" value={f.amount || ''} onChange={(e) => set({ amount: e.target.value })} /></Field>
-          <Field label="Mode"><select className="input" value={f.mode} onChange={(e) => set({ mode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m}>{m}</option>)}</select></Field>
+          <Field label="Mode"><select className="input" value={f.mode} onChange={(e) => set({ mode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></Field>
           <Field label="Date"><input className="input" type="date" value={f.date || ''} onChange={(e) => set({ date: e.target.value })} /></Field>
           <Field label="Reference / cheque no." className="col-span-2"><input className="input" value={f.ref || ''} onChange={(e) => set({ ref: e.target.value })} /></Field>
         </div>
       </Sheet>
 
       <Sheet open={sheet === 'dispatch'} onClose={() => setSheet(null)} title="Dispatch truck + gate pass" wide
-        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}>Cancel</button><button className="btn-primary flex-[2]" disabled={busy} onClick={dispatch}>{f.markOut === false ? 'Save loading slip' : 'Truck out · deduct stock'}</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-primary flex-[2]" disabled={busy} onClick={dispatch}>{f.markOut === false ? 'Save loading slip' : 'Truck out · deduct stock'}</button></>}>
         <div className="space-y-3">
           <div className="rounded-xl border border-sand-200 p-3">
-            <div className="text-xs font-bold uppercase text-char-500 mb-2">Loading slip – quantity loaded</div>
+            <div className="text-xs font-bold uppercase text-char-500 mb-2"><T>Loading slip – quantity loaded</T></div>
             {remaining.filter((i) => i.left > 0).map((i) => (
               <div key={i.stockItemId || i.name} className="flex items-center gap-3 py-1.5">
-                <div className="flex-1 text-sm">{i.name}<div className="text-[11px] text-char-500">left to send: {num(i.left)} {i.unit}</div></div>
+                <div className="flex-1 text-sm">{i.name}<div className="text-[11px] text-char-500"><T vars={{ n: num(i.left), u: i.unit }}>{'left to send: {n} {u}'}</T></div></div>
                 <input className="input !w-28" type="number" inputMode="decimal" defaultValue={i.left} onChange={(e) => set({ qty: { ...(f.qty || {}), [i.stockItemId || i.name]: e.target.value } })} />
               </div>
             ))}
@@ -180,7 +181,7 @@ export default function SaleDetail() {
             <Field label="Photo – loaded truck"><PhotoInput value={f.photoLoaded} onChange={(x) => set({ photoLoaded: x })} /></Field>
             <Field label="Photo – covered truck"><PhotoInput value={f.photoCovered} onChange={(x) => set({ photoCovered: x })} /></Field>
           </div>
-          <label className="flex items-center gap-3 min-h-[44px]"><input type="checkbox" className="w-5 h-5 accent-[#B5651D]" checked={f.markOut !== false} onChange={(e) => set({ markOut: e.target.checked })} /><span className="text-sm">Guard marks the truck out now (stock is deducted)</span></label>
+          <label className="flex items-center gap-3 min-h-[44px]"><input type="checkbox" className="w-5 h-5 accent-[#B5651D]" checked={f.markOut !== false} onChange={(e) => set({ markOut: e.target.checked })} /><span className="text-sm"><T>Guard marks the truck out now (stock is deducted)</T></span></label>
         </div>
       </Sheet>
     </RoleGuard>
