@@ -9,7 +9,7 @@ import { fmtDateTime } from '@/lib/format';
 const MODELS = ['employees', 'attendance', 'dailyreports', 'sales', 'payments', 'dispatches', 'expenses', 'purchases', 'stockitems', 'stockmovements', 'cashentries', 'cashclosings', 'salarysheets', 'advances', 'leaves', 'users', 'roles'];
 
 export default function AuditPage() {
-  const { t, can } = useApp();
+  const { t, tr, can } = useApp();
   const [model, setModel] = useState('');
   // newest first, a page at a time; the filter runs on the server (the log can hold millions of rows)
   const params = { sort: '-at', ...(model ? { model } : {}) };
@@ -19,7 +19,7 @@ export default function AuditPage() {
     <RoleGuard perm="auditlogs">
       <PageHeader title={t('audit')} subtitle="Nothing is deleted. Every change shows who changed it and when."
         actions={can('auditlogs', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/auditlogs?format=xlsx&${toQuery(params)}`)} />} />
-      <div className="mb-3"><select aria-label="Record type" className="input !w-auto min-w-[180px]" value={model} onChange={(e) => setModel(e.target.value)}><option value="">All records</option>{MODELS.map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
+      <div className="mb-3"><select aria-label={tr('Record type')} className="input !w-auto min-w-[180px]" value={model} onChange={(e) => setModel(e.target.value)}><option value="">{tr('All records')}</option>{MODELS.map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></div>
       <DataList loading={loading} rows={rows} columns={[
         { key: 'at', label: 'When', primary: true, render: (r) => fmtDateTime(r.at) },
         { key: 'by', label: 'By', render: (r) => <span>{r.by} <span className="text-char-500 text-xs">({r.role})</span></span> },

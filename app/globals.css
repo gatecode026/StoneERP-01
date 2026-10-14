@@ -109,3 +109,6 @@ img, video, canvas, svg { max-width: 100%; }
   .page-actions:has(> :nth-child(4)) input[type='date'], .page-actions:has(> :nth-child(4)) input[type='month'] { min-width: 98px; padding: 0 .4rem; }
   .page-actions:has(> :nth-child(4)) select { min-width: 76px; padding: 0 .4rem; }
 }
+
+/* long lists: rows far below the screen are not laid out or painted until they scroll near (the browser does the windowing; a list is at most 100 rows) */
+.cv-auto { content-visibility: auto; contain-intrinsic-size: auto 96px; }

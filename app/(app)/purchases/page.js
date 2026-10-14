@@ -3,13 +3,14 @@ import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Check, X, Banknote } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, StatCard, Badge } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
 import { inr, num, fmtDate, todayISO } from '@/lib/format';
+import T from '@/components/T';
 
 export default function PurchasesPage() {
   const { t, can } = useApp();
@@ -47,7 +48,7 @@ export default function PurchasesPage() {
     { key: 'total', label: 'Total', align: 'right', render: (r) => <b>{inr(r.total)}</b> },
     { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
     { key: 'billNo', label: 'Bill', render: (r) => r.billNo || '—' },
-    { label: 'Payment', render: (r) => (r.status === 'pending' ? <Badge tone="amber">Awaiting approval</Badge> : payable(r) > 0 ? <Badge tone={r.dueDate && r.dueDate < todayISO() ? 'red' : 'amber'}>Due {inr(payable(r))} · {fmtDate(r.dueDate)}</Badge> : <Badge tone="green">Paid</Badge>) },
+    { label: 'Payment', render: (r) => (r.status === 'pending' ? <Badge tone="amber"><T>Awaiting approval</T></Badge> : payable(r) > 0 ? <Badge tone={r.dueDate && r.dueDate < todayISO() ? 'red' : 'amber'}><T vars={{ a: inr(payable(r)) }}>{'Due {a}'}</T> · {fmtDate(r.dueDate)}</Badge> : <Badge tone="green"><T>Paid</T></Badge>) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
   ];
 

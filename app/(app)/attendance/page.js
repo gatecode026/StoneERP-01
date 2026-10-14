@@ -2,7 +2,7 @@
 import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Camera, CheckCheck, MapPin, Check, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, Pager, cx } from '@/components/ui';
@@ -13,6 +13,8 @@ import { submit, api, getLocation } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, fmtDate, monthOf } from '@/lib/format';
 import { SALARY } from '@/lib/config';
+import T from '@/components/T';
+import { trNow } from '@/lib/trNow';
 
 const STATES = [
   { v: 'present', label: 'Present', short: 'P', on: 'bg-emerald-600 text-white border-emerald-600' },
@@ -23,7 +25,7 @@ const STATES = [
 ];
 
 export default function AttendancePage() {
-  const { t, can, perm } = useApp();
+  const { t, tr, can, perm } = useApp();
   // The screen follows the Roles & permissions exactly:
   //   See = Own  -> only their own attendance, never a list of other people
   //   Add = Own  -> they mark themselves (selfie); Add = Team / All -> they mark other people; no Add -> nothing to mark
@@ -54,13 +56,13 @@ export default function AttendancePage() {
     const prev = over[e.empCode];
     setOver((m) => ({ ...m, [e.empCode]: { ...(m[e.empCode] || {}), state, ...extra } }));
     try {
-      await submit('/api/attendance', { date, empCode: e.empCode, state, ...(state === 'overtime' ? { otHours: extra.otHours ?? view(e).otHours ?? SALARY.otHoursDefault } : {}) }, { label: `Attendance ${e.name}` });
+      await submit('/api/attendance', { date, empCode: e.empCode, state, ...(state === 'overtime' ? { otHours: extra.otHours ?? view(e).otHours ?? SALARY.otHoursDefault } : {}) }, { label: trNow('Attendance {n}', { n: e.name }) });
     } catch (err) { toast.error(err.message); setOver((m) => { const n = { ...m }; if (prev) n[e.empCode] = prev; else delete n[e.empCode]; return n; }); }
   }
   async function markAll() {
     const todo = unmarked;
     if (!todo) { toast('Everyone is already marked'); return; }
-    const id = toast.loading(`Marking ${todo} present…`);
+    const id = toast.loading(trNow('Marking {n} present…', { n: todo }));
     try {
       // one request for the whole team (one transaction, one bulkWrite): the server marks everyone who has no mark yet
       await api('/api/bulk/attendance', { method: 'POST', body: { date, rest: 'present' } });
@@ -89,7 +91,7 @@ export default function AttendancePage() {
   const counts = (st) => (sheet.meta.counts?.[st] || 0) + sheet.rows.reduce((n, r) => { const o = over[r.empCode]; return o ? n + (o.state === st ? 1 : 0) - (r.state === st ? 1 : 0) : n; }, 0);
   const unmarked = Math.max(0, (sheet.meta.unmarked || 0) - sheet.rows.filter((r) => !r.state && over[r.empCode]?.state).length);
 
-  const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> <span className="sm:hidden">Selfie</span><span className="hidden sm:inline">{t('selfie')}</span></button>;
+  const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> <span className="sm:hidden"><T>Selfie</T></span><span className="hidden sm:inline">{t('selfie')}</span></button>;
 
   const tabsEl = leavesOn && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Attendance' }, { key: 'leaves', label: 'Leave requests' }]} />;
   const showMark = tab === 'mark' || !leavesOn;
@@ -98,7 +100,7 @@ export default function AttendancePage() {
     <RoleGuard perm="attendance">
       {tabsEl}
       {showMark && (
-        <PageHeader title={t('attendance')} subtitle={ownOnly ? 'Your attendance this month' : canMarkOthers ? 'Mark your team — present, absent, half day, overtime or leave' : 'Your team\'s attendance (view only)'}
+        <PageHeader title={t('attendance')} subtitle={ownOnly ? 'Your attendance this month' : canMarkOthers ? 'Mark your team — present, absent, half day, overtime or leave' : tr('Your team\'s attendance (view only)')}
           actions={<>{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}{canSelfie && selfieBtn}</>} />
       )}
 
@@ -121,13 +123,13 @@ export default function AttendancePage() {
                 const e = r;
                 const m = view(r);
                 return (
-                  <div key={e.empCode} className={cx('card p-3', !m.state && 'border-amber-300')}>
+                  <div key={e.empCode} className={cx('card p-3 cv-auto', !m.state && 'border-amber-300')}>
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="min-w-0"><div className="font-semibold text-sm truncate">{e.name}</div><div className="text-[11px] text-char-500">{e.job} · {e.empCode}</div></div>
                       <div className="flex items-center gap-2">
-                        {m?.state === 'overtime' && <input className="input !w-16 !min-h-[36px] text-center" type="number" min="0" defaultValue={m.otHours ?? SALARY.otHoursDefault} title="Overtime hours" onBlur={(ev) => mark(e, 'overtime', { otHours: Number(ev.target.value) })} />}
-                        {m?.method === 'selfie' && <Badge tone="blue"><MapPin size={10} /> selfie</Badge>}
-                        {!m.state && <Badge tone="amber">not marked</Badge>}
+                        {m?.state === 'overtime' && <input className="input !w-16 !min-h-[36px] text-center" type="number" min="0" defaultValue={m.otHours ?? SALARY.otHoursDefault} title={tr('Overtime hours')} onBlur={(ev) => mark(e, 'overtime', { otHours: Number(ev.target.value) })} />}
+                        {m?.method === 'selfie' && <Badge tone="blue"><MapPin size={10} /><T> selfie</T></Badge>}
+                        {!m.state && <Badge tone="amber"><T>not marked</T></Badge>}
                       </div>
                     </div>
                     {canMark && r.markable ? (
@@ -140,7 +142,7 @@ export default function AttendancePage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm">{m?.state ? <Badge tone={m.state === 'absent' ? 'red' : m.state === 'leave' ? 'blue' : m.state === 'half' ? 'amber' : 'green'}>{STATES.find((x) => x.v === m.state)?.label || m.state}</Badge> : <span className="text-char-500">Not marked</span>}</div>
+                      <div className="text-sm">{m?.state ? <Badge tone={m.state === 'absent' ? 'red' : m.state === 'leave' ? 'blue' : m.state === 'half' ? 'amber' : 'green'}>{STATES.find((x) => x.v === m.state)?.label || m.state}</Badge> : <span className="text-char-500"><T>Not marked</T></span>}</div>
                     )}
                   </div>
                 );
@@ -148,7 +150,7 @@ export default function AttendancePage() {
             </div>
           )}
           <Pager list={sheet} />
-          <p className="text-[11px] text-char-500 mt-3 md:hidden">P = Present · A = Absent · ½ = Half day · OT = Overtime · L = Leave</p>
+          <p className="text-[11px] text-char-500 mt-3 md:hidden"><T>P = Present · A = Absent · ½ = Half day · OT = Overtime · L = Leave</T></p>
         </>
       )}
 
@@ -160,7 +162,7 @@ export default function AttendancePage() {
       )}
 
       <Sheet open={selfie} onClose={() => setSelfie(false)} title={t('selfie')}
-        footer={<><button className="btn-outline flex-1" onClick={() => setSelfie(false)}>Cancel</button><button className="btn-primary flex-[2]" onClick={saveSelfie}>Mark present</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setSelfie(false)}><T>Cancel</T></button><button className="btn-primary flex-[2]" onClick={saveSelfie}><T>Mark present</T></button></>}>
         <div className="space-y-4">
           {canMarkOthers && (
             <Field label="Employee" required><LookupSelect kind="employees" by="empCode" value={sf.empCode} onChange={(it) => setSf({ ...sf, empCode: it ? it.id : '' })} /></Field>

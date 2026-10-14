@@ -1,13 +1,15 @@
 'use client';
 import ImportData from '@/components/ImportData';
 import { useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Lock } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, StatCard, Badge, Tabs, Sheet, Field } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { api } from '@/lib/client';
 import { inr, fmtDate, todayISO } from '@/lib/format';
+import T from '@/components/T';
+import { trNow } from '@/lib/trNow';
 
 export default function CashPage() {
   const { t, can } = useApp();
@@ -31,7 +33,7 @@ export default function CashPage() {
     if (isNaN(c) || counted === '') { toast.error('Enter counted cash'); return; }
     try {
       const r = await api('/api/cashclosings', { method: 'POST', body: { counted: c, note } });
-      toast[r.difference === 0 ? 'success' : 'error'](r.difference === 0 ? 'Cash matches the app ✔' : `Difference ${inr(r.difference)} flagged to owner`);
+      toast[r.difference === 0 ? 'success' : 'error'](r.difference === 0 ? 'Cash matches the app ✔' : trNow('Difference {d} flagged to owner', { d: inr(r.difference) }));
       setOpen(false); setCounted(''); setNote(''); acct.reload();
     } catch (e) { toast.error(e.message); }
   }
@@ -56,12 +58,12 @@ export default function CashPage() {
       </div>
       <div className={`rounded-2xl border p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3 ${todayClose ? (todayClose.difference ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200') : 'bg-amber-50 border-amber-200'}`}>
         <div className="flex-1">
-          <div className="font-bold text-sm">Cash closing – {fmtDate(today)}</div>
+          <div className="font-bold text-sm"><T vars={{ d: fmtDate(today) }}>{'Cash closing – {d}'}</T></div>
           {todayClose
-            ? <div className="text-sm">Counted {inr(todayClose.counted)} vs app {inr(todayClose.systemBalance)} · {todayClose.difference ? <b className="text-red-700">Difference {inr(todayClose.difference)} – flagged to owner</b> : <b className="text-emerald-700">Matched ✔</b>}</div>
-            : <div className="text-sm">Closing cash per app is <b>{inr(cash)}</b>. The cashier counts the drawer and confirms.</div>}
+            ? <div className="text-sm"><T vars={{ c: inr(todayClose.counted), a: inr(todayClose.systemBalance) }}>{'Counted {c} vs app {a}'}</T> · {todayClose.difference ? <b className="text-red-700"><T vars={{ d: inr(todayClose.difference) }}>{'Difference {d} – flagged to owner'}</T></b> : <b className="text-emerald-700"><T>Matched ✔</T></b>}</div>
+            : <div className="text-sm"><T vars={{ c: inr(cash) }}>{'Closing cash per app is {c}. The cashier counts the drawer and confirms.'}</T></div>}
         </div>
-        {!todayClose && can('cashclosings', 'create') && <button className="btn-primary" onClick={() => { setCounted(String(cash)); setOpen(true); }}><Lock size={16} /> Count & confirm</button>}
+        {!todayClose && can('cashclosings', 'create') && <button className="btn-primary" onClick={() => { setCounted(String(cash)); setOpen(true); }}><Lock size={16} /><T> Count & confirm</T></button>}
       </div>
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'cash', label: 'Cash book' }, { key: 'close', label: 'Closing history', count: closings.length }]} />
       {tab === 'cash' ? (
@@ -84,18 +86,18 @@ export default function CashPage() {
           {closings.map((c) => (
             <div key={c._id} className="card p-3.5 flex items-center justify-between gap-3">
               <div><div className="font-semibold text-sm">{fmtDate(c.date)}</div><div className="text-xs text-char-500">{c.note}{c.confirmedBy ? ` · ${c.confirmedBy}` : ''}</div></div>
-              <div className="text-right text-sm"><div>App {inr(c.systemBalance)} · Counted {inr(c.counted)}</div>{c.difference ? <Badge tone="red">Difference {inr(c.difference)}</Badge> : <Badge tone="green">Matched</Badge>}</div>
+              <div className="text-right text-sm"><div><T vars={{ a: inr(c.systemBalance), c: inr(c.counted) }}>{'App {a} · Counted {c}'}</T></div>{c.difference ? <Badge tone="red"><T vars={{ d: inr(c.difference) }}>{'Difference {d}'}</T></Badge> : <Badge tone="green"><T>Matched</T></Badge>}</div>
             </div>
           ))}
         </div>
       )}
       <Sheet open={open} onClose={() => setOpen(false)} title="Count cash & confirm"
-        footer={<><button className="btn-outline flex-1" onClick={() => setOpen(false)}>Cancel</button><button className="btn-primary flex-[2]" onClick={confirmClose}>Confirm closing cash</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setOpen(false)}><T>Cancel</T></button><button className="btn-primary flex-[2]" onClick={confirmClose}><T>Confirm closing cash</T></button></>}>
         <div className="space-y-3">
-          <div className="rounded-xl bg-sand-100 p-3 text-sm">Cash per app: <b>{inr(cash)}</b></div>
+          <div className="rounded-xl bg-sand-100 p-3 text-sm"><T>Cash per app:</T> <b>{inr(cash)}</b></div>
           <Field label="Cash counted in drawer (₹)" htmlFor="counted"><input id="counted" className="input" type="number" inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} /></Field>
           <Field label="Remark" htmlFor="cnote"><input id="cnote" className="input" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-          {counted !== '' && Number(counted) !== cash && <div className="text-sm text-red-600 font-semibold">Difference of {inr(Number(counted) - cash)} will be flagged to the owner.</div>}
+          {counted !== '' && Number(counted) !== cash && <div className="text-sm text-red-600 font-semibold"><T vars={{ d: inr(Number(counted) - cash) }}>{'Difference of {d} will be flagged to the owner.'}</T></div>}
         </div>
       </Sheet>
     </RoleGuard>

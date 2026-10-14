@@ -188,6 +188,8 @@ describe('overview and report endpoints', () => {
     const r = (await call(owner, expReport.GET as never, `/api/expenses/report?month=${monthOf(today)}`)).json;
     expect(r.total).toBe(8200);
     expect(r.count).toBe(3);
+    expect(typeof r.pending).toBe('number'); // the report screen shows how many are waiting for approval
+    expect(r.pending).toBeLessThanOrEqual(r.count);
     expect(r.byHead[0]).toMatchObject({ name: 'Diesel', amount: 7000 });
     expect(r.byHead.find((h: any) => h.name === 'Tea')).toMatchObject({ amount: 1200, count: 2 });
     expect((await call(owner, expReport.GET as never, '/api/expenses/report?month=bad')).status).toBe(400);

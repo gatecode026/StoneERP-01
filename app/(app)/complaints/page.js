@@ -1,6 +1,6 @@
 'use client';
 import ImportData from '@/components/ImportData';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Badge, Section } from '@/components/ui';
 import { useApp } from '@/components/Providers';

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Plus, Trash2, UserPlus } from 'lucide-react';
 import { useApp } from '@/components/Providers';
 import LookupSelect from '@/components/LookupSelect';
@@ -11,12 +11,14 @@ import { CUSTOMER_FIELDS } from '@/components/fields';
 import { api, submit } from '@/lib/client';
 import { computeTotals, taxTypeFor, TAX_LABEL, HSN_OPTIONS } from '@/lib/gst';
 import { inr, inr2, todayISO, amountInWords, num } from '@/lib/format';
+import T from '@/components/T';
+import { trNow } from '@/lib/trNow';
 
 const newItem = () => ({ stockItemId: '', name: '', hsn: '6802', qty: '', unit: 'sq ft', rate: '', gstRate: 18 });
 
 export default function NewSale() {
   const router = useRouter();
-  const { t, session } = useApp();
+  const { t, tr, session } = useApp();
   const [customerId, setCustomerId] = useState('');
   const [customer, setCustomer] = useState(null); // the chosen customer's full record (address, GSTIN, state), fetched when picked
   const [date, setDate] = useState(todayISO());
@@ -59,7 +61,7 @@ export default function NewSale() {
 
   async function saveCustomer() {
     const miss = missingRequired(CUSTOMER_FIELDS, cform);
-    if (miss) { toast.error(`${miss} is required`); return; }
+    if (miss) { toast.error(trNow('{f} is required', { f: trNow(miss) })); return; }
     try {
       const c = await api('/api/customers', { method: 'POST', body: cleanForm(CUSTOMER_FIELDS, cform) });
       toast.success('Customer added'); setCustomerId(c._id); setCustomer(c); setCustOpen(false);
@@ -92,7 +94,7 @@ export default function NewSale() {
               <Field label="Customer" required className="sm:col-span-2">
                 <div className="flex gap-2">
                   <LookupSelect className="flex-1 min-w-0" kind="customers" value={customerId} valueLabel={customer?.name} onChange={(it) => setCustomerId(it ? it.id : '')} placeholder="Search customer…" />
-                  <button className="btn-outline shrink-0" onClick={() => { setCform({ state: 'Rajasthan', country: 'India', type: 'Domestic' }); setCustOpen(true); }}><UserPlus size={18} /> New</button>
+                  <button className="btn-outline shrink-0" onClick={() => { setCform({ state: 'Rajasthan', country: 'India', type: 'Domestic' }); setCustOpen(true); }}><UserPlus size={18} /><T> New</T></button>
                 </div>
               </Field>
               <Field label="Date"><input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
@@ -100,7 +102,7 @@ export default function NewSale() {
             </div>
           </Section>
 
-          <Section title="2. Items" right={<button className="btn-outline btn-sm" onClick={() => setItems([...items, newItem()])}><Plus size={14} /> Add item</button>}>
+          <Section title="2. Items" right={<button className="btn-outline btn-sm" onClick={() => setItems([...items, newItem()])}><Plus size={14} /><T> Add item</T></button>}>
             <div className="space-y-3">
               {items.map((it, i) => (
                 <div key={i} className="rounded-xl border border-sand-200 p-3 bg-sand-50/50">
@@ -109,7 +111,7 @@ export default function NewSale() {
                     {items.length > 1 && <button className="p-2.5 text-red-600" onClick={() => setItems(items.filter((_, k) => k !== i))}><Trash2 size={18} /></button>}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                    <Field label={`Quantity (${it.unit})`}><input className="input" type="number" inputMode="decimal" value={it.qty} onChange={(e) => setItem(i, { qty: e.target.value })} /></Field>
+                    <Field label={tr('Quantity ({u})', { u: it.unit })}><input className="input" type="number" inputMode="decimal" value={it.qty} onChange={(e) => setItem(i, { qty: e.target.value })} /></Field>
                     <Field label="Rate (₹)" hint={it.rateHint}><input className="input" type="number" inputMode="decimal" value={it.rate} onChange={(e) => setItem(i, { rate: e.target.value, rateTouched: true })} /></Field>
                     <Field label="HSN"><select className="input" value={it.hsn} onChange={(e) => setItem(i, { hsn: e.target.value, gstRate: HSN_OPTIONS.find((h) => h.value === e.target.value)?.rate ?? 18 })}>{HSN_OPTIONS.map((h) => <option key={h.value} value={h.value}>{h.value}</option>)}</select></Field>
                     <Field label="GST %"><select className="input" value={it.gstRate} disabled={taxType === 'export'} onChange={(e) => setItem(i, { gstRate: e.target.value })}>{[0, 5, 12, 18, 28].map((g) => <option key={g} value={g}>{taxType === 'export' ? 0 : g}%</option>)}</select></Field>
@@ -123,35 +125,35 @@ export default function NewSale() {
           <Section title="3. Advance (only if confirming order)">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Advance received (₹)"><input className="input" type="number" inputMode="decimal" value={advance} onChange={(e) => setAdvance(e.target.value)} /></Field>
-              <Field label="Mode"><select className="input" value={advanceMode} onChange={(e) => setAdvanceMode(e.target.value)}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m}>{m}</option>)}</select></Field>
+              <Field label="Mode"><select className="input" value={advanceMode} onChange={(e) => setAdvanceMode(e.target.value)}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></Field>
             </div>
           </Section>
         </div>
 
         <div className="lg:col-span-1">
           <div className="card p-4 lg:sticky lg:top-20">
-            <h3 className="font-bold text-sm mb-2">Summary</h3>
+            <h3 className="font-bold text-sm mb-2"><T>Summary</T></h3>
             <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-char-500">Taxable value</span><span>{inr2(totals.taxable)}</span></div>
-              {taxType === 'cgst_sgst' && <><div className="flex justify-between"><span className="text-char-500">CGST</span><span>{inr2(totals.cgst)}</span></div><div className="flex justify-between"><span className="text-char-500">SGST</span><span>{inr2(totals.sgst)}</span></div></>}
-              {taxType === 'igst' && <div className="flex justify-between"><span className="text-char-500">IGST</span><span>{inr2(totals.igst)}</span></div>}
-              {taxType === 'export' && <div className="flex justify-between"><span className="text-char-500">GST</span><span>Nil (LUT)</span></div>}
-              <div className="flex justify-between"><span className="text-char-500">Round off</span><span>{inr2(totals.roundOff)}</span></div>
-              <div className="flex justify-between text-lg font-extrabold border-t border-sand-200 pt-2 mt-2"><span>Total</span><span>{inr(totals.total)}</span></div>
+              <div className="flex justify-between"><span className="text-char-500"><T>Taxable value</T></span><span>{inr2(totals.taxable)}</span></div>
+              {taxType === 'cgst_sgst' && <><div className="flex justify-between"><span className="text-char-500"><T>CGST</T></span><span>{inr2(totals.cgst)}</span></div><div className="flex justify-between"><span className="text-char-500"><T>SGST</T></span><span>{inr2(totals.sgst)}</span></div></>}
+              {taxType === 'igst' && <div className="flex justify-between"><span className="text-char-500"><T>IGST</T></span><span>{inr2(totals.igst)}</span></div>}
+              {taxType === 'export' && <div className="flex justify-between"><span className="text-char-500"><T>GST</T></span><span><T>Nil (LUT)</T></span></div>}
+              <div className="flex justify-between"><span className="text-char-500"><T>Round off</T></span><span>{inr2(totals.roundOff)}</span></div>
+              <div className="flex justify-between text-lg font-extrabold border-t border-sand-200 pt-2 mt-2"><span><T>Total</T></span><span>{inr(totals.total)}</span></div>
               {totals.total > 0 && <div className="text-[11px] text-char-500">{amountInWords(totals.total)}</div>}
-              {Number(advance) > 0 && <div className="flex justify-between text-emerald-700 text-sm"><span>Advance</span><span>− {inr(advance)}</span></div>}
+              {Number(advance) > 0 && <div className="flex justify-between text-emerald-700 text-sm"><span><T>Advance</T></span><span>− {inr(advance)}</span></div>}
             </div>
           </div>
         </div>
       </div>
 
       <div className="fixed bottom-[58px] md:bottom-0 inset-x-0 md:left-64 z-30 bg-white border-t border-sand-200 px-4 py-3 flex gap-2 safe-pb">
-        <button className="btn-outline flex-1" disabled={saving} onClick={() => save('quotation')}>Save quotation</button>
-        <button className="btn-primary flex-1" disabled={saving} onClick={() => save('order')}>Confirm order</button>
+        <button className="btn-outline flex-1" disabled={saving} onClick={() => save('quotation')}><T>Save quotation</T></button>
+        <button className="btn-primary flex-1" disabled={saving} onClick={() => save('order')}><T>Confirm order</T></button>
       </div>
 
       <Sheet open={custOpen} onClose={() => setCustOpen(false)} title="New customer"
-        footer={<><button className="btn-outline flex-1" onClick={() => setCustOpen(false)}>Cancel</button><button className="btn-primary flex-[2]" onClick={saveCustomer}>Save customer</button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setCustOpen(false)}><T>Cancel</T></button><button className="btn-primary flex-[2]" onClick={saveCustomer}><T>Save customer</T></button></>}>
         <FormFields fields={CUSTOMER_FIELDS} form={cform} set={(p) => setCform((f) => ({ ...f, ...p }))} />
       </Sheet>
     </RoleGuard>

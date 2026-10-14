@@ -4,10 +4,13 @@ import { ChevronDown, X } from 'lucide-react';
 import { api } from '@/lib/client';
 import { toQuery, useDebounced } from '@/lib/usePaged';
 import { cx } from '@/components/ui';
+import T from '@/components/T';
+import { useTx } from '@/components/Providers';
 
 // Typeahead over /api/lookup/<kind>: only {id, label, hint}, at most 20 rows, fetched as you type (debounced).
 // Replaces "download a thousand rows into every dropdown".
 export default function LookupSelect({ id, kind, value, valueLabel, onChange, query = {}, by, placeholder = 'Search…', disabled, className }) {
+  const tx = useTx();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
@@ -59,17 +62,17 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
     <div ref={box} className={cx('relative', className)}>
       <div className="relative">
         <input id={id} className="input pr-16" role="combobox" aria-expanded={open} aria-autocomplete="list" autoComplete="off" disabled={disabled}
-          placeholder={label || placeholder} value={open ? text : label}
+          placeholder={label || tx(placeholder)} value={open ? text : label}
           onFocus={() => { if (!disabled) { setOpen(true); setText(''); } }} onChange={(e) => { setText(e.target.value); setOpen(true); }} onKeyDown={onKey} />
         <div className="absolute right-0 top-0 h-11 flex items-center pr-2 gap-1 text-char-500">
-          {value && !disabled && <button type="button" className="p-1 rounded hover:bg-sand-100" aria-label="Clear" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(null)}><X size={16} /></button>}
+          {value && !disabled && <button type="button" className="p-1 rounded hover:bg-sand-100" aria-label={tx('Clear')} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(null)}><X size={16} /></button>}
           <ChevronDown size={16} aria-hidden />
         </div>
       </div>
       {open && (
         <ul role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-auto rounded-xl border border-sand-300 bg-white shadow-lg">
-          {busy && !items.length && <li className="px-3 py-2 text-sm text-char-500">Searching…</li>}
-          {!busy && !items.length && <li className="px-3 py-2 text-sm text-char-500">{dq ? 'No match' : 'Nothing to choose'}</li>}
+          {busy && !items.length && <li className="px-3 py-2 text-sm text-char-500"><T>Searching…</T></li>}
+          {!busy && !items.length && <li className="px-3 py-2 text-sm text-char-500">{dq ? <T>No match</T> : <T>Nothing to choose</T>}</li>}
           {items.map((it, i) => (
             <li key={it.id} role="option" aria-selected={String(it.id) === String(value)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(it)}
               className={cx('px-3 py-2.5 text-sm cursor-pointer flex items-baseline justify-between gap-2', i === active ? 'bg-sand-100' : 'hover:bg-sand-50', String(it.id) === String(value) && 'font-semibold')}>
@@ -77,7 +80,7 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
               {it.hint && <span className="text-[11px] text-char-500 shrink-0">{it.hint}</span>}
             </li>
           ))}
-          {items.length >= 20 && <li className="px-3 py-1.5 text-[11px] text-char-500 border-t border-sand-100">Type to narrow the list</li>}
+          {items.length >= 20 && <li className="px-3 py-1.5 text-[11px] text-char-500 border-t border-sand-100"><T>Type to narrow the list</T></li>}
         </ul>
       )}
     </div>

@@ -8,6 +8,7 @@ import { EMPLOYEE_FIELDS, missingDocs } from '@/components/fields';
 import { useApp } from '@/components/Providers';
 import { JOBS } from '@/lib/config';
 import { inr, fmtDate } from '@/lib/format';
+import T from '@/components/T';
 
 export default function EmployeesPage() {
   const { t, can, perm } = useApp();
@@ -25,7 +26,7 @@ export default function EmployeesPage() {
     { key: 'joiningDate', label: 'Joined', render: (r) => fmtDate(r.joiningDate) },
     { label: 'Documents', wide: true, render: (r) => {
       const m = missingDocs(r);
-      return m.length ? <Badge tone="red"><AlertTriangle size={11} /> Missing: {m.join(', ')}</Badge> : <Badge tone="green">Complete</Badge>;
+      return m.length ? <Badge tone="red"><AlertTriangle size={11} /> <T>Missing:</T> {m.join(', ')}</Badge> : <Badge tone="green"><T>Complete</T></Badge>;
     } },
     ...(mayLogin ? [{ key: 'hasLogin', label: 'Sign-in', render: (r) => (r.hasLogin ? <Badge tone="green">{r.loginRole || 'yes'}</Badge> : <span className="text-char-300">—</span>) }] : []),
     { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.isVoid ? 'void' : r.status === 'left' ? 'void' : 'active'} /> },
@@ -52,7 +53,7 @@ export default function EmployeesPage() {
         facets={{ by: 'status', query: { docs: 'missing', status: 'active' } }}
         summary={(rows, { facets: f }) => {
           const miss = f?.total || 0; // active employees without Aadhaar or passbook on file, counted by the server
-          return miss ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> {miss} working employees have a missing document</div> : null;
+          return miss ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> <T vars={{ n: miss }}>{'{n} working employees have a missing document'}</T></div> : null;
         }}
         exportName="employees"
         exportColumns={[{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'site', label: 'Site' }, { key: 'mobile', label: 'Mobile' }, { key: 'payType', label: 'Pay type' }, { key: 'rate', label: 'Rate' }, { key: 'joiningDate', label: 'Joining date' }]}

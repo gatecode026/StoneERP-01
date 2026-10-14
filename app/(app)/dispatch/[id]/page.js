@@ -1,16 +1,17 @@
 'use client';
 import { useParams } from 'next/navigation';
 import { Printer, MessageCircle, LogOut } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { useApp, useFetch } from '@/components/Providers';
+import toast from '@/lib/toast';
+import { useApp, useFetch, EnglishOnly } from '@/components/Providers';
 import { PageHeader, SkeletonList, RoleGuard, Photo } from '@/components/ui';
 import { api, openWA } from '@/lib/client';
 import { fmtDate, fmtDateTime, num, inr } from '@/lib/format';
+import T from '@/components/T';
 
 export default function GatePass() {
   const { id } = useParams();
   const company = useApp().session.company;
-  const { can } = useApp();
+  const { can, tr } = useApp();
   const { data: d, loading, reload } = useFetch(`/api/dispatches/${id}`);
   if (loading || !d) return <SkeletonList />;
   const out = d.status === 'out';
@@ -21,15 +22,15 @@ export default function GatePass() {
   const Row = ({ k, v }) => <tr><td className="py-1.5 pr-4 text-gray-500 w-40 align-top">{k}</td><td className="py-1.5 font-medium">{v || '—'}</td></tr>;
   return (
     <RoleGuard perm="dispatches">
-      <PageHeader title={`Gate pass ${d.gatePassNo}`} back="/dispatch" actions={<>
-        {!out && can('dispatches', 'approve') && <button className="btn-primary" onClick={markOut}><LogOut size={16} /> Guard: mark truck out</button>}
-        {out && <button className="btn-green" onClick={() => openWA(msg, d.customerMobile)}><MessageCircle size={16} /> Tell customer</button>}
-        <button className="btn-outline" onClick={() => window.print()}><Printer size={16} /> Print</button>
+      <PageHeader title={tr('Gate pass {n}', { n: d.gatePassNo })} back="/dispatch" actions={<>
+        {!out && can('dispatches', 'approve') && <button className="btn-primary" onClick={markOut}><LogOut size={16} /><T> Guard: mark truck out</T></button>}
+        {out && <button className="btn-green" onClick={() => openWA(msg, d.customerMobile)}><MessageCircle size={16} /><T> Tell customer</T></button>}
+        <button className="btn-outline" onClick={() => window.print()}><Printer size={16} /><T> Print</T></button>
       </>} />
-      <div className="print-doc card max-w-2xl mx-auto p-6">
+      <div className="print-doc card max-w-2xl mx-auto p-6"><EnglishOnly>
         <div className="flex justify-between items-start border-b-2 border-black pb-3">
           <div><div className="text-xl font-bold">{company.name}</div><div className="text-xs text-gray-600">{company.address}<br />GSTIN: {company.gstin}</div></div>
-          <div className="text-right"><div className="text-2xl font-extrabold tracking-wide">GATE PASS</div><div className="font-bold">{d.gatePassNo}</div><div className="text-xs">{fmtDate(d.date)}</div></div>
+          <div className="text-right"><div className="text-2xl font-extrabold tracking-wide"><T>GATE PASS</T></div><div className="font-bold">{d.gatePassNo}</div><div className="text-xs">{fmtDate(d.date)}</div></div>
         </div>
         <table className="w-full text-sm mt-4"><tbody>
           <Row k="Customer" v={d.customerName} />
@@ -42,7 +43,7 @@ export default function GatePass() {
           <Row k="Freight" v={d.freight ? `${inr(d.freight)} (${d.freightPaid ? 'paid' : 'to pay'})` : ''} />
         </tbody></table>
         <div className="mt-4 border border-gray-300 rounded">
-          <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold uppercase">Material loaded</div>
+          <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold uppercase"><T>Material loaded</T></div>
           {(d.items || []).map((i, k) => <div key={k} className="px-3 py-2 border-t text-sm flex justify-between"><span>{i.name}</span><b>{num(i.qty)} {i.unit}</b></div>)}
           {!(d.items || []).length && <div className="px-3 py-2 text-sm text-gray-500">—</div>}
         </div>
@@ -54,12 +55,12 @@ export default function GatePass() {
           </div>
         )}
         <div className="mt-8 grid grid-cols-3 gap-4 text-xs text-center">
-          <div className="pt-8 border-t border-black">Dispatch in-charge</div>
-          <div className="pt-8 border-t border-black">Driver signature</div>
+          <div className="pt-8 border-t border-black"><T>Dispatch in-charge</T></div>
+          <div className="pt-8 border-t border-black"><T>Driver signature</T></div>
           <div className="pt-8 border-t border-black">Guard {out ? `· OUT ${fmtDateTime(d.outAt)}` : ''}</div>
         </div>
         <div className={`mt-4 text-center text-sm font-bold ${out ? 'text-emerald-700' : 'text-amber-700'}`}>{out ? '✔ TRUCK MARKED OUT' : 'Not yet marked out by guard'}</div>
-      </div>
+      </EnglishOnly></div>
     </RoleGuard>
   );
 }

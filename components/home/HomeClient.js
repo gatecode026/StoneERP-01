@@ -10,11 +10,12 @@ import { AccountantHome, ManagerHome, PresetHome, SalespersonHome, SupervisorHom
 const WITH_DATE = ['owner', 'manager', 'accountant', 'supervisor'];
 const TITLES = { manager: 'Operations board', accountant: 'Money board', supervisor: 'Team board', salesperson: 'Sales board' };
 
-// One role-specific home per person, delivered by one request (/api/home). Everything the screen needs comes back together.
-export default function Home() {
-  const { t, session, can } = useApp();
-  const [date, setDate] = useState(todayISO());
-  const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`);
+// One role-specific home per person. The server renders today's (app/(app)/page.tsx); changing the date asks /api/home in one request.
+export default function HomeClient({ initialData = null, initialDate }) {
+  const { t, tr, session, can } = useApp();
+  const [date, setDate] = useState(initialDate || todayISO());
+  // the server already sent today's numbers: show them at once (no empty screen, no extra request), refresh in the background
+  const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`, [], { initial: date === initialDate ? initialData : null });
   const kind = data?.kind || session?.perm?.roleKey;
   const canDecide = ['expenses', 'purchases', 'advances', 'leaves', 'stockmovements'].some((r) => can(r, 'approve'));
   const title = kind === 'owner' ? t('ownerReport') : TITLES[kind] || `Namaste, ${session?.name}`;
@@ -22,7 +23,7 @@ export default function Home() {
   const subtitle = [data?.self?.me?.job, fmtDate(date)].filter(Boolean).join(' · ');
   const header = (
     <PageHeader title={title} subtitle={subtitle}
-      actions={WITH_DATE.includes(kind) ? <input type="date" aria-label="Date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} /> : null} />
+      actions={WITH_DATE.includes(kind) ? <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} /> : null} />
   );
 
   if (error) return <>{header}<HomeError error={error} onRetry={reload} /></>;

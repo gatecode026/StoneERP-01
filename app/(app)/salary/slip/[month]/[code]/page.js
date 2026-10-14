@@ -6,6 +6,7 @@ import { RoleGuard, PageHeader, SkeletonList, Empty } from '@/components/ui';
 import { openWA } from '@/lib/client';
 import { SALARY } from '@/lib/config';
 import { inr, fmtMonth, num, amountInWords, fmtDate, todayISO } from '@/lib/format';
+import T from '@/components/T';
 
 const L = {
   en: { title: 'SALARY SLIP', emp: 'Employee', code: 'Code', job: 'Job', payType: 'Pay type', days: 'Days present', qty: 'Quantity', earnings: 'Earnings', wages: 'Wages', ot: 'Overtime', gross: 'Gross', ded: 'Deductions', pf: 'PF', esi: 'ESI', adv: 'Advance recovery', net: 'NET SALARY', words: 'Amount in words', how: 'How wages were worked out', paid: 'Paid', status: 'Status', monthly: 'Monthly', daily: 'Daily', piece: 'Piece rate', sign: 'Authorised signatory', computer: 'This is a computer-generated slip.' },
@@ -27,8 +28,8 @@ export default function Slip() {
     <RoleGuard perm={["salarysheets", "salaryslips"]}>
       <PageHeader title={l.title} back="/salary" actions={<>
         <button className="btn-outline" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}>{lang === 'en' ? 'हिन्दी' : 'English'}</button>
-        <button className="btn-primary" onClick={() => window.print()}><Printer size={16} /> Print / PDF</button>
-        {can('salarysheets') && <button className="btn-green" onClick={() => openWA(msg, r.mobile)}><MessageCircle size={16} /> WhatsApp</button>}
+        <button className="btn-primary" onClick={() => window.print()}><Printer size={16} /><T> Print / PDF</T></button>
+        {can('salarysheets') && <button className="btn-green" onClick={() => openWA(msg, r.mobile)}><MessageCircle size={16} /><T> WhatsApp</T></button>}
       </>} />
       <div className="print-doc card max-w-2xl mx-auto p-6 text-sm">
         <div className="flex justify-between items-start border-b-2 border-black pb-3">

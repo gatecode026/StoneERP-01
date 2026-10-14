@@ -3,7 +3,7 @@ import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Plus, Lock, Check, X, Pencil } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, cx } from '@/components/ui';
@@ -12,11 +12,12 @@ import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, num } from '@/lib/format';
+import T from '@/components/T';
 
 const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '' });
 
 export default function DailyReportPage() {
-  const { t, can, perm, session } = useApp();
+  const { t, tr, can, perm, session } = useApp();
   const sp = useSearchParams();
   const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
   const [date, setDate] = useState(sp.get('date') || todayISO());
@@ -82,7 +83,7 @@ export default function DailyReportPage() {
   const isOwn = (r) => !!session?.empCode && r.empCode === session.empCode;
   const canEditRow = (r) => !locked(r.date) && can('dailyreports', 'edit');
   const canCheckRow = (r) => canCheck && !isOwn(r); // nobody checks their own report; nobody without the right sees the buttons
-  const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green">OK</Badge> : r.supCheck === 'not_ok' ? <Badge tone="red">Not OK</Badge> : canCheck ? <Badge tone="gray">Not checked</Badge> : null);
+  const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green"><T>OK</T></Badge> : r.supCheck === 'not_ok' ? <Badge tone="red"><T>Not OK</T></Badge> : canCheck ? <Badge tone="gray"><T>Not checked</T></Badge> : null);
 
   // one table on a computer, one compact list on a phone: tap a row for the whole report
   const renderList = (items) => (
@@ -97,7 +98,7 @@ export default function DailyReportPage() {
               </div>
               <p className="text-sm text-char-700 mt-1 line-clamp-2 break-words">{r.narration}</p>
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-char-500">
-                {r.hours > 0 && <span>{r.hours} h</span>}{r.quantity > 0 && <span>{num(r.quantity)} sq ft</span>}{r.problem && <span className="text-red-600 break-words">Problem: {r.problem}</span>}
+                {r.hours > 0 && <span><T vars={{ n: r.hours }}>{'{n} h'}</T></span>}{r.quantity > 0 && <span><T vars={{ n: num(r.quantity) }}>{'{n} sq ft'}</T></span>}{r.problem && <span className="text-red-600 break-words"><T>Problem:</T> {r.problem}</span>}
               </div>
             </button>
           </li>
@@ -107,7 +108,7 @@ export default function DailyReportPage() {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="th">Employee</th>{isWorker && <th className="th">Date</th>}<th className="th">Work done</th><th className="th text-right">Hours</th><th className="th text-right">Sq ft</th><th className="th">Problem</th><th className="th">Status</th><th className="th w-px" />
+              <th className="th"><T>Employee</T></th>{isWorker && <th className="th"><T>Date</T></th>}<th className="th"><T>Work done</T></th><th className="th text-right"><T>Hours</T></th><th className="th text-right"><T>Sq ft</T></th><th className="th"><T>Problem</T></th><th className="th"><T>Status</T></th><th className="th w-px" />
             </tr>
           </thead>
           <tbody>
@@ -122,10 +123,10 @@ export default function DailyReportPage() {
                 <td className="td whitespace-nowrap">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="inline ml-1.5 text-char-300" aria-label="Locked" />}</td>
                 <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>
                   {canCheckRow(r) && <>
-                    <button className={cx('icon-btn', r.supCheck === 'ok' && 'text-emerald-700')} onClick={() => check(r, 'ok')} disabled={checking} title="Mark OK" aria-label="Mark OK"><Check size={16} /></button>
-                    <button className={cx('icon-btn', r.supCheck === 'not_ok' && 'text-red-600')} onClick={() => check(r, 'not_ok')} disabled={checking} title="Mark not OK" aria-label="Mark not OK"><X size={16} /></button>
+                    <button className={cx('icon-btn', r.supCheck === 'ok' && 'text-emerald-700')} onClick={() => check(r, 'ok')} disabled={checking} title={tr('Mark OK')} aria-label={tr('Mark OK')}><Check size={16} /></button>
+                    <button className={cx('icon-btn', r.supCheck === 'not_ok' && 'text-red-600')} onClick={() => check(r, 'not_ok')} disabled={checking} title={tr('Mark not OK')} aria-label={tr('Mark not OK')}><X size={16} /></button>
                   </>}
-                  {canEditRow(r) && <button className="icon-btn" onClick={() => openNew(r)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>}
+                  {canEditRow(r) && <button className="icon-btn" onClick={() => openNew(r)} title={tr('Edit')} aria-label={tr('Edit')}><Pencil size={15} /></button>}
                 </td>
               </tr>
             ))}
@@ -143,7 +144,7 @@ export default function DailyReportPage() {
 
   return (
     <RoleGuard perm="dailyreports">
-      <PageHeader title={t('dailyReport')} subtitle={isWorker ? 'What you did today, in your own words' : `Every employee's report for ${fmtDate(date)}`}
+      <PageHeader title={t('dailyReport')} subtitle={isWorker ? 'What you did today, in your own words' : tr("Every employee's report for {d}", { d: fmtDate(date) })}
         actions={<><ImportData resource="dailyreports" perm="dailyreports" noun="daily work reports" hint="employee and work done are required" />
           {!isWorker && <input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} />}
           {!isWorker && can('dailyreports', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/dailyreports?format=xlsx&${toQuery({ date, sort: 'empName' })}`)} />}
@@ -154,21 +155,21 @@ export default function DailyReportPage() {
         mine.loading ? <SkeletonList /> : (mine.data || []).length ? renderList(mine.data) : <Empty text="No reports yet — fill today's report" />
       ) : loading ? <SkeletonList /> : (
         <>
-          {!rows.length ? <Empty text={`No reports for ${fmtDate(date)} yet`} /> : renderList(rows)}
+          {!rows.length ? <Empty text={tr('No reports for {d} yet', { d: fmtDate(date) })} /> : renderList(rows)}
           <Pager list={day} />
           {missingCount > 0 && (
             <div className="card p-4 mt-4 border-amber-200 bg-amber-50">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-bold text-sm">Not filled yet</div>
-                  <div className="text-xs text-char-500">{missingCount} {missingCount === 1 ? 'person has' : 'people have'} not sent a report for {fmtDate(date)}</div>
+                  <div className="font-bold text-sm"><T>Not filled yet</T></div>
+                  <div className="text-xs text-char-500"><T vars={{ n: missingCount, d: fmtDate(date) }}>{missingCount === 1 ? '{n} person has not sent a report for {d}' : '{n} people have not sent a report for {d}'}</T></div>
                 </div>
                 {missing.length > 12 && <button className="btn-outline btn-sm shrink-0" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>{showAll ? 'Hide' : 'Show all'}</button>}
               </div>
               <div className={cx('flex flex-wrap gap-1.5 mt-3', showAll && 'max-h-64 overflow-y-auto pr-1')}>
                 {(showAll ? missing : missing.slice(0, 12)).map((e) => <span key={e.empCode} className="badge-amber" title={e.job}>{e.name}</span>)}
-                {!showAll && missingCount > 12 && <span className="text-xs text-char-500 self-center">+ {missingCount - 12} more</span>}
-                {showAll && missingCount > missing.length && <span className="text-xs text-char-500 self-center">+ {missingCount - missing.length} more not listed</span>}
+                {!showAll && missingCount > 12 && <span className="text-xs text-char-500 self-center">+ <T vars={{ n: missingCount - 12 }}>{'{n} more'}</T></span>}
+                {showAll && missingCount > missing.length && <span className="text-xs text-char-500 self-center">+ <T vars={{ n: missingCount - missing.length }}>{'{n} more not listed'}</T></span>}
               </div>
             </div>
           )}
@@ -176,34 +177,34 @@ export default function DailyReportPage() {
       )}
 
       {/* The whole report: opens from a row. OK / Not OK only for someone who may check it, and never on their own report. */}
-      <Sheet open={!!detail} onClose={() => setDetail(null)} title={detail ? `Report · ${detail.empName}` : ''}
+      <Sheet open={!!detail} onClose={() => setDetail(null)} title={detail ? tr('Report · {n}', { n: detail.empName }) : ''}
         footer={detail && (
           <>
-            {canEditRow(detail) && <button className="btn-outline" onClick={() => { const r = detail; setDetail(null); openNew(r); }}><Pencil size={14} /> Edit</button>}
+            {canEditRow(detail) && <button className="btn-outline" onClick={() => { const r = detail; setDetail(null); openNew(r); }}><Pencil size={14} /><T> Edit</T></button>}
             {canCheckRow(detail) && <>
-              <button className={cx('flex-1', detail.supCheck === 'ok' ? 'btn-green' : 'btn-outline')} onClick={() => check(detail, 'ok')} disabled={checking}><Check size={16} /> OK</button>
-              <button className={cx('flex-1', detail.supCheck === 'not_ok' ? 'btn-danger' : 'btn-outline')} onClick={() => check(detail, 'not_ok')} disabled={checking}><X size={16} /> Not OK</button>
+              <button className={cx('flex-1', detail.supCheck === 'ok' ? 'btn-green' : 'btn-outline')} onClick={() => check(detail, 'ok')} disabled={checking}><Check size={16} /><T> OK</T></button>
+              <button className={cx('flex-1', detail.supCheck === 'not_ok' ? 'btn-danger' : 'btn-outline')} onClick={() => check(detail, 'not_ok')} disabled={checking}><X size={16} /><T> Not OK</T></button>
             </>}
-            {!canEditRow(detail) && !canCheckRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}>Close</button>}
+            {!canEditRow(detail) && !canCheckRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}><T>Close</T></button>}
           </>
         )}>
         {detail && (
           <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2 flex-wrap">{statusBadge(detail)}{locked(detail.date) && <Badge tone="gray"><Lock size={10} /> Locked</Badge>}</div>
+            <div className="flex items-center gap-2 flex-wrap">{statusBadge(detail)}{locked(detail.date) && <Badge tone="gray"><Lock size={10} /><T> Locked</T></Badge>}</div>
             <dl className="divide-y divide-sand-100">
               {detailRows.map(([k, v]) => <div key={k} className="flex justify-between gap-3 py-1.5"><dt className="text-char-500">{k}</dt><dd className="font-medium text-right">{v}</dd></div>)}
             </dl>
-            <div><div className="text-xs font-semibold uppercase text-char-500 mb-1">Work done</div><p className="whitespace-pre-wrap break-words">{detail.narration}</p></div>
-            {detail.problem && <div><div className="text-xs font-semibold uppercase text-red-600 mb-1">Problem</div><p className="break-words">{detail.problem}</p></div>}
-            {detail.plan && <div><div className="text-xs font-semibold uppercase text-char-500 mb-1">Plan for tomorrow</div><p className="break-words">{detail.plan}</p></div>}
-            {detail.photoCount > 0 && <div className="text-xs text-char-500">{detail.photoCount} photo{detail.photoCount > 1 ? 's' : ''} attached{canEditRow(detail) ? ' (open Edit to view)' : ''}</div>}
-            {detail.supRemark && <div className="rounded-lg bg-sand-100 px-3 py-2"><div className="text-xs font-semibold text-char-500 mb-0.5">Supervisor{detail.checkedBy ? ` · ${detail.checkedBy}` : ''}</div>{detail.supRemark}</div>}
+            <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Work done</T></div><p className="whitespace-pre-wrap break-words">{detail.narration}</p></div>
+            {detail.problem && <div><div className="text-xs font-semibold uppercase text-red-600 mb-1"><T>Problem</T></div><p className="break-words">{detail.problem}</p></div>}
+            {detail.plan && <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Plan for tomorrow</T></div><p className="break-words">{detail.plan}</p></div>}
+            {detail.photoCount > 0 && <div className="text-xs text-char-500"><T vars={{ n: detail.photoCount }}>{detail.photoCount > 1 ? '{n} photos attached' : '{n} photo attached'}</T>{canEditRow(detail) && <> <T>(open Edit to view)</T></>}</div>}
+            {detail.supRemark && <div className="rounded-lg bg-sand-100 px-3 py-2"><div className="text-xs font-semibold text-char-500 mb-0.5"><T>Supervisor</T>{detail.checkedBy ? ` · ${detail.checkedBy}` : ''}</div>{detail.supRemark}</div>}
           </div>
         )}
       </Sheet>
 
       {/* The one-screen form from the PDF */}
-      <Sheet open={open} onClose={() => setOpen(false)} title={`Daily work report · ${fmtDate(form.date || date)}${isWorker ? ` · ${session?.name}` : ''}`}
+      <Sheet open={open} onClose={() => setOpen(false)} title={tr('Daily work report · {d}', { d: fmtDate(form.date || date) }) + (isWorker ? ` · ${session?.name}` : '')}
         footer={<button className="btn-primary w-full !min-h-[52px] text-base" onClick={save} disabled={saving}>{saving ? '…' : t('submit')}</button>}>
         <div className="space-y-4">
           {!isWorker && !editing && (
@@ -212,7 +213,7 @@ export default function DailyReportPage() {
             </Field>
           )}
           <Field label={t('workDone')} required>
-            <textarea className="input" rows={4} value={form.narration} onChange={(e) => set({ narration: e.target.value })} placeholder="Cut 2 blocks on gang saw 1, got 410 sq ft of 30 mm slabs…" />
+            <textarea className="input" rows={4} value={form.narration} onChange={(e) => set({ narration: e.target.value })} placeholder={tr('Cut 2 blocks on gang saw 1, got 410 sq ft of 30 mm slabs…')} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <SpeakButton onText={(x) => set({ narration: (form.narration ? form.narration + ' ' : '') + x })} />
@@ -222,10 +223,10 @@ export default function DailyReportPage() {
             <Field label={t('hours')}><input className="input text-lg" type="number" inputMode="decimal" value={form.hours} onChange={(e) => set({ hours: e.target.value })} placeholder="9" /></Field>
             <Field label={`${t('quantity')} (sq ft)`}><input className="input text-lg" type="number" inputMode="decimal" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" /></Field>
           </div>
-          <p className="text-[11px] text-char-500 -mt-2">Quantity also feeds yield and piece-rate pay.</p>
-          <Field label={t('problem')}><input className="input" value={form.problem} onChange={(e) => set({ problem: e.target.value })} placeholder="Power cut, 1 hour" /></Field>
-          <Field label={t('plan')}><input className="input" value={form.plan} onChange={(e) => set({ plan: e.target.value })} placeholder="Calibrate yesterday's slabs" /></Field>
-          <p className="text-[11px] text-char-500">Saved even without internet and sent later. Correct it until tomorrow — after that it is locked.</p>
+          <p className="text-[11px] text-char-500 -mt-2"><T>Quantity also feeds yield and piece-rate pay.</T></p>
+          <Field label={t('problem')}><input className="input" value={form.problem} onChange={(e) => set({ problem: e.target.value })} placeholder={tr('Power cut, 1 hour')} /></Field>
+          <Field label={t('plan')}><input className="input" value={form.plan} onChange={(e) => set({ plan: e.target.value })} placeholder={tr("Calibrate yesterday's slabs")} /></Field>
+          <p className="text-[11px] text-char-500"><T>Saved even without internet and sent later. Correct it until tomorrow — after that it is locked.</T></p>
         </div>
       </Sheet>
     </RoleGuard>

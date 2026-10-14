@@ -3,16 +3,18 @@ import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Section, Badge, ExportBtn } from '@/components/ui';
+import T from '@/components/T';
+import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Section, Badge, ExportBtn, Pagination } from '@/components/ui';
 import { downloadCSV } from '@/lib/client';
 import { inr, num, num2, fmtDate } from '@/lib/format';
 
 const YieldChart = dynamic(() => import('@/components/charts/YieldChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function YieldPage() {
-  const { t, can } = useApp();
+  const { t, tr, can } = useApp();
   const { data, loading } = useFetch('/api/yield');
   const [tab, setTab] = useState('blocks');
+  const [pg, setPg] = useState({ page: 1, size: 25 }); // the table shows one page at a time; the chart, counts and Excel use every block
   const d = data;
   const showCost = d && !d.hideCost;
   const measured = (d?.rows || []).filter((r) => r.yieldPct != null);
@@ -46,12 +48,16 @@ export default function YieldPage() {
         </div>
       )}
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'blocks', label: 'By block' }, { key: 'supplier', label: 'By supplier' }, { key: 'machine', label: 'By machine' }, { key: 'operator', label: 'By operator' }]} />
-      {tab === 'blocks' && <DataList loading={loading} rows={d?.rows || []} columns={columns} rowClass={(r) => (r.low ? 'bg-red-50/60' : '')} empty="No blocks yet" />}
+      {tab === 'blocks' && (() => {
+        const all = d?.rows || [];
+        const shown = all.slice((pg.page - 1) * pg.size, pg.page * pg.size);
+        return <><DataList loading={loading} rows={shown} columns={columns} rowClass={(r) => (r.low ? 'bg-red-50/60' : '')} empty="No blocks yet" /><Pagination page={pg.page} pageSize={pg.size} total={all.length} shown={shown.length} onPage={(page) => setPg((x) => ({ ...x, page }))} onSize={(size) => setPg({ page: 1, size })} /></>;
+      })()}
       {tab !== 'blocks' && d && (() => {
         const rows = tab === 'supplier' ? d.bySupplier : tab === 'machine' ? d.byMachine : d.byOperator;
         return (
           <div className="space-y-4">
-            <Section title={`Yield % ${tab === 'blocks' ? '' : 'by ' + tab}`}>{chart(rows)}</Section>
+            <Section title={tab === 'blocks' ? tr('Yield %') : `${tr('Yield %')} – ${tr({ supplier: 'By supplier', machine: 'By machine', operator: 'By operator' }[tab])}`}>{chart(rows)}</Section>
             <DataList rows={rows} rowKey="name" columns={[
               { key: 'name', label: tab === 'supplier' ? 'Supplier' : tab === 'machine' ? 'Machine' : 'Operator', primary: true },
               { key: 'yieldPct', label: 'Avg yield', render: (r) => <b>{r.yieldPct}%</b> },
@@ -62,8 +68,8 @@ export default function YieldPage() {
         );
       })()}
       <p className="text-[11px] text-char-500 mt-4">
-        Yield % = saleable sq ft ÷ theoretical sq ft of the block (CFT × 304.8 ÷ slab thickness mm) × 100. Saleable = cutting-machine output − broken/waste.
-        {showCost && ' Cost per sq ft = (block cost + labour @ ₹80/machine-hour + power @ ₹8/unit & diesel @ ₹92/L + blades) ÷ saleable sq ft. Rates are assumptions you can change.'}
+        <T>Yield % = saleable sq ft ÷ theoretical sq ft of the block (CFT × 304.8 ÷ slab thickness mm) × 100. Saleable = cutting-machine output − broken/waste.</T>
+        {showCost && <> <T>Cost per sq ft = (block cost + labour + power + diesel + blades) ÷ saleable sq ft, at the rates set in Settings → Cost rates.</T></>}
       </p>
     </RoleGuard>
   );

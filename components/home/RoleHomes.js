@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { CalendarCheck, Check, ClipboardList, FileText, ListChecks, LogOut, MessageCircle, Plus, Search, X } from 'lucide-react';
 import { StatCard, Badge, PhotoInput, cx } from '@/components/ui';
 import { api, getLocation, openWA, submit } from '@/lib/client';
@@ -10,6 +10,8 @@ import { useApp, useFetch } from '@/components/Providers';
 import { AgeingChart, Card } from './parts';
 import { useH } from './strings';
 import { AlertsCard, Approvals, ReportCards, StockCard } from './OwnerHome';
+import T from '@/components/T';
+import { trNow } from '@/lib/trNow';
 
 // ---------------------------------------------------------------- MANAGER
 export function ManagerHome({ data, reload, canDecide }) {
@@ -85,10 +87,10 @@ export function AccountantHome({ data, reload, canDecide }) {
         <Card title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}><Approvals items={d.approvals || []} reload={reload} canDecide={canDecide} /></Card>
         <Card title={h('exports')}>
           <div className="flex flex-wrap gap-2">
-            {can('cashentries', 'export') && <Link href="/cash" className="btn-outline btn-sm">Cash book</Link>}
-            {can('sales', 'export') && <Link href="/sales" className="btn-outline btn-sm">Sales</Link>}
-            {can('expenses', 'export') && <Link href="/expenses" className="btn-outline btn-sm">Expenses</Link>}
-            {can('salarysheets', 'export') && <Link href="/salary" className="btn-outline btn-sm">Salary sheet</Link>}
+            {can('cashentries', 'export') && <Link href="/cash" className="btn-outline btn-sm"><T>Cash book</T></Link>}
+            {can('sales', 'export') && <Link href="/sales" className="btn-outline btn-sm"><T>Sales</T></Link>}
+            {can('expenses', 'export') && <Link href="/expenses" className="btn-outline btn-sm"><T>Expenses</T></Link>}
+            {can('salarysheets', 'export') && <Link href="/salary" className="btn-outline btn-sm"><T>Salary sheet</T></Link>}
           </div>
         </Card>
       </div>
@@ -111,7 +113,7 @@ export function SupervisorHome({ data, reload }) {
   async function mark(m, state) {
     const prev = local[m.empCode];
     setLocal((x) => ({ ...x, [m.empCode]: state })); // optimistic
-    try { await submit('/api/attendance', { date: data.date, empCode: m.empCode, state }, { label: `Attendance ${m.name}` }); }
+    try { await submit('/api/attendance', { date: data.date, empCode: m.empCode, state }, { label: trNow('Attendance {n}', { n: m.name }) }); }
     catch (e) { toast.error(e.message); setLocal((x) => ({ ...x, [m.empCode]: prev })); }
   }
   async function markAll() {
@@ -120,7 +122,7 @@ export function SupervisorHome({ data, reload }) {
     setBusy(true);
     try {
       await api('/api/bulk/attendance', { method: 'POST', body: { date: data.date, marks: todo.map((m) => ({ empCode: m.empCode, state: 'present' })) } });
-      toast.success(`${todo.length} marked present`); setLocal({}); reload();
+      toast.success(trNow('{n} marked present', { n: todo.length })); setLocal({}); reload();
     } catch (e) { toast.error(e.message); }
     setBusy(false);
   }
@@ -159,7 +161,7 @@ export function SupervisorHome({ data, reload }) {
             <div key={r._id} className="border-b border-sand-100 last:border-0 py-2.5">
               <div className="flex justify-between text-sm"><b>{r.empName}</b><span className="text-[11px] text-char-500">{fmtDate(r.date)}</span></div>
               <p className="text-sm text-char-700 line-clamp-2">{r.narration}</p>
-              <div className="text-xs text-char-500">{r.hours} h · {num(r.quantity)} sq ft{r.problem ? <span className="text-red-600"> · {r.problem}</span> : ''}</div>
+              <div className="text-xs text-char-500"><T vars={{ h: r.hours, q: num(r.quantity) }}>{'{h} h · {q} sq ft'}</T>{r.problem ? <span className="text-red-600"> · {r.problem}</span> : ''}</div>
               <div className="flex gap-2 mt-2"><button className="btn-green btn-sm flex-1" onClick={() => check(r, 'ok')}><Check size={14} /> {h('ok')}</button><button className="btn-outline btn-sm flex-1" onClick={() => check(r, 'not_ok')}><X size={14} /> {h('notOk')}</button></div>
             </div>
           ))}
@@ -190,8 +192,8 @@ export function SalespersonHome({ data }) {
     <div>
       <div className="flex gap-2 mb-3"><Link href="/sales/new" className="btn-primary flex-1 !min-h-[52px] text-base"><Plus size={20} /> {h('newQuote')}</Link></div>
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label={h('myToday')} value={inrShort(data.mine?.today ?? 0)} sub={`${data.mine?.todayOrders ?? 0} orders`} tone="terra" href="/sales" />
-        <StatCard label={h('myMonth')} value={inrShort(data.mine?.month ?? 0)} sub={`${data.mine?.monthOrders ?? 0} orders`} href="/sales" />
+        <StatCard label={h('myToday')} value={inrShort(data.mine?.today ?? 0)} sub={`${data.mine?.todayOrders ?? 0} ${h('orders')}`} tone="terra" href="/sales" />
+        <StatCard label={h('myMonth')} value={inrShort(data.mine?.month ?? 0)} sub={`${data.mine?.monthOrders ?? 0} ${h('orders')}`} href="/sales" />
       </div>
       <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
         <Card title={h('openQuotes')} href="/sales" empty={!data.open.length}>
@@ -252,7 +254,7 @@ export function WorkerCards({ self, reload }) {
                   {h('marked')} ✔
                   <Badge tone="green">{self.attendance.state}</Badge>
                 </div>
-                <div className="text-xs text-emerald-700 mt-0.5">Today's attendance recorded</div>
+                <div className="text-xs text-emerald-700 mt-0.5"><T>Today's attendance recorded</T></div>
               </div>
             </div>
           ) : (
@@ -277,7 +279,7 @@ export function WorkerCards({ self, reload }) {
               <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
                 <div className="flex items-center justify-between mb-1">
                   <Badge tone="green">{h('submitted')} ✔</Badge>
-                  {self.report.shift && <span className="text-[11px] font-semibold text-emerald-800 uppercase">{self.report.shift} shift</span>}
+                  {self.report.shift && <span className="text-[11px] font-semibold text-emerald-800 uppercase"><T vars={{ s: self.report.shift }}>{'{s} shift'}</T></span>}
                 </div>
                 <p className="mt-1 text-sm text-char-700 line-clamp-3 leading-relaxed">{self.report.narration}</p>
               </div>
@@ -300,8 +302,8 @@ export function WorkerCards({ self, reload }) {
       {can('salaryslips') && (
         <Card title={<span className="text-base font-bold flex items-center gap-2"><FileText className="text-terra" size={18} /> {h('mySlip')}</span>}>
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 text-xs text-char-600">
-              View your monthly wages, attendance days, and salary slip
+            <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 text-xs text-char-600"><T>
+              View your monthly wages, attendance days, and salary slip</T>
             </div>
             <Link href="/salary" className="btn-outline w-full !min-h-[50px] text-sm font-semibold justify-center">
               <FileText size={18} /> {h('mySlip')}
@@ -360,7 +362,7 @@ export function PresetHome({ data, reload }) {
         <Link href="/stock" className="btn-primary w-full !min-h-[52px] mb-3"><Plus size={18} /> {h('newMove')}</Link>
         <div className="grid lg:grid-cols-2 gap-4 items-start">
           <Card title={`${h('store')} (${s?.low?.length ?? 0})`} denied={den('store')} empty={!s?.low?.length} emptyText="✔" href="/stock?low=1">{s?.low?.map((i) => <div key={i._id} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{i.name}</span><b className="text-red-600">{num(i.balance)} / {num(i.minLevel)} {i.unit}</b></div>)}</Card>
-          <Card title={h('moveToday')} empty={!s?.movementsToday?.length}>{s?.movementsToday?.map((m, i) => <div key={i} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{m.itemName}</span><span>{m.type} {num(m.qty)} {m.status === 'pending' && <Badge tone="amber">pending</Badge>}</span></div>)}</Card>
+          <Card title={h('moveToday')} empty={!s?.movementsToday?.length}>{s?.movementsToday?.map((m, i) => <div key={i} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{m.itemName}</span><span>{m.type} {num(m.qty)} {m.status === 'pending' && <Badge tone="amber"><T>pending</T></Badge>}</span></div>)}</Card>
         </div>
       </>
     );
@@ -386,8 +388,8 @@ export function PresetHome({ data, reload }) {
     first = (
       <>
         <Link href="/vehicles" className="btn-primary w-full !min-h-[52px] mb-3"><Plus size={18} /> {h('newTrip')}</Link>
-        <div className="grid grid-cols-2 gap-3 mb-3"><StatCard label={h('drive')} value={dr?.trips?.length ?? 0} /><StatCard label={h('dieselMonth')} value={`${num(dr?.monthLitres ?? 0)} L`} sub={`${dr?.monthTrips ?? 0} trips`} /></div>
-        <Card title={h('vehiclePapers')} denied={den('drive')} empty={!dr?.vehicles?.length}>{dr?.vehicles?.map((v) => <div key={v._id} className="text-sm py-1.5"><b>{v.name}</b> <span className="text-char-500">· ins {fmtDate(v.insuranceExpiry)} · fit {fmtDate(v.fitnessExpiry)}</span></div>)}</Card>
+        <div className="grid grid-cols-2 gap-3 mb-3"><StatCard label={h('drive')} value={dr?.trips?.length ?? 0} /><StatCard label={h('dieselMonth')} value={`${num(dr?.monthLitres ?? 0)} L`} sub={`${dr?.monthTrips ?? 0} ${h('trips')}`} /></div>
+        <Card title={h('vehiclePapers')} denied={den('drive')} empty={!dr?.vehicles?.length}>{dr?.vehicles?.map((v) => <div key={v._id} className="text-sm py-1.5"><b>{v.name}</b> <span className="text-char-500">· <T vars={{ a: fmtDate(v.insuranceExpiry), b: fmtDate(v.fitnessExpiry) }}>{'ins {a} · fit {b}'}</T></span></div>)}</Card>
       </>
     );
   } else if (k === 'yard_incharge') {

@@ -19,13 +19,13 @@ const TABS = {
 };
 
 export default function SafetyPage() {
-  const { t } = useApp();
+  const { t, tr } = useApp();
   const [tab, setTab] = useState('gear');
   const c = TABS[tab];
   return (
     <RoleGuard perm="safetyrecords">
       <Tabs value={tab} onChange={setTab} tabs={Object.entries(TABS).map(([k, v]) => ({ key: k, label: v.label }))} />
-      <CrudPage key={tab} model="safetyrecords" headerExtra={tab !== 'gear' && <ImportData key={tab} resource={`safety-${tab}`} perm="safetyrecords" noun="safety records" />} baseQuery={{ kind: tab }} defaults={{ kind: tab }} title={t('safety')} subtitle={`Stone cutting is risky work — ${c.label.toLowerCase()}`} label={c.label}
+      <CrudPage key={tab} model="safetyrecords" headerExtra={tab !== 'gear' && <ImportData key={tab} resource={`safety-${tab}`} perm="safetyrecords" noun="safety records" />} baseQuery={{ kind: tab }} defaults={{ kind: tab }} title={t('safety')} subtitle={tr('Stone cutting is risky work — {g}', { g: tr(c.label).toLowerCase() })} label={c.label}
         fields={c.fields} columns={c.cols} sort={tab === 'checkup' ? 'dueDate' : '-date'} searchKeys={['empName', 'item', 'what', 'topic', 'machine']} exportName={`safety-${tab}`} />
     </RoleGuard>
   );

@@ -9,11 +9,12 @@ import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader } from 
 import { useApp, useFetch } from '@/components/Providers';
 import { MACHINE_TYPES } from '@/lib/config';
 import { todayISO, addDays, fmtDate, monthOf, num, fmtMonth } from '@/lib/format';
+import T from '@/components/T';
 
 const MachineChart = dynamic(() => import('@/components/charts/MachineChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function MachinesPage() {
-  const { t, can } = useApp();
+  const { t, tr, can } = useApp();
   const [tab, setTab] = useState('entries');
   const sp = useSearchParams();
   const [date, setDate] = useState(sp.get('date') || todayISO());
@@ -52,10 +53,10 @@ export default function MachinesPage() {
     { key: 'machineName', label: 'Machine', primary: true, render: (r) => <span>{r.machineName}<div className="text-[11px] text-char-500 font-normal">{r.operatorName} · {r.shift}</div></span> },
     { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
     { key: 'workDone', label: 'Work done', wide: true },
-    { key: 'outputSqft', label: 'Output', align: 'right', render: (r) => <b>{num(r.outputSqft)} sq ft{r.pieces ? <span className="text-char-500 font-normal"> / {r.pieces} pcs</span> : null}</b> },
+    { key: 'outputSqft', label: 'Output', align: 'right', render: (r) => <b><T vars={{ n: num(r.outputSqft) }}>{'{n} sq ft'}</T>{r.pieces ? <span className="text-char-500 font-normal"> / <T vars={{ n: r.pieces }}>{'{n} pcs'}</T></span> : null}</b> },
     { key: 'blockNo', label: 'Block', render: (r) => (r.blockNo ? `#${r.blockNo}` : '—') },
     { key: 'hoursRun', label: 'Hours run', render: (r) => r.hoursRun ?? '—' },
-    { key: 'stoppedMins', label: 'Stopped', render: (r) => (r.stoppedMins ? <span className={r.breakdown ? 'text-red-600 font-bold' : 'text-amber-700'}>{r.stoppedMins} min · {r.stopReason}</span> : '—') },
+    { key: 'stoppedMins', label: 'Stopped', render: (r) => (r.stoppedMins ? <span className={r.breakdown ? 'text-red-600 font-bold' : 'text-amber-700'}><T vars={{ n: r.stoppedMins }}>{'{n} min'}</T> · {r.stopReason}</span> : '—') },
   ];
 
   const baseQuery = mode === 'day' ? { date } : { from: `${monthOf(date)}-01`, to: date };
@@ -72,7 +73,7 @@ export default function MachinesPage() {
         <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift" label="Machine entry" addLabel="New entry" wide
           fields={entryFields} columns={columns} sort="-date,-createdAt" canEdit={() => false}
           exportName={`machine-entries-${date}`} onSaved={() => {}}
-          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">This day</option><option value="month">Month to date</option></select></>}
+          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">{tr('This day')}</option><option value="month">{tr('Month to date')}</option></select></>}
           facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
           summary={(rows, { facets: f }) => (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -104,9 +105,9 @@ export default function MachinesPage() {
           <PageHeader title="Monthly machine output" subtitle={fmtMonth(month)} actions={<input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />} />
           <MachineChart byMachine={byMachine} />
           <div className="grid lg:grid-cols-2 gap-4">
-            <div><h3 className="font-bold text-sm mb-2">Machine-wise: output, idle and breakdown hours</h3>
+            <div><h3 className="font-bold text-sm mb-2"><T>Machine-wise: output, idle and breakdown hours</T></h3>
               <DataList loading={monthEntries.loading} rows={byMachine} rowKey="name" columns={[{ key: 'name', label: 'Machine', primary: true }, { key: 'sqft', label: 'Output sq ft', align: 'right', render: (r) => <b>{num(r.sqft)}</b> }, { key: 'stopped', label: 'Idle h' }, { key: 'breakdown', label: 'Breakdown h', render: (r) => (r.breakdown ? <span className="text-red-600 font-bold">{r.breakdown}</span> : '—') }]} /></div>
-            <div><h3 className="font-bold text-sm mb-2">Output by operator</h3>
+            <div><h3 className="font-bold text-sm mb-2"><T>Output by operator</T></h3>
               <DataList loading={monthEntries.loading} rows={byOperator} rowKey="name" columns={[{ key: 'name', label: 'Operator', primary: true }, { key: 'shifts', label: 'Shifts' }, { key: 'sqft', label: 'Output sq ft', align: 'right', render: (r) => <b>{num(r.sqft)}</b> }]} /></div>
           </div>
         </div>

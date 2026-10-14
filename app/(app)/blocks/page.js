@@ -2,7 +2,7 @@
 import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { api } from '@/lib/client';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';

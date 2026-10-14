@@ -17,7 +17,8 @@ export const GET = withAuth('reports', 'view', async (auth) => {
   const [r]: any[] = await Expense.aggregate([{ $match: match }, { $facet: {
     total: [{ $group: { _id: null, amount: { $sum: '$amount' }, count: { $sum: 1 } } }],
     byHead: split('head'), bySite: split('site'), byPerson: split('spentBy'),
+    pending: [{ $match: { status: 'pending' } }, { $count: 'n' }], // waiting for approval, within the same month and scope
   } }]);
   const rows = (a: any[]) => a.map((x) => ({ name: x._id || '—', amount: r2(x.amount), count: x.count }));
-  return { month, total: r2(r?.total?.[0]?.amount), count: r?.total?.[0]?.count ?? 0, byHead: rows(r?.byHead ?? []), bySite: rows(r?.bySite ?? []), byPerson: rows(r?.byPerson ?? []) };
+  return { month, total: r2(r?.total?.[0]?.amount), count: r?.total?.[0]?.count ?? 0, pending: r?.pending?.[0]?.n ?? 0, byHead: rows(r?.byHead ?? []), bySite: rows(r?.bySite ?? []), byPerson: rows(r?.byPerson ?? []) };
 });

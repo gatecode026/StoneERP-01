@@ -34,6 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';
+  const hiDict = lang === 'hi' ? ((await import('@/lib/hi')).HI as Record<string, string>) : null; // only people who use Hindi receive the dictionary
   return (
     <html lang={lang} className={deva.variable} suppressHydrationWarning>
       <head>
@@ -41,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__nonce__=${JSON.stringify(nonce ?? '')}` }} />
       </head>
       <body suppressHydrationWarning>
-        <Providers initialSession={session} initialLang={lang}>{children}</Providers>
+        <Providers initialSession={session} initialLang={lang} hiDict={hiDict}>{children}</Providers>
       </body>
     </html>
   );

@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { translate } from '@/lib/i18n';
+import { translate, translatePhrase } from '@/lib/i18n';
+import { setTrNow, trNow } from '@/lib/trNow';
 import { can as canPerm, type ClientPerm } from '@/lib/clientPerm';
 import { api, flushQueue } from '@/lib/client';
 import { migrateLegacy, queueStats } from '@/lib/offlineQueue';
@@ -18,6 +19,8 @@ type AppCtx = {
   lang: 'en' | 'hi';
   setLang: (l: 'en' | 'hi') => void;
   t: (k: string, vars?: Record<string, string | number>) => string;
+  /** any English phrase of the screens -> Hindi when the language is Hindi (and the phrase is in lib/hi.js), else unchanged */
+  tr: (en: string, vars?: Record<string, string | number>) => string;
   session: ClientSession | null;
   logout: () => Promise<void>;
   online: boolean;
@@ -30,11 +33,27 @@ type AppCtx = {
 
 const Ctx = createContext<AppCtx | null>(null);
 export const useApp = (): AppCtx => useContext(Ctx) as AppCtx;
+/** Everything inside shows in English whatever the app language is: used for documents that go to customers (tax invoice, quotation, gate pass). */
+export function EnglishOnly({ children }: { children: ReactNode }) {
+  const ctx = useApp();
+  const value = useMemo<AppCtx>(() => ({ ...ctx, lang: 'en', t: (k, v) => translate('en', k, v), tr: (en, v) => translatePhrase(null, en, v) }), [ctx]);
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+/** Translate a label that may be text or already a React element: text is looked up in the Hindi dictionary, anything else passes through. */
+export function useTx() {
+  const { tr } = useApp();
+  return useCallback((v: any) => (typeof v === 'string' ? tr(v) : v), [tr]);
+}
 
 // `initialSession` comes from the server (real, signed, server-side session) – the browser never decides who it is.
-export function Providers({ children, initialSession = null, initialLang = 'en' }: { children: ReactNode; initialSession?: ClientSession | null; initialLang?: 'en' | 'hi' }) {
+export function Providers({ children, initialSession = null, initialLang = 'en', hiDict = null }: { children: ReactNode; initialSession?: ClientSession | null; initialLang?: 'en' | 'hi'; hiDict?: Record<string, string> | null }) {
   const router = useRouter();
   const [lang, setLangState] = useState<'en' | 'hi'>(initialLang);
+  // the Hindi dictionary arrives with the page for people who use Hindi; someone who switches to Hindi later loads it once, on demand
+  const [dict, setDict] = useState<Record<string, string> | null>(hiDict);
+  useEffect(() => { if (hiDict) setDict(hiDict); }, [hiDict]);
+  useEffect(() => { if (lang === 'hi' && !dict) void import('@/lib/hi').then((m) => setDict(m.HI as Record<string, string>)); }, [lang, dict]);
   // Always follow the server's answer: signing in/out re-renders the root layout (router.refresh) without remounting this component.
   const session = initialSession;
   const [online, setOnline] = useState(true);
@@ -51,7 +70,7 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
       const st = await upd();
       if (!st.pending || !navigator.onLine) return;
       const n = await flushQueue((item: any, ok: boolean, msg?: string) => { if (!ok) toast.error(`${item.label}: ${msg}`); });
-      if (n) toast.success(`${n} saved ${n > 1 ? 'entries' : 'entry'} sent`);
+      if (n) toast.success(n > 1 ? trNow('{n} saved entries sent', { n }) : trNow('1 saved entry sent'));
       upd();
     };
     const on = () => { setOnline(true); if (initialSession) void send(); };
@@ -91,6 +110,8 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
     if (initialSession) api('/api/auth/me', { method: 'PATCH', body: { lang: l } }).catch(() => {});
   }, [initialSession]);
   const t = useCallback((k: string, vars?: Record<string, string | number>) => translate(lang, k, vars), [lang]);
+  const tr = useCallback((en: string, vars?: Record<string, string | number>) => translatePhrase(lang === 'hi' ? dict : null, en, vars), [lang, dict]);
+  useEffect(() => { setTrNow(tr); }, [tr]);
 
   const logout = useCallback(async () => {
     try { await api('/api/auth/logout', { method: 'POST', body: {} }); } catch {}
@@ -101,7 +122,7 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
   }, [router]);
 
   const can = useCallback((resource: string, action = 'view') => !!session && canPerm(session.perm, resource, action as never), [session]);
-  const value = useMemo<AppCtx>(() => ({ lang, setLang, t, session, logout, online, queued, queueFailed, can, perm: session?.perm ?? null, role: session?.role }), [lang, setLang, t, session, logout, online, queued, queueFailed, can]);
+  const value = useMemo<AppCtx>(() => ({ lang, setLang, t, tr, session, logout, online, queued, queueFailed, can, perm: session?.perm ?? null, role: session?.role }), [lang, setLang, t, tr, session, logout, online, queued, queueFailed, can]);
 
   return (
     <Ctx.Provider value={value}>
@@ -132,9 +153,11 @@ async function fetchWithRetry(url: string): Promise<any> {
   }
 }
 
-export function useFetch(url: string | null, deps: unknown[] = []) {
+export function useFetch(url: string | null, deps: unknown[] = [], opts: { initial?: unknown } = {}) {
   const { session } = useApp();
   const key = url ? `${session?.id ?? '-'}|${url}` : null;
+  // data the server already rendered into the page counts as freshly fetched: it is shown at once and refreshed after the usual 2 s
+  if (key && opts.initial && !swr.has(key)) swr.set(key, { data: opts.initial, at: -1 }); // -1: stamped with the real time in the effect below
   const hit = key ? swr.get(key) : undefined;
   const [data, setData] = useState<any>(hit?.data ?? null);
   const [loading, setLoading] = useState(!!url && !hit);
@@ -144,6 +167,7 @@ export function useFetch(url: string | null, deps: unknown[] = []) {
     if (!url || !key) { setLoading(false); return; }
     let live = true;
     const cached = swr.get(key);
+    if (cached && cached.at === -1) cached.at = Date.now();
     if (cached) { setData(cached.data); setLoading(false); } else setLoading(true);
     const run = () => {
       let p = inflight.get(key);
