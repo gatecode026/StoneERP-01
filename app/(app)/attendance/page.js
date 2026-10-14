@@ -80,7 +80,7 @@ export default function AttendancePage() {
   const counts = (st) => (sheet.meta.counts?.[st] || 0) + sheet.rows.reduce((n, r) => { const o = over[r.empCode]; return o ? n + (o.state === st ? 1 : 0) - (r.state === st ? 1 : 0) : n; }, 0);
   const unmarked = Math.max(0, (sheet.meta.unmarked || 0) - sheet.rows.filter((r) => !r.state && over[r.empCode]?.state).length);
 
-  const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> {t('selfie')}</button>;
+  const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> <span className="sm:hidden">Selfie</span><span className="hidden sm:inline">{t('selfie')}</span></button>;
 
   return (
     <RoleGuard perm="attendance">

@@ -47,7 +47,7 @@ export default function ImportData({ resource, perm, noun, hint }) {
 
   return (
     <>
-      <button className="btn-outline btn-sm" onClick={() => setOpen(true)}><FileSpreadsheet size={14} /> <span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importExcel')}</span></button>
+      <button className="btn-outline btn-sm" onClick={() => setOpen(true)} title={t('importExcel')} aria-label={t('importExcel')}><FileSpreadsheet size={14} /> <span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importExcel')}</span></button>
       <Sheet open={open} onClose={close} title={t('impTitle', { noun })} wide
         footer={<>
           <button className="btn-outline" onClick={close}>{t('close')}</button>
