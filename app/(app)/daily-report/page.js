@@ -58,10 +58,20 @@ export default function DailyReportPage() {
     setSaving(false);
   }
 
+  const [detail, setDetail] = useState(null);
+  const [checking, setChecking] = useState(false);
+
   async function check(r, supCheck) {
+    if (checking) return;
     const remark = supCheck === 'not_ok' ? await promptDialog('Remark (what is wrong?)', r.supRemark || '') : r.supRemark || '';
     if (remark === null) return;
-    try { await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck, supRemark: remark } }); toast.success(supCheck === 'ok' ? 'Marked OK' : 'Marked not OK'); reload(); } catch (e) { toast.error(e.message); }
+    setChecking(true);
+    try {
+      await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck, supRemark: remark } });
+      toast.success(supCheck === 'ok' ? 'Marked OK' : 'Marked not OK', { id: 'report-check' });
+      setDetail(null); reload();
+    } catch (e) { toast.error(e.message, { id: 'report-check' }); } // same id: repeated clicks never pile up messages
+    setChecking(false);
   }
 
   const rows = day.rows;
@@ -69,34 +79,67 @@ export default function DailyReportPage() {
   const missingCount = missingQ.data?.count || 0;
   const canCheck = can('dailyreports', 'approve');
 
-  const Card = ({ r }) => {
-    return (
-      <div className="card p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0"><div className="font-bold">{r.empName}</div><div className="text-xs text-char-500">{r.job} · {fmtDate(r.date)}{r.filledBy && r.filledBy !== r.empName ? ` · filled by ${r.filledBy}` : ''}</div></div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {r.supCheck === 'ok' && <Badge tone="green">Supervisor OK</Badge>}
-            {r.supCheck === 'not_ok' && <Badge tone="red">Not OK</Badge>}
-            {locked(r.date) ? <Badge tone="gray"><Lock size={10} /> Locked</Badge> : can('dailyreports', 'edit') && <button className="icon-btn" onClick={() => openNew(r)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>}
-          </div>
-        </div>
-        <p className="text-sm mt-2 whitespace-pre-wrap">{r.narration}</p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-char-500 mt-2">
-          {r.hours > 0 && <span>⏱ {r.hours} h</span>}{r.quantity > 0 && <span>📐 {num(r.quantity)} sq ft</span>}
-        </div>
-        {r.problem && <div className="mt-2 text-sm"><span className="font-semibold text-red-600">Problem:</span> {r.problem}</div>}
-        {r.plan && <div className="text-sm"><span className="font-semibold text-char-500">Tomorrow:</span> {r.plan}</div>}
-        {r.photoCount > 0 && <div className="text-xs text-char-500 mt-2">📷 {r.photoCount} photo{r.photoCount > 1 ? 's' : ''} (open Edit to view)</div>}
-        {r.supRemark && <div className="mt-2 text-xs bg-sand-100 rounded-lg px-2 py-1">Supervisor: {r.supRemark}</div>}
-        {canCheck && (
-          <div className="flex gap-2 mt-3">
-            <button className={cx('btn-sm flex-1', r.supCheck === 'ok' ? 'btn-green' : 'btn-outline')} onClick={() => check(r, 'ok')}><Check size={14} /> OK</button>
-            <button className={cx('btn-sm flex-1', r.supCheck === 'not_ok' ? 'btn-danger' : 'btn-outline')} onClick={() => check(r, 'not_ok')}><X size={14} /> Not OK</button>
-          </div>
-        )}
+  const isOwn = (r) => !!session?.empCode && r.empCode === session.empCode;
+  const canEditRow = (r) => !locked(r.date) && can('dailyreports', 'edit');
+  const canCheckRow = (r) => canCheck && !isOwn(r); // nobody checks their own report; nobody without the right sees the buttons
+  const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green">OK</Badge> : r.supCheck === 'not_ok' ? <Badge tone="red">Not OK</Badge> : canCheck ? <Badge tone="gray">Not checked</Badge> : null);
+
+  // one table on a computer, one compact list on a phone: tap a row for the whole report
+  const renderList = (items) => (
+    <div className="card overflow-hidden">
+      <ul className="md:hidden divide-y divide-sand-100">
+        {items.map((r) => (
+          <li key={r._id}>
+            <button type="button" className="w-full text-left px-4 py-3 active:bg-sand-50 min-h-[44px]" onClick={() => setDetail(r)}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0"><div className="font-semibold text-[15px] truncate">{r.empName}</div><div className="text-xs text-char-500 truncate">{r.job}{isWorker ? ` · ${fmtDate(r.date)}` : ''}</div></div>
+                <div className="flex items-center gap-1.5 shrink-0">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="text-char-300" aria-label="Locked" />}</div>
+              </div>
+              <p className="text-sm text-char-700 mt-1 line-clamp-2 break-words">{r.narration}</p>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-char-500">
+                {r.hours > 0 && <span>{r.hours} h</span>}{r.quantity > 0 && <span>{num(r.quantity)} sq ft</span>}{r.problem && <span className="text-red-600 break-words">Problem: {r.problem}</span>}
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="th">Employee</th>{isWorker && <th className="th">Date</th>}<th className="th">Work done</th><th className="th text-right">Hours</th><th className="th text-right">Sq ft</th><th className="th">Problem</th><th className="th">Status</th><th className="th w-px" />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((r) => (
+              <tr key={r._id} className="hover:bg-sand-50 cursor-pointer" onClick={() => setDetail(r)}>
+                <td className="td whitespace-nowrap"><div className="font-semibold">{r.empName}</div><div className="text-xs text-char-500">{r.job}</div></td>
+                {isWorker && <td className="td whitespace-nowrap">{fmtDate(r.date)}</td>}
+                <td className="td max-w-[26rem]"><p className="line-clamp-2 break-words">{r.narration}</p></td>
+                <td className="td text-right whitespace-nowrap">{r.hours > 0 ? r.hours : '—'}</td>
+                <td className="td text-right whitespace-nowrap">{r.quantity > 0 ? num(r.quantity) : '—'}</td>
+                <td className="td max-w-[12rem]">{r.problem ? <span className="text-red-600 line-clamp-2 break-words">{r.problem}</span> : <span className="text-char-300">—</span>}</td>
+                <td className="td whitespace-nowrap">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="inline ml-1.5 text-char-300" aria-label="Locked" />}</td>
+                <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>
+                  {canCheckRow(r) && <>
+                    <button className={cx('icon-btn', r.supCheck === 'ok' && 'text-emerald-700')} onClick={() => check(r, 'ok')} disabled={checking} title="Mark OK" aria-label="Mark OK"><Check size={16} /></button>
+                    <button className={cx('icon-btn', r.supCheck === 'not_ok' && 'text-red-600')} onClick={() => check(r, 'not_ok')} disabled={checking} title="Mark not OK" aria-label="Mark not OK"><X size={16} /></button>
+                  </>}
+                  {canEditRow(r) && <button className="icon-btn" onClick={() => openNew(r)} title="Edit" aria-label="Edit"><Pencil size={15} /></button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    );
-  };
+    </div>
+  );
+
+  const detailRows = detail ? [
+    ['Employee', `${detail.empName}${detail.job ? ' · ' + detail.job : ''}`], ['Date', fmtDate(detail.date)],
+    ...(detail.filledBy && detail.filledBy !== detail.empName ? [['Filled by', detail.filledBy]] : []),
+    ['Hours', detail.hours > 0 ? `${detail.hours} h` : '—'], ['Quantity', detail.quantity > 0 ? `${num(detail.quantity)} sq ft` : '—'],
+  ] : [];
 
   return (
     <RoleGuard perm="dailyreports">
@@ -108,10 +151,10 @@ export default function DailyReportPage() {
         </>} />
 
       {isWorker ? (
-        mine.loading ? <SkeletonList /> : (mine.data || []).length ? <div className="space-y-3">{mine.data.map((r) => <Card key={r._id} r={r} />)}</div> : <Empty text="No reports yet — fill today's report" />
+        mine.loading ? <SkeletonList /> : (mine.data || []).length ? renderList(mine.data) : <Empty text="No reports yet — fill today's report" />
       ) : loading ? <SkeletonList /> : (
         <>
-          {!rows.length ? <Empty text={`No reports for ${fmtDate(date)} yet`} /> : <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r) => <Card key={r._id} r={r} />)}</div>}
+          {!rows.length ? <Empty text={`No reports for ${fmtDate(date)} yet`} /> : renderList(rows)}
           <Pager list={day} />
           {missingCount > 0 && (
             <div className="card p-4 mt-4 border-amber-200 bg-amber-50">
@@ -131,6 +174,33 @@ export default function DailyReportPage() {
           )}
         </>
       )}
+
+      {/* The whole report: opens from a row. OK / Not OK only for someone who may check it, and never on their own report. */}
+      <Sheet open={!!detail} onClose={() => setDetail(null)} title={detail ? `Report · ${detail.empName}` : ''}
+        footer={detail && (
+          <>
+            {canEditRow(detail) && <button className="btn-outline" onClick={() => { const r = detail; setDetail(null); openNew(r); }}><Pencil size={14} /> Edit</button>}
+            {canCheckRow(detail) && <>
+              <button className={cx('flex-1', detail.supCheck === 'ok' ? 'btn-green' : 'btn-outline')} onClick={() => check(detail, 'ok')} disabled={checking}><Check size={16} /> OK</button>
+              <button className={cx('flex-1', detail.supCheck === 'not_ok' ? 'btn-danger' : 'btn-outline')} onClick={() => check(detail, 'not_ok')} disabled={checking}><X size={16} /> Not OK</button>
+            </>}
+            {!canEditRow(detail) && !canCheckRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}>Close</button>}
+          </>
+        )}>
+        {detail && (
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-2 flex-wrap">{statusBadge(detail)}{locked(detail.date) && <Badge tone="gray"><Lock size={10} /> Locked</Badge>}</div>
+            <dl className="divide-y divide-sand-100">
+              {detailRows.map(([k, v]) => <div key={k} className="flex justify-between gap-3 py-1.5"><dt className="text-char-500">{k}</dt><dd className="font-medium text-right">{v}</dd></div>)}
+            </dl>
+            <div><div className="text-xs font-semibold uppercase text-char-500 mb-1">Work done</div><p className="whitespace-pre-wrap break-words">{detail.narration}</p></div>
+            {detail.problem && <div><div className="text-xs font-semibold uppercase text-red-600 mb-1">Problem</div><p className="break-words">{detail.problem}</p></div>}
+            {detail.plan && <div><div className="text-xs font-semibold uppercase text-char-500 mb-1">Plan for tomorrow</div><p className="break-words">{detail.plan}</p></div>}
+            {detail.photoCount > 0 && <div className="text-xs text-char-500">{detail.photoCount} photo{detail.photoCount > 1 ? 's' : ''} attached{canEditRow(detail) ? ' (open Edit to view)' : ''}</div>}
+            {detail.supRemark && <div className="rounded-lg bg-sand-100 px-3 py-2"><div className="text-xs font-semibold text-char-500 mb-0.5">Supervisor{detail.checkedBy ? ` · ${detail.checkedBy}` : ''}</div>{detail.supRemark}</div>}
+          </div>
+        )}
+      </Sheet>
 
       {/* The one-screen form from the PDF */}
       <Sheet open={open} onClose={() => setOpen(false)} title={`Daily work report · ${fmtDate(form.date || date)}${isWorker ? ` · ${session?.name}` : ''}`}

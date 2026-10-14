@@ -67,6 +67,16 @@ export function Providers({ children, initialSession = null, initialLang = 'en' 
   useEffect(() => { if (initialSession) setLangState(initialLang); }, [initialSession?.id, initialLang]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
+  // the Owner may change someone's access while they have the app open: when the tab comes back (at most every 30 s) re-read the session,
+  // so buttons they may no longer use disappear (the server refused them anyway)
+  useEffect(() => {
+    if (!initialSession) return;
+    let last = Date.now();
+    const back = () => { if (document.visibilityState === 'visible' && Date.now() - last > 30_000) { last = Date.now(); router.refresh(); } };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, [initialSession, router]);
+
   // offline shell: register the service worker (production only) and, once signed in, warm the screens a worker needs without a network
   useEffect(() => {
     if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
