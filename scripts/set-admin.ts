@@ -13,6 +13,7 @@ import { hashPassword, mobileSchema, passwordSchema } from '../lib/auth/password
 import mongoose from 'mongoose';
 
 async function main() {
+  if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is not set. Set it to the database you mean (PowerShell: $env:MONGODB_URI = "...") and run again.');
   const apply = process.argv.includes('--apply');
   const mobile = mobileSchema.parse(process.env.ADMIN_MOBILE ?? '9000000001');
   const password = process.env.ADMIN_PASSWORD ?? 'admin@1234';
