@@ -41,7 +41,7 @@ export default function DailyReportPage() {
     } else { setEditing(null); setForm({ ...blank(), date }); }
     setOpen(true);
   }
-  useEffect(() => { if (sp.get('new') === '1') openNew(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { if (sp.get('new') === '1' && can('dailyreports', 'create')) openNew(); /* eslint-disable-next-line */ }, []);
 
   async function save() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
@@ -147,7 +147,7 @@ export default function DailyReportPage() {
         actions={<><ImportData resource="dailyreports" perm="dailyreports" noun="daily work reports" hint="employee and work done are required" />
           {!isWorker && <input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} />}
           {!isWorker && can('dailyreports', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/dailyreports?format=xlsx&${toQuery({ date, sort: 'empName' })}`)} />}
-          <button className="btn-primary" onClick={() => openNew()}><Plus size={18} /> {isWorker ? 'Fill today\'s report' : t('add')}</button>
+          {can('dailyreports', 'create') && <button className="btn-primary" onClick={() => openNew()}><Plus size={18} /> {isWorker ? 'Fill today\'s report' : t('add')}</button>}
         </>} />
 
       {isWorker ? (

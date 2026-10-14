@@ -5,11 +5,11 @@ import type { AuthCtx } from '../api/withAuth';
 import { escapeRe } from '../api/query';
 
 
-/** The people this user may mark attendance for: employees they may view, else the team their attendance right covers. */
-export async function markableFilter(auth: AuthCtx): Promise<Record<string, any>> {
-  if (auth.perm.can('employees', 'view')) return scopeFilter(auth.user, auth.perm, 'employees', 'view').catch(() => ({ _id: { $in: [] } }));
-  return scopeFilter(auth.user, auth.perm, 'attendance', 'create');
-}
+/** The people whose attendance this user may SEE: exactly what their attendance "See" right covers (own, team or all) — never wider. */
+export const viewableFilter = (auth: AuthCtx): Promise<Record<string, any>> => scopeFilter(auth.user, auth.perm, 'attendance', 'view');
+
+/** The people this user may MARK attendance for: what their attendance "Add" right covers. Nobody without that right can mark anyone. */
+export const markableFilter = (auth: AuthCtx): Promise<Record<string, any>> => scopeFilter(auth.user, auth.perm, 'attendance', 'create');
 
 /**
  * One request for the whole "mark attendance" screen: a page of people (alphabetical by code) with today's mark merged in,
@@ -17,7 +17,7 @@ export async function markableFilter(auth: AuthCtx): Promise<Record<string, any>
  */
 export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: string; after?: string; page?: number; limit?: number }) {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
-  const teamSf = await markableFilter(auth);
+  const teamSf = await viewableFilter(auth);
   const base: Record<string, any> = { status: 'active', isVoid: false };
   const q = opts.q?.trim().slice(0, 40);
   const search = q ? { $or: [{ name: new RegExp('^' + escapeRe(q), 'i') }, { empCode: new RegExp('^' + escapeRe(q), 'i') }, { job: new RegExp('^' + escapeRe(q), 'i') }] } : {};
@@ -35,13 +35,16 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
   const hasMore = people.length > limit;
   if (hasMore) people.pop();
   const marks: any[] = await Attendance.find({ date, isVoid: false, empCode: { $in: people.map((p) => p.empCode) } }, 'empCode state otHours late method').lean();
+  // which of these rows this user may actually mark (the screen only enables buttons for those)
+  const markSf = await markableFilter(auth);
+  const markable = new Set<string>((await Employee.find({ $and: [{ empCode: { $in: people.map((p) => p.empCode) } }, markSf] }, 'empCode').lean() as any[]).map((e) => e.empCode));
   const byCode = new Map(marks.map((m) => [m.empCode, m]));
   const counts: Record<string, number> = { present: 0, absent: 0, half: 0, overtime: 0, leave: 0 };
   let markedTotal = 0;
   for (const g of marked) { counts[g._id] = g.n; markedTotal += g.n; }
   return {
     date, total, counts, unmarked: Math.max(0, total - markedTotal),
-    data: people.map((p) => { const m = byCode.get(p.empCode); return { empCode: p.empCode, name: p.name, job: p.job, ...(m ? { state: m.state, otHours: m.otHours, late: m.late, method: m.method } : {}) }; }),
+    data: people.map((p) => { const m = byCode.get(p.empCode); return { empCode: p.empCode, name: p.name, job: p.job, markable: markable.has(p.empCode), ...(m ? { state: m.state, otHours: m.otHours, late: m.late, method: m.method } : {}) }; }),
     nextCursor: hasMore ? people[people.length - 1].empCode : null,
   };
 }
