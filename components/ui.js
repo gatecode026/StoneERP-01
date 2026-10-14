@@ -182,6 +182,7 @@ export function LoadMore({ list }) {
 
 /** Numbered pages: Previous / 1 2 3 … / Next, "Showing 26–50 of 100", and a page-size choice. */
 export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
+  const { t } = useApp();
   if (total == null || total === 0) return null;
   const capped = total > 10000;
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -190,18 +191,18 @@ export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
   const nums = [...new Set([1, 2, page - 1, page, page + 1, pages - 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
   const btn = 'min-w-[44px] min-h-[44px] rounded-lg border text-sm font-semibold';
   return (
-    <nav aria-label="Pages" className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div className="text-xs text-char-500">Showing {from}–{to} of {capped ? '10,000+' : total}</div>
+    <nav aria-label={t('pages')} className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="text-xs text-char-500">{t('pagerShowing', { from, to, total: capped ? '10,000+' : total })}</div>
       <div className="flex items-center gap-1.5 flex-wrap justify-center">
-        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page">Prev</button>
+        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={t('prevPage')}>{t('prev')}</button>
         {nums.map((n, i) => (
           <span key={n} className="flex items-center gap-1.5">
             {i > 0 && n - nums[i - 1] > 1 && <span className="text-char-300">…</span>}
             <button className={`${btn} ${n === page ? 'bg-terra text-white border-terra' : 'border-sand-300 bg-white'}`} aria-current={n === page ? 'page' : undefined} onClick={() => onPage(n)}>{n}</button>
           </span>
         ))}
-        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page">Next</button>
-        <select aria-label="Rows per page" className="input !w-auto !min-h-[44px] ml-1" value={pageSize} onChange={(e) => onSize(Number(e.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n} / page</option>)}</select>
+        <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={t('nextPage')}>{t('next')}</button>
+        <select aria-label={t('rowsPerPage')} className="input !w-auto !min-h-[44px] ml-1" value={pageSize} onChange={(e) => onSize(Number(e.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{t('perPage', { n })}</option>)}</select>
       </div>
     </nav>
   );
@@ -247,8 +248,7 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
         )}
         {items.map((src, i) => (
           <div key={i} className="relative inline-flex items-center gap-2 p-1.5 rounded-xl border border-sand-200 bg-sand-50/60 shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={fileUrl(src, true)} alt="" loading="lazy" className="h-10 w-10 rounded-lg object-cover border border-sand-200" />
+            <Photo src={src} thumb width={40} height={40} className="h-10 w-10 rounded-lg object-cover border border-sand-200" />
             {!multiple && (
               <button
                 type="button"
@@ -274,16 +274,33 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
   );
 }
 
+/** A picture from our own storage: loads when it scrolls into view, keeps its box (no jumping) and shows a soft placeholder until it arrives. */
+export function Photo({ src, thumb = false, alt = '', className = '', width, height }) {
+  const [state, setState] = useState('loading');
+  const url = fileUrl(src, thumb);
+  if (!url) return null;
+  if (state === 'error') return <div className={cx('flex items-center justify-center bg-sand-100 text-char-300', className)} style={{ width, height }} role="img" aria-label={alt}><ImageIcon size={16} /></div>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url} alt={alt} loading="lazy" decoding="async" width={width} height={height}
+      onLoad={() => setState('ready')} onError={() => setState('error')}
+      className={cx(className, state === 'loading' && 'animate-pulse bg-sand-200')}
+    />
+  );
+}
+
 // A document (photo or PDF scan) uploaded straight to storage; the record keeps only the file key
 export function DocInput({ value, onChange, resource, kind = 'docs', label }) {
   const ref = useRef();
   const [busy, setBusy] = useState(false);
+  const [pct, setPct] = useState(0);
   async function pick(e) {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
-    setBusy(true);
-    try { const r = await uploadFile(f, resource, kind); onChange(r.key); toast.success('Uploaded'); } catch (err) { toast.error(err.message); }
+    setBusy(true); setPct(0);
+    try { const r = await uploadFile(f, resource, kind, setPct); onChange(r.key); toast.success('Uploaded'); } catch (err) { toast.error(err.message); }
     setBusy(false);
   }
   return (
@@ -294,8 +311,9 @@ export function DocInput({ value, onChange, resource, kind = 'docs', label }) {
         disabled={busy}
         onClick={() => ref.current?.click()}
       >
-        <Camera size={16} className="text-terra" /> {busy ? 'Uploading…' : label || 'Upload photo / PDF'}
+        <Camera size={16} className="text-terra" /> {busy ? `Uploading… ${pct}%` : label || 'Upload photo / PDF'}
       </button>
+      {busy && <div className="basis-full h-1.5 rounded-full bg-sand-200 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-terra transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>}
       {value && (
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
           <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="hover:underline font-semibold">View file</a>

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useApp } from '@/components/Providers';
 
 // Accessible replacements for window.confirm / window.prompt: real modal dialogs (role, focus trap, Esc, 44 px buttons),
 // usable with `await`:  if (!(await confirmDialog('Cancel this entry?'))) return;   const v = await promptDialog('Amount', '100');
@@ -17,6 +18,7 @@ export const confirmDialog = (message, opts = {}) => open({ kind: 'confirm', mes
 export const promptDialog = (message, defaultValue = '', opts = {}) => open({ kind: 'prompt', message, defaultValue, ...opts });
 
 export function DialogHost() {
+  const { t } = useApp();
   const [cur, setCur] = useState(null);
   const [val, setVal] = useState('');
   const box = useRef(null);
@@ -62,8 +64,8 @@ export function DialogHost() {
           </form>
         )}
         <div className="mt-4 flex gap-3 justify-end">
-          <button className="btn-outline min-w-[96px]" onClick={() => close(isPrompt ? null : false)}>{cur.cancelLabel || 'Cancel'}</button>
-          <button className={cur.danger ? 'btn-danger min-w-[96px]' : 'btn-primary min-w-[96px]'} onClick={() => close(isPrompt ? val : true)}>{cur.okLabel || 'OK'}</button>
+          <button className="btn-outline min-w-[96px]" onClick={() => close(isPrompt ? null : false)}>{cur.cancelLabel || t('cancel')}</button>
+          <button className={cur.danger ? 'btn-danger min-w-[96px]' : 'btn-primary min-w-[96px]'} onClick={() => close(isPrompt ? val : true)}>{cur.okLabel || t('ok')}</button>
         </div>
       </div>
     </div>

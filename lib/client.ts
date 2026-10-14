@@ -123,13 +123,29 @@ export function fileUrl(v: string | null | undefined, thumb = false): string {
 }
 
 /** Upload a file straight to storage (multipart). Returns the stored key. */
-export async function uploadFile(file: File, resource: string, kind = 'docs'): Promise<{ key: string; contentType: string; size: number }> {
+export async function uploadFile(file: File, resource: string, kind = 'docs', onProgress?: (percent: number) => void): Promise<{ key: string; contentType: string; size: number }> {
   const form = new FormData();
   form.set('file', file);
   form.set('resource', resource);
   form.set('kind', kind);
-  const res = await fetch('/api/files', { method: 'POST', body: form });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(data?.error?.message || `Upload failed (${res.status})`, res.status, data);
-  return data;
+  if (!onProgress) {
+    const res = await fetch('/api/files', { method: 'POST', body: form });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(data?.error?.message || `Upload failed (${res.status})`, res.status, data);
+    return data;
+  }
+  // fetch cannot report upload progress, XMLHttpRequest can
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/files');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100))); };
+    xhr.onerror = () => reject(new ApiError('Network problem — check your connection and try again', 0, null));
+    xhr.onload = () => {
+      let data: any = null;
+      try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) { onProgress(100); resolve(data); }
+      else reject(new ApiError(data?.error?.message || `Upload failed (${xhr.status})`, xhr.status, data));
+    };
+    xhr.send(form);
+  });
 }

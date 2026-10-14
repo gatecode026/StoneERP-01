@@ -120,8 +120,8 @@ export default function Shell({ children }) {
           </div>
           {(!online || queued > 0) && (
             <div className={`${queueFailed ? 'bg-red-100 text-red-900' : 'bg-amber-100 text-amber-900'} text-xs font-semibold px-4 flex items-center gap-2 min-h-[44px]`} role="status">
-              <WifiOff size={14} /> {!online ? t('offline') : `${queued} saved entries waiting to send`}{queueFailed > 0 && ` · ${queueFailed} need attention`}
-              {queued > 0 && <button className="ml-auto underline min-h-[44px] px-2" onClick={() => setSyncOpen(true)}>{queued} · Review</button>}
+              <WifiOff size={14} /> {!online ? t('offline') : t('queueWaiting', { n: queued })}{queueFailed > 0 && ` · ${t('queueAttention', { n: queueFailed })}`}
+              {queued > 0 && <button className="ml-auto underline min-h-[44px] px-2" onClick={() => setSyncOpen(true)}>{queued} · {t('review')}</button>}
             </div>
           )}
         </header>
