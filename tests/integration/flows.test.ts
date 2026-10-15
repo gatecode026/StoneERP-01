@@ -163,17 +163,18 @@ describe('row scope: own and team', () => {
     expect(r.status).toBe(403);
     expect(r.json.error.message).toMatch(/locked/);
   });
-  it('a worker marks only today, only themself, with a selfie; a supervisor’s mark is not overwritten', async () => {
-    const noSelfie = await api.create(worker, 'attendance', { state: 'present' });
-    expect(noSelfie.status).toBe(400);
-    const r = await api.create(worker, 'attendance', { selfie: PNG, state: 'absent', date: addDays(today, -1), empCode: 'E002' });
-    expect(r.status).toBe(403);
-    const mine = await api.create(worker, 'attendance', { selfie: PNG, location: { text: 'Gate' } });
+  it('nobody marks their own attendance: a worker is refused, the supervisor marks and can correct', async () => {
+    const own = await api.create(worker, 'attendance', { state: 'present' });
+    expect(own.status).toBe(403);
+    expect((await api.create(worker, 'attendance', { selfie: PNG })).status).toBe(403); // selfie attendance no longer exists
+    expect((await api.create(worker, 'attendance', { state: 'present', date: addDays(today, -1), empCode: 'E002' })).status).toBe(403);
+    const mine = await api.create(supervisor, 'attendance', { empCode: 'E001', state: 'present' });
     expect(mine.status, JSON.stringify(mine.json)).toBe(201);
-    expect(mine.json.state).toBe('present');
-    expect(mine.json.date).toBe(today);
-    expect((await api.create(worker, 'attendance', { selfie: PNG })).status).toBe(409);
+    expect(mine.json).toMatchObject({ state: 'present', date: today });
     expect((await api.patch(worker, 'attendance', mine.json._id, { state: 'overtime' })).status).toBe(403);
+    const fix = await api.create(supervisor, 'attendance', { empCode: 'E001', state: 'half' });
+    expect(fix.status).toBe(200);
+    expect(fix.json.state).toBe('half');
   });
 });
 

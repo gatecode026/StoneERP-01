@@ -3,8 +3,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import toast from '@/lib/toast';
 import { CalendarCheck, Check, ClipboardList, FileText, ListChecks, LogOut, MessageCircle, Plus, Search, X } from 'lucide-react';
-import { StatCard, Badge, PhotoInput, cx } from '@/components/ui';
-import { api, getLocation, openWA, submit } from '@/lib/client';
+import { StatCard, Badge, cx } from '@/components/ui';
+import { api, openWA, submit } from '@/lib/client';
 import { fmtDate, inr, inrShort, num, todayISO } from '@/lib/format';
 import { useApp, useFetch } from '@/components/Providers';
 import { AgeingChart, Card } from './parts';
@@ -224,26 +224,13 @@ export function SalespersonHome({ data }) {
 }
 
 // ---------------------------------------------------------------- WORKER (4 big cards) – also the "self" block of every job preset
-export function WorkerCards({ self, reload }) {
+export function WorkerCards({ self }) {
   const h = useH();
   const { can } = useApp();
-  const [selfie, setSelfie] = useState('');
-  const [busy, setBusy] = useState(false);
-  async function markAtt() {
-    if (!selfie) return toast.error('Take a selfie first');
-    setBusy(true);
-    try {
-      const location = await getLocation();
-      const r = await submit('/api/attendance', { selfie, location }, { label: 'Attendance' });
-      toast.success(r.queued ? 'Saved. It will be sent when the network returns.' : 'Attendance marked ✔');
-      reload();
-    } catch (e) { toast.error(e.message); }
-    setBusy(false);
-  }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {can('attendance', 'create') && (
-        <Card title={<span className="text-base font-bold flex items-center gap-2"><CalendarCheck className="text-terra" size={18} /> {h('markAtt')}</span>}>
+      {can('attendance', 'view') && (
+        <Card title={<span className="text-base font-bold flex items-center gap-2"><CalendarCheck className="text-terra" size={18} /> {h('myAtt')}</span>}>
           {self?.attendance ? (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
               <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
@@ -258,18 +245,12 @@ export function WorkerCards({ self, reload }) {
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              <PhotoInput value={selfie} onChange={setSelfie} label={h('takeSelfie')} capture="user" />
-              <button
-                type="button"
-                className="btn-primary w-full !min-h-[50px] text-base font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={busy}
-                onClick={markAtt}
-              >
-                <CalendarCheck size={18} /> {busy ? 'Marking…' : h('markAtt')}
-              </button>
+            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+              <div className="font-bold">{h('attPending')}</div>
+              <div className="text-xs mt-0.5"><T>Your supervisor marks attendance. It will show here once it is marked.</T></div>
             </div>
           )}
+          <Link href="/attendance" className="btn-outline w-full !min-h-[44px] text-sm font-semibold justify-center mt-3">{h('viewAtt')}</Link>
         </Card>
       )}
       {can('dailyreports', 'create') && (

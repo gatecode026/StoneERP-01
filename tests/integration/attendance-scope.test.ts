@@ -71,10 +71,10 @@ describe('the attendance sheet follows the attendance rights, not the employees 
     expect(r.json.data.every((x: any) => x.markable === true)).toBe(true);
   });
 
-  it('a worker (See = Own, Add = Own) sees only themselves and may mark themselves', async () => {
+  it('a worker (See = Own, no Add) sees only themselves and cannot mark anyone', async () => {
     const r = await call(worker, sheet.GET as never, '/api/attendance/sheet?limit=100');
     expect(rows(r)).toEqual(['E001']);
-    expect(r.json.data[0].markable).toBe(true);
+    expect(r.json.data[0].markable).toBe(false);
   });
 });
 

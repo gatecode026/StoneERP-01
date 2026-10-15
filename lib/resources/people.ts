@@ -158,31 +158,27 @@ export const attendance: ResourceDef = {
   serverOnly: ['markedBy', 'empName', 'method'],
   create: z.object({
     date: dateStr.optional(), empCode: empCode.optional(), state: enumOf(['present', 'absent', 'half', 'overtime', 'leave']).optional(),
-    otHours: num(0, 16).optional(), late: z.boolean().optional(), selfie: photo.optional(),
-    location: z.object({ lat: z.number().min(-90).max(90).optional(), lng: z.number().min(-180).max(180).optional(), text: text(120).optional() }).optional(),
+    otHours: num(0, 16).optional(), late: z.boolean().optional(),
     biometric: z.boolean().optional(),
   }).strict(),
   update: z.object({ state: enumOf(['present', 'absent', 'half', 'overtime', 'leave']), otHours: num(0, 16), late: z.boolean() }).partial().strict(),
   lifecycle: {
     async create(ctx, input, auth) {
       const today = todayIST();
-      const own = auth.scope === 'own';
-      const date = own ? today : input.date ?? today; // a worker can only mark today, for themselves
+      // Nobody marks their own attendance (there is no selfie any more): a supervisor, manager or the Owner marks it, and a biometric machine will later.
+      if (auth.scope === 'own') throw forbidden('Attendance is marked by your supervisor');
+      const date = input.date ?? today;
       if (date > today) throw badRequest('You cannot mark a future day');
-      const code = own ? auth.user.empCode : input.empCode;
-      if (!code) throw badRequest(own ? 'Your login is not linked to an employee profile. Ask the Owner.' : 'Choose the employee');
-      if (own && input.empCode && input.empCode !== code) throw forbidden('You can only mark your own attendance');
-      const e = await employeeByCode(ctx, code, { active: true });
-      const state = own ? 'present' : input.state;
+      if (!input.empCode) throw badRequest('Choose the employee');
+      const e = await employeeByCode(ctx, input.empCode, { active: true });
+      const state = input.state;
       if (!state) throw badRequest('Choose present, absent, half day, overtime or leave');
-      if (own && !input.selfie) throw badRequest('Take a selfie to mark attendance');
       const existing: any = await Attendance.findOne({ date, empCode: e.empCode, isVoid: false }).session(s(ctx)).lean();
       const base: any = {
         date, empCode: e.empCode, empName: e.name, state, otHours: state === 'overtime' ? input.otHours ?? ctx.settings.salary.otHoursDefault : undefined,
-        late: input.late ?? false, method: input.biometric ? 'biometric' : own || input.selfie ? 'selfie' : 'manual', selfie: input.selfie, location: input.location, markedBy: ctx.actor.name,
+        late: input.late ?? false, method: input.biometric ? 'biometric' : 'manual', markedBy: ctx.actor.name,
       };
       if (existing) {
-        if (own) throw conflict('Your attendance is already marked for today');
         const doc: any = await Attendance.findOneAndUpdate({ _id: existing._id }, { $set: { ...base, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name } }, { returnDocument: 'after', session: ctx.session, lean: true });
         await roll.att(date, existing.state, state, ctx.session);
         return { doc, action: 'update', changes: { state: { from: existing.state, to: state } }, status: 200 };

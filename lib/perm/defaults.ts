@@ -26,7 +26,7 @@ export function parse(spec: Partial<Record<Resource, string>>): Grants {
 
 // Everybody who signs in and is linked to an employee can do these about themselves.
 const OWN: Partial<Record<Resource, string>> = {
-  dailyreports: 'vm cm em', attendance: 'vm cm', tasks: 'vm em', leaves: 'vm cm', advances: 'vm cm', salaryslips: 'vm', dashboard: 'v*',
+  dailyreports: 'vm cm em', attendance: 'vm', tasks: 'vm em', leaves: 'vm cm', advances: 'vm cm', salaryslips: 'vm', dashboard: 'v*',
 };
 const withOwn = (spec: Partial<Record<Resource, string>>) => ({ ...OWN, ...spec });
 const F = (money: FieldAccess['money'], cost: FieldAccess['cost'], pii: FieldAccess['pii']): FieldAccess => ({ money, cost, pii });

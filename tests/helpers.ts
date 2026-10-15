@@ -15,6 +15,8 @@ export async function useTestDb(name: string) {
   process.env.STORAGE_LOCAL_DIR = path.join(os.tmpdir(), `vss-test-files-${process.pid}`);
   resetEnvCache();
   await connect();
+  // build every index before the first transaction: a write inside a transaction can fail while its collection's indexes are still being created
+  await Promise.all(Object.values(mongoose.models).map((m) => m.init().catch(() => undefined)));
   return {
     async clean() {
       await mongoose.connection.dropDatabase();

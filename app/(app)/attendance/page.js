@@ -3,13 +3,12 @@ import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Camera, CheckCheck, MapPin, Check, X } from 'lucide-react';
+import { CheckCheck, MapPin, Check, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Sheet, Field, PhotoInput, Badge, StatCard, Empty, DataList, Pager, cx } from '@/components/ui';
-import LookupSelect from '@/components/LookupSelect';
+import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Badge, StatCard, Empty, DataList, Pager, cx } from '@/components/ui';
 import { useDebounced, useNumberedList } from '@/lib/usePaged';
 import CrudPage from '@/components/CrudPage';
-import { submit, api, getLocation } from '@/lib/client';
+import { submit, api } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, fmtDate, monthOf } from '@/lib/format';
 import { SALARY } from '@/lib/config';
@@ -28,11 +27,9 @@ export default function AttendancePage() {
   const { t, tr, can, perm } = useApp();
   // The screen follows the Roles & permissions exactly:
   //   See = Own  -> only their own attendance, never a list of other people
-  //   Add = Own  -> they mark themselves (selfie); Add = Team / All -> they mark other people; no Add -> nothing to mark
+  //   Add = Team / All -> they mark other people; no Add -> nothing to mark (nobody marks themselves: supervisors now, a biometric machine later)
   const ownOnly = scopeOf(perm, 'attendance', 'view') === 'own';
-  const isWorker = scopeOf(perm, 'attendance', 'create') === 'own'; // marks only themselves
-  const canMarkOthers = can('attendance', 'create') && !isWorker;
-  const canSelfie = can('attendance', 'create');
+  const canMarkOthers = can('attendance', 'create') && scopeOf(perm, 'attendance', 'create') !== 'own';
   const leavesOn = can('leaves', 'view');
   const leaveOwn = scopeOf(perm, 'leaves', 'create') === 'own'; // may only apply for themselves: no "employee" choice
   const canImportLeaves = can('leaves', 'create') && !leaveOwn;
@@ -45,8 +42,6 @@ export default function AttendancePage() {
   const sheet = useNumberedList(ownOnly ? null : '/api/attendance/sheet', { date, q: dq }, { size: 25 });
   const att = useFetch(ownOnly ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
   const [over, setOver] = useState({}); // marks tapped on this screen, shown at once (optimistic)
-  const [selfie, setSelfie] = useState(false);
-  const [sf, setSf] = useState({ empCode: '', photo: '', loc: '' });
   const canMark = canMarkOthers;
 
   useEffect(() => { setOver({}); }, [sheet.rows, date]);
@@ -71,27 +66,9 @@ export default function AttendancePage() {
     sheet.reload();
   }
 
-  function getLoc() {
-    setSf((x) => ({ ...x, loc: '' }));
-    getLocation().then((l) => setSf((x) => ({ ...x, loc: l.text, geo: l })));
-  }
-  async function saveSelfie() {
-    if (canMarkOthers && !sf.empCode) { toast.error('Choose the employee'); return; }
-    if (!sf.photo) { toast.error('Take a selfie'); return; }
-    try {
-      const location = sf.geo || { text: sf.loc || 'Location not shared' };
-      const body = isWorker ? { selfie: sf.photo, location } : { date, empCode: sf.empCode, state: 'present', selfie: sf.photo, location };
-      const r = await submit('/api/attendance', body, { label: 'Selfie attendance' });
-      toast.success(r.queued ? t('offline') : 'Attendance marked with selfie ✔');
-      setSelfie(false); setSf({ empCode: '', photo: '', loc: '' }); ownOnly ? att.reload() : sheet.reload?.();
-    } catch (e) { toast.error(e.message); }
-  }
-
   // exact team counts from the server, adjusted for what was tapped since the sheet loaded
   const counts = (st) => (sheet.meta.counts?.[st] || 0) + sheet.rows.reduce((n, r) => { const o = over[r.empCode]; return o ? n + (o.state === st ? 1 : 0) - (r.state === st ? 1 : 0) : n; }, 0);
   const unmarked = Math.max(0, (sheet.meta.unmarked || 0) - sheet.rows.filter((r) => !r.state && over[r.empCode]?.state).length);
-
-  const selfieBtn = <button className="btn-outline" onClick={() => { setSelfie(true); getLoc(); }}><Camera size={18} /> <span className="sm:hidden"><T>Selfie</T></span><span className="hidden sm:inline">{t('selfie')}</span></button>;
 
   const tabsEl = leavesOn && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Attendance' }, { key: 'leaves', label: 'Leave requests' }]} />;
   const showMark = tab === 'mark' || !leavesOn;
@@ -101,7 +78,7 @@ export default function AttendancePage() {
       {tabsEl}
       {showMark && (
         <PageHeader title={t('attendance')} subtitle={ownOnly ? 'Your attendance this month' : canMarkOthers ? 'Mark your team — present, absent, half day, overtime or leave' : tr('Your team\'s attendance (view only)')}
-          actions={<>{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}{canSelfie && selfieBtn}</>} />
+          actions={<>{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}</>} />
       )}
 
       {showMark && ownOnly && (
@@ -161,16 +138,6 @@ export default function AttendancePage() {
           rowActions={(row, { reload }) => (row.status === 'pending' && can('leaves', 'approve') ? ['approve', 'reject'].map((a) => ({ label: a === 'approve' ? 'Approve' : 'Reject', tone: a === 'approve' ? 'green' : undefined, icon: a === 'approve' ? <Check size={14} /> : <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'leaves', id: row._id, action: a } }); toast.success(a === 'approve' ? 'Leave approved' : 'Rejected'); reload(); } catch (e) { toast.error(e.message); } } })) : [])} />
       )}
 
-      <Sheet open={selfie} onClose={() => setSelfie(false)} title={t('selfie')}
-        footer={<><button className="btn-outline flex-1" onClick={() => setSelfie(false)}><T>Cancel</T></button><button className="btn-primary flex-[2]" onClick={saveSelfie}><T>Mark present</T></button></>}>
-        <div className="space-y-4">
-          {canMarkOthers && (
-            <Field label="Employee" required><LookupSelect kind="employees" by="empCode" value={sf.empCode} onChange={(it) => setSf({ ...sf, empCode: it ? it.id : '' })} /></Field>
-          )}
-          <Field label="Selfie" required><PhotoInput value={sf.photo} onChange={(p) => setSf({ ...sf, photo: p })} label="Take selfie" capture="user" /></Field>
-          <div className="text-sm flex items-center gap-2 text-char-700"><MapPin size={16} className="text-terra" /> {sf.loc || 'Getting location…'}</div>
-        </div>
-      </Sheet>
     </RoleGuard>
   );
 }

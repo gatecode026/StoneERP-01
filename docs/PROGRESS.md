@@ -68,7 +68,7 @@ One entry per phase. Every phase ends with: `npm run lint`, `npm run typecheck`,
 | **Accountant** | Money board: receivables **ageing 0-15 / 16-30 / 31-60 / 60+** (Mongo `$bucket`), top-owing customers with one-tap WhatsApp reminder, payables due this week, orders without a GST bill, trucks sent without e-way bill, salary-sheet status, cash/bank + closing status, month-close checklist, export shortcuts. | `RoleHomes.js` |
 | **Supervisor** | Team board, no money anywhere: one-tap P/A/½/OT/L per person (optimistic) + **Mark all present** (single bulk request), team reports to check (OK / Not OK), machines with no entry this shift, team output, breakdowns, safety check-ups due, tasks. | `RoleHomes.js` |
 | **Salesperson** | Sales board: my sales today/month, my open quotations/orders, my customers who owe (with age in days and WhatsApp reminder), live stock search, my open complaints, big "New quotation". Scope is *own*: another salesperson's home is empty. | `RoleHomes.js` |
-| **Worker** | Exactly four cards: mark attendance (selfie + real GPS), write today's report, my salary slip, my tasks. Large buttons. | `RoleHomes.js` |
+| **Worker** | Exactly four cards: my attendance (read-only; selfie attendance was removed, a supervisor marks it and a biometric machine is planned), write today's report, my salary slip, my tasks. Large buttons. | `RoleHomes.js` |
 | **Job presets** | Guard (trucks waiting → **Mark truck OUT** with gate-pass link), Store keeper (stock to refill, today's movements), Mechanic (open breakdowns, service due), Cashier (cash/bank, closing count, today's entries), Driver (today's trips, diesel this month, vehicle papers), Yard in-charge (blocks in yard, trucks in) — the one daily task first, then the worker cards. | `RoleHomes.js` |
 
 * Every card handles ready / empty / no-permission; the page handles loading (skeleton shaped like the final layout) and error (retry). Charts are lazy-loaded (`next/dynamic`) so they never weigh on first paint.
@@ -236,7 +236,7 @@ Also seen on live, not bugs: `/settings` and `/api/notifications` return 404 bec
 
 **Bugs found by the browser tests and fixed:** (1) **Sign out could hang forever** when the browser had no service worker (private window, development): it waited for `navigator.serviceWorker.ready`, which never resolves; now `getRegistration()` (`components/Providers.tsx`). (2) the hourly notification retry job was never scheduled.
 
-**Flaky test noted:** `import-lists.test.ts` failed once during a full run while the e2e server and database were also running on the same machine, and passed alone and on the next two full runs. Treat a repeat as a real failure.
+**Flaky test fixed:** `import-lists.test.ts` failed twice in full runs (a write inside a transaction while its collection's indexes were still being built). The test database helper now builds every index before the first test; two full runs afterwards were clean. This only affected the test setup: production builds indexes with `npm run db:indexes` at deploy.
 
 ### Definition-of-Done measurement
 
@@ -265,3 +265,7 @@ Measured here (local machine, production build, perf dataset of 1 M audit rows, 
 * The nightly backup holds the compressed file in memory (fine at this size); use Atlas continuous backup too for a very large database.
 
 **Left out on purpose:** converting the screens to server components (Phase 6 decision); biometric attendance and the e-way bill GSP integration need outside accounts and hardware.
+
+## Selfie attendance removed
+
+Selfie attendance (the Selfie button on the attendance screen and the worker home card) is gone, ahead of a biometric machine. Nobody marks their own attendance now: a worker's home shows today's mark read-only ("Not marked yet today / Your supervisor marks attendance"), and a supervisor, manager or the Owner marks it from the sheet. The server refuses any attendance create from an Own-scope login (403), the `selfie` and `location` fields are no longer accepted, and the default worker role lost "Add attendance (own)". Old selfie records and files stay readable (history is never deleted). The biometric machine will need its own endpoint with a device key; it is not built yet, and the `biometric` flag on the normal create is only a label for the Owner / supervisor path.
