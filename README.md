@@ -1,26 +1,45 @@
-# Vipul Stone Suppliers – Basic ERP (Demo)
+# Vipul Stone Suppliers – ERP
 
-Mobile-first demo ERP for Vipul Stone Suppliers, Bijoliya (RD Natural Stones, Mandsaur), built from the "Basic ERP Requirements" PDF (20 parts).
+Mobile-first ERP for Vipul Stone Suppliers, Bijoliya (RD Natural Stones, Mandsaur), built from the "Basic ERP Requirements" PDF (20 parts). Phone and computer use the same data; Hindi and English; works on weak internet.
 
-**Stack:** Next.js 14 (App Router) · Tailwind CSS · MongoDB + Mongoose · Recharts · lucide-react · react-hot-toast
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · MongoDB (replica set) + Mongoose · Tailwind CSS · Recharts · Zod · Vitest · Playwright
 
-## Setup
+## Run it locally
 
 ```bash
 npm install
-cp .env.example .env.local      # then set MONGODB_URI
-npm run dev                     # http://localhost:3000
+npm run dev:db                  # terminal 1: throw-away local MongoDB replica set (prints MONGODB_URI)
+cp .env.example .env.local      # set MONGODB_URI from above (MONGODB_DB=vss_dev)
+BOOTSTRAP_OWNER_MOBILE=9800000000 BOOTSTRAP_OWNER_NAME="Owner" BOOTSTRAP_OWNER_PASSWORD="Choose-a-password-1" npm run bootstrap
+npm run dev                     # http://localhost:3000, sign in with the mobile number and password above
 ```
 
-1. Open `http://localhost:3000/api/seed` once (or just log in as Owner – an empty database is seeded automatically). Demo data is dated *today*.
-2. Pick a role on the login screen (no password in the demo).
-3. Owner can reload sample data any time with **Reset demo data** on the dashboard (or `/api/seed?force=1`).
+There is no demo data and no role picker: everyone signs in with their own mobile number (or e-mail) and password. The Owner adds people under **Employees** (a sign-in is created from the profile) or by Excel import.
 
-Optional: `NEXT_PUBLIC_DEMO_DATE=2026-10-08` in `.env.local` pins "today" (seed + reports) to a fixed date.
+## Quality gates
 
-> If `mongodb+srv://` fails with `querySrv ECONNREFUSED` on your network, the app already resolves SRV through public DNS. Set `MONGO_DNS=system` to turn that off.
+```bash
+npm run lint && npm run typecheck
+npm test                 # unit + integration + permission matrix (in-memory MongoDB, no external services)
+npm run build && npm run check:bundle
+npm run e2e:install      # once: downloads the browser   (or set E2E_CHANNEL=msedge to use installed Edge)
+npm run test:e2e         # real browser at 360 px
+```
 
-`npm run build` produces a production build; `node scripts/smoke.mjs` runs an end-to-end API check against a running dev server.
+CI runs all of this (`.github/workflows/ci.yml`).
+
+## Documentation
+
+| File | What |
+|---|---|
+| `docs/DEPLOY.md` | First deploy, every deploy, scheduled jobs, backups and restore, monitoring, checklist |
+| `docs/ENVIRONMENT.md` | Every environment variable and npm script |
+| `docs/ARCHITECTURE.md` | Layers, and how to add a record type, a job or an integration |
+| `docs/API.md` | The API contract (lists, filters, errors, caching) |
+| `docs/PROD_PLAN.md`, `docs/PROGRESS.md` | The production plan and what each phase delivered |
+| `docs/PERF_REPORT.md`, `docs/perf/` | Measurements and the Definition-of-Done table |
+| `docs/AUDIT_REPORT.md`, `docs/DATA_RETENTION.md` | The security audit and the data retention rules |
+| `docs/ROUTES_AND_MODELS.json` | Generated list of pages, API routes and models (`npm run docs:routes`) |
 
 ## What is in it
 
@@ -31,24 +50,8 @@ Optional: `NEXT_PUBLIC_DEMO_DATE=2026-10-08` in `.env.local` pins "today" (seed 
 | Stock & Buying | 4 Stock · 9 Purchases & suppliers |
 | Selling | 5 Sales → GST invoice · 12 Dispatch & gate pass · 16 Complaints |
 | Money & Control | 6 Expenses · 14 Cash book · 15 Tasks & reminders · 18 Papers · Audit trail |
+| Admin | Settings · Roles and permissions · Backups · Excel / Tally export · Excel import on every screen |
 
-Owner dashboard = Part 8 (the 8 pm report) with a WhatsApp preview and a one-tap *Share on WhatsApp*.
+Each person's home screen follows their job. **Roles:** Owner, Manager, Accountant, Supervisor, Salesperson, Worker / operator; the Owner can change what each may see and do under Roles, and give one person extra access.
 
-Cross-links: machine output adds to stock · dispatch deducts stock · payments/expenses/salary post to the cash book · piece-rate pay comes from daily reports · yield comes from machine entries against a block.
-
-**Roles** follow the PDF table (Owner, Manager, Accountant, Supervisor, Salesperson, Worker). Worker logs in as *Ramesh Meena* and sees only their own report, attendance and slip. Supervisors cannot see salaries or purchase rates.
-
-**Rules built in:** nothing is deleted (cancel = void, kept in the audit trail) · every change records who/when · expenses above ₹5,000 and purchases above ₹25,000 need owner approval · cash receipts ≥ ₹2 lakh and large cash expenses warn before saving · duplicate rawanna warns · daily report locks after the next day · entries made offline are queued in the browser and sent when the network returns.
-
-**Assumptions** (all in `lib/config.js`): GST 18% for HSN 6802 and 5% for 2516 (editable per line); intra-state = CGST+SGST, other states = IGST, non-India customers = export under LUT; overtime = 2× hourly rate; PF 12% (wage cap ₹15,000), ESI 0.75% (gross up to ₹21,000); labour ₹80/machine-hour, power ₹8/unit, diesel ₹92/L for cost per sq ft; company GSTIN/bank are placeholders.
-
-## 2-minute demo script (phone view)
-
-1. **Login → Owner.** Dashboard: attendance 42/3, reports 40/5, 6,200 sq ft, Gang saw 2 down 2 h, low stock in red, ₹3.2 lakh sales, ₹18.5 lakh pending. Tap *Share on WhatsApp*. Approve one of the 3 pending expenses.
-2. **Worker's daily report.** Switch role → *Worker (Ramesh)* → **Fill today's report**: tap *Speak (Hindi)*, add hours 9 and quantity 410, submit. Back as Owner → *Daily Work Report* shows it with supervisor OK / Not OK.
-3. **Machine entry.** Supervisor → **+** → *Machine Work*: Gang saw 1, operator Ramesh, 410 sq ft, block 249, stopped 30 min + breakdown ticked. Show stock going up and a repair auto-created.
-4. **Sale with GST bill.** Salesperson → **+** → *Sales*: customer Delhi builder, pavers 500 sq ft → save quotation → *Convert to order* with ₹10,000 advance → *Dispatch truck* (gate pass, stock drops) → Accountant: *Generate GST bill* → *Download PDF* / *Share on WhatsApp* → *Add payment*. Show *Pending payments* + WhatsApp reminder.
-5. **Expense with bill photo.** **+** → *Expenses*: Diesel ₹7,000, take bill photo → goes to *Pending approval* → Owner approves from the dashboard.
-6. **Salary.** Accountant → *Salary* → previous month: open a monthly worker (₹16,000 ÷ 30 × days) and a piece-rate worker (sq ft × rate), see advance cut → Owner *Approve salary sheet* → *Salary slip* (Hindi/English) → WhatsApp.
-
-Finish with the Hindi/English toggle and *Add to Home Screen* (PWA).
+**Rules built in:** nothing is deleted (cancel = void, kept in the Audit Trail) · every change records who and when · expenses and purchases above the limits set in Settings need Owner approval · large cash receipts warn before saving · duplicate rawanna warns · a daily report locks after the next day · entries made offline are queued in the browser and sent when the network returns.

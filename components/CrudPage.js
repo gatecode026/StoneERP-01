@@ -31,7 +31,7 @@ const LOOKUP_KIND = { employees: 'employees', machines: 'machines', stockitems: 
 function RefSelect({ field, form, set, id }) {
   const r = field.ref;
   const kind = LOOKUP_KIND[r.model];
-  const { sort: _sort, ...query } = r.query || {}; // eslint-disable-line no-unused-vars
+  const { sort: _sort, ...query } = r.query || {};  
   const by = r.valueKey && r.valueKey !== '_id' ? r.valueKey : undefined;
   async function pick(it) {
     const patch = { [field.name]: it ? it.id : '' };
@@ -213,7 +213,7 @@ export default function CrudPage({
 
   const mayAdd = canAdd && can(model, 'create');
   const openNew = () => { setEditing(null); setForm({ date: todayISO(), ...Object.fromEntries(fields.filter((f) => f.default !== undefined).map((f) => [f.name, typeof f.default === 'function' ? f.default() : f.default])), ...defaults }); setOpen(true); };
-  useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew();   }, []);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   // lists carry no photos or documents, so editing loads the full record first

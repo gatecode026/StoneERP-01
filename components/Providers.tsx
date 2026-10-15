@@ -116,7 +116,9 @@ export function Providers({ children, initialSession = null, initialLang = 'en',
   const logout = useCallback(async () => {
     try { await api('/api/auth/logout', { method: 'POST', body: {} }); } catch {}
     clearFetchCache();
-    try { (await navigator.serviceWorker?.ready)?.active?.postMessage({ type: 'clear' }); } catch {} // nothing of this person stays cached on a shared phone
+    // nothing of this person stays cached on a shared phone. getRegistration() answers at once when there is no service worker
+    // (private window, dev server); `.ready` would wait forever and the person could never sign out.
+    try { (await navigator.serviceWorker?.getRegistration())?.active?.postMessage({ type: 'clear' }); } catch {}
     router.replace('/login');
     router.refresh();
   }, [router]);

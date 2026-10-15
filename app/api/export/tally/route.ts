@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { withAuth } from '@/lib/api/withAuth';
 import { badRequest, forbidden } from '@/lib/errors';
 import { Expense, Payment, Purchase, Sale } from '@/lib/models';

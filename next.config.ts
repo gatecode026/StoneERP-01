@@ -5,7 +5,9 @@ const isProd = process.env.NODE_ENV === 'production';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  serverExternalPackages: ['@node-rs/argon2', 'pino', 'mongoose', 'sharp'],
+  serverExternalPackages: ['@node-rs/argon2', 'pino', 'mongoose', 'sharp', 'pdf-lib', '@pdf-lib/fontkit'],
+  // the PDF routes read the Devanagari font from disk at run time
+  outputFileTracingIncludes: { '/api/**': ['./assets/fonts/**'] },
   async headers() {
     const common = [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

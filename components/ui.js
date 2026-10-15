@@ -299,7 +299,7 @@ export function Photo({ src, thumb = false, alt = '', className = '', width, hei
   if (!url) return null;
   if (state === 'error') return <div className={cx('flex items-center justify-center bg-sand-100 text-char-300', className)} style={{ width, height }} role="img" aria-label={alt}><ImageIcon size={16} /></div>;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
+     
     <img
       src={url} alt={alt} loading="lazy" decoding="async" width={width} height={height}
       onLoad={() => setState('ready')} onError={() => setState('error')}

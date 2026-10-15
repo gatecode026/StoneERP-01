@@ -32,7 +32,7 @@ export async function call(who: Who | null, handler: (req: NextRequest, c: { par
   const res = await handler(req, { params: Promise.resolve(opts.params ?? {}) });
   let json: any = null;
   try { json = await res.clone().json(); } catch { /* empty */ }
-  return { status: res.status, json, headers: res.headers };
+  return { status: res.status, json, headers: res.headers, res };
 }
 
 /** Generic resource helpers: GET/POST /api/<resource>, GET/PATCH/DELETE /api/<resource>/<id>. */

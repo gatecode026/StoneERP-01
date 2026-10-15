@@ -9,6 +9,10 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/jobs/send-notifications",
+      "schedule": "5 * * * *"
+    },
+    {
       "path": "/api/jobs/reconcile",
       "schedule": "30 20 * * *"
     },

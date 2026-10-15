@@ -36,7 +36,7 @@ export function tenDigits(v: string): string {
   return d;
 }
 
-export const COLUMNS: Col[] = [ // eslint-disable-line
+export const COLUMNS: Col[] = [  
   { key: 'empCode', label: 'Employee code', aliases: ['code', 'empcode', 'employeeid', 'empid', 'id'], example: 'E101', note: 'Leave empty to number automatically' },
   { key: 'name', label: 'Name', aliases: ['employeename', 'fullname'], example: 'Ramesh Meena', note: 'Required' },
   { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / operator', note: 'Manager / Accountant / Supervisor / Salesperson / Worker / operator' },

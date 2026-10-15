@@ -194,7 +194,7 @@ How it works (same for all, `lib/import/specs.ts` + `app/api/import/[resource]`)
 
 Checked at 360 px on all 23 sidebar screens (no horizontal overflow anywhere) and fixed the common problems: the top bar no longer overflows (brand shortens, three 44 px buttons); every page title is followed by **one tidy action bar** (Import / date or month / Excel / primary action wrap together, equal 44 px heights, the primary "Add" at the end) instead of one button per line; the import button reads "Import" on a phone; search and filters sit in a neat grid (search full width, filters two per row); tab rows scroll sideways with a soft edge and correct start padding; an odd last stat card spans the full row; the Roles toolbar is a 3-button grid; the Daily Work Report "Not filled yet" card keeps its button beside the text. Shared styles live in `app/globals.css` (`.page-actions`, `.tabs-row`, `.filter-row`) and `PageHeader`, so every screen gets them.
 
-## Phase 7 — Settings, notifications, backups, exports, health  ◐ (core done; PDF generation and an error-tracker SDK deliberately not built)
+## Phase 7 — Settings, notifications, backups, exports, health  ✅ (PDF generation and the error-tracker adapter were finished in Phase 8)
 
 | Brief item | Status |
 |---|---|
@@ -204,8 +204,8 @@ Checked at 360 px on all 23 sidebar screens (no horizontal overflow anywhere) an
 | WhatsApp + scheduler | **Done as an adapter.** `lib/notify/whatsapp.ts`: with `WHATSAPP_PROVIDER=cloud` + token + phone id the outbox is sent through the WhatsApp Business Cloud API (claimed row by row so two runs never send twice; 429/5xx/network retried up to 5 times, other 4xx fail at once; optional approved template). Without it, messages wait as **manual** under *Settings → WhatsApp messages to send* with a one-tap wa.me link and Mark sent / Skip. The daily report and payment-reminder jobs now deliver after queueing; a new `send-notifications` job (hourly period) retries. **Not verified against live WhatsApp** (no account here): the request shape follows Meta's documentation and is covered by tests with a stubbed network. |
 | Backups | **Done.** `lib/backup.ts`: every collection (except sessions, rate-limit counters, one-time codes) as gzip'd Extended-JSON lines, streamed (flat memory). Nightly `backup` job (cron 21:00 UTC) keeps `backups/<date>.ndjson.gz` in storage for `BACKUP_RETENTION_DAYS` (14); the Owner can download one now (Settings → Backup; no password hashes; audit-logged; 3 per hour). `npm run restore -- <file>` puts it back and refuses to touch a collection that already has data unless `--replace`. Test: backup → wipe → restore gives identical documents (ids, dates, encrypted fields). **Limit:** the nightly job holds the compressed file in memory before uploading, fine for this data size; for a very large database rely on Atlas continuous backup as well. Cloudinary is not suitable for backup files: use S3/R2. |
 | Excel / Tally export | **Done.** Every Excel button now downloads a real `.xlsx` (`?format=xlsx`: numbers are numbers, dates are dates, mobile numbers keep their digits, header frozen; streamed row by row), same rights, scope, field hiding and audit as the CSV (CSV still available). **Tally:** `GET /api/export/tally?from&to` (Settings → Accounts export) writes one XML with ledgers first, then Sales, Purchase, Receipt and Payment vouchers that each add to zero; needs export rights over the whole books; records that do not balance are skipped and counted. **Not tested against Tally itself** (not installed here): ledger names (Sales, Purchases, Output CGST/SGST/IGST, Input GST, Cash, Bank Account) follow Tally defaults and may need to match your company. Purchases book one combined *Input GST* ledger because the purchase record has no CGST/SGST split. |
-| Health / monitoring | **Done without a Sentry SDK.** `GET /api/health` (up) and `?deep=1` (also pings the database; 503 when down) for a monitor; unhandled server errors are logged with route and reference and, with `ERROR_WEBHOOK_URL`, posted to Slack/Discord/Teams at most once a minute (`lib/errorReport.ts`, `onRequestError`). |
-| PDF gaps | **Not built.** Invoices, salary slips and gate passes have print pages (browser "Save as PDF") and WhatsApp text sharing. Generating PDFs on the server needs a PDF library plus Devanagari text shaping; it is a separate piece of work and was left out rather than shipped with broken Hindi. |
+| Health / monitoring | **Done; Sentry through its HTTP endpoint, no SDK (Phase 8).** `GET /api/health` (up) and `?deep=1` (also pings the database; 503 when down) for a monitor; unhandled server errors are logged with route and reference and, with `ERROR_WEBHOOK_URL`, posted to Slack/Discord/Teams at most once a minute (`lib/errorReport.ts`, `onRequestError`). |
+| PDF gaps | **Done in Phase 8** (see below): invoice, quotation, gate pass and salary slip (English and Hindi) are generated on the server as real PDFs. |
 
 **Tests:** settings (5), backup/restore (4), health (2), notifications (8), Excel export (2), Tally (3 + 3 unit), error alerts (3).
 
@@ -220,3 +220,48 @@ A scripted end-to-end run against the live site as the Owner (read sweep of 25 s
 | Two employee profiles could share a mobile number silently | The form asks "<name> (E046) already has this mobile number. Save anyway?" (imports confirm automatically). |
 
 Also seen on live, not bugs: `/settings` and `/api/notifications` return 404 because live runs the pre-Phase-7 `main`; every request takes about 1.1 s (see the Phase 8 latency check). The run left only voided test records (and their audit entries) on live.
+
+## Phase 8 — Tests, CI, deploy, docs, measurement  ✅
+
+| Brief item | Status |
+|---|---|
+| Permission matrix tests | Already in place (`tests/permissions/matrix.test.ts`); run in CI with everything else. |
+| Unit / integration tests | 27 files, **584 tests** (in-memory MongoDB replica set, no external account needed). New this phase: PDF documents and their rights (`pdf.test.ts`, 4), Sentry envelope (1). |
+| Browser end-to-end | **Done.** `tests/e2e` (Playwright, 360 px phone, `npm run test:e2e`): wrong password refused; signed-out visitor sent to sign-in; Owner signs in and out; session cookie is HttpOnly; **all 23 Owner screens fit a 360 px phone with no sideways scrolling**; Hindi/English toggle both ways; Worker cannot open settings, books or purchases and the API agrees; Supervisor cannot read salaries or settings; a write from another website is refused (CSRF); Owner creates a customer, finds it, cancels it and sees it in the Audit Trail. 10 tests, ~2 minutes on `next dev` with a throw-away database (`scripts/e2e-server.ts`). |
+| CI | **Done.** `.github/workflows/ci.yml`: install, lint, typecheck, tests, `npm audit` (high and above), build, bundle budget; then a second job runs the browser tests. **Not run on GitHub yet** (no push from here): the first run on the repository is the real check. |
+| Deploy | **Done.** `docs/DEPLOY.md` (first deploy, every deploy, jobs and schedule, backups and restore, monitoring, rollback, checklist), `docs/ENVIRONMENT.md` (every variable and script). `vercel.json` was missing the hourly `send-notifications` job: added. |
+| Docs | `README.md` rewritten (it still described the 20-part demo with a role picker and `/api/seed`); `docs/ARCHITECTURE.md` (layers and how to add a record type, a job or an integration — the "can grow later" requirement); `docs/ROUTES_AND_MODELS.json` regenerated from the source (31 pages, 59 API route files, 32 models; `npm run docs:routes`). |
+| PDF generation (Phase 7 gap) | **Done.** `lib/export/pdf.ts` + `documents.ts` (pdf-lib, Noto Sans Devanagari embedded so Hindi conjuncts and ₹ come out right): `GET /api/sales/:id/pdf` (tax / export invoice, `?type=quotation`), `GET /api/dispatches/:id/pdf` (gate pass), `GET /api/salary/slip/pdf?month&empCode&lang=en|hi`. Same sign-in, scope and hidden-field rules as the screens (a worker gets only their own slip; tested). The "Download PDF" buttons now download a file instead of opening the print dialog. Checked visually by rendering the files. |
+| Error tracker (Phase 7 gap) | **Done without an SDK.** With `SENTRY_DSN` set, errors are posted to Sentry (or GlitchTip) through its envelope endpoint, at most 20 a minute; the Slack/Discord webhook still works alongside. Tested against a stubbed network, **not against a real Sentry project**. |
+
+**Bugs found by the browser tests and fixed:** (1) **Sign out could hang forever** when the browser had no service worker (private window, development): it waited for `navigator.serviceWorker.ready`, which never resolves; now `getRegistration()` (`components/Providers.tsx`). (2) the hourly notification retry job was never scheduled.
+
+**Flaky test noted:** `import-lists.test.ts` failed once during a full run while the e2e server and database were also running on the same machine, and passed alone and on the next two full runs. Treat a repeat as a real failure.
+
+### Definition-of-Done measurement
+
+Measured here (local machine, production build, perf dataset of 1 M audit rows, 200 k cash entries, 181 k attendance rows, 20 k sales; details in `docs/PERF_REPORT.md`):
+
+| Requirement | Result |
+|---|---|
+| API latency | Every endpoint p50 ≤ 37 ms, p95 ≤ 44 ms (slowest: dispatch freight totals p50 37 ms, payments list p50 35 ms); owner home p50 8 ms |
+| Hot queries use indexes | Verified with `explain("executionStats")` for every list; audit log at 1 M rows reads 2 ms / index scan |
+| Response size | Lists ≤ 100 KB (largest 52.7 KB for 100 sales), home ≤ 50 KB (largest 11.3 KB); brotli on the wire 0.2–8 KB |
+| Requests per screen | At most 2, one page of rows at a time |
+| Large export | 200 000 rows CSV in 4.5 s, memory flat (123 → 161 MB) |
+| JavaScript | Shared 144 kB gzip (budget 150), every route adds ≤ 35 kB (budget 60); charts load on demand; `check:bundle` gates CI |
+| Phone layout | All 23 Owner screens fit 360 px (browser test) |
+| Offline | Worker report saved with the network off and delivered when it returned (Phase 6 browser check) |
+| Security | `npm audit --omit=dev`: 0 vulnerabilities at Phase 1; permission matrix, scope, field-hiding, CSRF, XSS, injection, rate-limit tests all green |
+| Data integrity | No deletes (void + reversal), audit in the same transaction, idempotent writes, gap-free invoice numbers, no duplicate rawanna, rollups reconciled by a nightly job |
+| Backups | Backup → wipe → restore gives identical documents (test) |
+
+**Not measured or not verified, and why:**
+
+* Lighthouse mobile scores and timings on a real Android phone over 4G: no device or throttled-network rig here.
+* Latency against MongoDB Atlas Mumbai: tests ran on a local database; Atlas adds network time per request.
+* Live WhatsApp Business Cloud API, live Sentry, a real Tally import, the e-way bill GSP: no accounts here; each is built to the provider's documentation behind an adapter with a safe fallback and tested against stubs.
+* The CI workflow has not run on GitHub yet.
+* The nightly backup holds the compressed file in memory (fine at this size); use Atlas continuous backup too for a very large database.
+
+**Left out on purpose:** converting the screens to server components (Phase 6 decision); biometric attendance and the e-way bill GSP integration need outside accounts and hardware.

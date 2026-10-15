@@ -42,7 +42,7 @@ export default function DailyReportPage() {
     } else { setEditing(null); setForm({ ...blank(), date }); }
     setOpen(true);
   }
-  useEffect(() => { if (sp.get('new') === '1' && can('dailyreports', 'create')) openNew(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { if (sp.get('new') === '1' && can('dailyreports', 'create')) openNew();   }, []);
 
   async function save() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
