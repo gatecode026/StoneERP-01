@@ -21,6 +21,7 @@ export const Employee = defineModel(
     rate: money({ required: true, default: 0 }), // money
     pieceUnit: { type: S, enum: ['sqft', 'piece'] },
     bankAccount: { type: S }, // money+pii, encrypted at rest
+    ifsc: { type: S }, // bank branch code, goes with the account number
     upi: { type: S, maxlength: 80 }, // money+pii
     pfApplicable: { type: B, default: false },
     pfNo: { type: S, maxlength: 40 },

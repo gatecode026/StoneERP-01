@@ -11,24 +11,47 @@ import { withinApprovalLimit } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
 import { applyLogin, loginSchema, syncLoginIdentity, type LoginInput } from '../services/employeeLogin';
 import type { AuthCtx } from '../api/withAuth';
-import { dateStr, empCode, enumOf, mobile, optMobile, photo, photos, posNum, req, text, num, monthStr } from './zod';
+import { dateStr, empCode, enumOf, photo, photos, posNum, req, text, num, monthStr, ruled } from './zod';
+import { joiningDateProblem } from '../validators';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
 const SITES = ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] as const;
 const DOC_FIELDS = ['docAadhaar', 'docPan', 'docPassbook', 'docLicense'] as const;
 const FLAG: Record<string, string> = { docAadhaar: 'aadhaar', docPan: 'pan', docPassbook: 'passbook', docLicense: 'license' };
 
+const rate = z.coerce.number().finite().gt(0, 'Pay rate must be more than 0').max(1e7, 'Pay rate is too large');
 const employeeFields = {
-  name: req(120), mobile: optMobile.optional(), photo: photo.optional(), fatherName: text(120).optional(), address: text(400).optional(),
+  name: ruled('name', { required: true }), mobile: ruled('mobile').optional(), photo: photo.optional(), fatherName: ruled('fatherName').optional(), address: text(400).optional(),
   job: req(80), site: enumOf(SITES).optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
   status: enumOf(['active', 'left']).optional(),
-  payType: enumOf(['monthly', 'daily', 'piece']).optional(), rate: num(0, 1e7).optional(), pieceUnit: enumOf(['sqft', 'piece']).optional().or(z.literal('')),
-  bankAccount: text(40).optional(), upi: text(80).optional(), pfApplicable: z.boolean().optional(), pfNo: text(40).optional(),
-  esiApplicable: z.boolean().optional(), esiNo: text(40).optional(), aadhaarNo: z.string().trim().regex(/^(\d{12})?$/, 'Aadhaar must be 12 digits').optional(),
-  panNo: z.string().trim().toUpperCase().regex(/^([A-Z]{5}\d{4}[A-Z])?$/, 'Invalid PAN').optional(),
+  payType: enumOf(['monthly', 'daily', 'piece']).optional(), rate: rate.optional(), pieceUnit: enumOf(['sqft', 'piece']).optional().or(z.literal('')),
+  bankAccount: ruled('bankAccount').optional(), ifsc: ruled('ifsc').optional(), upi: ruled('upi').optional(), pfApplicable: z.boolean().optional(), pfNo: ruled('pfNo').optional(),
+  esiApplicable: z.boolean().optional(), esiNo: ruled('esiNo').optional(), aadhaarNo: ruled('aadhaarNo').optional(),
+  panNo: ruled('panNo').optional(),
   docAadhaar: photo.optional(), docPan: photo.optional(), docPassbook: photo.optional(), docLicense: photo.optional(),
-  emergencyName: text(120).optional(), emergencyMobile: text(20).optional(), supervisorCode: empCode.optional().or(z.literal('')), teamId: text(40).optional(),
+  emergencyName: ruled('emergencyName').optional(), emergencyMobile: ruled('emergencyMobile').optional(), supervisorCode: empCode.optional().or(z.literal('')), teamId: text(40).optional(),
 };
+
+/** Rules that look at several fields together (the single-field rules are in the schema). */
+function crossChecks(next: Record<string, any>, prev?: Record<string, any>) {
+  const merged = { ...(prev ?? {}), ...next };
+  // dates are checked only when this request touches them, so an old profile can still be edited for something else
+  if ('joiningDate' in next || 'leavingDate' in next) {
+    const problem = joiningDateProblem(merged.joiningDate, merged.leavingDate, todayIST());
+    if (problem) throw badRequest(`${problem.startsWith('Leaving') ? 'Leaving date' : 'Joining date'}: ${problem}`);
+  }
+  if (merged.emergencyMobile && merged.mobile && merged.emergencyMobile === merged.mobile) throw badRequest('Emergency contact number: use a different number from the employee’s own mobile');
+}
+
+/** EMP-0001, EMP-0002 … numbered by the server (one counter, no gaps, never reused). Older codes (E001 …) are left as they are. */
+export const EMP_CODE_PREFIX = 'EMP-';
+async function nextEmployeeCode(ctx: any) {
+  for (let i = 0; i < 20; i++) {
+    const code = EMP_CODE_PREFIX + String(await nextSeq('emp', ctx.session, 45)).padStart(4, '0');
+    if (!(await Employee.exists({ empCode: code }).session(ctx.session ?? null))) return code;
+  }
+  throw conflict('Could not number the employee. Please try again.');
+}
 
 function sealEmployee(doc: Record<string, any>, prev?: any) {
   for (const f of ['bankAccount', 'aadhaarNo', 'panNo']) if (f in doc) doc[f] = encryptField(doc[f]);
@@ -64,11 +87,13 @@ export const employees: ResourceDef = {
     async prepareCreate(ctx, input, auth) {
       const { login, ...rest } = input as any;
       await warnSharedMobile(ctx, rest.mobile);
+      crossChecks(rest);
       if (login) pendingLogin.set(ctx, { login, auth });
       const doc: any = { ...rest };
-      if (!doc.empCode) doc.empCode = 'E' + String(await nextSeq('emp', ctx.session, 45)).padStart(3, '0');
+      if (!doc.empCode) doc.empCode = await nextEmployeeCode(ctx);
       doc.status ??= 'active';
       doc.payType ??= 'monthly';
+      if (doc.payType === 'piece' && !doc.pieceUnit) doc.pieceUnit = 'sqft';
       doc.rate ??= 0;
       if (doc.status === 'left' && !doc.leavingDate) doc.leavingDate = todayIST();
       return sealEmployee(doc);
@@ -76,6 +101,7 @@ export const employees: ResourceDef = {
     async prepareUpdate(ctx, prev, patch, auth) {
       if ('login' in patch) { pendingLogin.set(ctx, { login: patch.login, auth }); delete patch.login; } // never stored on the profile; applied in afterUpdate
       if (patch.mobile && patch.mobile !== prev.mobile) await warnSharedMobile(ctx, patch.mobile, prev._id);
+      crossChecks(patch, prev);
       if (patch.status === 'left' && !patch.leavingDate && !prev.leavingDate) patch.leavingDate = todayIST();
       if (patch.status === 'active') patch.leavingDate = '';
       return sealEmployee(patch, prev);

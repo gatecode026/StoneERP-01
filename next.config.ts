@@ -3,6 +3,8 @@ import type { NextConfig } from 'next';
 const isProd = process.env.NODE_ENV === 'production';
 
 const nextConfig: NextConfig = {
+  // the browser tests build into their own folder so they can run next to a `next dev` you already have open
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ['@node-rs/argon2', 'pino', 'mongoose', 'sharp', 'pdf-lib', '@pdf-lib/fontkit'],

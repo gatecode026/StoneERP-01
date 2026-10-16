@@ -5,7 +5,7 @@ import nextTs from 'eslint-config-next/typescript';
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores(['.next/**', 'node_modules/**', 'docs/**', 'next-env.d.ts', 'coverage/**', 'public/sw.js', 'public/swe-worker*.js', 'playwright-report/**', 'test-results/**']),
+  globalIgnores(['.next/**', '.next-e2e/**', 'node_modules/**', 'docs/**', 'next-env.d.ts', 'coverage/**', 'public/sw.js', 'public/swe-worker*.js', 'playwright-report/**', 'test-results/**']),
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',

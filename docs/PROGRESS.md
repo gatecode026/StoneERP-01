@@ -269,3 +269,29 @@ Measured here (local machine, production build, perf dataset of 1 M audit rows, 
 ## Selfie attendance removed
 
 Selfie attendance (the Selfie button on the attendance screen and the worker home card) is gone, ahead of a biometric machine. Nobody marks their own attendance now: a worker's home shows today's mark read-only ("Not marked yet today / Your supervisor marks attendance"), and a supervisor, manager or the Owner marks it from the sheet. The server refuses any attendance create from an Own-scope login (403), the `selfie` and `location` fields are no longer accepted, and the default worker role lost "Add attendance (own)". Old selfie records and files stay readable (history is never deleted). The biometric machine will need its own endpoint with a device key; it is not built yet, and the `biometric` flag on the normal create is only a label for the Owner / supervisor path.
+
+## Employee form: ID and bank validation, automatic employee code
+
+All rules live in `lib/validators.ts` and run twice: in the form (as the person types and on leaving a field) and on the server (Zod, `ruled()` in `lib/resources/zod.ts`), so the Excel import follows exactly the same rules.
+
+| Field | Rule |
+|---|---|
+| Aadhaar | 12 digits, not starting with 0 or 1, valid Verhoeff check digit (spaces and dashes are removed) |
+| PAN | `ABCPE1234F`: 5 letters, 4 digits, 1 letter; 4th letter one of A B C F G H L J P T K; capitals forced |
+| Bank account | 9 to 18 digits, not one repeated digit; digits only |
+| IFSC (new field) | `SBIN0001234`: 4 letters, `0`, 6 letters or digits. Optional, but checked when given |
+| UPI ID | `name@bank`, kept in small letters |
+| PF number | a 12-digit UAN or a PF account number (letters, digits, `/`, `-`) |
+| ESI number | exactly 10 digits |
+| Mobile and emergency mobile | 10 digits starting 6-9 (`+91` and a leading 0 are dropped), not one repeated digit; the emergency number must differ from the employee's own |
+| Names (employee, father, emergency) | start with a letter (Hindi too); letters, digits, spaces, `. ' -`; at least 2 characters |
+| Pay rate | more than 0 and at most 1 crore |
+| Dates | joining not before 1980 and at most 60 days ahead; leaving not before joining (checked only when the request touches a date) |
+
+An edit only checks the fields it changes, so an older profile with a value from before these rules can still be edited for something else. The form shows the reason under the field, stops the save with the first problem and moves the cursor to it; Hindi text is included.
+
+**Employee code** is now numbered by the server only: `EMP-0046`, `EMP-0047` … (one counter, in order, never reused, safe when two are saved at once; a number already taken by a hand-typed code is skipped). The form field is read-only ("Auto-generated when saved"). Older codes (`E045` and so on) stay as they are, and an Excel import may still carry its own code.
+
+**Fixed on the way:** a pasted `+91 98290 12345` was cut short by the input's length limit; the limit is now applied after the number is tidied. The browser tests also build into `.next-e2e`, so they no longer fail when a `next dev` is already open.
+
+**Tests:** 29 unit checks for the rules (`validators.test.ts`), 23 server cases (`employee-validation.test.ts`: every bad value refused, good values tidied and encrypted, old values not blocking an edit, numbering), and a browser test that types into the real form (`employee-form.spec.ts`).

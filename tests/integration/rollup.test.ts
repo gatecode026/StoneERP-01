@@ -25,7 +25,7 @@ beforeAll(async () => {
   sales = await makeUser('salesperson', { empCode: 'E901' });
   acc = await makeUser('accountant');
   guard = await makeUser('worker', { preset: 'guard', empCode: 'E902' });
-  for (const [empCode, name] of [['E001', 'A'], ['E002', 'B'], ['E003', 'C'], ['E900', 'Sup']] as const) {
+  for (const [empCode, name] of [['E001', 'Amit'], ['E002', 'Bharat'], ['E003', 'Chetan'], ['E900', 'Sup']] as const) {
     await api.create(owner, 'employees', { empCode, name, job: 'Helper', supervisorCode: empCode === 'E900' ? undefined : 'E900', payType: 'daily', rate: 500 });
   }
 });

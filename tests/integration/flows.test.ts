@@ -43,7 +43,7 @@ beforeAll(async () => {
     ['E001', 'Ramesh Meena', 'Gang saw operator', 'E900', 'monthly', 16000], ['E002', 'Sunil Gurjar', 'Helper', 'E900', 'daily', 500], ['E003', 'Mohan Jat', 'Polisher', 'E999', 'piece', 2],
     ['E900', 'Sup Visor', 'Supervisor', undefined, 'monthly', 21000], ['E901', 'Sales Man', 'Salesperson', undefined, 'monthly', 19000],
   ] as const) {
-    const r = await api.create(owner, 'employees', { empCode, name, job, supervisorCode, payType, rate, pieceUnit: payType === 'piece' ? 'sqft' : undefined, mobile: '9829000000', bankAccount: '123456789012', aadhaarNo: '123412341234', _confirmed: true }); // the fixtures share one phone number
+    const r = await api.create(owner, 'employees', { empCode, name, job, supervisorCode, payType, rate, pieceUnit: payType === 'piece' ? 'sqft' : undefined, mobile: '9829000000', bankAccount: '123456789012', aadhaarNo: '234123412346', _confirmed: true }); // the fixtures share one phone number
     expect(r.status, JSON.stringify(r.json)).toBe(201);
   }
   const mk = async (body: any) => (await api.create(owner, 'stockitems', body)).json;
@@ -85,7 +85,7 @@ describe('field groups: money / cost / pii', () => {
     expect(list.status).toBe(200);
     expect(list.json.data.length).toBeGreaterThan(0);
     for (const e of list.json.data) for (const k of ['rate', 'payType', 'bankAccount', 'upi', 'pfNo', 'aadhaarNo', 'docAadhaar', 'address', 'emergencyMobile']) expect(e, `${k} leaked`).not.toHaveProperty(k);
-    expect(JSON.stringify(list.json)).not.toMatch(/123456789012|123412341234/);
+    expect(JSON.stringify(list.json)).not.toMatch(/123456789012|234123412346/);
     const items = await api.list(salesperson, 'stockitems');
     for (const i of items.json.data) expect(i).not.toHaveProperty('costRate');
     const accItems = await api.list(accountant, 'stockitems');
@@ -102,7 +102,7 @@ describe('field groups: money / cost / pii', () => {
     expect(asOwner.status).toBe(200);
     const detailOwner = await api.get(owner, 'employees', String(raw._id));
     expect(detailOwner.json.bankAccount).toBe('123456789012');
-    expect(detailOwner.json.aadhaarNoMasked).toBe('XXXX-XXXX-1234');
+    expect(detailOwner.json.aadhaarNoMasked).toBe('XXXX-XXXX-2346');
     const detailMgr = await api.get(manager, 'employees', String(raw._id)); // manager: money read, pii read
     expect(detailMgr.json.rate).toBe(16000);
   });

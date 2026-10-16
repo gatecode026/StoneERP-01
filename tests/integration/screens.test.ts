@@ -36,7 +36,7 @@ beforeAll(async () => {
   other = await makeUser('salesperson', { empCode: 'E903' });
   acc = await makeUser('accountant');
   guard = await makeUser('worker', { preset: 'guard', empCode: 'E902' });
-  await api.create(owner, 'employees', { empCode: 'E900', name: 'Sup', job: 'Supervisor', payType: 'monthly', rate: 20000, aadhaarNo: '123412341234' });
+  await api.create(owner, 'employees', { empCode: 'E900', name: 'Sup', job: 'Supervisor', payType: 'monthly', rate: 20000, aadhaarNo: '234123412346' });
   for (let i = 1; i <= 8; i++) await api.create(owner, 'employees', { empCode: `E00${i}`, name: `Worker ${i}`, job: 'Helper', payType: 'daily', rate: 400, supervisorCode: 'E900' });
   for (let i = 9; i <= 12; i++) await api.create(owner, 'employees', { empCode: `E0${i}`, name: `Other ${i}`, job: 'Helper', payType: 'daily', rate: 400 });
 });

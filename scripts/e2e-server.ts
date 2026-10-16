@@ -28,6 +28,7 @@ async function main() {
   process.env.API_RATE_IP = '100000';
   process.env.APP_ORIGIN = `http://localhost:${E2E_PORT}`;
   process.env.LOG_LEVEL = 'warn';
+  process.env.NEXT_DIST_DIR = '.next-e2e';
 
   const { connect, disconnect } = await import('../lib/db');
   const { User } = await import('../lib/models');
