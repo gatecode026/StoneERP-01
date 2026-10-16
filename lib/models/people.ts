@@ -87,6 +87,10 @@ export const DailyReport = defineModel(
     supRemark: { type: S, maxlength: 500 },
     checkedBy: { type: S },
     checkedAt: { type: Date },
+    reopenedFrom: { type: S, enum: ['', 'not_ok', 'undo'], default: '' }, // why a report is waiting for a check again: corrected after Not OK, or the decision was undone
+    undoReason: { type: S, maxlength: 300 },
+    undoneBy: { type: S },
+    undoneAt: { type: Date },
     onTime: { type: B, default: true },
     submittedAt: { type: Date },
     filledBy: { type: S },

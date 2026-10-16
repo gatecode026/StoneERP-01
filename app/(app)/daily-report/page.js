@@ -4,14 +4,14 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, Lock, Check, X, Pencil } from 'lucide-react';
+import { Plus, Lock, Check, X, Pencil, RotateCcw } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, cx } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
-import { todayISO, addDays, fmtDate, num } from '@/lib/format';
+import { todayISO, addDays, fmtDate, fmtDateTime, num } from '@/lib/format';
 import T from '@/components/T';
 
 const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '' });
@@ -66,6 +66,7 @@ export default function DailyReportPage() {
     if (checking) return;
     const remark = supCheck === 'not_ok' ? await promptDialog('Remark (what is wrong?)', r.supRemark || '') : r.supRemark || '';
     if (remark === null) return;
+    if (supCheck === 'not_ok' && !remark.trim()) { toast.error('Write what is wrong: a remark is needed for Not OK'); return; }
     setChecking(true);
     try {
       await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck, supRemark: remark } });
@@ -75,15 +76,32 @@ export default function DailyReportPage() {
     setChecking(false);
   }
 
+  // Owner or Manager only: take a decision back (a wrong tap). It asks why and is written to the Audit Trail.
+  async function undo(r) {
+    if (checking) return;
+    const reason = await promptDialog('Why are you undoing this decision?', '');
+    if (reason === null) return;
+    if (reason.trim().length < 3) { toast.error('Say why the decision is being undone'); return; }
+    setChecking(true);
+    try {
+      await api(`/api/dailyreports/${r._id}`, { method: 'PATCH', body: { supCheck: '', undoReason: reason.trim() } });
+      toast.success('Decision undone: the report can be checked again', { id: 'report-check' });
+      setDetail(null); reload();
+    } catch (e) { toast.error(e.message, { id: 'report-check' }); }
+    setChecking(false);
+  }
+
   const rows = day.rows;
   const missing = missingQ.data?.people || [];
   const missingCount = missingQ.data?.count || 0;
   const canCheck = can('dailyreports', 'approve');
 
   const isOwn = (r) => !!session?.empCode && r.empCode === session.empCode;
-  const canEditRow = (r) => !locked(r.date) && can('dailyreports', 'edit');
-  const canCheckRow = (r) => canCheck && !isOwn(r); // nobody checks their own report; nobody without the right sees the buttons
-  const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green"><T>OK</T></Badge> : r.supCheck === 'not_ok' ? <Badge tone="red"><T>Not OK</T></Badge> : canCheck ? <Badge tone="gray"><T>Not checked</T></Badge> : null);
+  // A decision is final: OK / Not OK buttons are there only until the report has one. An OK report is locked (only an undo reopens it).
+  const canEditRow = (r) => !locked(r.date) && can('dailyreports', 'edit') && r.supCheck !== 'ok';
+  const canCheckRow = (r) => canCheck && !isOwn(r) && !r.supCheck; // nobody checks their own report; nobody without the right sees the buttons
+  const canUndoRow = (r) => canCheck && !isOwn(r) && !!r.supCheck && ['owner', 'manager'].includes(session?.role);
+  const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green"><T>OK</T></Badge> : r.supCheck === 'not_ok' ? <Badge tone="red"><T>Not OK</T></Badge> : r.reopenedFrom === 'not_ok' ? <Badge tone="amber"><T>Corrected: check again</T></Badge> : canCheck ? <Badge tone="gray"><T>Not checked</T></Badge> : null);
 
   // one table on a computer, one compact list on a phone: tap a row for the whole report
   const renderList = (items) => (
@@ -123,9 +141,10 @@ export default function DailyReportPage() {
                 <td className="td whitespace-nowrap">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="inline ml-1.5 text-char-300" aria-label="Locked" />}</td>
                 <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>
                   {canCheckRow(r) && <>
-                    <button className={cx('icon-btn', r.supCheck === 'ok' && 'text-emerald-700')} onClick={() => check(r, 'ok')} disabled={checking} title={tr('Mark OK')} aria-label={tr('Mark OK')}><Check size={16} /></button>
-                    <button className={cx('icon-btn', r.supCheck === 'not_ok' && 'text-red-600')} onClick={() => check(r, 'not_ok')} disabled={checking} title={tr('Mark not OK')} aria-label={tr('Mark not OK')}><X size={16} /></button>
+                    <button className="icon-btn" onClick={() => check(r, 'ok')} disabled={checking} title={tr('Mark OK')} aria-label={tr('Mark OK')}><Check size={16} /></button>
+                    <button className="icon-btn" onClick={() => check(r, 'not_ok')} disabled={checking} title={tr('Mark not OK')} aria-label={tr('Mark not OK')}><X size={16} /></button>
                   </>}
+                  {canUndoRow(r) && <button className="icon-btn" onClick={() => undo(r)} disabled={checking} title={tr('Undo decision')} aria-label={tr('Undo decision')}><RotateCcw size={15} /></button>}
                   {canEditRow(r) && <button className="icon-btn" onClick={() => openNew(r)} title={tr('Edit')} aria-label={tr('Edit')}><Pencil size={15} /></button>}
                 </td>
               </tr>
@@ -182,10 +201,11 @@ export default function DailyReportPage() {
           <>
             {canEditRow(detail) && <button className="btn-outline" onClick={() => { const r = detail; setDetail(null); openNew(r); }}><Pencil size={14} /><T> Edit</T></button>}
             {canCheckRow(detail) && <>
-              <button className={cx('flex-1', detail.supCheck === 'ok' ? 'btn-green' : 'btn-outline')} onClick={() => check(detail, 'ok')} disabled={checking}><Check size={16} /><T> OK</T></button>
-              <button className={cx('flex-1', detail.supCheck === 'not_ok' ? 'btn-danger' : 'btn-outline')} onClick={() => check(detail, 'not_ok')} disabled={checking}><X size={16} /><T> Not OK</T></button>
+              <button className="flex-1 btn-outline" onClick={() => check(detail, 'ok')} disabled={checking}><Check size={16} /><T> OK</T></button>
+              <button className="flex-1 btn-outline" onClick={() => check(detail, 'not_ok')} disabled={checking}><X size={16} /><T> Not OK</T></button>
             </>}
-            {!canEditRow(detail) && !canCheckRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}><T>Close</T></button>}
+            {canUndoRow(detail) && <button className="flex-1 btn-outline" onClick={() => undo(detail)} disabled={checking}><RotateCcw size={15} /><T> Undo decision</T></button>}
+            {!canEditRow(detail) && !canCheckRow(detail) && !canUndoRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}><T>Close</T></button>}
           </>
         )}>
         {detail && (
@@ -198,7 +218,10 @@ export default function DailyReportPage() {
             {detail.problem && <div><div className="text-xs font-semibold uppercase text-red-600 mb-1"><T>Problem</T></div><p className="break-words">{detail.problem}</p></div>}
             {detail.plan && <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Plan for tomorrow</T></div><p className="break-words">{detail.plan}</p></div>}
             {detail.photoCount > 0 && <div className="text-xs text-char-500"><T vars={{ n: detail.photoCount }}>{detail.photoCount > 1 ? '{n} photos attached' : '{n} photo attached'}</T>{canEditRow(detail) && <> <T>(open Edit to view)</T></>}</div>}
-            {detail.supRemark && <div className="rounded-lg bg-sand-100 px-3 py-2"><div className="text-xs font-semibold text-char-500 mb-0.5"><T>Supervisor</T>{detail.checkedBy ? ` · ${detail.checkedBy}` : ''}</div>{detail.supRemark}</div>}
+            {detail.supCheck && detail.checkedBy && <div className="text-xs text-char-500">{detail.supCheck === 'ok' ? tr('Marked OK by {n}', { n: detail.checkedBy }) : tr('Marked not OK by {n}', { n: detail.checkedBy })}{detail.checkedAt ? ` · ${fmtDateTime(detail.checkedAt)}` : ''}</div>}
+            {detail.supRemark && <div className="rounded-lg bg-sand-100 px-3 py-2"><div className="text-xs font-semibold text-char-500 mb-0.5">{detail.reopenedFrom === 'not_ok' ? tr('Earlier remark') : <T>Supervisor</T>}{detail.checkedBy ? ` · ${detail.checkedBy}` : ''}</div>{detail.supRemark}</div>}
+            {detail.supCheck === 'ok' && <div className="text-xs text-char-500 flex items-center gap-1"><Lock size={11} /><T>An OK report is locked. The Owner or a Manager can undo the decision to open it again.</T></div>}
+            {detail.supCheck === 'not_ok' && canEditRow(detail) && <div className="text-xs text-amber-700"><T>Edit this report to correct it: it then goes back for a new check.</T></div>}
           </div>
         )}
       </Sheet>

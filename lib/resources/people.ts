@@ -147,12 +147,12 @@ const checkKeys = ['supCheck', 'supRemark'] as const;
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'job', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'onTime', 'filledBy', 'submittedAt'],
+  listFields: ['date', 'empCode', 'empName', 'job', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
   sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode'],
   dateFields: ['date'], filters: { date: 'date', empCode: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
-  serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'photoCount', 'empName', 'job'],
+  serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job'],
   create: z.object({ date: dateStr.optional(), empCode: empCode.optional(), narration: req(4000), hours: num(0, 24).optional(), quantity: num(0, 1e6).optional(), problem: text(1000).optional(), plan: text(1000).optional(), photos: photos().optional() }).strict(),
-  update: z.object({ narration: req(4000), hours: num(0, 24), quantity: num(0, 1e6), problem: text(1000), plan: text(1000), photos: photos(), supCheck: enumOf(['', 'ok', 'not_ok']), supRemark: text(500) }).partial().strict(),
+  update: z.object({ narration: req(4000), hours: num(0, 24), quantity: num(0, 1e6), problem: text(1000), plan: text(1000), photos: photos(), supCheck: enumOf(['', 'ok', 'not_ok']), supRemark: text(500), undoReason: text(300) }).partial().strict(),
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const today = todayIST();
@@ -170,17 +170,43 @@ export const dailyreports: ResourceDef = {
     },
     async afterCreate(ctx, d) { await roll.reportFiled(d.date, 1, ctx.session); },
     async beforeVoid(ctx, d) { await roll.reportFiled(d.date, -1, ctx.session); },
+    /**
+     * A supervisor's decision is final: OK or Not OK can be given once. After that
+     *  - the report cannot be decided again (two people tapping at once: only the first is accepted, the second is refused);
+     *  - an OK report is locked, nobody can change what it says;
+     *  - editing a Not OK report sends it back to "not checked" (it was corrected), keeping the old remark visible;
+     *  - the Owner or a Manager can undo a decision, with a reason; that is written to the Audit Trail.
+     */
     async prepareUpdate(ctx, prev, patch, auth) {
       const isCheck = checkKeys.some((k) => k in patch);
-      const isContent = Object.keys(patch).some((k) => !(checkKeys as readonly string[]).includes(k));
-      if (isCheck) {
+      const isUndo = patch.supCheck === '';
+      const isContent = Object.keys(patch).some((k) => !(checkKeys as readonly string[]).includes(k) && k !== 'undoReason');
+      if ((isCheck || 'undoReason' in patch) && isContent) throw badRequest('Check or undo a report on its own, not together with an edit');
+      // a field that equals what is stored may already have been dropped from the patch (an identical repeat), so judge by what is stored
+      const decided = () => `This report is already marked ${prev.supCheck === 'ok' ? 'OK' : 'Not OK'}${prev.checkedBy ? ` by ${prev.checkedBy}` : ''}. Only the Owner or a Manager can undo it.`;
+      if ('undoReason' in patch && !isUndo) throw prev.supCheck ? badRequest('A reason is only for undoing a decision') : conflict('This report has no decision to undo');
+      if (isCheck && !patch.supCheck && !isUndo) throw prev.supCheck ? conflict(decided()) : badRequest('Choose OK or Not OK');
+
+      if (isUndo) {
+        if (!['owner', 'manager'].includes(auth.user.role)) throw forbidden('Only the Owner or a Manager can undo a decision');
+        if (prev.empCode === ctx.actor.empCode) throw forbidden('You cannot undo a decision on your own report');
+        if (!prev.supCheck) throw conflict('This report has no decision to undo');
+        const reason = String(patch.undoReason ?? '').trim();
+        if (reason.length < 3) throw badRequest('Say why the decision is being undone');
+        Object.assign(patch, { undoReason: reason, undoneBy: ctx.actor.name, undoneAt: new Date(), reopenedFrom: 'undo', supRemark: '', checkedBy: '', checkedAt: null });
+      } else if (isCheck) {
         if (!auth.perm.can('dailyreports', 'approve')) throw forbidden('Only a supervisor can check a report');
         if (prev.empCode === ctx.actor.empCode) throw forbidden('You cannot check your own report');
+        if (prev.supCheck) throw conflict(decided());
+        if (patch.supCheck === 'not_ok' && !String(patch.supRemark ?? '').trim()) throw badRequest('Write what is wrong: a remark is needed for Not OK');
         patch.checkedBy = ctx.actor.name;
         patch.checkedAt = new Date();
+        patch.reopenedFrom = '';
       }
       if (isContent) {
         if (todayIST() > addDays(prev.date, 1)) throw forbidden('Report is locked (correction allowed only until the next day)');
+        if (prev.supCheck === 'ok') throw forbidden('This report was marked OK and is locked. The Owner or a Manager can undo the decision to open it again.');
+        if (prev.supCheck === 'not_ok') { patch.supCheck = ''; patch.reopenedFrom = 'not_ok'; } // corrected: waits for a new check, the old remark stays visible
         if (patch.photos) patch.photoCount = patch.photos.length;
       }
       return patch;

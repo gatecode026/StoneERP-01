@@ -295,3 +295,15 @@ An edit only checks the fields it changes, so an older profile with a value from
 **Fixed on the way:** a pasted `+91 98290 12345` was cut short by the input's length limit; the limit is now applied after the number is tidied. The browser tests also build into `.next-e2e`, so they no longer fail when a `next dev` is already open.
 
 **Tests:** 29 unit checks for the rules (`validators.test.ts`), 23 server cases (`employee-validation.test.ts`: every bad value refused, good values tidied and encrypted, old values not blocking an edit, numbering), and a browser test that types into the real form (`employee-form.spec.ts`).
+
+## Daily report: final decisions, locked OK reports, undo
+
+- **A decision is final.** OK or Not OK can be given once. The ✓ / ✗ buttons (table and report sheet) are shown only while the report has no decision; afterwards the sheet shows "Marked OK by <name> · time" and the remark. The server enforces it too: a second decision is refused (409, "already marked OK by …"), and when several people tap at the same moment exactly one is accepted (tested).
+- **Not OK needs a remark** (the prompt already asked; now it must be filled).
+- **An OK report is locked.** Nobody can change what it says (403), and the pencil is hidden.
+- **Not OK goes back for a new check when corrected.** When the employee edits a Not OK report it returns to "not checked", shows an amber "Corrected: check again" badge, and the old remark stays visible as "Earlier remark".
+- **Undo (Owner or Manager only).** A round-arrow button / "Undo decision" asks why, needs at least 3 characters, clears the decision and returns the report to "not checked". The reason, who and when are kept on the report (`undoReason`, `undoneBy`, `undoneAt`) and the change is in the Audit Trail. Supervisors, the employee and anyone checking their own report cannot undo.
+- Check or undo is a request of its own: it cannot be combined with an edit, and `reopenedFrom`, `undoneBy`, `undoneAt` cannot be set from outside.
+- The correction window is unchanged: content can be edited only until the next day, so a Not OK report not corrected by then stays Not OK (piece-rate pay already leaves Not OK reports out). Undo reopens the decision, not the day lock.
+
+**Tests:** `report-decision.test.ts` (10 server cases) and `report-decision.spec.ts` (browser: OK removes the buttons and the pencil, Undo with a reason brings them back).
