@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod';
-import { Advance, Attendance, DailyReport, Employee, Leave, PerfRemark, SafetyRecord, Task } from '../models';
+import { Advance, Attendance, DailyReport, Employee, Leave, PerfRemark, SafetyRecord, Task, User } from '../models';
 import type { ResourceDef } from '../api/resource';
 import { badRequest, confirmable, conflict, forbidden } from '../errors';
 import { encryptField } from '../crypto';
@@ -66,6 +66,16 @@ function sealEmployee(doc: Record<string, any>, prev?: any) {
 
 const pendingLogin = new WeakMap<object, { login: LoginInput; auth: AuthCtx }>(); // the sign-in part of a request, from prepare* to after*
 
+/**
+ * A sign-in ID (the mobile number) belongs to exactly one person. Checked BEFORE the softer "already on another profile, save anyway?"
+ * question, so nobody is asked to confirm something that will then be refused.
+ */
+async function assertSignInIdFree(ctx: any, mobile: string | undefined, selfId?: unknown) {
+  if (!mobile) return;
+  const u: any = await User.findOne({ username: mobile }).select('name employeeId empCode').session(ctx.session ?? null).lean();
+  if (u && (!selfId || String(u.employeeId ?? '') !== String(selfId))) throw conflict(`${u.name}${u.empCode ? ` (${u.empCode})` : ''} already signs in with this mobile number. Use a different mobile number for this person.`);
+}
+
 /** The same mobile on two profiles is sometimes right (a shared family phone) but usually a slip: ask before saving. */
 async function warnSharedMobile(ctx: any, mobile: string | undefined, selfId?: unknown) {
   if (!mobile || ctx.confirmed) return;
@@ -86,6 +96,7 @@ export const employees: ResourceDef = {
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const { login, ...rest } = input as any;
+      if (login?.enabled) await assertSignInIdFree(ctx, rest.mobile);
       await warnSharedMobile(ctx, rest.mobile);
       crossChecks(rest);
       if (login) pendingLogin.set(ctx, { login, auth });
@@ -100,7 +111,10 @@ export const employees: ResourceDef = {
     },
     async prepareUpdate(ctx, prev, patch, auth) {
       if ('login' in patch) { pendingLogin.set(ctx, { login: patch.login, auth }); delete patch.login; } // never stored on the profile; applied in afterUpdate
-      if (patch.mobile && patch.mobile !== prev.mobile) await warnSharedMobile(ctx, patch.mobile, prev._id);
+      if (patch.mobile && patch.mobile !== prev.mobile) {
+        if (prev.hasLogin || (pendingLogin.get(ctx)?.login as LoginInput | undefined)?.enabled) await assertSignInIdFree(ctx, patch.mobile, prev._id);
+        await warnSharedMobile(ctx, patch.mobile, prev._id);
+      }
       crossChecks(patch, prev);
       if (patch.status === 'left' && !patch.leavingDate && !prev.leavingDate) patch.leavingDate = todayIST();
       if (patch.status === 'active') patch.leavingDate = '';

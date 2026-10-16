@@ -90,3 +90,32 @@ describe('employee code is numbered by the server', () => {
     expect((await make({ empCode: 'E045', mobile: '9829066681', _confirmed: true })).status).toBe(409);
   });
 });
+
+describe('a mobile number that is already someone’s sign-in', () => {
+  const login = { enabled: true, role: 'worker', password: 'Start-Pass-123' };
+  it('is refused straight away (no "save anyway?" first) and nothing is saved', async () => {
+    const first: any = await make({ mobile: '9829077001', login });
+    expect(first.status, JSON.stringify(first.json)).toBe(201);
+    const before = await Employee.countDocuments({});
+    const again: any = await make({ mobile: '9829077001', login });
+    expect(again.status).toBe(409);
+    expect(again.json.error.code).toBe('CONFLICT');
+    expect(again.json.error.message).toMatch(/already signs in with this mobile number/);
+    expect(await Employee.countDocuments({})).toBe(before);
+  });
+  it('a plain profile on the same number still gets the confirmation question, then saves once', async () => {
+    const ask: any = await make({ mobile: '9829077001' });
+    expect(ask.status).toBe(409);
+    expect(ask.json.error.code).toBe('CONFIRM_REQUIRED');
+    const before = await Employee.countDocuments({});
+    expect((await make({ mobile: '9829077001', _confirmed: true })).status).toBe(201);
+    expect(await Employee.countDocuments({})).toBe(before + 1);
+  });
+  it('giving an existing person a sign-in on a number that is taken is refused the same way', async () => {
+    const plain: any = await make({ mobile: '9829077002' });
+    const r: any = await api.patch(owner, 'employees', plain.json._id, { mobile: '9829077001', login });
+    expect(r.status).toBe(409);
+    expect(r.json.error.message).toMatch(/already signs in/);
+    expect(((await Employee.findById(plain.json._id).lean()) as any).mobile).toBe('9829077002');
+  });
+});
