@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/jobs/send-notifications",
-      "schedule": "5 * * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/jobs/reconcile",

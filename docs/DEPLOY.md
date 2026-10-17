@@ -42,12 +42,12 @@ Jobs are plain HTTP endpoints, safe to call twice (a second call for the same pe
 |---|---|---|
 | `daily-report` | 14:30 → 20:00 | Owner's evening report, queued and sent on WhatsApp |
 | `payment-reminders` | 04:30 → 10:00 | Reminders for pending customer payments |
-| `send-notifications` | every hour at :05 | Retries messages that could not be delivered |
+| `send-notifications` | 15:00 → 20:30 | Retries messages that could not be delivered (right after the daily report). Daily, because Vercel's free Hobby plan rejects any cron that runs more than once a day |
 | `reconcile` | 20:30 → 02:00 | Checks roll-ups and balances against the records and repairs drift |
 | `backup` | 21:00 → 02:30 | Nightly backup to storage (`BACKUP_RETENTION_DAYS`, default 14) |
 | `scorecards` | 1st of month 21:30 | Monthly performance scorecards |
 
-`GET /api/jobs/status` (with the secret) lists recent runs. Vercel's free plan runs a cron at most once a day: the hourly `send-notifications` entry needs a paid plan, or call it from any scheduler (`curl -X POST -H "x-cron-secret: …" https://host/api/jobs/send-notifications`). On a plain server you can also run `npm run job -- daily-report`.
+`GET /api/jobs/status` (with the secret) lists recent runs. Vercel's free Hobby plan allows each cron at most once a day (a more frequent one makes the whole deployment fail). For hourly retries use a paid plan, or call it from any scheduler (`curl -X POST -H "x-cron-secret: …" https://host/api/jobs/send-notifications`). On a plain server you can also run `npm run job -- daily-report`.
 
 ## Backups and restore
 
