@@ -73,3 +73,20 @@ test('Owner: the Supervisor (team) dropdown on the Employee form lists superviso
   await page.locator('#f_supervisorCode').click();
   await expect(page.locator('[role=option], ul[role=listbox] li').filter({ hasText: /E2E supervisor/ })).toBeVisible();
 });
+
+test('Owner: the Trips driver dropdown lists only employees marked Driver', async ({ page }) => {
+  await signIn(page, 'owner');
+  const make = async (name: string, designation?: string) => {
+    const r = await page.request.post('/api/employees', { headers: SAME_ORIGIN, data: { name, job: 'Worker / operator', ...(designation ? { designation } : {}), payType: 'daily', rate: 600, mobile: '98' + String(Math.floor(10000000 + Math.random() * 89999999)), _confirmed: true } });
+    expect(r.status(), await r.text()).toBeLessThan(300);
+  };
+  await make(`Driver ${uid}`, 'Driver');
+  await make(`Loader ${uid}`, 'Loader');
+  await page.goto('/vehicles');
+  await page.getByRole('button', { name: /Trips/ }).first().click();
+  await page.getByRole('button', { name: /^\s*\+?\s*(New|Add)\b/i }).first().click();
+  await page.locator('#f_driverCode').click();
+  const options = page.locator('[role=option], ul[role=listbox] li');
+  await expect(options.filter({ hasText: `Driver ${uid}` })).toBeVisible();
+  await expect(options.filter({ hasText: `Loader ${uid}` })).toHaveCount(0);
+});

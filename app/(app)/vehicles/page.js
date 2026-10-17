@@ -42,7 +42,7 @@ export default function VehiclesPage() {
         <CrudPage model="vehicletrips" headerExtra={<ImportData resource="vehicletrips" perm="vehicletrips" noun="trips and diesel" />} title="Trips & diesel" subtitle="Diesel used per hour or per km — extra use stands out" label="Trip" sort="-date,-createdAt"
           fields={[
             { name: 'date', label: 'Date', type: 'date', required: true }, { name: 'vehicleId', label: 'Vehicle', type: 'ref', required: true, ref: { model: 'vehicles', nameField: 'vehicleName' } },
-            { name: 'driverCode', label: 'Driver', type: 'ref', ref: { model: 'employees', valueKey: 'empCode', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } }, { name: 'work', label: 'Trip or work done', wide: true, placeholder: 'Block shifted quarry → factory' },
+            { name: 'driverCode', label: 'Driver', type: 'ref', hint: 'Employees whose Designation is Driver (set it on the Employee form)', ref: { model: 'employees', valueKey: 'empCode', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', designation: 'Driver' } } }, { name: 'work', label: 'Trip or work done', wide: true, placeholder: 'Block shifted quarry → factory' },
             { name: 'hours', label: 'Hour-meter hours', type: 'number' }, { name: 'km', label: 'Kilometres', type: 'number' },
             { name: 'dieselLitres', label: 'Diesel filled (litres)', type: 'number', required: true }, { name: 'dieselAmount', label: 'Diesel amount (₹)', type: 'number' },
           ]}

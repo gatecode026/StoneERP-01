@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { useTestDb } from '../helpers';
 import { api, call, makeUser, resetCaches, type Who } from '../api';
-import { Block, Machine, Repair, StockItem } from '@/lib/models';
+import { Block, Employee, Machine, Repair, StockItem } from '@/lib/models';
 import * as lookup from '@/app/api/lookup/[kind]/route';
 
 let db: Awaited<ReturnType<typeof useTestDb>>;
@@ -49,6 +49,20 @@ describe('the dropdowns on the Machine Work and Employee forms', () => {
     expect(r.json.data.map((x: any) => x.id)).toEqual(['E900']);
     expect((await look(owner, 'employees', 'job=Nobody')).json.data).toEqual([]);
     expect((await look(owner, 'employees', 'job=')).status).toBe(400);
+  });
+
+  it('employees: the Trips driver dropdown offers only people whose designation is Driver', async () => {
+    const mk = (empCode: string, name: string, designation?: string) => api.create(owner, 'employees', { empCode, name, job: 'Worker / operator', ...(designation ? { designation } : {}), payType: 'daily', rate: 600, mobile: '9828' + String(100000 + Math.floor(Math.random() * 800000)), _confirmed: true });
+    expect((await mk('E710', 'Driver Dev', 'Driver')).status).toBe(201);
+    expect((await mk('E711', 'Loader Lal', 'Loader')).status).toBe(201);
+    expect((await mk('E712', 'No Designation')).status).toBe(201);
+    const r = await look(owner, 'employees', 'by=empCode&status=active&designation=Driver');
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.data.map((x: any) => x.id)).toEqual(['E710']);
+    expect((await look(owner, 'employees', 'designation=Pilot')).status).toBe(400); // not on the list
+    expect((await mk('E713', 'Bad Designation', 'Pilot')).status).toBe(400);
+    expect((await api.patch(owner, 'employees', String(((await Employee.findOne({ empCode: 'E712' }).lean()) as any)._id), { designation: 'Driver' })).status).toBe(200);
+    expect((await look(owner, 'employees', 'by=empCode&designation=Driver')).json.data.map((x: any) => x.id).sort()).toEqual(['E710', 'E712']);
   });
 });
 

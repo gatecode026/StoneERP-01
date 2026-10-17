@@ -4,6 +4,7 @@ import { Block, Customer, Employee, Machine, Sale, StockItem, Supplier, Vehicle 
 import { badRequest, notFound } from '../errors';
 import type { Resource } from '../perm/resources';
 import type { AnyModel } from '../models/_base';
+import { DESIGNATIONS } from '../config';
 
 export const LOOKUP_MAX = 20;
 
@@ -26,7 +27,7 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string' }, defaults: { status: 'active' }, select: 'name empCode job', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS }, defaults: { status: 'active' }, select: 'name empCode job designation', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})` },
   items: { resource: 'stockitems', model: StockItem, search: ['name'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name unit balance category', sort: { name: 1 }, label: (d) => `${d.name} (${n(d.balance)} ${d.unit})`, hint: (d) => d.unit },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },

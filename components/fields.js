@@ -1,5 +1,5 @@
 // Shared field configs for CrudPage forms
-import { JOBS } from '@/lib/config';
+import { JOBS, DESIGNATIONS } from '@/lib/config';
 import { joiningDateProblem } from '@/lib/validators';
 
 export const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
@@ -24,6 +24,7 @@ export const EMPLOYEE_FIELDS = [
   { name: 'address', label: 'Address', group: 'pii', wide: true, section: 'Personal Details' },
 
   { name: 'job', label: 'Job', type: 'select', options: JOBS, required: true, section: 'Job & Workplace' },
+  { name: 'designation', label: 'Designation', type: 'select', options: DESIGNATIONS, hint: 'Optional. What they actually do, e.g. Driver. Trips offer only Drivers', section: 'Job & Workplace' },
   { name: 'site', label: 'Where they work', type: 'select', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'], default: 'Factory', section: 'Job & Workplace' },
   { name: 'supervisorCode', label: 'Supervisor (team)', type: 'ref', ref: { model: 'employees', valueKey: 'empCode', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor' } }, hint: 'Decides whose team this person is in', section: 'Job & Workplace' },
   { name: 'shiftId', label: 'Shift', type: 'select', options: [], hint: 'Leave empty for the default shift (Settings → Working hours)', section: 'Job & Workplace' },
