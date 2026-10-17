@@ -336,3 +336,7 @@ Attendance now comes from **punches** (the biometric machine later; the Punch In
 **Tests:** 18 unit (calendar, day calculation), 24 server (punching, night shift, double taps, team scope, overtime, corrections, sheet, weekly off, salary, leave), 9 (settings validation, shifts, biometric ID, role rights), 5 browser (Punch In on a phone, Fix with a reason, overtime approval, supervisor limits, Settings).
 
 **Not done:** the biometric machine connection itself (it needs the machine brand and how it sends data: it will use the same punches and the Biometric ID); a different shift for one day; automatic closing of forgotten Outs (they are flagged and fixed by a senior).
+
+## Punch In / Out for Manager, Accountant, Supervisor and Salesperson
+
+These roles (when the login is linked to an employee profile) now see **My attendance** at the top of their home, with today's In / Out and the Punch In / Punch Out button, the same card the Worker has. The Accountant was given the right to punch for themselves (punches: see all, punch own). The Owner home is unchanged. Tests: all four punch In and Out and their home carries the punch state (server), and a browser test for the Supervisor and the Owner.

@@ -110,3 +110,15 @@ test.describe('on a computer the day is a ledger table', () => {
     await page.screenshot({ path: 'test-results/attendance-ledger.png' });
   });
 });
+
+test('Supervisor sees My attendance with Punch In on their own home; the Owner home has no punch card', async ({ page }) => {
+  await signIn(page, 'supervisor');
+  await expect(page.getByText('My attendance')).toBeVisible();
+  await page.getByRole('button', { name: /^Punch In$/ }).click();
+  await expect(page.getByText(/Punched in/i).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Punch Out$/ })).toBeVisible();
+  await page.context().clearCookies();
+  await signIn(page, 'owner');
+  await expect(page.getByText('My attendance')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Punch In$/ })).toHaveCount(0);
+});

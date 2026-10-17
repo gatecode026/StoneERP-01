@@ -35,7 +35,7 @@ export default function HomeClient({ initialData = null, initialDate }) {
       case 'manager': return <ManagerHome data={data} reload={reload} canDecide={canDecide} />;
       case 'accountant': return <AccountantHome data={data} reload={reload} canDecide={canDecide} />;
       case 'supervisor': return <SupervisorHome data={data} reload={reload} />;
-      case 'salesperson': return <SalespersonHome data={data} />;
+      case 'salesperson': return <SalespersonHome data={data} reload={reload} />;
       case 'worker': return <WorkerHome data={data} reload={reload} name={session?.name} />;
       default: return <PresetHome data={data} reload={reload} />;
     }

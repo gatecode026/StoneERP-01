@@ -45,7 +45,7 @@ const MANAGER = parse({
 });
 
 const ACCOUNTANT = parse({
-  employees: 'v* c* e* o*', dailyreports: 'v* o*', attendance: 'v* o*', punches: 'v*', leaves: 'v*', advances: 'v* c* e* o*', salarysheets: 'v* c* e* o*',
+  employees: 'v* c* e* o*', dailyreports: 'v* o*', attendance: 'v* o*', punches: 'v* cm', leaves: 'v*', advances: 'v* c* e* o*', salarysheets: 'v* c* e* o*',
   salarypayments: 'v* c*', salaryslips: 'v* o*', tasks: 'vm em', blocks: 'v*', royalties: 'v* c* e* o*', yield: 'v* o*', repairs: 'v*',
   vehicles: 'v*', stockitems: 'v* o*', stockmovements: 'v* o*', suppliers: 'v* c* e* x* o*', purchases: 'v* c* e* x* o*',
   customers: 'v* c* e* x* o*', sales: 'v* c* e* x* o*', invoices: 'v* c* o*', payments: 'v* c* e* x* o*', dispatches: 'v* o*', complaints: 'v* o*',

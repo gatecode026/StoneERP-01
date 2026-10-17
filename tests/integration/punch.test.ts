@@ -10,6 +10,7 @@ import * as otRoute from '@/app/api/attendance/overtime/route';
 import * as sheetRoute from '@/app/api/attendance/sheet/route';
 import * as bulkAtt from '@/app/api/bulk/attendance/route';
 import * as approvals from '@/app/api/approvals/route';
+import * as homeRoute from '@/app/api/home/route';
 import { computeSalary } from '@/lib/services/salary';
 import { istDate } from '@/lib/attendance/calc';
 
@@ -320,5 +321,38 @@ describe('approved leave fills the sheet', () => {
     const req2 = await api.create(worker2, 'leaves', { from: '2026-10-26', to: '2026-10-27', reason: 'x' });
     await call(manager, approvals.POST as never, '/x', { method: 'POST', body: { model: 'leaves', id: req2.json._id, action: 'reject' } });
     expect(await Attendance.countDocuments({ empCode: 'E002', date: { $gte: '2026-10-26', $lte: '2026-10-27' } })).toBe(0);
+  });
+});
+
+describe('Manager, Accountant, Supervisor and Salesperson punch for themselves (not only Workers)', () => {
+  it('each can punch In and Out, and their own home carries the punch state; the Owner home does not', async () => {
+    const mk = async (empCode: string, name: string, job: string) => {
+      const r = await api.create(owner, 'employees', { empCode, name, job, payType: 'monthly', rate: 30000, mobile: '9829' + String(500000 + Math.floor(Math.random() * 400000)), _confirmed: true });
+      expect(r.status, JSON.stringify(r.json)).toBe(201);
+    };
+    await mk('E700', 'Acc Ountant', 'Accountant');
+    await mk('E701', 'Sales Person', 'Salesperson');
+    const accountant = await makeUser('accountant', { empCode: 'E700' });
+    const salesperson = await makeUser('salesperson', { empCode: 'E701' });
+    clock('2026-10-14', '09:00');
+    for (const [who, code] of [[manager, 'E800'], [accountant, 'E700'], [supervisor, 'E900'], [salesperson, 'E701']] as [Who, string][]) {
+      const home = await call(who, homeRoute.GET as never, '/api/home');
+      expect(home.status, JSON.stringify(home.json)).toBe(200);
+      expect(home.json.self?.punch, `${code} home`).toMatchObject({ enabled: true, next: 'in' });
+      const a = await punch(who);
+      expect(a.status, `${code} In ${JSON.stringify(a.json)}`).toBe(201);
+      expect(a.json).toMatchObject({ type: 'in', day: { empCode: code, state: 'present' } });
+    }
+    clock('2026-10-14', '18:10');
+    for (const [who, code] of [[manager, 'E800'], [accountant, 'E700'], [supervisor, 'E900'], [salesperson, 'E701']] as [Who, string][]) {
+      const home = await call(who, homeRoute.GET as never, '/api/home');
+      expect(home.json.self.punch.next, code).toBe('out');
+      const b = await punch(who);
+      expect(b.status, `${code} Out ${JSON.stringify(b.json)}`).toBe(201);
+      expect(((await day(code, '2026-10-14')) as any)).toMatchObject({ state: 'present', workedMinutes: 490, otMinutes: 0 }); // 09:00 to 18:10 is 9 h 10 min, less the 1 h break; 10 minutes past the end earns no overtime
+    }
+    // the Owner's home is unchanged: no personal attendance card data
+    const own = await call(owner, homeRoute.GET as never, '/api/home');
+    expect(own.json.self).toBeUndefined();
   });
 });

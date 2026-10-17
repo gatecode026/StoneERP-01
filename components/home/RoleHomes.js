@@ -20,6 +20,7 @@ export function ManagerHome({ data, reload, canDecide }) {
   const den = (k) => data.denied?.includes(k);
   return (
     <div>
+      <MyAttendance data={data} reload={reload} />
       <ReportCards d={d} />
       <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card className="lg:col-span-2" title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}>
@@ -52,6 +53,7 @@ export function AccountantHome({ data, reload, canDecide }) {
   const den = (k) => data.denied?.includes(k);
   return (
     <div>
+      <MyAttendance data={data} reload={reload} />
       <ReportCards d={{ sales: d.sales, expenses: d.expenses, cash: d.cash }} />
       <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card title={h('ageing')} denied={den('ageing')} empty={!m.ageing || !m.ageing.total} className="lg:col-span-2">
@@ -132,6 +134,7 @@ export function SupervisorHome({ data, reload }) {
   const c = data.team?.counts || {};
   return (
     <div>
+      <MyAttendance data={data} reload={reload} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={CalendarCheck} label={h('attendance')} value={`${members.length - (members.filter((m) => !stateOf(m)).length)}/${members.length}`} sub={`${c.absent ?? 0} ${h('absent')} · ${members.filter((m) => !stateOf(m)).length} ${h('notMarked')}`} tone={members.some((m) => !stateOf(m)) ? 'amber' : 'green'} />
         <StatCard icon={ClipboardList} label={h('reports')} value={`${data.reports?.filled ?? 0}/${members.length}`} sub={`${data.reports?.missing?.length ?? 0} ${h('missing')}`} tone={data.reports?.missing?.length ? 'amber' : 'green'} href="/daily-report" />
@@ -183,13 +186,14 @@ export function SupervisorHome({ data, reload }) {
 }
 
 // ---------------------------------------------------------------- SALESPERSON
-export function SalespersonHome({ data }) {
+export function SalespersonHome({ data, reload }) {
   const h = useH();
   const den = (k) => data.denied?.includes(k);
   const [q, setQ] = useState('');
   const stock = useFetch(q.trim().length >= 2 ? `/api/stockitems?q=${encodeURIComponent(q.trim())}&category=finished&limit=8` : null, [q]);
   return (
     <div>
+      <MyAttendance data={data} reload={reload} />
       <div className="flex gap-2 mb-3"><Link href="/sales/new" className="btn-primary flex-1 !min-h-[52px] text-base"><Plus size={20} /> {h('newQuote')}</Link></div>
       <div className="grid grid-cols-2 gap-3">
         <StatCard label={h('myToday')} value={inrShort(data.mine?.today ?? 0)} sub={`${data.mine?.todayOrders ?? 0} ${h('orders')}`} tone="terra" href="/sales" />
@@ -223,8 +227,9 @@ export function SalespersonHome({ data }) {
   );
 }
 
-// ---------------------------------------------------------------- WORKER (4 big cards) – also the "self" block of every job preset
-export function WorkerCards({ self, reload }) {
+// ---------------------------------------------------------------- MY ATTENDANCE (today's In / Out and the Punch button)
+// The same card on the Worker home and, for anyone who is also an employee, on the Manager / Accountant / Supervisor / Salesperson homes.
+export function AttendanceCard({ self, reload }) {
   const h = useH();
   const { can } = useApp();
   const [busy, setBusy] = useState(false);
@@ -239,42 +244,56 @@ export function WorkerCards({ self, reload }) {
     setBusy(false);
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {can('attendance', 'view') && (
-        <Card title={<span className="text-base font-bold flex items-center gap-2"><CalendarCheck className="text-terra" size={18} /> {h('myAtt')}</span>}>
-          {self?.attendance?.inAt ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={20} strokeWidth={2.5} /></div>
-              <div className="min-w-0">
-                <div className="font-bold text-sm text-emerald-950 flex items-center gap-2 flex-wrap">
-                  <span><T>In</T> {fmtClock(self.attendance.inAt)}</span>
-                  <span><T>Out</T> {self.attendance.outAt ? fmtClock(self.attendance.outAt) : '—'}</span>
-                </div>
-                <div className="text-xs text-emerald-700 mt-0.5">
-                  {self.attendance.workedMinutes > 0 && <>{fmtDuration(self.attendance.workedMinutes)} · </>}
-                  {self.attendance.otMinutes > 0 && <T vars={{ n: fmtDuration(self.attendance.otMinutes) }}>{self.attendance.otStatus === 'approved' ? 'Overtime {n} (approved)' : 'Overtime {n} (waiting for approval)'}</T>}
-                </div>
+      <Card title={<span className="text-base font-bold flex items-center gap-2"><CalendarCheck className="text-terra" size={18} /> {h('myAtt')}</span>}>
+        {self?.attendance?.inAt ? (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={20} strokeWidth={2.5} /></div>
+            <div className="min-w-0">
+              <div className="font-bold text-sm text-emerald-950 flex items-center gap-2 flex-wrap">
+                <span><T>In</T> {fmtClock(self.attendance.inAt)}</span>
+                <span><T>Out</T> {self.attendance.outAt ? fmtClock(self.attendance.outAt) : '—'}</span>
+              </div>
+              <div className="text-xs text-emerald-700 mt-0.5">
+                {self.attendance.workedMinutes > 0 && <>{fmtDuration(self.attendance.workedMinutes)} · </>}
+                {self.attendance.otMinutes > 0 && <T vars={{ n: fmtDuration(self.attendance.otMinutes) }}>{self.attendance.otStatus === 'approved' ? 'Overtime {n} (approved)' : 'Overtime {n} (waiting for approval)'}</T>}
               </div>
             </div>
-          ) : self?.attendance ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={20} strokeWidth={2.5} /></div>
-              <div><div className="font-bold text-sm text-emerald-950 flex items-center gap-2">{h('marked')} ✔ <Badge tone="green">{self.attendance.state}</Badge></div><div className="text-xs text-emerald-700 mt-0.5"><T>Today's attendance recorded</T></div></div>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
-              <div className="font-bold">{h('attPending')}</div>
-              <div className="text-xs mt-0.5">{self?.punch?.enabled && can('punches', 'create') ? <T>Press Punch In when you start work.</T> : <T>Attendance is recorded by the biometric machine, or your supervisor marks it.</T>}</div>
-            </div>
-          )}
-          {self?.punch?.enabled && can('punches', 'create') && (
-            <button type="button" className={`${self.punch.next === 'out' ? 'btn-primary' : 'btn-green'} w-full !min-h-[56px] text-base font-semibold mt-3 disabled:opacity-50`} disabled={busy} onClick={punch}>
-              <CalendarCheck size={18} /> {busy ? '…' : self.punch.next === 'out' ? h('punchOut') : h('punchIn')}
-            </button>
-          )}
-          <Link href="/attendance" className="btn-outline w-full !min-h-[44px] text-sm font-semibold justify-center mt-3">{h('viewAtt')}</Link>
-        </Card>
-      )}
+          </div>
+        ) : self?.attendance ? (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={20} strokeWidth={2.5} /></div>
+            <div><div className="font-bold text-sm text-emerald-950 flex items-center gap-2">{h('marked')} ✔ <Badge tone="green">{self.attendance.state}</Badge></div><div className="text-xs text-emerald-700 mt-0.5"><T>Today's attendance recorded</T></div></div>
+          </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+            <div className="font-bold">{h('attPending')}</div>
+            <div className="text-xs mt-0.5">{self?.punch?.enabled && can('punches', 'create') ? <T>Press Punch In when you start work.</T> : <T>Attendance is recorded by the biometric machine, or your supervisor marks it.</T>}</div>
+          </div>
+        )}
+        {self?.punch?.enabled && can('punches', 'create') && (
+          <button type="button" className={`${self.punch.next === 'out' ? 'btn-primary' : 'btn-green'} w-full !min-h-[56px] text-base font-semibold mt-3 disabled:opacity-50`} disabled={busy} onClick={punch}>
+            <CalendarCheck size={18} /> {busy ? '…' : self.punch.next === 'out' ? h('punchOut') : h('punchIn')}
+          </button>
+        )}
+        <Link href="/attendance" className="btn-outline w-full !min-h-[44px] text-sm font-semibold justify-center mt-3">{h('viewAtt')}</Link>
+      </Card>
+  );
+}
+
+/** For the role homes: shown only to someone who is an employee (has a profile) and may see attendance or punch. Not shown on the Owner home. */
+function MyAttendance({ data, reload }) {
+  const { can } = useApp();
+  if (!data?.self?.me || !(can('attendance', 'view') || can('punches', 'create'))) return null;
+  return <div className="mb-4 max-w-xl"><AttendanceCard self={data.self} reload={reload} /></div>;
+}
+
+// ---------------------------------------------------------------- WORKER (4 big cards) – also the "self" block of every job preset
+export function WorkerCards({ self, reload }) {
+  const h = useH();
+  const { can } = useApp();
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {can('attendance', 'view') && <AttendanceCard self={self} reload={reload} />}
       {can('dailyreports', 'create') && (
         <Card title={<span className="text-base font-bold flex items-center gap-2"><ClipboardList className="text-terra" size={18} /> {h('writeReport')}</span>}>
           {self?.report ? (

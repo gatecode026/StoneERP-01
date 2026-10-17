@@ -229,15 +229,20 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
   }
 }
 
+async function withSelf<T extends object>(home: T, date: string, user: SessionUser) {
+  return { ...home, self: await workerHome(date, user as any) };
+}
+
 /** One round trip per role home. The response contains exactly the sections that role is allowed to see. */
 export async function buildHome(date: string, user: SessionUser, perm: EffectivePerm, settings: AppSettings) {
   const kind = homeKind(perm);
   switch (kind) {
     case 'owner': return ownerHome(date, user, perm, settings);
-    case 'manager': return managerHome(date, user, perm, settings);
-    case 'accountant': return accountantHome(date, user, perm, settings);
-    case 'supervisor': return supervisorHome(date, user, perm, settings);
-    case 'salesperson': return salespersonHome(date, user, perm);
+    // everybody who is also an employee sees their own attendance (and the Punch button) at the top of their home
+    case 'manager': return withSelf(await managerHome(date, user, perm, settings), date, user);
+    case 'accountant': return withSelf(await accountantHome(date, user, perm, settings), date, user);
+    case 'supervisor': return withSelf(await supervisorHome(date, user, perm, settings), date, user);
+    case 'salesperson': return withSelf(await salespersonHome(date, user, perm), date, user);
     case 'worker': return { kind, date, self: await workerHome(date, user), denied: [] as string[] };
     default: return presetHome(kind, date, user, perm);
   }
