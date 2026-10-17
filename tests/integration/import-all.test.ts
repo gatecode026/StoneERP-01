@@ -52,8 +52,8 @@ describe('Excel import for every list that has entries', () => {
     expect(await DailyReport.countDocuments()).toBe(2);
     const bad = await imp('dailyreports', [['Date', 'Employee', 'Work done'], [D, 'E999', 'x']], false);
     expect(bad.json.rows[0].errors.join()).toMatch(/Employee "E999" is not in the app/);
-    expect((await imp('attendance', [['Date', 'Employee', 'State', 'Overtime hours'], [D, 'E001', 'P', ''], [D, 'E002', 'OT', 3]])).json.imported).toBe(2);
-    expect((await Attendance.findOne({ empCode: 'E002' }).lean() as any)).toMatchObject({ state: 'overtime', otHours: 3 });
+    expect((await imp('attendance', [['Date', 'Employee', 'State'], [D, 'E001', 'P'], [D, 'E002', 'OT']])).json.imported).toBe(2); // OT is read as present: overtime now comes from punches
+    expect((await Attendance.findOne({ empCode: 'E002' }).lean() as any)).toMatchObject({ state: 'present', method: 'manual' });
     expect((await imp('attendance', [['Date', 'Employee', 'State'], [D, 'E001', 'present']], false)).json.rows[0].errors.join()).toMatch(/Already in the app/);
     expect((await imp('leaves', [['Employee', 'From', 'To', 'Reason'], ['E001', '10-10-2026', '12-10-2026', 'Family']])).json.imported).toBe(1);
     expect((await Leave.findOne().lean() as any)).toMatchObject({ empCode: 'E001', status: 'pending' });

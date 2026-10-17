@@ -307,3 +307,32 @@ An edit only checks the fields it changes, so an older profile with a value from
 - The correction window is unchanged: content can be edited only until the next day, so a Not OK report not corrected by then stays Not OK (piece-rate pay already leaves Not OK reports out). Undo reopens the decision, not the day lock.
 
 **Tests:** `report-decision.test.ts` (10 server cases) and `report-decision.spec.ts` (browser: OK removes the buttons and the pencil, Undo with a reason brings them back).
+
+## Attendance: punches, shifts, weekly off, overtime approval
+
+Attendance now comes from **punches** (the biometric machine later; the Punch In / Punch Out button until then). A day is worked out from the first In and last Out against the person's shift. The older one-tap marks (Present / Absent / Half day / Leave) stay, for days without punches.
+
+**Settings → Working hours (Owner only; every change is audited)**
+- **Shifts:** name, start, end, break, "late after", full-day hours, half-day hours, overtime buffer and rounding. A shift that ends before it starts is a night shift (the day belongs to the evening it starts). A day and a night shift are set up by default; at least one must remain; a shift still used by an employee cannot be removed.
+- **Weekly off:** each weekday is working, off every week, off on the 2nd and 4th, or off on the 1st, 3rd and 5th. Sunday is off by default.
+- **Holidays:** a date or a date range with a name.
+- **Rules:** weekly offs and holidays paid for monthly staff (on by default), Punch In / Out buttons on or off (switch off when the biometric machine is live), repeat-punch gap, flag a missing Out after N hours.
+- **Employee profile:** a Shift (empty = the default) and a **Biometric ID** (unique per person; it is what the machine will send). Both are also in the Excel import.
+
+**Punching:** `POST /api/punches` (own, or for the team / everybody with the right). The server stamps the time. In starts the day, Out closes it; a repeat within the gap is ignored; In while already in is refused; a second In the same day (back from a break) keeps the first In; last Out wins. Every punch is kept as it happened (`Punch` collection). `GET /api/punches` lists them.
+
+**What a day means (`lib/attendance/calc.ts`):** worked = Out − In less the break (the break comes off only for a stay of 4 h or more); late = In after start + grace; full day / half day / absent by the worked hours; overtime = time after the shift end once the buffer has passed, in blocks rounded down; on a weekly off or holiday every worked minute is overtime and nobody is late. In with no Out long after the shift is flagged **Out missing** (counts as present, no overtime) and shows under "Needs a fix".
+
+**Overtime must be approved before it is paid.** New right "Approve overtime" (attendance → Approve; Owner and Manager by default). Approve all or fewer minutes, reject, or reopen; not on your own, not once the month's salary is approved; a changed amount (a correction) needs a new decision. Screens: buttons on each row, an Overtime tab, a count on the sheet. Salary pays approved overtime only and shows what is waiting.
+
+**Wrong punches are fixed by a senior:** new right "Correct punches" (punches → Edit; Owner and Manager by default, the Owner can give it to supervisors for their team in Roles). Fix opens the day's In / Out, needs a reason, keeps the original punches, records who/what/why on the day, recalculates, and goes to the Audit Trail. Not on your own punches, not for a future time, not after the month's salary is approved. A later punch does not move a time a senior set.
+
+**Roles:** new "Punch in / out" row (See punches / Punch in / out / Correct punches) and "Approve overtime" on Attendance. Defaults: workers punch themselves; supervisors punch for their team; accountants see; Manager and Owner correct and approve. A role the Owner saved earlier gets the new rights from the defaults (`known` list on the saved role); a role saved afterwards is taken exactly as saved.
+
+**Salary:** monthly = salary ÷ days in month × paid days, where paid days = days worked + paid leave + every weekly off and holiday in the period (so with Saturday and Sunday off nothing is deducted for either); a day worked on an off day is overtime, not an extra day. Daily wage = days they came (a Sunday worked is a paid day), no weekly-off pay. The hourly rate uses the person's real shift length. Sheet, slip and PDF show weekly-off days and overtime waiting for approval; "unmarked" no longer counts off days.
+
+**Other:** approved leave puts Leave on every working day of the request that has no mark; "mark the rest" and "not marked" skip weekly offs and holidays; a manual mark on a day with punches is refused (use Fix); manual marks and imports no longer have an "overtime" status (OT in an import is read as present). Old records with the overtime status are still paid correctly; `npm run migrate:attendance` (dry run, then `-- --apply`) converts them.
+
+**Tests:** 18 unit (calendar, day calculation), 24 server (punching, night shift, double taps, team scope, overtime, corrections, sheet, weekly off, salary, leave), 9 (settings validation, shifts, biometric ID, role rights), 5 browser (Punch In on a phone, Fix with a reason, overtime approval, supervisor limits, Settings).
+
+**Not done:** the biometric machine connection itself (it needs the machine brand and how it sends data: it will use the same punches and the Biometric ID); a different shift for one day; automatic closing of forgotten Outs (they are flagged and fixed by a senior).

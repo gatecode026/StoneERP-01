@@ -42,10 +42,10 @@ describe('DailySummary stays equal to the source records through a messy day', (
     await call(sup, bulkAtt.POST as never, '/x', { method: 'POST', body: { marks: [{ empCode: 'E001', state: 'present' }, { empCode: 'E002', state: 'present' }, { empCode: 'E003', state: 'absent' }] } });
     await call(sup, bulkAtt.POST as never, '/x', { method: 'POST', body: { marks: [{ empCode: 'E002', state: 'half' }, { empCode: 'E003', state: 'absent' }] } });
     const a = (await api.list(sup, 'attendance', `date=${today}&empCode=E001`)).json.data[0];
-    await api.patch(sup, 'attendance', a._id, { state: 'overtime' });
+    await api.patch(sup, 'attendance', a._id, { state: 'leave' });
     const c = (await api.list(sup, 'attendance', `date=${today}&empCode=E003`)).json.data[0];
     await api.void(owner, 'attendance', c._id);
-    expect((await getDay(today)).attendance).toMatchObject({ overtime: 1, half: 1 });
+    expect((await getDay(today)).attendance).toMatchObject({ leave: 1, half: 1 });
     await expectConsistent();
   });
   it('reports, machine entries, expenses (approved, pending, rejected, cancelled)', async () => {

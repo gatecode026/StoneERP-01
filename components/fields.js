@@ -26,6 +26,8 @@ export const EMPLOYEE_FIELDS = [
   { name: 'job', label: 'Job', type: 'select', options: JOBS, required: true, section: 'Job & Workplace' },
   { name: 'site', label: 'Where they work', type: 'select', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'], default: 'Factory', section: 'Job & Workplace' },
   { name: 'supervisorCode', label: 'Supervisor (team)', type: 'ref', ref: { model: 'employees', valueKey: 'empCode', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor' } }, hint: 'Decides whose team this person is in', section: 'Job & Workplace' },
+  { name: 'shiftId', label: 'Shift', type: 'select', options: [], hint: 'Leave empty for the default shift (Settings → Working hours)', section: 'Job & Workplace' },
+  { name: 'biometricId', label: 'Biometric ID', hint: 'The number the biometric machine knows this person by', section: 'Job & Workplace' },
   { name: 'joiningDate', label: 'Joining date', type: 'date', validate: (f) => (f.joiningDate ? joiningDateProblem(f.joiningDate, f.status === 'left' ? f.leavingDate : '') : ''), section: 'Job & Workplace' },
   { name: 'status', label: 'Status', type: 'select', options: [{ value: 'active', label: 'Working' }, { value: 'left', label: 'Left' }], default: 'active', section: 'Job & Workplace' },
   { name: 'leavingDate', label: 'Leaving date', type: 'date', show: (f) => f.status === 'left', validate: (f) => (f.leavingDate && f.joiningDate && f.leavingDate < f.joiningDate ? 'Leaving date is before the joining date' : ''), section: 'Job & Workplace' },

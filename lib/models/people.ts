@@ -38,6 +38,8 @@ export const Employee = defineModel(
     docFlags: { aadhaar: { type: B, default: false }, pan: { type: B, default: false }, passbook: { type: B, default: false }, license: { type: B, default: false } }, // lists show these, never the images
     hasLogin: { type: B, default: false }, // this person can sign in (the User is linked by employeeId); kept by lib/services/employeeLogin.ts
     loginRole: { type: S },
+    shiftId: { type: S, maxlength: 20 }, // one of the shifts in Settings; empty = the default shift
+    biometricId: { type: S, maxlength: 30 }, // the number the biometric machine knows this person by
     supervisorCode: { type: S, uppercase: true, index: true }, // empCode of the supervisor => "team" scope
     teamId: { type: S, maxlength: 40 },
   },
@@ -48,6 +50,7 @@ export const Employee = defineModel(
       [{ status: 1, name: 1 }],
       [{ name: 1 }],
       [{ mobile: 1 }],
+      [{ biometricId: 1 }, liveUnique({ biometricId: { $gt: '' } })], // two people cannot share a machine ID
     ],
   }
 );
@@ -58,15 +61,53 @@ export const Attendance = defineModel(
     date: dateStr({ required: true }),
     empCode: { type: S, required: true, uppercase: true },
     empName: { type: S },
-    state: { type: S, enum: ['present', 'absent', 'half', 'overtime', 'leave'], required: true },
-    otHours: { type: N, min: 0, max: 16 },
+    state: { type: S, enum: ['present', 'absent', 'half', 'overtime', 'leave'], required: true }, // 'overtime' only on records made before punching existed
+    otHours: { type: N, min: 0, max: 16 }, // old records only; overtime is now otMinutes
     late: { type: B, default: false },
-    method: { type: S, enum: ['manual', 'selfie', 'biometric'], default: 'manual' },
+    method: { type: S, enum: ['manual', 'selfie', 'biometric', 'app'], default: 'manual' }, // app = Punch In / Out button, biometric = the machine, selfie = removed, old records only
+    // ---- punching (times are real instants; the day belongs to `date`, the day the shift started)
+    shiftId: { type: S },
+    shiftName: { type: S },
+    dayKind: { type: S, enum: ['working', 'weekoff', 'holiday'] },
+    inAt: { type: Date },
+    outAt: { type: Date },
+    rawInAt: { type: Date }, // what the punches said, before any correction
+    rawOutAt: { type: Date },
+    inFixed: { type: B, default: false }, // a senior set this time: later punches are logged but do not move it
+    outFixed: { type: B, default: false },
+    workedMinutes: { type: N, min: 0, default: 0 },
+    lateMinutes: { type: N, min: 0, default: 0 },
+    otMinutes: { type: N, min: 0, default: 0 }, // overtime worked, worked out from the punches
+    otStatus: { type: S, enum: ['', 'pending', 'approved', 'rejected'], default: '' }, // paid only when approved
+    otApprovedMinutes: { type: N, min: 0, default: 0 },
+    otDecidedBy: { type: S },
+    otDecidedAt: { type: Date },
+    corrected: { type: B, default: false },
+    fixes: {
+      type: [new Schema({ at: Date, by: String, byId: OID, reason: { type: String, maxlength: 300 }, fromIn: Date, fromOut: Date, toIn: Date, toOut: Date }, { _id: false })],
+      default: [],
+    },
     selfie: { type: S },
     location: { lat: N, lng: N, text: { type: S, maxlength: 120 } },
     markedBy: { type: S },
   },
   { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ isVoid: 1, empCode: 1, date: 1, _id: 1 }], [{ date: 1, state: 1 }]] }
+);
+
+/** Every punch, exactly as it happened (the machine, the app button, or somebody punching for a colleague). Never edited: a correction is made on the day record and kept there with its reason. */
+export const Punch = defineModel(
+  'Punch',
+  {
+    empCode: { type: S, required: true, uppercase: true },
+    empName: { type: S },
+    at: { type: Date, required: true },
+    type: { type: S, enum: ['in', 'out'], required: true },
+    date: dateStr({ required: true }), // the attendance day this punch belongs to
+    source: { type: S, enum: ['app', 'biometric', 'manual'], default: 'app' },
+    deviceId: { type: S, maxlength: 40 },
+    punchedBy: { type: S }, // who pressed it, when it was not the person themselves
+  },
+  { indexes: [[{ empCode: 1, at: -1 }], [{ date: 1, empCode: 1, at: 1 }]] }
 );
 
 export const DailyReport = defineModel(

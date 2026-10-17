@@ -1,6 +1,6 @@
 {
   "generatedFrom": "scripts/gen-routes.ts (reads the source tree); regenerate with `npm run docs:routes`",
-  "generatedOn": "2026-10-15",
+  "generatedOn": "2026-10-17",
   "app": {
     "name": "vss-erp-demo",
     "next": "^16.4.0",
@@ -10,7 +10,7 @@
   },
   "summary": {
     "pages": 31,
-    "apiRouteFiles": 59,
+    "apiRouteFiles": 65,
     "models": 32
   },
   "pages": [
@@ -229,6 +229,27 @@
       ]
     },
     {
+      "path": "/api/attendance/fix",
+      "file": "app/api/attendance/fix/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "punches.edit"
+      ]
+    },
+    {
+      "path": "/api/attendance/overtime",
+      "file": "app/api/attendance/overtime/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "attendance.approve"
+      ]
+    },
+    {
       "path": "/api/attendance/sheet",
       "file": "app/api/attendance/sheet/route.ts",
       "methods": [
@@ -397,6 +418,16 @@
       ],
       "guards": [
         "dispatches.approve"
+      ]
+    },
+    {
+      "path": "/api/dispatches/:id/pdf",
+      "file": "app/api/dispatches/[id]/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dispatches.view"
       ]
     },
     {
@@ -583,6 +614,18 @@
       ]
     },
     {
+      "path": "/api/punches",
+      "file": "app/api/punches/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "guards": [
+        "punches.create",
+        "punches.view"
+      ]
+    },
+    {
       "path": "/api/purchases/:id/pay",
       "file": "app/api/purchases/[id]/pay/route.ts",
       "methods": [
@@ -683,6 +726,16 @@
       ]
     },
     {
+      "path": "/api/salary/slip/pdf",
+      "file": "app/api/salary/slip/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "salaryslips.view"
+      ]
+    },
+    {
       "path": "/api/sales/:id/full",
       "file": "app/api/sales/[id]/full/route.ts",
       "methods": [
@@ -710,6 +763,16 @@
       ],
       "guards": [
         "sales.edit"
+      ]
+    },
+    {
+      "path": "/api/sales/:id/pdf",
+      "file": "app/api/sales/[id]/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "sales.view"
       ]
     },
     {
@@ -789,7 +852,7 @@
       "resource": "attendance",
       "model": "Attendance",
       "collection": "attendances",
-      "fields": 21,
+      "fields": 39,
       "indexes": 5
     },
     {
@@ -838,7 +901,7 @@
       "resource": "dailyreports",
       "model": "DailyReport",
       "collection": "dailyreports",
-      "fields": 27,
+      "fields": 31,
       "indexes": 6
     },
     {
@@ -859,8 +922,8 @@
       "resource": "employees",
       "model": "Employee",
       "collection": "employees",
-      "fields": 45,
-      "indexes": 9
+      "fields": 48,
+      "indexes": 10
     },
     {
       "resource": "expenseheads",

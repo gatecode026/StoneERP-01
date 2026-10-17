@@ -32,6 +32,8 @@ export type ResourceMeta = {
   own?: readonly OwnClause[];
   team?: readonly TeamClause[];
   fieldGroups?: Partial<Record<FieldGroup, readonly string[]>>;
+  /** what an action is called for THIS resource on the Roles screen, where the plain word (See / Add / Edit / Approve) would mislead */
+  actionLabels?: Partial<Record<Action, { en: string; hi: string }>>;
 };
 
 const ALL_A = ACTIONS;
@@ -49,7 +51,10 @@ export const RESOURCES = {
       pii: ['bankAccount', 'ifsc', 'upi', 'address', 'fatherName', 'aadhaarNo', 'panNo', 'docAadhaar', 'docPan', 'docPassbook', 'docLicense', 'emergencyName', 'emergencyMobile'],
     } },
   dailyreports: { label: { en: 'Daily work report', hi: 'दैनिक कार्य रिपोर्ट' }, group: 'people', part: 2, model: true, actions: CRUD, own: empOwn, team: empTeam },
-  attendance: { label: { en: 'Attendance', hi: 'हाज़िरी' }, group: 'people', part: 7, model: true, actions: CRUD, own: empOwn, team: empTeam },
+  attendance: { label: { en: 'Attendance', hi: 'हाज़िरी' }, group: 'people', part: 7, model: true, actions: ALL_A, own: empOwn, team: empTeam,
+    actionLabels: { create: { en: 'Mark', hi: 'हाज़िरी लगाएँ' }, approve: { en: 'Approve overtime', hi: 'ओवरटाइम मंज़ूर करें' } } },
+  punches: { label: { en: 'Punch in / out', hi: 'पंच इन / आउट' }, group: 'people', part: 7, actions: ['view', 'create', 'edit'], own: empOwn, team: empTeam,
+    actionLabels: { view: { en: 'See punches', hi: 'पंच देखें' }, create: { en: 'Punch in / out', hi: 'पंच इन / आउट' }, edit: { en: 'Correct punches', hi: 'पंच सुधारें' } } },
   leaves: { label: { en: 'Leave requests', hi: 'छुट्टी के अनुरोध' }, group: 'people', part: 7, model: true, actions: ALL_A, own: empOwn, team: empTeam },
   advances: { label: { en: 'Advances', hi: 'एडवांस' }, group: 'people', part: 7, model: true, actions: ALL_A, own: empOwn, team: empTeam },
   salarysheets: { label: { en: 'Salary sheet', hi: 'वेतन शीट' }, group: 'people', part: 7, model: true, actions: ALL_A },

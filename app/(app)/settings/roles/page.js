@@ -105,8 +105,8 @@ function RolesEditor() {
                     const opts = [''].concat(c.hasOwn ? ['own'] : [], c.hasTeam ? ['team'] : [], ['all']);
                     return (
                       <label key={a} className="block">
-                        <span className="block text-[11px] font-semibold text-char-500 mb-0.5">{tr(ACT_LABEL[a])}</span>
-                        <select className="input !min-h-[40px] !px-2 text-sm" aria-label={`${c.label[lang] || c.label.en} – ${tr(ACT_LABEL[a])}`}
+                        <span className="block text-[11px] font-semibold text-char-500 mb-0.5">{c.actionLabels?.[a]?.[lang] || c.actionLabels?.[a]?.en || tr(ACT_LABEL[a])}</span>
+                        <select className="input !min-h-[40px] !px-2 text-sm" aria-label={`${c.label[lang] || c.label.en} – ${c.actionLabels?.[a]?.en || tr(ACT_LABEL[a])}`}
                           value={draft.grants[c.key]?.[a] || ''} onChange={(e) => setScope(c.key, a, e.target.value)}>
                           {opts.map((o) => <option key={o} value={o}>{tr(SCOPE_LABEL[o])}</option>)}
                         </select>

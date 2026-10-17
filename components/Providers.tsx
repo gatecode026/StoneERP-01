@@ -13,6 +13,8 @@ import { DialogHost } from './Dialogs';
 export type ClientSession = {
   id: string; username: string; name: string; role: string; preset: string | null; empCode: string | null; lang: string; mustChangePassword: boolean;
   perm: ClientPerm;
+  /** the shifts in Settings (for the employee form) */
+  shifts?: { id: string; name: string; start: string; end: string }[]; defaultShiftId?: string;
   company: { name: string; brand: string; address: string; gstin: string; state: string; stateCode: string; phone: string; email: string; bankName: string; bankAccount: string; ifsc: string };
 };
 type AppCtx = {

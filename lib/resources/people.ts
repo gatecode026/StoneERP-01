@@ -6,6 +6,7 @@ import { badRequest, confirmable, conflict, forbidden } from '../errors';
 import { encryptField } from '../crypto';
 import { addDays, daysBetween, todayIST } from '../time';
 import { employeeByCode } from '../services/lookup';
+import { assertNoPunches, manualFields } from '../services/punch';
 import { nextSeq, oid, postCash, accountFor, round2 } from '../services/core';
 import { withinApprovalLimit } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
@@ -22,7 +23,7 @@ const FLAG: Record<string, string> = { docAadhaar: 'aadhaar', docPan: 'pan', doc
 const rate = z.coerce.number().finite().gt(0, 'Pay rate must be more than 0').max(1e7, 'Pay rate is too large');
 const employeeFields = {
   name: ruled('name', { required: true }), mobile: ruled('mobile').optional(), photo: photo.optional(), fatherName: ruled('fatherName').optional(), address: text(400).optional(),
-  job: req(80), site: enumOf(SITES).optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
+  job: req(80), site: enumOf(SITES).optional(), shiftId: z.string().trim().max(20).optional(), biometricId: z.string().trim().regex(/^([A-Za-z0-9-]{1,30})?$/, 'Biometric ID: letters, digits and - only').optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
   status: enumOf(['active', 'left']).optional(),
   payType: enumOf(['monthly', 'daily', 'piece']).optional(), rate: rate.optional(), pieceUnit: enumOf(['sqft', 'piece']).optional().or(z.literal('')),
   bankAccount: ruled('bankAccount').optional(), ifsc: ruled('ifsc').optional(), upi: ruled('upi').optional(), pfApplicable: z.boolean().optional(), pfNo: ruled('pfNo').optional(),
@@ -33,8 +34,9 @@ const employeeFields = {
 };
 
 /** Rules that look at several fields together (the single-field rules are in the schema). */
-function crossChecks(next: Record<string, any>, prev?: Record<string, any>) {
+function crossChecks(next: Record<string, any>, prev: Record<string, any> | undefined, settings: { workHours: { shifts: { id: string }[] } }) {
   const merged = { ...(prev ?? {}), ...next };
+  if (next.shiftId && !settings.workHours.shifts.some((x) => x.id === next.shiftId)) throw badRequest('Shift: choose one of the shifts set up in Settings');
   // dates are checked only when this request touches them, so an old profile can still be edited for something else
   if ('joiningDate' in next || 'leavingDate' in next) {
     const problem = joiningDateProblem(merged.joiningDate, merged.leavingDate, todayIST());
@@ -66,6 +68,13 @@ function sealEmployee(doc: Record<string, any>, prev?: any) {
 
 const pendingLogin = new WeakMap<object, { login: LoginInput; auth: AuthCtx }>(); // the sign-in part of a request, from prepare* to after*
 
+/** One biometric ID belongs to one person (the machine tells people apart by it). */
+async function assertBiometricFree(ctx: any, id: string | undefined, selfId?: unknown) {
+  if (!id) return;
+  const other: any = await Employee.findOne({ biometricId: id, isVoid: false, ...(selfId ? { _id: { $ne: selfId } } : {}) }).select('name empCode').session(ctx.session ?? null).lean();
+  if (other) throw conflict(`Biometric ID ${id} already belongs to ${other.name} (${other.empCode})`);
+}
+
 /**
  * A sign-in ID (the mobile number) belongs to exactly one person. Checked BEFORE the softer "already on another profile, save anyway?"
  * question, so nobody is asked to confirm something that will then be refused.
@@ -86,7 +95,7 @@ async function warnSharedMobile(ctx: any, mobile: string | undefined, selfId?: u
 export const employees: ResourceDef = {
   key: 'employees', model: Employee,
   label: (d) => `${d.name} (${d.empCode})`,
-  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'site', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
+  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
   sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
   filters: { status: { enum: ['active', 'left'] }, job: 'string', site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
   named: { docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}) }, // same rule as the profile's "missing documents" badge
@@ -98,7 +107,8 @@ export const employees: ResourceDef = {
       const { login, ...rest } = input as any;
       if (login?.enabled) await assertSignInIdFree(ctx, rest.mobile);
       await warnSharedMobile(ctx, rest.mobile);
-      crossChecks(rest);
+      crossChecks(rest, undefined, ctx.settings);
+      await assertBiometricFree(ctx, rest.biometricId);
       if (login) pendingLogin.set(ctx, { login, auth });
       const doc: any = { ...rest };
       if (!doc.empCode) doc.empCode = await nextEmployeeCode(ctx);
@@ -115,7 +125,8 @@ export const employees: ResourceDef = {
         if (prev.hasLogin || (pendingLogin.get(ctx)?.login as LoginInput | undefined)?.enabled) await assertSignInIdFree(ctx, patch.mobile, prev._id);
         await warnSharedMobile(ctx, patch.mobile, prev._id);
       }
-      crossChecks(patch, prev);
+      crossChecks(patch, prev, ctx.settings);
+      if (patch.biometricId) await assertBiometricFree(ctx, patch.biometricId, prev._id);
       if (patch.status === 'left' && !patch.leavingDate && !prev.leavingDate) patch.leavingDate = todayIST();
       if (patch.status === 'active') patch.leavingDate = '';
       return sealEmployee(patch, prev);
@@ -218,16 +229,15 @@ export const dailyreports: ResourceDef = {
 export const attendance: ResourceDef = {
   key: 'attendance', model: Attendance,
   label: (d) => `${d.empName ?? d.empCode} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'state', 'otHours', 'late', 'method', 'location', 'markedBy'],
+  listFields: ['date', 'empCode', 'empName', 'state', 'late', 'lateMinutes', 'method', 'markedBy', 'shiftName', 'dayKind', 'inAt', 'outAt', 'workedMinutes', 'otMinutes', 'otStatus', 'otApprovedMinutes', 'corrected', 'otHours', 'location'],
   sortable: ['date', 'empCode', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode'],
-  dateFields: ['date'], filters: { date: 'date', empCode: 'string', state: { enum: ['present', 'absent', 'half', 'overtime', 'leave'] }, method: { enum: ['manual', 'selfie', 'biometric'] } },
-  serverOnly: ['markedBy', 'empName', 'method'],
+  dateFields: ['date'], filters: { date: 'date', empCode: 'string', state: { enum: ['present', 'absent', 'half', 'overtime', 'leave'] }, method: { enum: ['manual', 'selfie', 'biometric', 'app'] }, otStatus: { enum: ['', 'pending', 'approved', 'rejected'] } },
+  serverOnly: ['markedBy', 'empName', 'method', 'shiftId', 'shiftName', 'dayKind', 'inAt', 'outAt', 'workedMinutes', 'lateMinutes', 'otMinutes', 'otStatus', 'otApprovedMinutes', 'corrected'],
   create: z.object({
-    date: dateStr.optional(), empCode: empCode.optional(), state: enumOf(['present', 'absent', 'half', 'overtime', 'leave']).optional(),
-    otHours: num(0, 16).optional(), late: z.boolean().optional(),
-    biometric: z.boolean().optional(),
+    date: dateStr.optional(), empCode: empCode.optional(), state: enumOf(['present', 'absent', 'half', 'leave']).optional(),
+    late: z.boolean().optional(),
   }).strict(),
-  update: z.object({ state: enumOf(['present', 'absent', 'half', 'overtime', 'leave']), otHours: num(0, 16), late: z.boolean() }).partial().strict(),
+  update: z.object({ state: enumOf(['present', 'absent', 'half', 'leave']), late: z.boolean() }).partial().strict(),
   lifecycle: {
     async create(ctx, input, auth) {
       const today = todayIST();
@@ -239,10 +249,11 @@ export const attendance: ResourceDef = {
       const e = await employeeByCode(ctx, input.empCode, { active: true });
       const state = input.state;
       if (!state) throw badRequest('Choose present, absent, half day, overtime or leave');
+      await assertNoPunches(ctx, date, [e.empCode]); // a day with punches is corrected (Fix), not re-marked
       const existing: any = await Attendance.findOne({ date, empCode: e.empCode, isVoid: false }).session(s(ctx)).lean();
       const base: any = {
-        date, empCode: e.empCode, empName: e.name, state, otHours: state === 'overtime' ? input.otHours ?? ctx.settings.salary.otHoursDefault : undefined,
-        late: input.late ?? false, method: input.biometric ? 'biometric' : 'manual', markedBy: ctx.actor.name,
+        date, empCode: e.empCode, empName: e.name, state, late: input.late ?? false, method: 'manual', markedBy: ctx.actor.name,
+        ...manualFields(ctx.settings, e, date, state),
       };
       if (existing) {
         const doc: any = await Attendance.findOneAndUpdate({ _id: existing._id }, { $set: { ...base, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name } }, { returnDocument: 'after', session: ctx.session, lean: true });
@@ -252,6 +263,11 @@ export const attendance: ResourceDef = {
       const [doc] = await Attendance.create([{ ...base, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
       await roll.att(date, null, state, ctx.session);
       return { doc: doc.toObject() };
+    },
+    async prepareUpdate(ctx, prev, patch) {
+      if (prev.inAt) throw conflict('This day has punches. Use Fix to correct the times.');
+      if (patch.state) Object.assign(patch, manualFields(ctx.settings, { shiftId: prev.shiftId }, prev.date, patch.state));
+      return patch;
     },
     async afterUpdate(ctx, doc, prev) { await roll.att(doc.date, prev.state, doc.state, ctx.session); },
     async beforeVoid(ctx, d) { await roll.att(d.date, d.state, null, ctx.session); },

@@ -5,7 +5,7 @@ import toast from '@/lib/toast';
 import { CalendarCheck, Check, ClipboardList, FileText, ListChecks, LogOut, MessageCircle, Plus, Search, X } from 'lucide-react';
 import { StatCard, Badge, cx } from '@/components/ui';
 import { api, openWA, submit } from '@/lib/client';
-import { fmtDate, inr, inrShort, num, todayISO } from '@/lib/format';
+import { fmtClock, fmtDate, fmtDuration, inr, inrShort, num, todayISO } from '@/lib/format';
 import { useApp, useFetch } from '@/components/Providers';
 import { AgeingChart, Card } from './parts';
 import { useH } from './strings';
@@ -224,31 +224,53 @@ export function SalespersonHome({ data }) {
 }
 
 // ---------------------------------------------------------------- WORKER (4 big cards) – also the "self" block of every job preset
-export function WorkerCards({ self }) {
+export function WorkerCards({ self, reload }) {
   const h = useH();
   const { can } = useApp();
+  const [busy, setBusy] = useState(false);
+  // Punch In / Punch Out (testing until the biometric machine is in use): the server stamps the time
+  async function punch() {
+    setBusy(true);
+    try {
+      const r = await api('/api/punches', { method: 'POST', body: {} });
+      toast.success(r.ignored ? 'Already punched a moment ago' : r.type === 'in' ? 'Punched in ✔' : 'Punched out ✔');
+      reload?.();
+    } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {can('attendance', 'view') && (
         <Card title={<span className="text-base font-bold flex items-center gap-2"><CalendarCheck className="text-terra" size={18} /> {h('myAtt')}</span>}>
-          {self?.attendance ? (
+          {self?.attendance?.inAt ? (
             <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                <Check size={20} strokeWidth={2.5} />
-              </div>
-              <div>
-                <div className="font-bold text-sm text-emerald-950 flex items-center gap-2">
-                  {h('marked')} ✔
-                  <Badge tone="green">{self.attendance.state}</Badge>
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={20} strokeWidth={2.5} /></div>
+              <div className="min-w-0">
+                <div className="font-bold text-sm text-emerald-950 flex items-center gap-2 flex-wrap">
+                  <span><T>In</T> {fmtClock(self.attendance.inAt)}</span>
+                  <span><T>Out</T> {self.attendance.outAt ? fmtClock(self.attendance.outAt) : '—'}</span>
                 </div>
-                <div className="text-xs text-emerald-700 mt-0.5"><T>Today's attendance recorded</T></div>
+                <div className="text-xs text-emerald-700 mt-0.5">
+                  {self.attendance.workedMinutes > 0 && <>{fmtDuration(self.attendance.workedMinutes)} · </>}
+                  {self.attendance.otMinutes > 0 && <T vars={{ n: fmtDuration(self.attendance.otMinutes) }}>{self.attendance.otStatus === 'approved' ? 'Overtime {n} (approved)' : 'Overtime {n} (waiting for approval)'}</T>}
+                </div>
               </div>
+            </div>
+          ) : self?.attendance ? (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={20} strokeWidth={2.5} /></div>
+              <div><div className="font-bold text-sm text-emerald-950 flex items-center gap-2">{h('marked')} ✔ <Badge tone="green">{self.attendance.state}</Badge></div><div className="text-xs text-emerald-700 mt-0.5"><T>Today's attendance recorded</T></div></div>
             </div>
           ) : (
             <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
               <div className="font-bold">{h('attPending')}</div>
-              <div className="text-xs mt-0.5"><T>Your supervisor marks attendance. It will show here once it is marked.</T></div>
+              <div className="text-xs mt-0.5">{self?.punch?.enabled && can('punches', 'create') ? <T>Press Punch In when you start work.</T> : <T>Attendance is recorded by the biometric machine, or your supervisor marks it.</T>}</div>
             </div>
+          )}
+          {self?.punch?.enabled && can('punches', 'create') && (
+            <button type="button" className={`${self.punch.next === 'out' ? 'btn-primary' : 'btn-green'} w-full !min-h-[56px] text-base font-semibold mt-3 disabled:opacity-50`} disabled={busy} onClick={punch}>
+              <CalendarCheck size={18} /> {busy ? '…' : self.punch.next === 'out' ? h('punchOut') : h('punchIn')}
+            </button>
           )}
           <Link href="/attendance" className="btn-outline w-full !min-h-[44px] text-sm font-semibold justify-center mt-3">{h('viewAtt')}</Link>
         </Card>

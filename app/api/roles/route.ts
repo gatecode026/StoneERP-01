@@ -16,6 +16,6 @@ export const GET = withAuth('roles', 'view', async (auth) => {
       return { key, label: ROLE_LABEL[key as BaseRole | Preset], base: (BASE_ROLES as readonly string[]).includes(key), custom: cfg.custom, grants: cfg.grants, fields: cfg.fields, approvalLimit: cfg.approvalLimit, defaults: { grants: def.grants, fields: def.fields, approvalLimit: def.approvalLimit } };
     })
   );
-  const catalogue = RESOURCE_KEYS.map((k) => ({ key: k, label: RESOURCES[k].label, group: RESOURCES[k].group, part: (RESOURCES[k] as { part?: number }).part ?? null, actions: RESOURCES[k].actions, hasOwn: Boolean((RESOURCES[k] as { own?: unknown }).own), hasTeam: Boolean((RESOURCES[k] as { team?: unknown }).team), fieldGroups: Object.keys((RESOURCES[k] as { fieldGroups?: object }).fieldGroups ?? {}) }));
+  const catalogue = RESOURCE_KEYS.map((k) => ({ key: k, label: RESOURCES[k].label, group: RESOURCES[k].group, part: (RESOURCES[k] as { part?: number }).part ?? null, actions: RESOURCES[k].actions, actionLabels: (RESOURCES[k] as { actionLabels?: object }).actionLabels ?? {}, hasOwn: Boolean((RESOURCES[k] as { own?: unknown }).own), hasTeam: Boolean((RESOURCES[k] as { team?: unknown }).team), fieldGroups: Object.keys((RESOURCES[k] as { fieldGroups?: object }).fieldGroups ?? {}) }));
   return jsonWithEtag(auth.req, { roles, catalogue, actions: ACTIONS, scopes: SCOPES, fieldGroups: FIELD_GROUPS, fieldLevels: FIELD_LEVELS });
 });

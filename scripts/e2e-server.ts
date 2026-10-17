@@ -31,13 +31,17 @@ async function main() {
   process.env.NEXT_DIST_DIR = '.next-e2e';
 
   const { connect, disconnect } = await import('../lib/db');
-  const { User } = await import('../lib/models');
+  const { User, Employee } = await import('../lib/models');
   const { Settings } = await import('../lib/models/settings');
   const { hashPassword } = await import('../lib/auth/password');
   await connect();
   await Settings.updateOne({ _id: 'main' }, { $setOnInsert: { _id: 'main' } }, { upsert: true });
+  // the worker and the supervisor are real employees (the worker is in the supervisor's team), so punching and attendance have someone to act on
+  const profiles: Record<string, { empCode: string; job: string }> = { supervisor: { empCode: 'E302', job: 'Supervisor' }, worker: { empCode: 'E301', job: 'Worker / operator' } };
   for (const [role, who] of Object.entries(E2E_USERS)) {
-    await User.create({ username: who.mobile, name: `E2E ${role}`, role, passwordHash: await hashPassword(who.password), mustChangePassword: false, createdBy: 'e2e' });
+    const p = profiles[role];
+    if (p) await Employee.create({ empCode: p.empCode, name: `E2E ${role}`, mobile: who.mobile, job: p.job, payType: 'daily', rate: 500, status: 'active', supervisorCode: role === 'worker' ? 'E302' : undefined, createdBy: 'e2e' });
+    await User.create({ username: who.mobile, name: `E2E ${role}`, role, empCode: p?.empCode ?? null, passwordHash: await hashPassword(who.password), mustChangePassword: false, createdBy: 'e2e' });
   }
   await disconnect();
 

@@ -41,6 +41,8 @@ export const COLUMNS: Col[] = [
   { key: 'name', label: 'Name', aliases: ['employeename', 'fullname'], example: 'Ramesh Meena', note: 'Required' },
   { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / operator', note: 'Manager / Accountant / Supervisor / Salesperson / Worker / operator' },
   { key: 'mobile', label: 'Mobile', aliases: ['phone', 'mobileno', 'mobilenumber', 'phonenumber', 'contact'], example: '9829012345', parse: tenDigits },
+  { key: 'shiftId', label: 'Shift code', aliases: ['shift', 'shiftcode'], example: 'day', note: 'The code of a shift in Settings; empty = the default shift', parse: (v) => v.trim().toLowerCase() },
+  { key: 'biometricId', label: 'Biometric ID', aliases: ['biometric', 'machineid', 'punchid'], example: '', note: 'The number the biometric machine knows this person by', parse: (v) => v.replace(/\s/g, '') },
   { key: 'site', label: 'Site', aliases: ['location', 'place'], example: 'Factory', note: SITES.join(' / '), parse: (v) => SITES.find((s) => s.toLowerCase() === v.trim().toLowerCase()) ?? v.trim() },
   { key: 'joiningDate', label: 'Joining date', aliases: ['doj', 'dateofjoining', 'joined', 'joindate'], example: '01-04-2024', parse: parseDate },
   { key: 'payType', label: 'Pay type', aliases: ['paymenttype', 'salarytype', 'wagetype'], example: 'monthly', note: 'monthly / daily / piece', parse: (v) => v.trim().toLowerCase() },

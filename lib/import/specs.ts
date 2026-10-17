@@ -74,7 +74,7 @@ function parseTime(v: string): string {
 }
 const STATE = (v: string) => {
   const s = low(v);
-  return ['p', 'present'].includes(s) ? 'present' : ['a', 'absent'].includes(s) ? 'absent' : ['h', 'half', 'half day', 'halfday', '½'].includes(s) ? 'half' : ['ot', 'overtime'].includes(s) ? 'overtime' : ['l', 'leave'].includes(s) ? 'leave' : s;
+  return ['p', 'present'].includes(s) ? 'present' : ['a', 'absent'].includes(s) ? 'absent' : ['h', 'half', 'half day', 'halfday', '½'].includes(s) ? 'half' : ['ot', 'overtime'].includes(s) ? 'present' : ['l', 'leave'].includes(s) ? 'leave' : s;
 };
 
 // ---------------------------------------------------------------- reference lookups (name → record)
@@ -199,10 +199,10 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
   },
   attendance: {
     resource: 'attendance', noun: 'attendance', required: ['employee', 'state'], refs: [employee()],
-    footnote: 'One row per employee per day. State: present / absent / half / overtime / leave (P, A, H, OT, L also work). A mark that already exists for that employee and day is skipped.',
+    footnote: 'One row per employee per day. State: present / absent / half / leave (P, A, H, L also work). Overtime now comes from Punch In / Out and is approved on the attendance screen, so it is not imported; OT is read as present. A mark that already exists for that employee and day is skipped.',
     columns: [
-      dateCol(), empCol(), col('state', 'State', ['status', 'attendance', 'mark'], 'present', { note: 'present / absent / half / overtime / leave', parse: STATE }),
-      numCol('otHours', 'Overtime hours', ['ot', 'othours'], ''), col('late', 'Late', [], 'No', { note: 'Yes / No', parse: yes }),
+      dateCol(), empCol(), col('state', 'State', ['status', 'attendance', 'mark'], 'present', { note: 'present / absent / half / leave', parse: STATE }),
+      col('late', 'Late', [], 'No', { note: 'Yes / No', parse: yes }),
     ],
     describe: (i) => `${i.employee ?? ''} ${i.date ?? ''}`,
     keyOf: (d) => `${d.date}|${d.empCode}`,
