@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Block, Machine, MachineEntry, Repair, Royalty, StockItem, Vehicle, VehicleTrip } from '../models';
 import { MACHINE_TYPES } from '../models/production';
 import type { ResourceDef } from '../api/resource';
-import { badRequest, conflict } from '../errors';
+import { badRequest, confirmable, conflict } from '../errors';
 import { addDays, minutesBetween, todayIST } from '../time';
 import { applyStock, nextSeq, oid, reverseStockFor, round2 } from '../services/core';
 import { employeeByCode, machineById } from '../services/lookup';
@@ -118,10 +118,17 @@ const blockFields = {
   rawanna: req(60), rawannaPhoto: photo.optional(), length: posNum(1000), width: posNum(1000), height: posNum(1000), weight: num().optional(),
   grade: enumOf(['A', 'B', 'C']).optional(), photo: photo.optional(), yardLocation: text(60).optional(), costPerCft: num().optional(), slabThicknessMm: num(1, 500).optional(),
 };
+/** Natural stone weighs about 0.075 tonne per CFT (2.7 t/m³). A slip far from that is usually a typing slip, so ask before saving. */
+function checkWeight(ctx: { confirmed?: boolean }, weight: number | undefined, cft: number) {
+  if (!weight || !cft || ctx.confirmed) return;
+  const perCft = weight / cft;
+  if (perCft < 0.04 || perCft > 0.13) throw confirmable(`${weight} tonne for ${cft} CFT looks wrong (stone is about ${round2(cft * 0.075)} tonne). Save anyway?`);
+}
+
 export const blocks: ResourceDef = {
   key: 'blocks', model: Block, label: (d) => `Block ${d.blockNo}`,
   listFields: ['blockNo', 'date', 'source', 'supplierName', 'truckNo', 'rawanna', 'length', 'width', 'height', 'cft', 'weight', 'grade', 'yardLocation', 'stage', 'slabThicknessMm', 'cost', 'costPerCft'],
-  sortable: ['blockNo', 'date'], defaultSort: '-blockNo', searchFields: ['rawanna', 'truckNo', 'supplierName', 'yardLocation'],
+  sortable: ['blockNo', 'date'], defaultSort: '-blockNo', searchFields: ['rawanna', 'truckNo', 'supplierName', 'yardLocation'], searchNumbers: ['blockNo'],
   dateFields: ['date'], filters: { blockNo: 'number', stage: { enum: ['received', 'cutting', 'cut'] }, source: { enum: ['own', 'supplier'] }, rawanna: 'string', grade: { enum: ['A', 'B', 'C'] } },
   serverOnly: ['blockNo', 'cft', 'stage', 'cost', 'supplierName', 'stockItemId'],
   create: z.object(blockFields).strict(),
@@ -130,6 +137,10 @@ export const blocks: ResourceDef = {
   lifecycle: {
     async prepareCreate(ctx, input) {
       const rawanna = input.rawanna.trim().toUpperCase();
+      if (input.date && input.date > todayIST()) throw badRequest('Date received cannot be in the future');
+      if (input.source === 'supplier' && !input.supplierId) throw badRequest('Choose the supplier this block came from');
+      const cftNow = round2(input.length * input.width * input.height);
+      checkWeight(ctx, input.weight, cftNow);
       const dup: any = await Block.findOne({ rawanna, isVoid: false }).session(s(ctx)).select('blockNo date').lean();
       if (dup) throw conflict(`Rawanna ${rawanna} was already entered for block ${dup.blockNo} on ${dup.date}`, { existingBlockNo: dup.blockNo });
       const cft = round2(input.length * input.width * input.height);
@@ -138,15 +149,18 @@ export const blocks: ResourceDef = {
         const { Supplier } = await import('../models');
         supplierName = ((await Supplier.findById(input.supplierId).session(s(ctx)).lean()) as any)?.name;
       }
-      const raw: any = await StockItem.findOne({ category: 'raw', name: /block/i, isVoid: false }).session(s(ctx)).select('_id').lean();
+      // the raw-block stock item (counted in CFT); made the first time a block comes in, so raw stock is never silently skipped
+      const raw: any = (await StockItem.findOne({ category: 'raw', name: /block/i, isVoid: false }).session(s(ctx)).select('_id').lean())
+        ?? (await StockItem.findOneAndUpdate({ category: 'raw', name: 'Raw blocks', isVoid: false }, { $setOnInsert: { unit: 'CFT', balance: 0 } }, { upsert: true, returnDocument: 'after', session: s(ctx), lean: true }));
       const blockNo = await nextSeq('block', ctx.session, 250);
-      return { ...input, rawanna, date: input.date ?? todayIST(), cft, blockNo, stage: 'received', supplierName, stockItemId: raw?._id, cost: input.costPerCft ? Math.round(cft * input.costPerCft) : 0 };
+      return { ...input, ...(input.source === 'supplier' ? {} : { supplierId: undefined }), rawanna, date: input.date ?? todayIST(), cft, blockNo, stage: 'received', supplierName, stockItemId: raw?._id, cost: input.costPerCft ? Math.round(cft * input.costPerCft) : 0 };
     },
     async afterCreate(ctx, d) {
       if (d.stockItemId) await applyStock(ctx, { itemId: d.stockItemId, delta: d.cft, type: 'in', date: d.date, ref: `Block ${d.blockNo}`, note: d.rawanna, refModel: 'blocks', refId: d._id });
     },
     async prepareUpdate(ctx, prev, patch) {
       if (patch.costPerCft != null) patch.cost = Math.round(prev.cft * patch.costPerCft);
+      if (patch.weight != null) checkWeight(ctx, patch.weight, prev.cft);
       return patch;
     },
     async beforeVoid(ctx, d) {
@@ -162,7 +176,29 @@ export const royalties: ResourceDef = {
   sortable: ['month', 'dueDate'], defaultSort: '-month', searchFields: ['month', 'note'], filters: { state: { enum: ['due', 'paid'] }, month: 'string' },
   create: z.object({ month: monthStr, amount: posNum(1e8), dueDate: dateStr, paidDate: dateStr.optional(), state: enumOf(['due', 'paid']).optional(), note: text(500).optional() }).strict(),
   update: z.object({ amount: posNum(1e8), dueDate: dateStr, paidDate: dateStr, state: enumOf(['due', 'paid']), note: text(500) }).partial().strict(),
+  lifecycle: {
+    async prepareCreate(ctx, input) {
+      royaltyCheck(input.state ?? 'due', input.paidDate);
+      const same = await Royalty.exists({ month: input.month, isVoid: false }).session(s(ctx));
+      if (same && !ctx.confirmed) throw confirmable(`A royalty record for ${input.month} already exists. Add another one for the same month?`);
+      return input;
+    },
+    async prepareUpdate(ctx, prev, patch) {
+      const out: Record<string, any> = { ...patch };
+      if (patch.state === 'due') out.paidDate = ''; // set back to due: the old paid date goes
+      else if (patch.paidDate && !patch.state) out.state = 'paid'; // a paid date means it was paid
+      royaltyCheck(out.state ?? prev.state, 'paidDate' in out ? out.paidDate : prev.paidDate);
+      return out;
+    },
+  },
 };
+
+/** Paid needs the date it was paid; a record still due carries no paid date. */
+function royaltyCheck(state: string, paidDate?: string) {
+  if (state === 'paid' && !paidDate) throw badRequest('Paid on: enter the date the royalty was paid');
+  if (state !== 'paid' && paidDate) throw badRequest('Status is Due, so leave "Paid on" empty (or set the status to Paid)');
+  if (paidDate && paidDate > todayIST()) throw badRequest('Paid on cannot be in the future');
+}
 
 // ------------------------------------------------------------------ repairs
 const repairFields = {

@@ -17,6 +17,8 @@ export type ListSpec = {
   /** e.g. '-date'. Keyset pagination always adds _id as the tiebreaker */
   defaultSort: string;
   searchFields?: readonly string[];
+  /** numeric fields that an all-digit search matches exactly (e.g. a block number) */
+  searchNumbers?: readonly string[];
   filters: Record<string, FilterSpec>;
   /** date fields that `from`/`to` may apply to; first is the default */
   dateFields?: readonly string[];
@@ -156,9 +158,10 @@ export function buildFilter(lq: ListQuery, spec: ListSpec, scope: Record<string,
   if (Object.keys(lq.match).length) and.push(lq.match);
   for (const c of lq.extra) and.push(c);
   if (!lq.includeVoid) and.push({ isVoid: false });
-  if (lq.q && spec.searchFields?.length) {
+  if (lq.q && (spec.searchFields?.length || spec.searchNumbers?.length)) {
     const re = new RegExp('^' + escapeRe(lq.q), 'i');
-    and.push({ $or: spec.searchFields.map((f) => ({ [f]: re })) });
+    const numeric = /^\d{1,9}$/.test(lq.q) ? (spec.searchNumbers ?? []).map((f) => ({ [f]: Number(lq.q) })) : [];
+    and.push({ $or: [...(spec.searchFields ?? []).map((f) => ({ [f]: re })), ...numeric] });
   }
   if (Object.keys(scope).length) and.push(scope);
   if (lq.cursor) {

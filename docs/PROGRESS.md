@@ -340,3 +340,19 @@ Attendance now comes from **punches** (the biometric machine later; the Punch In
 ## Punch In / Out for Manager, Accountant, Supervisor and Salesperson
 
 These roles (when the login is linked to an employee profile) now see **My attendance** at the top of their home, with today's In / Out and the Punch In / Punch Out button, the same card the Worker has. The Accountant was given the right to punch for themselves (punches: see all, punch own). The Owner home is unchanged. Tests: all four punch In and Out and their home carries the punch state (server), and a browser test for the Supervisor and the Owner.
+
+## Machine Work and Block Entry fixes
+
+**Machine Work:** the block dropdown and the Employee "Supervisor (team)" dropdown work again (the lookup now accepts the stage / source / job filters the forms send); the shift sets the start and stop times from Settings (Night ends next morning); hour-meter start / end and electricity meter start / end fields (units are worked out from the two readings); waste needs a reason. Employees have an optional **Designation** (Driver, Machine operator, Loader, Mechanic, Guard, Helper); the Trips driver dropdown offers only Drivers.
+
+**Block Entry (PDF Part 10):**
+* Search finds a block by its number (a digit-only search also matches `blockNo`; `searchNumbers` on a resource).
+* A supplier block needs its supplier; an own-quarry block keeps none; the date received cannot be in the future.
+* Weight is sanity-checked against the size (stone is about 0.075 tonne per CFT): a slip far from that asks "Save anyway?".
+* Blocks can be edited after entry: truck, weight, grade, photos, yard, cost, slab thickness. Date, source, supplier, rawanna and size are locked (stock was booked on them; correct a wrong block by cancelling it).
+* The raw-block stock item ("Raw blocks", CFT) is created by the first block, so raw stock is never silently skipped.
+* "Mark cut" on a block that never had machine work takes its CFT out of raw stock (once).
+* Royalty: Paid needs the date paid, Due carries none, the paid date is not in the future, a second record for the same month asks first; overdue records are flagged in red and a "Mark paid" action records today.
+* Form fix: a create-only required field (date, source, rawanna, size) is now checked on create (it was skipped); the Block and Royalty tabs no longer share the search box.
+
+Tests: 11 server (blocks, royalty), browser test for add / search / edit / cut / mark paid.
