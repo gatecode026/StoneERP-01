@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { useTestDb } from '../helpers';
 import { api, call, makeUser, resetCaches, type Who } from '../api';

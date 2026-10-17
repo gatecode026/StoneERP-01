@@ -3,12 +3,22 @@ import type { ClientSession } from 'mongoose';
 import { Settings } from './models/settings';
 import { connect } from './db';
 
+export type Shift = { id: string; name: string; start: string; end: string; breakMinutes: number; graceMinutes: number; fullDayHours: number; halfDayHours: number; otBufferMinutes: number; otRoundMinutes: number };
+export type WeekOffRule = 'none' | 'all' | '1st3rd5th' | '2nd4th';
+export type WorkHours = {
+  shifts: Shift[]; defaultShiftId: string;
+  weekOff: Record<'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat', WeekOffRule>;
+  holidays: { date: string; endDate?: string; name: string }[];
+  paidWeekOff: boolean; appPunching: boolean; punchGapMinutes: number; openDayAfterHours: number;
+};
+
 export type AppSettings = {
   company: { name: string; brand: string; address: string; gstin: string; state: string; stateCode: string; phone: string; email: string; bankName: string; bankAccount: string; ifsc: string; logoKey: string };
   schedule: { ownerReportTime: string; reportReminderTime: string; ownerReportEnabled: boolean };
   limits: { expenseApproval: number; purchaseApproval: number; cashReceipt: number; cashExpense: number };
   salary: { otMultiplier: number; hoursPerDay: number; otHoursDefault: number; pfRate: number; pfWageCap: number; esiRate: number; esiGrossCap: number; payDay: number };
   costRates: { labourPerHour: number; powerPerUnit: number; dieselPerLitre: number };
+  workHours: WorkHours;
   fyStartMonth: number;
   units: string[];
 };

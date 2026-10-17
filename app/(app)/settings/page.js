@@ -7,6 +7,7 @@ import { RoleGuard, PageHeader, Section, Field, SkeletonList, Badge } from '@/co
 import { fmtDateTime, todayISO } from '@/lib/format';
 import { api } from '@/lib/client';
 import T from '@/components/T';
+import WorkHoursCards from '@/components/settings/WorkHours';
 
 // One card per group of settings; each card saves on its own, so a mistake in one never blocks another.
 // `scale: 100` shows a rate such as 0.12 as 12 (%).
@@ -27,8 +28,8 @@ const SECTIONS = [
     { k: 'cashReceipt', label: 'Cash receipt warning at (Sec 269ST)', type: 'number' }, { k: 'cashExpense', label: 'Cash expense warning above (Sec 40A(3))', type: 'number' },
   ] },
   { key: 'salary', title: 'Salary rules', fields: [
-    { k: 'hoursPerDay', label: 'Working hours in a day', type: 'number' }, { k: 'payDay', label: 'Salary day of the month (1–28)', type: 'number' },
-    { k: 'otMultiplier', label: 'Overtime pay × normal rate', type: 'number', step: '0.1' }, { k: 'otHoursDefault', label: 'Default overtime hours', type: 'number', step: '0.5' },
+    { k: 'hoursPerDay', label: 'Working hours in a day (only if a person has no shift)', type: 'number' }, { k: 'payDay', label: 'Salary day of the month (1–28)', type: 'number' },
+    { k: 'otMultiplier', label: 'Overtime pay × normal rate', type: 'number', step: '0.1' }, 
     { k: 'pfRate', label: 'PF rate (%)', type: 'number', scale: 100, step: '0.01' }, { k: 'pfWageCap', label: 'PF wage ceiling (₹)', type: 'number' },
     { k: 'esiRate', label: 'ESI rate (%)', type: 'number', scale: 100, step: '0.01' }, { k: 'esiGrossCap', label: 'ESI gross ceiling (₹)', type: 'number' },
   ] },
@@ -163,6 +164,7 @@ function SettingsScreen() {
       {loading && !data ? <SkeletonList n={4} className="h-40" /> : error && !data ? <div className="card p-6 text-center text-sm text-red-700">{error.message}</div> : (
         <div className="space-y-4 max-w-3xl">
           {SECTIONS.map((def) => <SectionForm key={def.key} def={def} value={data?.[def.key]} onSaved={reload} />)}
+          <WorkHoursCards value={data?.workHours} onSaved={reload} />
           <FinancialYear value={data?.fyStartMonth ?? 4} onSaved={reload} />
           <MessagesCard />
           <TallyCard />

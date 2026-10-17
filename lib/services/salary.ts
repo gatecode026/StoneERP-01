@@ -4,6 +4,9 @@ import { badRequest, conflict, forbidden, notFound } from '../errors';
 import { decryptField, maskTail } from '../crypto';
 import { writeAudit } from '../audit';
 import { daysInMonth, monthEnd, monthStart, todayIST } from '../time';
+import { isOffDay, offDaysBetween, workingDaysBetween } from '../attendance/calendar';
+import { shiftPaidHours } from '../attendance/calc';
+import { shiftFor } from './punch';
 import { accountFor, oid, postCash, round2, type SvcCtx } from './core';
 import type { AppSettings } from '../settings';
 
@@ -13,7 +16,7 @@ const sumBy = <T,>(a: T[], f: (x: T) => number) => a.reduce((t, x) => t + (Numbe
 export type SalaryRow = {
   empCode: string; name: string; job: string; payType: string; rate: number; pieceUnit?: string; mobile?: string; bank: string;
   present: number; overtime: number; half: number; leave: number; absent: number; unmarked: number; daysPresent: number; qty: number; otHours: number;
-  wages: number; otPay: number; gross: number; pf: number; esi: number; advanceRecovery: number; advanceParts: { id: string; cut: number }[]; net: number; formula: string; leaver: boolean;
+  wages: number; otPay: number; otPendingHours?: number; paidOffDays?: number; gross: number; pf: number; esi: number; advanceRecovery: number; advanceParts: { id: string; cut: number }[]; net: number; formula: string; leaver: boolean;
   paid: boolean; paidMode?: string; paidOn?: string;
 };
 
@@ -32,7 +35,7 @@ export async function computeSalary(month: string, settings: AppSettings, opts: 
   const emps: any[] = await Employee.find(empFilter).session(sess).sort({ empCode: 1 }).lean();
   const codes = emps.map((e) => e.empCode);
   const [att, reps, advs] = await Promise.all([
-    Attendance.find({ date: { $gte: from, $lte: to }, empCode: { $in: codes }, isVoid: false }).session(sess).select('empCode date state otHours').lean(),
+    Attendance.find({ date: { $gte: from, $lte: to }, empCode: { $in: codes }, isVoid: false }).session(sess).select('empCode date state otHours otMinutes otStatus otApprovedMinutes').lean(),
     DailyReport.find({ date: { $gte: from, $lte: to }, empCode: { $in: codes }, isVoid: false, supCheck: { $ne: 'not_ok' } }).session(sess).select('empCode quantity').lean(),
     Advance.find({ status: 'approved', empCode: { $in: codes }, isVoid: false, $expr: { $lt: ['$recovered', '$amount'] } }).session(sess).sort({ date: 1 }).lean(),
   ]);
@@ -43,21 +46,44 @@ export async function computeSalary(month: string, settings: AppSettings, opts: 
 
   return emps.map((e): SalaryRow => {
     const a = (attBy.get(e.empCode) ?? []) as any[];
-    const cnt = (st: string) => a.filter((x) => x.state === st).length;
-    const present = cnt('present'), overtime = cnt('overtime'), half = cnt('half'), leave = cnt('leave'), absent = cnt('absent');
-    const otHours = sumBy(a.filter((x) => x.state === 'overtime'), (x) => x.otHours ?? sal.otHoursDefault);
+    const wh = settings.workHours;
     const rate = Number(e.rate) || 0;
-    const paidLeave = e.payType === 'monthly' ? leave : 0;
-    const daysPresent = present + overtime + half * 0.5 + paidLeave;
     const lastDay = [to, today, e.leavingDate && e.leavingDate < to ? e.leavingDate : to].reduce((x, y) => (x < y ? x : y));
     const firstDay = e.joiningDate && e.joiningDate > from ? e.joiningDate : from;
-    const dueDays = lastDay >= firstDay ? Number(lastDay.slice(8)) - Number(firstDay.slice(8)) + 1 : 0;
-    const unmarked = Math.max(0, dueDays - a.length);
+    const due = lastDay >= firstDay;
+    // A weekly off or a holiday is never a lost day: monthly-paid staff are paid for it (Settings can switch that off), and a day
+    // worked on one is overtime for them. Daily-paid staff are paid for the days they come, off days included.
+    let present = 0, half = 0, leave = 0, absent = 0, workedDays = 0, paidLeave = 0, workingRecords = 0, otDays = 0;
+    let otMinutes = 0, otPending = 0;
+    for (const x of a) {
+      const off = isOffDay(x.date, wh);
+      const legacyOt = x.state === 'overtime';
+      const state = legacyOt ? 'present' : x.state;
+      if (state === 'present') present++; else if (state === 'half') half++; else if (state === 'leave') leave++; else if (state === 'absent') absent++;
+      if (!off) workingRecords++;
+      // days that count as worked
+      if (e.payType === 'monthly') {
+        if (!off) { if (state === 'present') workedDays += 1; else if (state === 'half') workedDays += 0.5; else if (state === 'leave') paidLeave += 1; }
+      } else if (state === 'present') workedDays += 1; else if (state === 'half') workedDays += 0.5;
+      // overtime: only what a senior approved is paid. (Records made before punching existed carry their hours in otHours.)
+      if (e.payType === 'daily' && off) continue; // a daily wage already pays the day worked on an off day
+      const approved = legacyOt && !x.otMinutes ? Math.round((x.otHours ?? sal.otHoursDefault) * 60) : x.otStatus === 'approved' ? Number(x.otApprovedMinutes) || 0 : 0;
+      if (approved > 0) { otMinutes += approved; otDays++; }
+      else if (x.otStatus === 'pending') otPending += Number(x.otMinutes) || 0;
+    }
+    const offList = due ? offDaysBetween(firstDay, lastDay, wh) : [];
+    const paidOffDays = e.payType === 'monthly' && wh.paidWeekOff ? offList.length : 0;
+    const daysPresent = workedDays + paidLeave + paidOffDays;
+    const otHours = otMinutes / 60;
+    const unmarked = due ? Math.max(0, workingDaysBetween(firstDay, lastDay, wh) - workingRecords) : 0;
+    const overtime = otDays;
+    const hoursPerDay = shiftPaidHours(shiftFor(settings, e)) || sal.hoursPerDay;
 
     let wages = 0, qty = 0, formula = '';
     if (e.payType === 'monthly') {
       wages = (rate / D) * daysPresent;
-      formula = `₹${r0(rate)} ÷ ${D} days × ${daysPresent} days = ₹${r0(wages)}`;
+      const parts = [`${workedDays} worked`, ...(paidLeave ? [`${paidLeave} paid leave`] : []), ...(paidOffDays ? [`${paidOffDays} weekly off / holiday`] : [])];
+      formula = `₹${r0(rate)} ÷ ${D} days × ${daysPresent} days (${parts.join(' + ')}) = ₹${r0(wages)}`;
     } else if (e.payType === 'daily') {
       wages = rate * daysPresent;
       formula = `₹${r0(rate)} × ${daysPresent} days = ₹${r0(wages)}`;
@@ -66,7 +92,7 @@ export async function computeSalary(month: string, settings: AppSettings, opts: 
       wages = qty * rate;
       formula = `${r0(qty)} ${e.pieceUnit === 'piece' ? 'pieces' : 'sq ft'} × ₹${rate} = ₹${r0(wages)}`;
     }
-    const hourly = e.payType === 'monthly' ? rate / D / sal.hoursPerDay : e.payType === 'daily' ? rate / sal.hoursPerDay : 0;
+    const hourly = e.payType === 'monthly' ? rate / D / hoursPerDay : e.payType === 'daily' ? rate / hoursPerDay : 0;
     const otPay = hourly * otHours * sal.otMultiplier;
     const gross = wages + otPay;
     const pf = e.pfApplicable ? sal.pfRate * Math.min(wages, sal.pfWageCap) : 0;
@@ -84,7 +110,7 @@ export async function computeSalary(month: string, settings: AppSettings, opts: 
     const net = Math.max(0, gross - pf - esi - advanceRecovery);
     return {
       empCode: e.empCode, name: e.name, job: e.job, payType: e.payType, rate, pieceUnit: e.pieceUnit, mobile: e.mobile, bank: maskTail(decryptField(e.bankAccount)) || e.upi || '',
-      present, overtime, half, leave, absent, unmarked, daysPresent, qty, otHours: round2(otHours), wages: r0(wages), otPay: r0(otPay), gross: r0(gross), pf: r0(pf), esi: r0(esi),
+      present, overtime, half, leave, absent, unmarked, daysPresent, qty, otHours: round2(otHours), wages: r0(wages), otPay: r0(otPay), otPendingHours: round2(otPending / 60), paidOffDays, gross: r0(gross), pf: r0(pf), esi: r0(esi),
       advanceRecovery: r0(advanceRecovery), advanceParts, net: r0(net), formula, leaver: e.status === 'left', paid: false,
     };
   });

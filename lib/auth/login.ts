@@ -21,13 +21,13 @@ export async function loginWithPassword(input: { username: string; password: str
   const parsed = byEmail ? emailSchema.safeParse(raw) : mobileSchema.safeParse(raw);
   const password = String(input.password ?? '');
   const ip = meta.ip ?? 'unknown';
-  await enforce(`login:ip:${ip}`, 30, 600);
+  await enforce(`login:ip:${ip}`, Number(process.env.LOGIN_RATE_IP) || 30, 600); // per 10 minutes; the browser tests raise it
   if (!parsed.success || !password || password.length > 128) {
     await burnVerify(password || 'x');
     throw invalid();
   }
   const username = parsed.data;
-  await enforce(`login:user:${username}`, 10, 900);
+  await enforce(`login:user:${username}`, Number(process.env.LOGIN_RATE_USER) || 10, 900); // per 15 minutes
 
   const user = await User.findOne(byEmail ? { email: username } : { username }).select('+passwordHash');
   if (!user || !user.active) {

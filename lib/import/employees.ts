@@ -36,11 +36,13 @@ export function tenDigits(v: string): string {
   return d;
 }
 
-export const COLUMNS: Col[] = [ // eslint-disable-line
-  { key: 'empCode', label: 'Employee code', aliases: ['code', 'empcode', 'employeeid', 'empid', 'id'], example: 'E101', note: 'Leave empty to number automatically' },
+export const COLUMNS: Col[] = [  
+  { key: 'empCode', label: 'Employee code', aliases: ['code', 'empcode', 'employeeid', 'empid', 'id'], example: 'E101', note: 'Leave empty: the app numbers new people automatically (EMP-0001, EMP-0002 …)' },
   { key: 'name', label: 'Name', aliases: ['employeename', 'fullname'], example: 'Ramesh Meena', note: 'Required' },
   { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / operator', note: 'Manager / Accountant / Supervisor / Salesperson / Worker / operator' },
   { key: 'mobile', label: 'Mobile', aliases: ['phone', 'mobileno', 'mobilenumber', 'phonenumber', 'contact'], example: '9829012345', parse: tenDigits },
+  { key: 'shiftId', label: 'Shift code', aliases: ['shift', 'shiftcode'], example: 'day', note: 'The code of a shift in Settings; empty = the default shift', parse: (v) => v.trim().toLowerCase() },
+  { key: 'biometricId', label: 'Biometric ID', aliases: ['biometric', 'machineid', 'punchid'], example: '', note: 'The number the biometric machine knows this person by', parse: (v) => v.replace(/\s/g, '') },
   { key: 'site', label: 'Site', aliases: ['location', 'place'], example: 'Factory', note: SITES.join(' / '), parse: (v) => SITES.find((s) => s.toLowerCase() === v.trim().toLowerCase()) ?? v.trim() },
   { key: 'joiningDate', label: 'Joining date', aliases: ['doj', 'dateofjoining', 'joined', 'joindate'], example: '01-04-2024', parse: parseDate },
   { key: 'payType', label: 'Pay type', aliases: ['paymenttype', 'salarytype', 'wagetype'], example: 'monthly', note: 'monthly / daily / piece', parse: (v) => v.trim().toLowerCase() },
@@ -48,10 +50,11 @@ export const COLUMNS: Col[] = [ // eslint-disable-line
   { key: 'pieceUnit', label: 'Piece unit', aliases: ['unit', 'pieceunit'], example: '', note: 'sqft / piece (piece-rate only)', parse: (v) => v.trim().toLowerCase().replace(/\s|\./g, '').replace('sqft', 'sqft') },
   { key: 'fatherName', label: "Father's name", aliases: ['father', 'fathersname', 'fathername'], example: 'Mohan Meena' },
   { key: 'address', label: 'Address', aliases: ['village', 'residence'], example: 'Bijoliya, Bhilwara' },
-  { key: 'bankAccount', label: 'Bank account', aliases: ['bankaccountno', 'accountno', 'accountnumber', 'bank'], example: '', note: 'Stored encrypted', parse: (v) => v.replace(/\s/g, '') },
+  { key: 'bankAccount', label: 'Bank account', aliases: ['bankaccountno', 'accountno', 'accountnumber', 'bank'], example: '', note: '9 to 18 digits, stored encrypted', parse: (v) => v.replace(/[\s-]/g, '') },
+  { key: 'ifsc', label: 'IFSC code', aliases: ['ifsc', 'bankifsc', 'ifsccode'], example: '', note: 'Like SBIN0001234', parse: (v) => v.replace(/\s/g, '').toUpperCase() },
   { key: 'upi', label: 'UPI', aliases: ['upiid', 'phonepe', 'gpay'], example: '' },
-  { key: 'aadhaarNo', label: 'Aadhaar number', aliases: ['aadhaar', 'aadhar', 'aadharno', 'aadhaarno', 'uid'], example: '', note: '12 digits, stored encrypted', parse: digits },
-  { key: 'panNo', label: 'PAN', aliases: ['pannumber', 'pan'], example: '', parse: (v) => v.replace(/\s/g, '').toUpperCase() },
+  { key: 'aadhaarNo', label: 'Aadhaar number', aliases: ['aadhaar', 'aadhar', 'aadharno', 'aadhaarno', 'uid'], example: '', note: '12 digits (a valid Aadhaar number), stored encrypted', parse: digits },
+  { key: 'panNo', label: 'PAN', aliases: ['pannumber', 'pan'], example: '', note: 'Like ABCDE1234F', parse: (v) => v.replace(/\s/g, '').toUpperCase() },
   { key: 'pfApplicable', label: 'PF applicable', aliases: ['pf', 'providentfund'], example: 'No', note: 'Yes / No', parse: yes },
   { key: 'pfNo', label: 'PF number', aliases: ['pfno', 'uan'], example: '' },
   { key: 'esiApplicable', label: 'ESI applicable', aliases: ['esi'], example: 'No', note: 'Yes / No', parse: yes },

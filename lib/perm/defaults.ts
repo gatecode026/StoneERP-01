@@ -26,7 +26,7 @@ export function parse(spec: Partial<Record<Resource, string>>): Grants {
 
 // Everybody who signs in and is linked to an employee can do these about themselves.
 const OWN: Partial<Record<Resource, string>> = {
-  dailyreports: 'vm cm em', attendance: 'vm cm', tasks: 'vm em', leaves: 'vm cm', advances: 'vm cm', salaryslips: 'vm', dashboard: 'v*',
+  dailyreports: 'vm cm em', attendance: 'vm', punches: 'vm cm', tasks: 'vm em', leaves: 'vm cm', advances: 'vm cm', salaryslips: 'vm', dashboard: 'v*',
 };
 const withOwn = (spec: Partial<Record<Resource, string>>) => ({ ...OWN, ...spec });
 const F = (money: FieldAccess['money'], cost: FieldAccess['cost'], pii: FieldAccess['pii']): FieldAccess => ({ money, cost, pii });
@@ -34,7 +34,7 @@ const F = (money: FieldAccess['money'], cost: FieldAccess['cost'], pii: FieldAcc
 const ALL_STAR = 'v* c* e* x* a* o*';
 
 const MANAGER = parse({
-  employees: 'v* c* e* x* o*', dailyreports: 'v* c* e* x* a* o*', attendance: 'v* c* e* x* o*', leaves: 'v* c* e* x* a* o*',
+  employees: 'v* c* e* x* o*', dailyreports: 'v* c* e* x* a* o*', attendance: 'v* c* e* x* a* o*', punches: 'v* c* e*', leaves: 'v* c* e* x* a* o*',
   advances: 'v* c* e* x* a* o*', salarysheets: 'v* o*', salaryslips: 'v* o*', safetyrecords: 'v* c* e* x* o*', performance: 'v* o*',
   perfremarks: 'v* c* e*', tasks: 'v* c* e* x* o*', machines: 'v* c* e* x* o*', machineentries: 'v* c* e* x* o*', blocks: 'v* c* e* x* o*',
   royalties: 'v* c* e* x* o*', yield: 'v* o*', repairs: 'v* c* e* x* o*', vehicles: 'v* c* e* x* o*', vehicletrips: 'v* c* e* x* o*',
@@ -45,7 +45,7 @@ const MANAGER = parse({
 });
 
 const ACCOUNTANT = parse({
-  employees: 'v* c* e* o*', dailyreports: 'v* o*', attendance: 'v* o*', leaves: 'v*', advances: 'v* c* e* o*', salarysheets: 'v* c* e* o*',
+  employees: 'v* c* e* o*', dailyreports: 'v* o*', attendance: 'v* o*', punches: 'v*', leaves: 'v*', advances: 'v* c* e* o*', salarysheets: 'v* c* e* o*',
   salarypayments: 'v* c*', salaryslips: 'v* o*', tasks: 'vm em', blocks: 'v*', royalties: 'v* c* e* o*', yield: 'v* o*', repairs: 'v*',
   vehicles: 'v*', stockitems: 'v* o*', stockmovements: 'v* o*', suppliers: 'v* c* e* x* o*', purchases: 'v* c* e* x* o*',
   customers: 'v* c* e* x* o*', sales: 'v* c* e* x* o*', invoices: 'v* c* o*', payments: 'v* c* e* x* o*', dispatches: 'v* o*', complaints: 'v* o*',
@@ -54,7 +54,7 @@ const ACCOUNTANT = parse({
 });
 
 const SUPERVISOR = parse(withOwn({
-  employees: 'vt', dailyreports: 'vt ct et ot at', attendance: 'vt ct et ot', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
+  employees: 'vt', dailyreports: 'vt ct et ot at', attendance: 'vt ct et ot', punches: 'vt ct', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
   tasks: 'vt ct et', machines: 'vt', machineentries: 'vt ct et ot', blocks: 'v* c*', repairs: 'vt ct et', vehicles: 'v* c* e*', vehicletrips: 'v* c* e*',
   stockitems: 'v*', stockmovements: 'v* c*', dispatches: 'v* c* e* a*', complaints: 'v*', expenses: 'vm cm', reminders: 'vt', yield: 'v*',
 }));

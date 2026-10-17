@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Types } from 'mongoose';
 import { isSafeImageSrc } from '../safeUrl';
+import { EMPLOYEE_RULES } from '../validators';
 
 // Shared building blocks for request schemas. Every schema is an ALLOW-LIST: fields not listed are dropped.
 export const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
@@ -28,3 +29,16 @@ export const enumOf = <const T extends readonly [string, ...string[]]>(v: T) => 
 export const MODES = ['UPI', 'Bank', 'Cash', 'Cheque'] as const;
 export const PAY_BY = ['Cash', 'UPI', 'Bank'] as const;
 export const GST_RATES = [0, 5, 12, 18, 28] as const;
+
+/**
+ * A string tidied by `rule.clean` (spaces, dashes, case) and checked by `rule.check`; an empty value passes unless `required`.
+ * The same rules run in the browser (lib/validators.ts), so the form and the server agree.
+ */
+export const ruled = (field: keyof typeof EMPLOYEE_RULES, opts: { required?: boolean } = {}) => {
+  const r = EMPLOYEE_RULES[field];
+  return z.string().max(r.maxLength + 10).transform((v) => r.clean(v)).superRefine((v, ctx) => {
+    if (!v) { if (opts.required) ctx.addIssue({ code: 'custom', message: 'Required' }); return; }
+    const m = r.check(v);
+    if (m) ctx.addIssue({ code: 'custom', message: m });
+  });
+};

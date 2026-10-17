@@ -44,7 +44,7 @@ describe('employee import from Excel', () => {
   it('previews every row with the add-employee rules and saves nothing', async () => {
     const f = await sheet([
       HEAD,
-      ['', 'Ramesh Meena', 'Gang saw operator', '+91 98290 12345', 'factory', '01-04-2024', 'Monthly', '15000', '1234567890', '123412341234', 'Yes', ''],
+      ['', 'Ramesh Meena', 'Gang saw operator', '+91 98290 12345', 'factory', '01-04-2024', 'Monthly', '15000', '1234567890', '234123412346', 'Yes', ''],
       ['E050', 'Suresh', 'Helper', '9829011111', 'Yard', '2024-05-10', 'daily', 500, '', '', 'No', 'E001'],
       ['E001', 'Duplicate of existing', 'Helper', '', '', '', '', '', '', '', '', ''],
       ['E060', 'Bad Mobile', 'Helper', '12345', '', '', '', '', '', '', '', ''],
@@ -68,7 +68,7 @@ describe('employee import from Excel', () => {
   it('commits the good rows in one go: auto code, tidy mobile, encrypted bank / Aadhaar, one audit entry', async () => {
     const f = await sheet([
       HEAD,
-      ['', 'Ramesh Meena', 'Gang saw operator', '+91 98290 12345', 'factory', '01-04-2024', 'Monthly', '15000', '1234567890', '123412341234', 'Yes', ''],
+      ['', 'Ramesh Meena', 'Gang saw operator', '+91 98290 12345', 'factory', '01-04-2024', 'Monthly', '15000', '1234567890', '234123412346', 'Yes', ''],
       ['E050', 'Suresh', 'Helper', '9829011111', 'Yard', '2024-05-10', 'daily', 500, '', '', 'No', 'E001'],
       ['E061', 'Bad Date', 'Helper', '', '', 'not-a-date', '', '', '', '', '', ''],
     ]);
@@ -76,7 +76,7 @@ describe('employee import from Excel', () => {
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ committed: true, imported: 2, skipped: 1 });
     const ram: any = await Employee.findOne({ name: 'Ramesh Meena' }).lean();
-    expect(ram.empCode).toMatch(/^E\d{3}$/); // numbered automatically
+    expect(ram.empCode).toMatch(/^EMP-\d{4}$/); // numbered automatically
     expect(ram.mobile).toBe('9829012345');
     expect(ram.site).toBe('Factory');
     expect(ram.joiningDate).toBe('2024-04-01');

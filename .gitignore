@@ -12,3 +12,4 @@ next-env.d.ts
 /backups
 .vitest-cache
 .dev-db
+.next-e2e

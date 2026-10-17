@@ -25,7 +25,7 @@ beforeAll(async () => {
   sales = await makeUser('salesperson', { empCode: 'E901' });
   acc = await makeUser('accountant');
   guard = await makeUser('worker', { preset: 'guard', empCode: 'E902' });
-  for (const [empCode, name] of [['E001', 'A'], ['E002', 'B'], ['E003', 'C'], ['E900', 'Sup']] as const) {
+  for (const [empCode, name] of [['E001', 'Amit'], ['E002', 'Bharat'], ['E003', 'Chetan'], ['E900', 'Sup']] as const) {
     await api.create(owner, 'employees', { empCode, name, job: 'Helper', supervisorCode: empCode === 'E900' ? undefined : 'E900', payType: 'daily', rate: 500 });
   }
 });
@@ -42,10 +42,10 @@ describe('DailySummary stays equal to the source records through a messy day', (
     await call(sup, bulkAtt.POST as never, '/x', { method: 'POST', body: { marks: [{ empCode: 'E001', state: 'present' }, { empCode: 'E002', state: 'present' }, { empCode: 'E003', state: 'absent' }] } });
     await call(sup, bulkAtt.POST as never, '/x', { method: 'POST', body: { marks: [{ empCode: 'E002', state: 'half' }, { empCode: 'E003', state: 'absent' }] } });
     const a = (await api.list(sup, 'attendance', `date=${today}&empCode=E001`)).json.data[0];
-    await api.patch(sup, 'attendance', a._id, { state: 'overtime' });
+    await api.patch(sup, 'attendance', a._id, { state: 'leave' });
     const c = (await api.list(sup, 'attendance', `date=${today}&empCode=E003`)).json.data[0];
     await api.void(owner, 'attendance', c._id);
-    expect((await getDay(today)).attendance).toMatchObject({ overtime: 1, half: 1 });
+    expect((await getDay(today)).attendance).toMatchObject({ leave: 1, half: 1 });
     await expectConsistent();
   });
   it('reports, machine entries, expenses (approved, pending, rejected, cancelled)', async () => {

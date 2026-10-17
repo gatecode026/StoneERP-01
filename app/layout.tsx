@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let session: ClientSession | null = null;
   if (user) {
     const [perm, st] = await Promise.all([getEffectivePerm(user), getSettings()]);
-    session = { ...publicUser(user), perm: describePerm(perm), company: st.company } as ClientSession;
+    session = { ...publicUser(user), perm: describePerm(perm), company: st.company, shifts: st.workHours.shifts.map(({ id, name, start, end }) => ({ id, name, start, end })), defaultShiftId: st.workHours.defaultShiftId } as ClientSession;
   }
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';

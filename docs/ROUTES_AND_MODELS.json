@@ -1,2360 +1,1069 @@
 {
-  "generatedFrom": "static read of the repository (no source file was changed); see docs/AUDIT_REPORT.md",
-  "generatedOn": "2026-10-12",
+  "generatedFrom": "scripts/gen-routes.ts (reads the source tree); regenerate with `npm run docs:routes`",
+  "generatedOn": "2026-10-17",
   "app": {
     "name": "vss-erp-demo",
-    "next": "14.2.15",
-    "react": "18.3.1",
-    "mongoose": "8.24.5",
-    "router": "App Router",
-    "language": "JavaScript (no TypeScript)"
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "mongoose": "^9.11.1",
+    "language": "TypeScript (strict) with some remaining JavaScript screens"
   },
-  "roles": [
-    "owner",
-    "manager",
-    "accountant",
-    "supervisor",
-    "salesperson",
-    "worker"
-  ],
   "summary": {
-    "pages": 28,
-    "apiRouteFiles": 10,
-    "apiEndpointsLogical": 20,
-    "models": 31
+    "pages": 31,
+    "apiRouteFiles": 65,
+    "models": 32
   },
   "pages": [
     {
-      "path": "/login",
-      "purpose": "Demo role picker (no password)",
-      "requiredPerm": null,
-      "rolesAllowed": "public",
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "none",
-      "file": "app/login/page.js"
-    },
-    {
       "path": "/",
-      "purpose": "Owner dashboard / 8pm report (worker gets personal home)",
-      "requiredPerm": "dashboard",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/page.js"
-    },
-    {
-      "path": "/eomployees",
-      "purpose": "Part 1 employee profiles",
-      "requiredPerm": "employees",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/employees/page.js"
-    },
-    {
-      "path": "/daily-report",
-      "purpose": "Part 2 daily work report",
-      "requiredPerm": "dailyreports",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/daily-report/page.js"
+      "file": "app/(app)/page.tsx",
+      "guard": "proxy.ts cookie check + server session + client permission check"
     },
     {
       "path": "/attendance",
-      "purpose": "Part 7 attendance + leave requests + selfie",
-      "requiredPerm": "attendance",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/attendance/page.js"
-    },
-    {
-      "path": "/salary",
-      "purpose": "Part 7 salary sheet + advance register",
-      "requiredPerm": "salary",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "worker"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/salary/page.js"
-    },
-    {
-      "path": "/salary/slip/[month]/[code]",
-      "purpose": "Part 7 salary slip (EN/HI, print)",
-      "requiredPerm": "salary",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "worker"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/salary/slip/[month]/[code]/page.js"
-    },
-    {
-      "path": "/safety",
-      "purpose": "Part 19 gear/accident/training/check-up",
-      "requiredPerm": "safety",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/safety/page.js"
-    },
-    {
-      "path": "/performance",
-      "purpose": "Part 20 scorecard",
-      "requiredPerm": "performance",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/performance/page.js"
-    },
-    {
-      "path": "/machines",
-      "purpose": "Part 3 machine list, shift entries, monthly output",
-      "requiredPerm": "machines",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/machines/page.js"
-    },
-    {
-      "path": "/blocks",
-      "purpose": "Part 10 block register + royalty",
-      "requiredPerm": "blocks",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/blocks/page.js"
-    },
-    {
-      "path": "/yield",
-      "purpose": "Part 11 yield % and cost per sq ft",
-      "requiredPerm": "yield",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/yield/page.js"
-    },
-    {
-      "path": "/repairs",
-      "purpose": "Part 13 repairs, service schedule, history",
-      "requiredPerm": "repairs",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/repairs/page.js"
-    },
-    {
-      "path": "/vehicles",
-      "purpose": "Part 17 vehicles, papers, trips/diesel",
-      "requiredPerm": "vehicles",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/vehicles/page.js"
-    },
-    {
-      "path": "/stock",
-      "purpose": "Part 4 stock balance + movements",
-      "requiredPerm": "stock",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/stock/page.js"
-    },
-    {
-      "path": "/purchases",
-      "purpose": "Part 9 purchases, payables, suppliers",
-      "requiredPerm": "purchases",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/purchases/page.js"
-    },
-    {
-      "path": "/sales",
-      "purpose": "Part 5 sales list, pending, customers, rate list",
-      "requiredPerm": "sales",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/sales/page.js"
-    },
-    {
-      "path": "/sales/new",
-      "purpose": "Part 5 new quotation/order",
-      "requiredPerm": "sales",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/sales/new/page.js"
-    },
-    {
-      "path": "/sales/[id]",
-      "purpose": "Part 5 sale detail: order/dispatch/invoice/payment",
-      "requiredPerm": "sales",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/sales/[id]/page.js"
-    },
-    {
-      "path": "/sales/[id]/invoice",
-      "purpose": "Part 5 printable quotation / tax invoice",
-      "requiredPerm": "sales",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/sales/[id]/invoice/page.js"
-    },
-    {
-      "path": "/dispatch",
-      "purpose": "Part 12 trucks out/in, freight",
-      "requiredPerm": "dispatch",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/dispatch/page.js"
-    },
-    {
-      "path": "/dispatch/[id]",
-      "purpose": "Part 12 printable gate pass",
-      "requiredPerm": "dispatch",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/dispatch/[id]/page.js"
-    },
-    {
-      "path": "/complaints",
-      "purpose": "Part 16 complaints",
-      "requiredPerm": "complaints",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/complaints/page.js"
-    },
-    {
-      "path": "/expenses",
-      "purpose": "Part 6 expenses + monthly report",
-      "requiredPerm": "expenses",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/expenses/page.js"
-    },
-    {
-      "path": "/cash",
-      "purpose": "Part 14 cash/bank book + closing",
-      "requiredPerm": "cash",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/cash/page.js"
-    },
-    {
-      "path": "/tasks",
-      "purpose": "Part 15 tasks + reminder centre",
-      "requiredPerm": "tasks",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/tasks/page.js"
-    },
-    {
-      "path": "/papers",
-      "purpose": "Part 18 important papers",
-      "requiredPerm": "papers",
-      "rolesAllowed": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/papers/page.js"
+      "file": "app/(app)/attendance/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
     },
     {
       "path": "/audit",
-      "purpose": "Audit trail",
-      "requiredPerm": "audit",
-      "rolesAllowed": [
-        "owner",
-        "manager"
+      "file": "app/(app)/audit/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/blocks",
+      "file": "app/(app)/blocks/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/cash",
+      "file": "app/(app)/cash/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/change-password",
+      "file": "app/change-password/page.tsx",
+      "guard": "public / session-only"
+    },
+    {
+      "path": "/complaints",
+      "file": "app/(app)/complaints/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/daily-report",
+      "file": "app/(app)/daily-report/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/dispatch",
+      "file": "app/(app)/dispatch/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/dispatch/:id",
+      "file": "app/(app)/dispatch/[id]/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/employees",
+      "file": "app/(app)/employees/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/expenses",
+      "file": "app/(app)/expenses/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/login",
+      "file": "app/login/page.tsx",
+      "guard": "public / session-only"
+    },
+    {
+      "path": "/machines",
+      "file": "app/(app)/machines/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/papers",
+      "file": "app/(app)/papers/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/performance",
+      "file": "app/(app)/performance/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/purchases",
+      "file": "app/(app)/purchases/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/repairs",
+      "file": "app/(app)/repairs/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/safety",
+      "file": "app/(app)/safety/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/salary",
+      "file": "app/(app)/salary/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/salary/slip/:month/:code",
+      "file": "app/(app)/salary/slip/[month]/[code]/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/sales",
+      "file": "app/(app)/sales/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/sales/:id",
+      "file": "app/(app)/sales/[id]/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/sales/:id/invoice",
+      "file": "app/(app)/sales/[id]/invoice/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/sales/new",
+      "file": "app/(app)/sales/new/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/settings",
+      "file": "app/(app)/settings/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/settings/roles",
+      "file": "app/(app)/settings/roles/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/stock",
+      "file": "app/(app)/stock/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/tasks",
+      "file": "app/(app)/tasks/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/vehicles",
+      "file": "app/(app)/vehicles/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    },
+    {
+      "path": "/yield",
+      "file": "app/(app)/yield/page.js",
+      "guard": "proxy.ts cookie check + server session + client permission check"
+    }
+  ],
+  "apiRoutes": [
+    {
+      "path": "/api/:resource",
+      "file": "app/api/[resource]/route.ts",
+      "methods": [
+        "GET",
+        "POST"
       ],
-      "rendering": "client component inside server-rendered layout shell",
-      "guard": "client RoleGuard only; middleware checks cookie presence only",
-      "file": "app/(app)/audit/page.js"
-    }
-  ],
-  "apiEndpoints": [
-    {
-      "method": "GET",
-      "path": "/api/{model}",
-      "does": "List records (filter by any query key, from/to/dateField, sort, limit<=5000, includeVoid, ids)",
-      "authCheck": true,
-      "roleRule": "canView(role, model); worker scoped via WORKER_SCOPE (salarysheets NOT scoped); supervisor/salesperson see own expenses only; HIDE_FIELDS stripped",
-      "validation": false,
-      "file": "app/api/[model]/route.js + lib/crud.js"
+      "guards": [
+        "dynamic.view",
+        "dynamic.create"
+      ]
     },
     {
-      "method": "POST",
-      "path": "/api/{model}",
-      "does": "Create record (model hooks apply); auditlogs/counters blocked",
-      "authCheck": true,
-      "roleRule": "canView(role, model); worker only dailyreports/attendance/leaves/advances/tasks",
-      "validation": "hook-specific only (no schema validation)",
-      "file": "app/api/[model]/route.js + lib/crud.js"
+      "path": "/api/:resource/:id",
+      "file": "app/api/[resource]/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "guards": [
+        "dynamic.view",
+        "dynamic.edit",
+        "dynamic.void"
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/{model}/{id}",
-      "does": "Fetch one record",
-      "authCheck": true,
-      "roleRule": "canView only; NO worker/own-only scope (IDOR)",
-      "validation": false,
-      "file": "app/api/[model]/[id]/route.js"
+      "path": "/api/:resource/facets",
+      "file": "app/api/[resource]/facets/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dynamic.view"
+      ]
     },
     {
-      "method": "PATCH",
-      "path": "/api/{model}/{id}",
-      "does": "$set arbitrary fields (mass assignment); hooks beforeUpdate/afterUpdate",
-      "authCheck": true,
-      "roleRule": "canView(role, model); worker scope check on WORKER_SCOPE field only; no field allow-list",
-      "validation": "hook-specific only",
-      "file": "app/api/[model]/[id]/route.js + lib/crud.js:82-107"
+      "path": "/api/accounts",
+      "file": "app/api/accounts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "accounts.view"
+      ]
     },
     {
-      "method": "DELETE",
-      "path": "/api/{model}/{id}",
-      "does": "Soft void (status=void, reason, audit); no side-effect reversal",
-      "authCheck": true,
-      "roleRule": "owner/manager/accountant",
-      "validation": false,
-      "file": "lib/crud.js:110-123"
-    },
-    {
-      "method": "POST",
-      "path": "/api/actions {action:saleOrder}",
-      "does": "Quotation -> order (+ advance payment)",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant, salesperson",
-      "validation": "minimal",
-      "file": "app/api/actions/route.js"
-    },
-    {
-      "method": "POST",
-      "path": "/api/actions {action:saleInvoice}",
-      "does": "Assign GST invoice no. (FY series via counter)",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant",
-      "validation": "minimal",
-      "file": "app/api/actions/route.js"
-    },
-    {
-      "method": "POST",
-      "path": "/api/actions {action:paySupplier}",
-      "does": "Pay supplier against purchase + cash/bank out",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant",
-      "validation": "amount clamped to outstanding",
-      "file": "app/api/actions/route.js"
-    },
-    {
-      "method": "POST",
-      "path": "/api/actions {action:salarySave}",
-      "does": "Save draft salary sheet for month",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant",
-      "validation": "month unvalidated",
-      "file": "app/api/actions/route.js"
-    },
-    {
-      "method": "POST",
-      "path": "/api/actions {action:salaryApprove}",
-      "does": "Approve sheet, apply advance recoveries",
-      "authCheck": true,
-      "roleRule": "owner",
-      "validation": "month unvalidated",
-      "file": "app/api/actions/route.js"
-    },
-    {
-      "method": "POST",
-      "path": "/api/actions {action:salaryPay}",
-      "does": "Mark salaries paid + cash/bank out per employee",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant",
-      "validation": "mode free text",
-      "file": "app/api/actions/route.js"
-    },
-    {
-      "method": "GET",
       "path": "/api/approvals",
-      "does": "Pending approvals list",
-      "authCheck": true,
-      "roleRule": "owner/manager (others get [])",
-      "validation": false,
-      "file": "app/api/approvals/route.js"
+      "file": "app/api/approvals/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "dashboard.view"
+      ]
     },
     {
-      "method": "POST",
-      "path": "/api/approvals",
-      "does": "Approve/reject pending expense/purchase/damage/advance/leave",
-      "authCheck": true,
-      "roleRule": "owner/manager (manager capped at 25,000)",
-      "validation": "model unrestricted (any model with status=pending)",
-      "file": "app/api/approvals/route.js"
+      "path": "/api/attendance/fix",
+      "file": "app/api/attendance/fix/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "punches.edit"
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/dashboard?date=",
-      "does": "Owner report aggregates / worker home",
-      "authCheck": true,
-      "roleRule": "all roles; money sections stripped by role",
-      "validation": false,
-      "file": "app/api/dashboard/route.js"
+      "path": "/api/attendance/overtime",
+      "file": "app/api/attendance/overtime/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "attendance.approve"
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/salary?month=&empCode=",
-      "does": "Salary sheet (preview/saved) with computed rows",
-      "authCheck": true,
-      "roleRule": "canView(salary); worker forced to own empCode (taken from cookie)",
-      "validation": false,
-      "file": "app/api/salary/route.js"
+      "path": "/api/attendance/sheet",
+      "file": "app/api/attendance/sheet/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "attendance.view"
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/performance?month=",
-      "does": "Monthly scorecards",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant, supervisor",
-      "validation": false,
-      "file": "app/api/performance/route.js"
+      "path": "/api/auth/change-password",
+      "file": "app/api/auth/change-password/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "auth:allowPasswordChange"
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/yield",
-      "does": "Yield % + cost per sq ft",
-      "authCheck": true,
-      "roleRule": "FIELD roles; supervisor cost fields stripped",
-      "validation": false,
-      "file": "app/api/yield/route.js"
+      "path": "/api/auth/login",
+      "file": "app/api/auth/login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "auth:none"
+      ]
     },
     {
-      "method": "GET",
+      "path": "/api/auth/logout",
+      "file": "app/api/auth/logout/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "auth:allowPasswordChange"
+      ]
+    },
+    {
+      "path": "/api/auth/me",
+      "file": "app/api/auth/me/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "guards": [
+        "auth:allowPasswordChange"
+      ]
+    },
+    {
+      "path": "/api/auth/otp/request",
+      "file": "app/api/auth/otp/request/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "auth:none"
+      ]
+    },
+    {
+      "path": "/api/auth/otp/verify",
+      "file": "app/api/auth/otp/verify/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "auth:none"
+      ]
+    },
+    {
+      "path": "/api/backup",
+      "file": "app/api/backup/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "settings.edit"
+      ]
+    },
+    {
+      "path": "/api/blocks/:id/cut",
+      "file": "app/api/blocks/[id]/cut/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "blocks.edit"
+      ]
+    },
+    {
+      "path": "/api/bulk/approvals",
+      "file": "app/api/bulk/approvals/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "dashboard.view"
+      ]
+    },
+    {
+      "path": "/api/bulk/attendance",
+      "file": "app/api/bulk/attendance/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "attendance.create"
+      ]
+    },
+    {
+      "path": "/api/bulk/freight-paid",
+      "file": "app/api/bulk/freight-paid/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "cashentries.create"
+      ]
+    },
+    {
+      "path": "/api/bulk/stockmovements",
+      "file": "app/api/bulk/stockmovements/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "stockmovements.create"
+      ]
+    },
+    {
+      "path": "/api/cash/overview",
+      "file": "app/api/cash/overview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "cashentries.view"
+      ]
+    },
+    {
+      "path": "/api/dailyreports/missing",
+      "file": "app/api/dailyreports/missing/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dailyreports.view"
+      ]
+    },
+    {
+      "path": "/api/dispatches/:id/freight-paid",
+      "file": "app/api/dispatches/[id]/freight-paid/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "cashentries.create"
+      ]
+    },
+    {
+      "path": "/api/dispatches/:id/out",
+      "file": "app/api/dispatches/[id]/out/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "dispatches.approve"
+      ]
+    },
+    {
+      "path": "/api/dispatches/:id/pdf",
+      "file": "app/api/dispatches/[id]/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dispatches.view"
+      ]
+    },
+    {
+      "path": "/api/dispatches/freight",
+      "file": "app/api/dispatches/freight/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dispatches.view"
+      ]
+    },
+    {
+      "path": "/api/employees/:id/login",
+      "file": "app/api/employees/[id]/login/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "users.view"
+      ]
+    },
+    {
+      "path": "/api/expenses/overview",
+      "file": "app/api/expenses/overview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "expenses.view"
+      ]
+    },
+    {
+      "path": "/api/expenses/report",
+      "file": "app/api/expenses/report/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "reports.view"
+      ]
+    },
+    {
+      "path": "/api/export/:resource",
+      "file": "app/api/export/[resource]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dynamic.export"
+      ]
+    },
+    {
+      "path": "/api/export/tally",
+      "file": "app/api/export/tally/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "sales.export"
+      ]
+    },
+    {
+      "path": "/api/files",
+      "file": "app/api/files/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "auth:required"
+      ]
+    },
+    {
+      "path": "/api/files/:...key",
+      "file": "app/api/files/[...key]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "auth:required"
+      ]
+    },
+    {
+      "path": "/api/health",
+      "file": "app/api/health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "auth:none"
+      ]
+    },
+    {
+      "path": "/api/home",
+      "file": "app/api/home/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dashboard.view"
+      ]
+    },
+    {
+      "path": "/api/import/:resource",
+      "file": "app/api/import/[resource]/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "dynamic.create"
+      ]
+    },
+    {
+      "path": "/api/import/employees",
+      "file": "app/api/import/employees/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "employees.create"
+      ]
+    },
+    {
+      "path": "/api/jobs/:name",
+      "file": "app/api/jobs/[name]/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "auth:none"
+      ]
+    },
+    {
+      "path": "/api/lookup/:kind",
+      "file": "app/api/lookup/[kind]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "dynamic.view"
+      ]
+    },
+    {
+      "path": "/api/machineentries/monthly",
+      "file": "app/api/machineentries/monthly/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "machineentries.view"
+      ]
+    },
+    {
+      "path": "/api/notifications",
+      "file": "app/api/notifications/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "settings.edit"
+      ]
+    },
+    {
+      "path": "/api/notifications/:id",
+      "file": "app/api/notifications/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "guards": [
+        "settings.edit"
+      ]
+    },
+    {
+      "path": "/api/performance",
+      "file": "app/api/performance/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "performance.view"
+      ]
+    },
+    {
+      "path": "/api/punches",
+      "file": "app/api/punches/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "guards": [
+        "punches.create",
+        "punches.view"
+      ]
+    },
+    {
+      "path": "/api/purchases/:id/pay",
+      "file": "app/api/purchases/[id]/pay/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "purchases.edit"
+      ]
+    },
+    {
       "path": "/api/reminders",
-      "does": "Computed reminders (in-app only, nothing is sent)",
-      "authCheck": true,
-      "roleRule": "owner, manager, accountant, supervisor",
-      "validation": false,
-      "file": "app/api/reminders/route.js"
+      "file": "app/api/reminders/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "reminders.view"
+      ]
     },
     {
-      "method": "GET",
-      "path": "/api/seed[?force=1]",
-      "does": "Seed demo data if DB empty; with force=1 WIPES ALL COLLECTIONS and reseeds",
-      "authCheck": false,
-      "roleRule": "NONE when no session cookie (audit S-01); owner-only only if a non-owner cookie is present",
-      "validation": false,
-      "file": "app/api/seed/route.js"
+      "path": "/api/roles",
+      "file": "app/api/roles/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "roles.view"
+      ]
     },
     {
-      "method": "POST",
-      "path": "/api/seed",
-      "does": "Wipe all collections and reseed",
-      "authCheck": false,
-      "roleRule": "same as above",
-      "validation": false,
-      "file": "app/api/seed/route.js"
+      "path": "/api/roles/:key",
+      "file": "app/api/roles/[key]/route.ts",
+      "methods": [
+        "PUT"
+      ],
+      "guards": [
+        "roles.edit"
+      ]
+    },
+    {
+      "path": "/api/roles/:key/reset",
+      "file": "app/api/roles/[key]/reset/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "roles.edit"
+      ]
+    },
+    {
+      "path": "/api/salary/approve",
+      "file": "app/api/salary/approve/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "salarysheets.approve"
+      ]
+    },
+    {
+      "path": "/api/salary/pay",
+      "file": "app/api/salary/pay/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "salarypayments.create"
+      ]
+    },
+    {
+      "path": "/api/salary/preview",
+      "file": "app/api/salary/preview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "salarysheets.view"
+      ]
+    },
+    {
+      "path": "/api/salary/save",
+      "file": "app/api/salary/save/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "salarysheets.create"
+      ]
+    },
+    {
+      "path": "/api/salary/slip",
+      "file": "app/api/salary/slip/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "salaryslips.view"
+      ]
+    },
+    {
+      "path": "/api/salary/slip/pdf",
+      "file": "app/api/salary/slip/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "salaryslips.view"
+      ]
+    },
+    {
+      "path": "/api/sales/:id/full",
+      "file": "app/api/sales/[id]/full/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "sales.view"
+      ]
+    },
+    {
+      "path": "/api/sales/:id/invoice",
+      "file": "app/api/sales/[id]/invoice/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "invoices.create"
+      ]
+    },
+    {
+      "path": "/api/sales/:id/order",
+      "file": "app/api/sales/[id]/order/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "sales.edit"
+      ]
+    },
+    {
+      "path": "/api/sales/:id/pdf",
+      "file": "app/api/sales/[id]/pdf/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "sales.view"
+      ]
+    },
+    {
+      "path": "/api/sales/overview",
+      "file": "app/api/sales/overview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "sales.view"
+      ]
+    },
+    {
+      "path": "/api/settings",
+      "file": "app/api/settings/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "guards": [
+        "settings.view",
+        "settings.edit"
+      ]
+    },
+    {
+      "path": "/api/users",
+      "file": "app/api/users/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "guards": [
+        "users.view",
+        "users.create"
+      ]
+    },
+    {
+      "path": "/api/users/:id",
+      "file": "app/api/users/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "guards": [
+        "users.edit"
+      ]
+    },
+    {
+      "path": "/api/users/:id/reset-password",
+      "file": "app/api/users/[id]/reset-password/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "guards": [
+        "users.edit"
+      ]
+    },
+    {
+      "path": "/api/yield",
+      "file": "app/api/yield/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "guards": [
+        "yield.view"
+      ]
     }
-  ],
-  "genericCrudModels": [
-    "employees",
-    "attendance",
-    "dailyreports",
-    "machines",
-    "machineentries",
-    "stockitems",
-    "stockmovements",
-    "customers",
-    "sales",
-    "payments",
-    "expenses",
-    "expenseheads",
-    "salarysheets",
-    "advances",
-    "leaves",
-    "suppliers",
-    "purchases",
-    "blocks",
-    "royalties",
-    "dispatches",
-    "repairs",
-    "cashentries",
-    "tasks",
-    "complaints",
-    "vehicles",
-    "vehicletrips",
-    "documents",
-    "safetyrecords",
-    "perfremarks",
-    "auditlogs"
   ],
   "models": [
     {
-      "key": "employees",
-      "mongooseModel": "Employee",
-      "declaredFields": {
-        "empCode": "String",
-        "name": "String",
-        "job": "String",
-        "site": "String",
-        "payType": "String",
-        "rate": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "mobile",
-        "photo",
-        "fatherName",
-        "address",
-        "joiningDate",
-        "pieceUnit",
-        "bankAccount",
-        "upi",
-        "pfApplicable",
-        "pfNo",
-        "esiApplicable",
-        "doc_aadhaar",
-        "doc_pan",
-        "doc_passbook",
-        "doc_license",
-        "emergencyName",
-        "emergencyMobile",
-        "leavingDate"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "empCode": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": {
-        "supervisor": [
-          "rate",
-          "payType",
-          "pieceUnit",
-          "bankAccount",
-          "upi",
-          "pfNo",
-          "esiNo",
-          "pfApplicable"
-        ]
-      },
-      "hooks": "lib/hooks.js: beforeCreate,beforeUpdate"
+      "resource": "advances",
+      "model": "Advance",
+      "collection": "advances",
+      "fields": 20,
+      "indexes": 4
     },
     {
-      "key": "attendance",
-      "mongooseModel": "Attendance",
-      "declaredFields": {
-        "date": "String",
-        "empCode": "String",
-        "employeeId": "String",
-        "state": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "empName",
-        "otHours",
-        "late (seed only)",
-        "method",
-        "selfie",
-        "location",
-        "markedBy"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        },
-        {
-          "date": 1,
-          "empCode": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate"
+      "resource": "attendance",
+      "model": "Attendance",
+      "collection": "attendances",
+      "fields": 39,
+      "indexes": 5
     },
     {
-      "key": "dailyreports",
-      "mongooseModel": "DailyReport",
-      "declaredFields": {
-        "date": "String",
-        "empCode": "String",
-        "employeeId": "String",
-        "quantity": "Number",
-        "hours": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "empName",
-        "job",
-        "narration",
-        "problem",
-        "plan",
-        "photos[]",
-        "photo",
-        "supCheck",
-        "supRemark",
-        "checkedBy",
-        "checkedAt",
-        "onTime",
-        "submittedAt",
-        "filledBy"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        },
-        {
-          "date": 1,
-          "empCode": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,beforeUpdate"
+      "resource": "auditlogs",
+      "model": "AuditLog",
+      "collection": "auditlogs",
+      "fields": 10,
+      "indexes": 4
     },
     {
-      "key": "machines",
-      "mongooseModel": "Machine",
-      "declaredFields": {
-        "name": "String",
-        "type": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "location",
-        "purchaseDate",
-        "serviceIntervalDays",
-        "lastServiceDate"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate"
+      "resource": "blocks",
+      "model": "Block",
+      "collection": "blocks",
+      "fields": 30,
+      "indexes": 6
     },
     {
-      "key": "machineentries",
-      "mongooseModel": "MachineEntry",
-      "declaredFields": {
-        "date": "String",
-        "machineId": "String",
-        "blockNo": "Number",
-        "outputSqft": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "shift",
-        "machineName",
-        "machineType",
-        "operatorCode",
-        "operatorName",
-        "startTime",
-        "stopTime",
-        "hoursRun",
-        "workDone",
-        "pieces",
-        "stockItemId",
-        "wasteSqft",
-        "stoppedMins",
-        "stopReason",
-        "breakdown",
-        "bladeChanged",
-        "bladeCost",
-        "electricityUnits",
-        "dieselLitres",
-        "photo",
-        "remarks"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "cashclosings",
+      "model": "CashClosing",
+      "collection": "cashclosings",
+      "fields": 16,
+      "indexes": 3
     },
     {
-      "key": "stockitems",
-      "mongooseModel": "StockItem",
-      "declaredFields": {
-        "name": "String",
-        "category": "String",
-        "balance": "Number(default 0)",
-        "minLevel": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "unit",
-        "size",
-        "thickness",
-        "finish",
-        "grade",
-        "location",
-        "sellRate",
-        "costRate",
-        "photo"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": {
-        "supervisor": [
-          "costRate"
-        ],
-        "salesperson": [
-          "costRate"
-        ]
-      },
-      "hooks": null
+      "resource": "cashentries",
+      "model": "CashEntry",
+      "collection": "cashentries",
+      "fields": 21,
+      "indexes": 6
     },
     {
-      "key": "stockmovements",
-      "mongooseModel": "StockMovement",
-      "declaredFields": {
-        "itemId": "String",
-        "type": "String",
-        "qty": "Number",
-        "date": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "itemName",
-        "ref",
-        "note",
-        "location"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "complaints",
+      "model": "Complaint",
+      "collection": "complaints",
+      "fields": 24,
+      "indexes": 6
     },
     {
-      "key": "customers",
-      "mongooseModel": "Customer",
-      "declaredFields": {
-        "name": "String",
-        "country": "String",
-        "state": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "mobile",
-        "gstin",
-        "address",
-        "city",
-        "type"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "customers",
+      "model": "Customer",
+      "collection": "customers",
+      "fields": 19,
+      "indexes": 8
     },
     {
-      "key": "sales",
-      "mongooseModel": "Sale",
-      "declaredFields": {
-        "date": "String",
-        "stage": "String",
-        "total": "Number",
-        "paid": "Number(default 0)"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "saleNo",
-        "customerId",
-        "customerName",
-        "customerGstin",
-        "customerState",
-        "customerCountry",
-        "customerAddress",
-        "customerMobile",
-        "taxType",
-        "items[]",
-        "taxable",
-        "cgst",
-        "sgst",
-        "igst",
-        "roundOff",
-        "orderDate",
-        "invoiceNo",
-        "invoiceDate",
-        "dispatched{}",
-        "fullyDispatched",
-        "salesperson",
-        "advance",
-        "advanceMode"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate,beforeUpdate"
+      "resource": "dailyreports",
+      "model": "DailyReport",
+      "collection": "dailyreports",
+      "fields": 31,
+      "indexes": 6
     },
     {
-      "key": "payments",
-      "mongooseModel": "Payment",
-      "declaredFields": {
-        "saleId": "String",
-        "amount": "Number",
-        "date": "String",
-        "mode": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "saleNo",
-        "customerId",
-        "customerName",
-        "kind",
-        "ref"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "dispatches",
+      "model": "Dispatch",
+      "collection": "dispatches",
+      "fields": 37,
+      "indexes": 10
     },
     {
-      "key": "expenses",
-      "mongooseModel": "Expense",
-      "declaredFields": {
-        "date": "String",
-        "head": "String",
-        "amount": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "paidBy",
-        "paidTo",
-        "spentBy",
-        "site",
-        "billPhoto",
-        "narration",
-        "approvedBy",
-        "approvedAt",
-        "approvalRemark"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "documents",
+      "model": "PaperDoc",
+      "collection": "paperdocs",
+      "fields": 14,
+      "indexes": 4
     },
     {
-      "key": "expenseheads",
-      "mongooseModel": "ExpenseHead",
-      "declaredFields": {
-        "name": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "employees",
+      "model": "Employee",
+      "collection": "employees",
+      "fields": 48,
+      "indexes": 10
     },
     {
-      "key": "salarysheets",
-      "mongooseModel": "SalarySheet",
-      "declaredFields": {
-        "month": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "rows[]",
-        "totals{}",
-        "approvedBy",
-        "approvedAt"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "month": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "worker"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "expenseheads",
+      "model": "ExpenseHead",
+      "collection": "expenseheads",
+      "fields": 10,
+      "indexes": 3
     },
     {
-      "key": "advances",
-      "mongooseModel": "Advance",
-      "declaredFields": {
-        "empCode": "String",
-        "amount": "Number",
-        "date": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "empName",
-        "reason",
-        "monthlyDeduction",
-        "recovered"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "worker"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "worker"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "expenses",
+      "model": "Expense",
+      "collection": "expenses",
+      "fields": 26,
+      "indexes": 8
     },
     {
-      "key": "leaves",
-      "mongooseModel": "Leave",
-      "declaredFields": {
-        "empCode": "String",
-        "from": "String",
-        "to": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "empName",
-        "reason"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "worker"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "worker"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate"
+      "resource": "leaves",
+      "model": "Leave",
+      "collection": "leaves",
+      "fields": 18,
+      "indexes": 4
     },
     {
-      "key": "suppliers",
-      "mongooseModel": "Supplier",
-      "declaredFields": {
-        "name": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "mobile",
-        "gstin",
-        "city",
-        "supplies"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "machineentries",
+      "model": "MachineEntry",
+      "collection": "machineentries",
+      "fields": 40,
+      "indexes": 7
     },
     {
-      "key": "purchases",
-      "mongooseModel": "Purchase",
-      "declaredFields": {
-        "date": "String",
-        "supplierId": "String",
-        "total": "Number",
-        "paidAmount": "Number(default 0)"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "supplierName",
-        "itemId",
-        "itemName",
-        "qty",
-        "rate",
-        "gstPercent",
-        "prevRate",
-        "billNo",
-        "billPhoto",
-        "paidNow",
-        "payMode",
-        "dueDate"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "machines",
+      "model": "Machine",
+      "collection": "machines",
+      "fields": 20,
+      "indexes": 6
     },
     {
-      "key": "blocks",
-      "mongooseModel": "Block",
-      "declaredFields": {
-        "blockNo": "Number",
-        "rawanna": "String",
-        "cft": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "date",
-        "source",
-        "supplierId",
-        "supplierName",
-        "truckNo",
-        "rawannaPhoto",
-        "length",
-        "width",
-        "height",
-        "weight",
-        "grade",
-        "photo",
-        "yardLocation",
-        "costPerCft",
-        "cost",
-        "slabThicknessMm",
-        "stage"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "blockNo": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": {
-        "supervisor": [
-          "cost",
-          "costPerCft"
-        ],
-        "salesperson": [
-          "cost",
-          "costPerCft"
-        ]
-      },
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate"
+      "resource": "payments",
+      "model": "Payment",
+      "collection": "payments",
+      "fields": 20,
+      "indexes": 5
     },
     {
-      "key": "royalties",
-      "mongooseModel": "Royalty",
-      "declaredFields": {
-        "month": "String",
-        "amount": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "dueDate",
-        "paidDate",
-        "state",
-        "note"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "perfremarks",
+      "model": "PerfRemark",
+      "collection": "perfremarks",
+      "fields": 13,
+      "indexes": 3
     },
     {
-      "key": "dispatches",
-      "mongooseModel": "Dispatch",
-      "declaredFields": {
-        "date": "String",
-        "direction": "String",
-        "saleId": "String",
-        "truckNo": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "gatePassNo",
-        "saleNo",
-        "customerName",
-        "customerMobile",
-        "invoiceNo",
-        "items[]",
-        "driverName",
-        "driverMobile",
-        "transporter",
-        "freight",
-        "freightPaid",
-        "emptyWeight",
-        "loadedWeight",
-        "netWeight",
-        "photoLoaded",
-        "photoCovered",
-        "eway",
-        "outAt",
-        "guard",
-        "kind",
-        "note"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate,beforeUpdate,afterUpdate"
+      "resource": "purchases",
+      "model": "Purchase",
+      "collection": "purchases",
+      "fields": 31,
+      "indexes": 8
     },
     {
-      "key": "repairs",
-      "mongooseModel": "Repair",
-      "declaredFields": {
-        "date": "String",
-        "machineId": "String",
-        "kind": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "machineName",
-        "problem",
-        "action",
-        "spares",
-        "cost",
-        "stoppedHours",
-        "mechanic",
-        "photo",
-        "reportedBy"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,afterCreate,afterUpdate"
+      "resource": "repairs",
+      "model": "Repair",
+      "collection": "repairs",
+      "fields": 24,
+      "indexes": 5
     },
     {
-      "key": "cashentries",
-      "mongooseModel": "CashEntry",
-      "declaredFields": {
-        "date": "String",
-        "account": "String",
-        "type": "String",
-        "amount": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "ref",
-        "head",
-        "note",
-        "kind",
-        "systemBalance",
-        "counted",
-        "difference",
-        "confirmedBy"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        },
-        {
-          "date": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate"
+      "resource": "royalties",
+      "model": "Royalty",
+      "collection": "royalties",
+      "fields": 15,
+      "indexes": 4
     },
     {
-      "key": "tasks",
-      "mongooseModel": "Task",
-      "declaredFields": {
-        "dueDate": "String",
-        "assignedCode": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "title",
-        "details",
-        "assignedName",
-        "priority",
-        "state",
-        "doneAt",
-        "doneNote",
-        "donePhoto",
-        "assignedBy"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson",
-        "worker"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,beforeUpdate"
+      "resource": "safetyrecords",
+      "model": "SafetyRecord",
+      "collection": "safetyrecords",
+      "fields": 25,
+      "indexes": 5
     },
     {
-      "key": "complaints",
-      "mongooseModel": "Complaint",
-      "declaredFields": {
-        "date": "String",
-        "customerId": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "complaintNo",
-        "customerName",
-        "invoiceNo",
-        "problem",
-        "details",
-        "photo",
-        "action",
-        "actionNote",
-        "state",
-        "closedDate",
-        "daysTaken",
-        "linkedCode (seed only; no UI field)"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor",
-        "salesperson"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate,beforeUpdate"
+      "resource": "salarysheets",
+      "model": "SalarySheet",
+      "collection": "salarysheets",
+      "fields": 24,
+      "indexes": 4
     },
     {
-      "key": "vehicles",
-      "mongooseModel": "Vehicle",
-      "declaredFields": {
-        "regNo": "String",
-        "kind": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "name",
-        "insuranceExpiry",
-        "fitnessExpiry",
-        "permitExpiry",
-        "pucExpiry",
-        "rcPhoto",
-        "notes"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "sales",
+      "model": "Sale",
+      "collection": "sales",
+      "fields": 41,
+      "indexes": 15
     },
     {
-      "key": "vehicletrips",
-      "mongooseModel": "VehicleTrip",
-      "declaredFields": {
-        "date": "String",
-        "vehicleId": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "vehicleName",
-        "driverName",
-        "work",
-        "hours",
-        "km",
-        "dieselLitres",
-        "dieselAmount",
-        "dieselPerUnit"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate"
+      "resource": "stockcounts",
+      "model": "StockCount",
+      "collection": "stockcounts",
+      "fields": 16,
+      "indexes": 3
     },
     {
-      "key": "documents",
-      "mongooseModel": "PaperDoc",
-      "declaredFields": {
-        "name": "String",
-        "expiryDate": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "category",
-        "file",
-        "note"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": "lib/hooks.js: beforeCreate"
+      "resource": "stockitems",
+      "model": "StockItem",
+      "collection": "stockitems",
+      "fields": 24,
+      "indexes": 6
     },
     {
-      "key": "safetyrecords",
-      "mongooseModel": "SafetyRecord",
-      "declaredFields": {
-        "kind": "String",
-        "date": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "empCode",
-        "empName",
-        "item",
-        "signature",
-        "severity",
-        "where",
-        "what",
-        "firstAid",
-        "action",
-        "photo",
-        "machine",
-        "topic",
-        "dueDate",
-        "note"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "stockmovements",
+      "model": "StockMovement",
+      "collection": "stockmovements",
+      "fields": 23,
+      "indexes": 7
     },
     {
-      "key": "perfremarks",
-      "mongooseModel": "PerfRemark",
-      "declaredFields": {
-        "month": "String",
-        "empCode": "String"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "empName",
-        "remark"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "apiWriteRoles": [
-        "owner",
-        "manager",
-        "accountant",
-        "supervisor"
-      ],
-      "voidRoles": [
-        "owner",
-        "manager",
-        "accountant"
-      ],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "suppliers",
+      "model": "Supplier",
+      "collection": "suppliers",
+      "fields": 15,
+      "indexes": 3
     },
     {
-      "key": "auditlogs",
-      "mongooseModel": "AuditLog",
-      "declaredFields": {
-        "model": "String",
-        "refId": "String",
-        "action": "String",
-        "by": "String",
-        "role": "String",
-        "changes": "Mixed"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [
-        "label"
-      ],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [
-        "owner",
-        "manager"
-      ],
-      "apiWriteRoles": [],
-      "voidRoles": [],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "tasks",
+      "model": "Task",
+      "collection": "tasks",
+      "fields": 21,
+      "indexes": 4
     },
     {
-      "key": "counters",
-      "mongooseModel": "Counter",
-      "declaredFields": {
-        "_id": "String",
-        "seq": "Number"
-      },
-      "commonFields": {
-        "status": "String default \"active\" (indexed)",
-        "createdBy": "String",
-        "updatedBy": "String",
-        "createdAt": "Date (timestamps)",
-        "updatedAt": "Date (timestamps)"
-      },
-      "observedUndeclaredFields": [],
-      "indexes": [
-        {
-          "status": 1
-        }
-      ],
-      "requiredFields": [],
-      "uniqueConstraints": [],
-      "strictSchema": false,
-      "apiReadRoles": [],
-      "apiWriteRoles": [],
-      "voidRoles": [],
-      "hiddenFieldsByRole": null,
-      "hooks": null
+      "resource": "vehicles",
+      "model": "Vehicle",
+      "collection": "vehicles",
+      "fields": 19,
+      "indexes": 4
+    },
+    {
+      "resource": "vehicletrips",
+      "model": "VehicleTrip",
+      "collection": "vehicletrips",
+      "fields": 22,
+      "indexes": 5
     }
-  ],
-  "middleware": {
-    "file": "middleware.js",
-    "rule": "redirect to /login if cookie vss_role is absent (any value is accepted); /api is excluded from the matcher"
-  },
-  "sequences": [
-    "block (start 250)",
-    "sale (SO-, start 8)",
-    "gatepass (GP-, start 40)",
-    "complaint (CMP-)",
-    "emp (E###, start 45)",
-    "invoice-<FY> (VSS/<FY>/####)"
   ]
 }

@@ -11,6 +11,7 @@ import LookupSelect from './LookupSelect';
 import { api, submit, ApiError } from '@/lib/client';
 import { toQuery, useDebounced, usePagedList } from '@/lib/usePaged';
 import { todayISO, fmtDate, fmtDateTime } from '@/lib/format';
+import { EMPLOYEE_RULES } from '@/lib/validators';
 import T from '@/components/T';
 
 const TONE = {
@@ -31,7 +32,7 @@ const LOOKUP_KIND = { employees: 'employees', machines: 'machines', stockitems: 
 function RefSelect({ field, form, set, id }) {
   const r = field.ref;
   const kind = LOOKUP_KIND[r.model];
-  const { sort: _sort, ...query } = r.query || {}; // eslint-disable-line no-unused-vars
+  const { sort: _sort, ...query } = r.query || {};  
   const by = r.valueKey && r.valueKey !== '_id' ? r.valueKey : undefined;
   async function pick(it) {
     const patch = { [field.name]: it ? it.id : '' };
@@ -53,16 +54,19 @@ function RefSelect({ field, form, set, id }) {
 const level = (perm, f) => (f.group ? perm?.fields?.[f.group] || 'none' : 'write');
 const visible = (perm, f) => ['read', 'write'].includes(level(perm, f));
 
-export function FormFields({ fields, form, set, mode }) {
+export function FormFields({ fields, form, set, mode, showErrors = false }) {
   const { perm } = useApp();
   const tx = useTx();
+  const [touched, setTouched] = useState({}); // fields the person has already left: only those show their error while typing continues elsewhere
   const visibleFields = fields.filter((f) => (!f.show || f.show(form)) && visible(perm, f) && !(f.createOnly && mode === 'edit'));
   const hasSections = visibleFields.some((f) => f.section);
 
   const renderField = (f) => {
     const v = form[f.name] ?? '';
     const span = f.half ? '' : f.type === 'textarea' || (f.type === 'photo' && !f.half) || f.type === 'photos' || f.wide ? 'sm:col-span-2' : '';
-    const disabled = (f.readOnlyOnEdit && mode === 'edit') || level(perm, f) === 'read';
+    const disabled = f.readOnly || (f.readOnlyOnEdit && mode === 'edit') || level(perm, f) === 'read';
+    const rule = f.rule ? EMPLOYEE_RULES[f.rule] : null;
+    const error = (touched[f.name] || showErrors) && !disabled ? fieldError(f, form, mode) : '';
     const id = `f_${f.name}`;
     let input;
     switch (f.type) {
@@ -98,11 +102,13 @@ export function FormFields({ fields, form, set, mode }) {
         ); break;
       default:
         input = (
-          <input id={id} className="input" type={f.type || 'text'} inputMode={f.type === 'number' ? 'decimal' : undefined} step={f.type === 'number' ? 'any' : undefined}
-            value={v} disabled={disabled} placeholder={tx(f.placeholder)} onChange={(e) => set({ [f.name]: e.target.value })} />
+          <input id={id} className={cx('input', error && '!border-red-500')} type={f.type || 'text'} inputMode={rule?.inputMode || (f.type === 'number' ? 'decimal' : undefined)} step={f.type === 'number' ? 'any' : undefined}
+            value={v} disabled={disabled} placeholder={tx(f.placeholder)} autoCapitalize={rule?.autoCapitalize} spellCheck={rule ? false : undefined} aria-invalid={error ? true : undefined}
+            onChange={(e) => set({ [f.name]: rule ? rule.live(e.target.value) : e.target.value })}
+            onBlur={() => { if (rule && v !== '') set({ [f.name]: rule.clean(v) }); setTouched((t) => ({ ...t, [f.name]: true })); }} />
         );
     }
-    return <Field key={f.name} htmlFor={id} className={span} label={f.type === 'checkbox' ? '' : f.label} required={f.required} hint={f.hint}>{input}</Field>;
+    return <Field key={f.name} htmlFor={id} className={span} label={f.type === 'checkbox' ? '' : f.label} required={f.required} hint={f.hint} error={error}>{input}</Field>;
   };
 
   if (!hasSections) {
@@ -138,10 +144,32 @@ export function FormFields({ fields, form, set, mode }) {
   );
 }
 
+/** The message under a field, or '' when it is fine: the field's own format rule first, then its `validate(form)` (checks across fields). */
+export function fieldError(f, form, mode) {
+  const v = form[f.name];
+  if (f.rule && typeof v === 'string' && v !== '') {
+    const m = EMPLOYEE_RULES[f.rule].check(v);
+    if (m) return m;
+  }
+  return f.validate ? f.validate(form, mode) || '' : '';
+}
+
+/** The first format problem among the fields that are shown and changed; null when all are fine. An unchanged old value is never held against a save. */
+export function firstFieldError(fields, form, editing, canWrite) {
+  for (const f of fields) {
+    if ((!f.rule && !f.validate) || (f.show && !f.show(form)) || !canWrite(f)) continue;
+    if (editing && !f.validate && same(form[f.name], editing[f.name])) continue;
+    const message = fieldError(f, form, editing ? 'edit' : 'new');
+    if (message) return { label: f.label, message, name: f.name };
+  }
+  return null;
+}
+
 export function cleanForm(fields, form) {
   const out = { ...form };
   for (const f of fields) {
     if (f.type === 'number') out[f.name] = out[f.name] === '' || out[f.name] == null ? undefined : Number(out[f.name]);
+    if (f.rule && typeof out[f.name] === 'string') out[f.name] = EMPLOYEE_RULES[f.rule].clean(out[f.name]);
   }
   Object.keys(out).forEach((k) => out[k] === undefined && delete out[k]);
   return out;
@@ -204,6 +232,7 @@ export default function CrudPage({
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
   const savingRef = useRef(false);
   const [hist, setHist] = useState(null);
   const [voiding, setVoiding] = useState(null);
@@ -212,8 +241,8 @@ export default function CrudPage({
   const voidBusyRef = useRef(false);
 
   const mayAdd = canAdd && can(model, 'create');
-  const openNew = () => { setEditing(null); setForm({ date: todayISO(), ...Object.fromEntries(fields.filter((f) => f.default !== undefined).map((f) => [f.name, typeof f.default === 'function' ? f.default() : f.default])), ...defaults }); setOpen(true); };
-  useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew(); /* eslint-disable-next-line */ }, []);
+  const openNew = () => { setEditing(null); setShowErrors(false); setForm({ date: todayISO(), ...Object.fromEntries(fields.filter((f) => f.default !== undefined).map((f) => [f.name, typeof f.default === 'function' ? f.default() : f.default])), ...defaults }); setOpen(true); };
+  useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew();   }, []);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   // lists carry no photos or documents, so editing loads the full record first
@@ -221,14 +250,16 @@ export default function CrudPage({
     try {
       const full = await api(`/api/${model}/${row._id}`);
       const extra = loadExtra ? await loadExtra(full) : {};
-      setEditing(full); setForm({ ...full, ...extra }); setOpen(true);
+      setEditing(full); setShowErrors(false); setForm({ ...full, ...extra }); setOpen(true);
     } catch (e) { toast.error(e.message); }
   }
 
   async function save() {
     if (savingRef.current) return;
     const miss = missingRequired(fields, form);
-    if (miss) { toast.error(trNow('{f} is required', { f: trNow(miss) })); return; }
+    if (miss) { setShowErrors(true); toast.error(trNow('{f} is required', { f: trNow(miss) })); return; }
+    const bad = firstFieldError(fields, form, editing, (f) => visible(perm, f) && level(perm, f) === 'write');
+    if (bad) { setShowErrors(true); toast.error(`${trNow(bad.label)}: ${trNow(bad.message)}`); document.getElementById(`f_${bad.name}`)?.focus(); return; }
     const names = new Set([...fields.filter((f) => visible(perm, f) && level(perm, f) === 'write').map((f) => f.name), ...Object.keys(defaults)]);
     let body = cleanForm(fields, form);
     if (beforeSave) {
@@ -341,7 +372,7 @@ export default function CrudPage({
           <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[110px]" onClick={() => setOpen(false)}>{t('cancel')}</button>
           <button type="button" className="btn-primary flex-1 sm:flex-initial sm:min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed" onClick={save} disabled={saving}>{saving ? '…' : editing ? t('save') : t('submit')}</button>
         </>}>
-        <FormFields fields={fields} form={form} set={set} mode={editing ? 'edit' : 'new'} />
+        <FormFields fields={fields} form={form} set={set} mode={editing ? 'edit' : 'new'} showErrors={showErrors} />
       </Sheet>
 
       <Sheet open={!!voiding} onClose={() => { if (!voidBusy) setVoiding(null); }} title={t('cancelEntry')}

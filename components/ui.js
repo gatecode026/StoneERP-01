@@ -66,13 +66,13 @@ export function Badge({ tone = 'gray', children, className }) {
   return <span className={cx(`badge-${tone}`, className)}>{tx(children)}</span>;
 }
 
-export function Field({ label, hint, children, className, required, htmlFor }) {
+export function Field({ label, hint, children, className, required, htmlFor, error }) {
   const tx = useTx();
   return (
     <div className={className}>
       {label && <label htmlFor={htmlFor} className="label">{tx(label)}{required && <span className="text-red-500"> *</span>}</label>}
       {children}
-      {hint && <div className="text-[11px] text-char-500 mt-1">{tx(hint)}</div>}
+      {error ? <div className="text-[12px] text-red-600 mt-1" role="alert">{tx(error)}</div> : hint && <div className="text-[11px] text-char-500 mt-1">{tx(hint)}</div>}
     </div>
   );
 }
@@ -299,7 +299,7 @@ export function Photo({ src, thumb = false, alt = '', className = '', width, hei
   if (!url) return null;
   if (state === 'error') return <div className={cx('flex items-center justify-center bg-sand-100 text-char-300', className)} style={{ width, height }} role="img" aria-label={alt}><ImageIcon size={16} /></div>;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
+     
     <img
       src={url} alt={alt} loading="lazy" decoding="async" width={width} height={height}
       onLoad={() => setState('ready')} onError={() => setState('error')}

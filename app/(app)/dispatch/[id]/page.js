@@ -1,6 +1,6 @@
 'use client';
 import { useParams } from 'next/navigation';
-import { Printer, MessageCircle, LogOut } from 'lucide-react';
+import { Printer, MessageCircle, LogOut, Download } from 'lucide-react';
 import toast from '@/lib/toast';
 import { useApp, useFetch, EnglishOnly } from '@/components/Providers';
 import { PageHeader, SkeletonList, RoleGuard, Photo } from '@/components/ui';
@@ -25,6 +25,7 @@ export default function GatePass() {
       <PageHeader title={tr('Gate pass {n}', { n: d.gatePassNo })} back="/dispatch" actions={<>
         {!out && can('dispatches', 'approve') && <button className="btn-primary" onClick={markOut}><LogOut size={16} /><T> Guard: mark truck out</T></button>}
         {out && <button className="btn-green" onClick={() => openWA(msg, d.customerMobile)}><MessageCircle size={16} /><T> Tell customer</T></button>}
+        <a className="btn-primary" href={`/api/dispatches/${id}/pdf`} download><Download size={16} /><T> Download PDF</T></a>
         <button className="btn-outline" onClick={() => window.print()}><Printer size={16} /><T> Print</T></button>
       </>} />
       <div className="print-doc card max-w-2xl mx-auto p-6"><EnglishOnly>

@@ -1,15 +1,13 @@
 'use client';
-import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from '@/lib/toast';
 import { BadgeCheck, Save, Banknote, FileText, MessageCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, Sheet, KV, ExportBtn, Section, SkeletonList, Empty, Pagination } from '@/components/ui';
-import CrudPage, { StatusBadge } from '@/components/CrudPage';
+import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination } from '@/components/ui';
 import { api, downloadCSV, openWA } from '@/lib/client';
-import { inr, num, fmtMonth, todayISO, monthOf, addDays, fmtDate } from '@/lib/format';
+import { inr, num, fmtMonth, todayISO, monthOf, addDays } from '@/lib/format';
 import { SALARY } from '@/lib/config';
 import T from '@/components/T';
 
@@ -19,7 +17,6 @@ const PT = { monthly: 'Monthly', daily: 'Daily', piece: 'Piece rate' };
 export default function SalaryPage() {
   const { t, tr, can } = useApp();
   const isWorker = !can('salarysheets'); // people without the sheet only ever see their own slip
-  const [tab, setTab] = useState('sheet');
   const [month, setMonth] = useState(prevMonth());
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(25);
@@ -58,14 +55,13 @@ export default function SalaryPage() {
   return (
     <RoleGuard perm={["salarysheets", "salaryslips"]}>
       <PageHeader title={t('salary')} subtitle={isWorker ? 'Your salary slip' : 'Calculated automatically from attendance, pay rate and advances'}
-        actions={<>{!isWorker && <ImportData resource="advances" perm="advances" noun="advances" hint="employee and amount are required" />}
+        actions={<>
           <input type="month" className="input !w-auto" value={month} max={monthOf(todayISO())} onChange={(e) => setMonth(e.target.value || month)} />
           {can('salarysheets', 'export') && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/salary/preview?month=${month}&all=1`); downloadCSV(`salary-sheet-${month}`, all.rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, { key: 'otPay', label: 'Overtime' }, { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }]); } catch (e) { toast.error(e.message); } }} />}
         </>} />
 
-      {!isWorker && can('advances') && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'sheet', label: 'Salary sheet' }, { key: 'advances', label: 'Advance register' }]} />}
 
-      {(isWorker || tab === 'sheet') && (
+      {(
         <>
           {!isWorker && (
             <>
@@ -93,18 +89,9 @@ export default function SalaryPage() {
             </>
           ) : <Empty text="No salary data for this month" />}
           <p className="text-[11px] text-char-500 mt-3">
-            <T vars={{ o: SALARY.otMultiplier, p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Monthly = salary ÷ days in month × days present (paid leave counts) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime = {o}× hourly rate · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.'}</T>
+            <T vars={{ o: SALARY.otMultiplier, p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Monthly = salary ÷ days in month × paid days (days worked + paid leave + weekly offs and holidays) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime (only after it is approved) = {o}× hourly rate · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.'}</T>
           </p>
         </>
-      )}
-
-      {!isWorker && tab === 'advances' && (
-        <CrudPage model="advances" title="Advance register" label="Advance" noHeader sort="-date" searchKeys={['empName', 'reason']} canEdit={() => false}
-          fields={[{ name: 'empCode', label: 'Employee', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'empName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } },
-            { name: 'date', label: 'Date given', type: 'date', required: true }, { name: 'amount', label: 'Advance amount (₹)', type: 'number', required: true }, { name: 'monthlyDeduction', label: 'Cut from each salary (₹)', type: 'number', required: true }, { name: 'reason', label: 'Reason', wide: true }]}
-          columns={[{ key: 'empName', label: 'Employee', primary: true }, { key: 'date', label: 'Given', render: (r) => fmtDate(r.date) }, { key: 'amount', label: 'Advance', render: (r) => inr(r.amount) }, { key: 'monthlyDeduction', label: 'Monthly cut', render: (r) => inr(r.monthlyDeduction) },
-            { key: 'recovered', label: 'Recovered', render: (r) => inr(r.recovered) }, { label: 'Balance', render: (r) => <b>{inr((r.amount || 0) - (r.recovered || 0))}</b> }, { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> }]}
-          rowActions={(row, { reload }) => (row.status === 'pending' && can('advances', 'approve') ? [{ label: 'Approve', tone: 'green', onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'advances', id: row._id, action: 'approve' } }); toast.success('Advance approved'); reload(); } catch (e) { toast.error(e.message); } } }] : [])} />
       )}
 
       <Sheet open={!!sel} onClose={() => setSel(null)} title={`${sel?.name} · ${fmtMonth(month)}`}
@@ -114,9 +101,10 @@ export default function SalaryPage() {
             <div className="rounded-xl bg-sand-100 p-3 text-sm mb-3"><div className="text-[11px] uppercase font-bold text-char-500 mb-1"><T>How wages were worked out</T></div><div className="font-mono text-[13px]">{sel.formula}</div></div>
             <KV label="Pay type">{PT[sel.payType]} · ₹{num(sel.rate)}</KV>
             {sel.unmarked > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.unmarked }}>{'{n} day(s) have no attendance marked — they are not paid.'}</T></div>}
-            {sel.payType !== 'piece' && <><KV label="Present / overtime days">{sel.present} / {sel.overtime}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV></>}
+            {sel.payType !== 'piece' && <><KV label="Present days">{sel.present}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV>{sel.paidOffDays > 0 && <KV label="Weekly off / holidays (paid)">{sel.paidOffDays}</KV>}</>}
             <KV label="Wages">{inr(sel.wages)}</KV>
-            <KV label={tr('Overtime ({h} h × {m}×)', { h: sel.otHours, m: SALARY.otMultiplier })}>+ {inr(sel.otPay)}</KV>
+            <KV label={tr('Overtime approved ({h} h × {m}×)', { h: sel.otHours, m: SALARY.otMultiplier })}>+ {inr(sel.otPay)}</KV>
+            {sel.otPendingHours > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.otPendingHours }}>{'{n} h of overtime is waiting for approval and is not in this salary yet. Approve it on the Attendance screen, then the salary is worked out again.'}</T></div>}
             <KV label="Gross">{inr(sel.gross)}</KV>
             <KV label="PF">− {inr(sel.pf)}</KV><KV label="ESI">− {inr(sel.esi)}</KV><KV label="Advance recovery">− {inr(sel.advanceRecovery)}</KV>
             <KV label={<b><T>Net salary</T></b>}><b className="text-lg text-terra">{inr(sel.net)}</b></KV>

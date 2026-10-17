@@ -5,12 +5,35 @@ import { connect } from '@/lib/db';
 import { Settings } from '@/lib/models/settings';
 import { clearSettingsCache, getSettings } from '@/lib/settings';
 import { diffObjects, writeAudit } from '@/lib/audit';
+import { Employee } from '@/lib/models';
+import { badRequest } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 20:00');
 const text = (max = 200) => z.string().trim().max(max);
 const money = z.number().min(0).max(1e10);
+
+const shift = z.object({
+  id: z.string().trim().toLowerCase().regex(/^[a-z0-9_-]{1,20}$/, 'Shift code: small letters, digits, - or _ (up to 20)'),
+  name: text(40).min(1, 'Give the shift a name'), start: time, end: time,
+  breakMinutes: z.number().int().min(0).max(240), graceMinutes: z.number().int().min(0).max(120),
+  fullDayHours: z.number().min(1).max(24), halfDayHours: z.number().min(0.5).max(24),
+  otBufferMinutes: z.number().int().min(0).max(240), otRoundMinutes: z.number().int().min(1).max(120),
+}).strict().superRefine((v, ctx) => {
+  if (v.start === v.end) ctx.addIssue({ code: 'custom', message: `${v.name}: start and end cannot be the same time` });
+  if (v.halfDayHours > v.fullDayHours) ctx.addIssue({ code: 'custom', message: `${v.name}: half-day hours cannot be more than full-day hours` });
+});
+const weekOff = z.enum(['none', 'all', '1st3rd5th', '2nd4th']);
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-11-09').refine((v) => !Number.isNaN(Date.parse(v)), 'Not a real date');
+const workHours = z.object({
+  shifts: z.array(shift).min(1, 'Keep at least one shift').max(10).superRefine((a, ctx) => { if (new Set(a.map((x) => x.id)).size !== a.length) ctx.addIssue({ code: 'custom', message: 'Two shifts have the same code' }); }),
+  defaultShiftId: z.string().trim().toLowerCase(),
+  weekOff: z.object({ sun: weekOff, mon: weekOff, tue: weekOff, wed: weekOff, thu: weekOff, fri: weekOff, sat: weekOff }).partial(),
+  holidays: z.array(z.object({ date: isoDate, endDate: z.union([isoDate, z.literal('')]).optional(), name: text(60).min(1, 'Give the holiday a name') }).strict()
+    .refine((h) => !h.endDate || h.endDate >= h.date, 'A holiday cannot end before it starts')).max(120),
+  paidWeekOff: z.boolean(), appPunching: z.boolean(), punchGapMinutes: z.number().int().min(0).max(60), openDayAfterHours: z.number().min(0).max(24),
+}).partial();
 
 // every section is optional: the screen saves one section at a time
 const body = z.object({
@@ -28,6 +51,7 @@ const body = z.object({
     pfRate: z.number().min(0).max(1), pfWageCap: money, esiRate: z.number().min(0).max(1), esiGrossCap: money, payDay: z.number().int().min(1).max(28),
   }).partial(),
   costRates: z.object({ labourPerHour: money, powerPerUnit: money, dieselPerLitre: money }).partial(),
+  workHours,
   fyStartMonth: z.number().int().min(1).max(12),
 }).partial().strict();
 
@@ -40,6 +64,20 @@ export const GET = withAuth('settings', 'view', async (auth) => jsonWithEtag(aut
 export const PUT = withAuth('settings', 'edit', async (auth) => {
   const input = await auth.json(body);
   const before = await getSettings();
+  const wh = input.workHours;
+  if (wh) {
+    const shifts = wh.shifts ?? before.workHours.shifts;
+    const ids = new Set(shifts.map((x) => x.id));
+    const def = wh.defaultShiftId ?? before.workHours.defaultShiftId;
+    if (!ids.has(def)) throw badRequest('Choose one of the shifts as the default shift');
+    if (wh.shifts) {
+      const removed = before.workHours.shifts.map((x) => x.id).filter((id) => !ids.has(id));
+      if (removed.length) {
+        const used = await Employee.countDocuments({ shiftId: { $in: removed }, isVoid: false });
+        if (used) throw badRequest(`${used} employee${used > 1 ? 's' : ''} still work${used > 1 ? '' : 's'} on a shift you removed. Change their shift first.`);
+      }
+    }
+  }
   const $set: Record<string, unknown> = { updatedBy: auth.user.name };
   for (const [section, value] of Object.entries(input)) {
     if (section === 'fyStartMonth') { $set.fyStartMonth = value; continue; }

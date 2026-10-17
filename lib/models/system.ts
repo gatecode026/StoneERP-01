@@ -42,6 +42,7 @@ export const RolePermission = defineModel(
     fields: { money: { type: S, enum: ['none', 'masked', 'read', 'write'] }, cost: { type: S, enum: ['none', 'masked', 'read', 'write'] }, pii: { type: S, enum: ['none', 'masked', 'read', 'write'] } },
     approvalLimit: { type: N, default: null },
     version: { type: N, default: 0 },
+    known: { type: [S], default: undefined }, // the resources that existed when this role was saved; ones added later start from the code defaults
     updatedBy: S,
   },
   { noBase: true }

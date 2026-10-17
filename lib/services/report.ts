@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getSettings } from '../settings';
+import { punchState } from './punch';
 import { Account, Attendance, CashClosing, Customer, DailyReport, Dispatch, Employee, Expense, MachineEntry, Payment, Repair, Sale, StockItem, Task } from '../models';
 import { scopeFilter, type EffectivePerm } from '../perm/engine';
 import type { SessionUser } from '../auth/session';
@@ -140,11 +142,12 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
 /** The worker's own home: today's attendance, report and open tasks. */
 export async function workerHome(date: string, user: U & { empCode: string | null }) {
   if (!user.empCode) return { me: null, attendance: null, report: null, tasks: [] };
-  const [me, att, rep, tasks] = await Promise.all([
+  const [me, att, rep, tasks, punch] = await Promise.all([
     Employee.findOne({ empCode: user.empCode, isVoid: false }).select('name job empCode').lean(),
-    Attendance.findOne({ date, empCode: user.empCode, isVoid: false }).select('state method').lean(),
+    Attendance.findOne({ date, empCode: user.empCode, isVoid: false }).select('state method inAt outAt workedMinutes otMinutes otStatus lateMinutes').lean(),
     DailyReport.findOne({ date, empCode: user.empCode, isVoid: false }).select('narration submittedAt').lean(),
     Task.find({ assignedCode: user.empCode, state: 'pending', isVoid: false }).sort({ dueDate: 1 }).limit(10).select('title dueDate priority').lean(),
+    getSettings().then((settings) => punchState({ settings }, user.empCode as string)),
   ]);
-  return { me, attendance: att, report: rep, tasks, date: todayIST() };
+  return { me, attendance: att, report: rep, tasks, date: todayIST(), punch };
 }

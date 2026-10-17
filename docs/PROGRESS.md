@@ -68,7 +68,7 @@ One entry per phase. Every phase ends with: `npm run lint`, `npm run typecheck`,
 | **Accountant** | Money board: receivables **ageing 0-15 / 16-30 / 31-60 / 60+** (Mongo `$bucket`), top-owing customers with one-tap WhatsApp reminder, payables due this week, orders without a GST bill, trucks sent without e-way bill, salary-sheet status, cash/bank + closing status, month-close checklist, export shortcuts. | `RoleHomes.js` |
 | **Supervisor** | Team board, no money anywhere: one-tap P/A/½/OT/L per person (optimistic) + **Mark all present** (single bulk request), team reports to check (OK / Not OK), machines with no entry this shift, team output, breakdowns, safety check-ups due, tasks. | `RoleHomes.js` |
 | **Salesperson** | Sales board: my sales today/month, my open quotations/orders, my customers who owe (with age in days and WhatsApp reminder), live stock search, my open complaints, big "New quotation". Scope is *own*: another salesperson's home is empty. | `RoleHomes.js` |
-| **Worker** | Exactly four cards: mark attendance (selfie + real GPS), write today's report, my salary slip, my tasks. Large buttons. | `RoleHomes.js` |
+| **Worker** | Exactly four cards: my attendance (read-only; selfie attendance was removed, a supervisor marks it and a biometric machine is planned), write today's report, my salary slip, my tasks. Large buttons. | `RoleHomes.js` |
 | **Job presets** | Guard (trucks waiting → **Mark truck OUT** with gate-pass link), Store keeper (stock to refill, today's movements), Mechanic (open breakdowns, service due), Cashier (cash/bank, closing count, today's entries), Driver (today's trips, diesel this month, vehicle papers), Yard in-charge (blocks in yard, trucks in) — the one daily task first, then the worker cards. | `RoleHomes.js` |
 
 * Every card handles ready / empty / no-permission; the page handles loading (skeleton shaped like the final layout) and error (retry). Charts are lazy-loaded (`next/dynamic`) so they never weigh on first paint.
@@ -194,7 +194,7 @@ How it works (same for all, `lib/import/specs.ts` + `app/api/import/[resource]`)
 
 Checked at 360 px on all 23 sidebar screens (no horizontal overflow anywhere) and fixed the common problems: the top bar no longer overflows (brand shortens, three 44 px buttons); every page title is followed by **one tidy action bar** (Import / date or month / Excel / primary action wrap together, equal 44 px heights, the primary "Add" at the end) instead of one button per line; the import button reads "Import" on a phone; search and filters sit in a neat grid (search full width, filters two per row); tab rows scroll sideways with a soft edge and correct start padding; an odd last stat card spans the full row; the Roles toolbar is a 3-button grid; the Daily Work Report "Not filled yet" card keeps its button beside the text. Shared styles live in `app/globals.css` (`.page-actions`, `.tabs-row`, `.filter-row`) and `PageHeader`, so every screen gets them.
 
-## Phase 7 — Settings, notifications, backups, exports, health  ◐ (core done; PDF generation and an error-tracker SDK deliberately not built)
+## Phase 7 — Settings, notifications, backups, exports, health  ✅ (PDF generation and the error-tracker adapter were finished in Phase 8)
 
 | Brief item | Status |
 |---|---|
@@ -204,8 +204,8 @@ Checked at 360 px on all 23 sidebar screens (no horizontal overflow anywhere) an
 | WhatsApp + scheduler | **Done as an adapter.** `lib/notify/whatsapp.ts`: with `WHATSAPP_PROVIDER=cloud` + token + phone id the outbox is sent through the WhatsApp Business Cloud API (claimed row by row so two runs never send twice; 429/5xx/network retried up to 5 times, other 4xx fail at once; optional approved template). Without it, messages wait as **manual** under *Settings → WhatsApp messages to send* with a one-tap wa.me link and Mark sent / Skip. The daily report and payment-reminder jobs now deliver after queueing; a new `send-notifications` job (hourly period) retries. **Not verified against live WhatsApp** (no account here): the request shape follows Meta's documentation and is covered by tests with a stubbed network. |
 | Backups | **Done.** `lib/backup.ts`: every collection (except sessions, rate-limit counters, one-time codes) as gzip'd Extended-JSON lines, streamed (flat memory). Nightly `backup` job (cron 21:00 UTC) keeps `backups/<date>.ndjson.gz` in storage for `BACKUP_RETENTION_DAYS` (14); the Owner can download one now (Settings → Backup; no password hashes; audit-logged; 3 per hour). `npm run restore -- <file>` puts it back and refuses to touch a collection that already has data unless `--replace`. Test: backup → wipe → restore gives identical documents (ids, dates, encrypted fields). **Limit:** the nightly job holds the compressed file in memory before uploading, fine for this data size; for a very large database rely on Atlas continuous backup as well. Cloudinary is not suitable for backup files: use S3/R2. |
 | Excel / Tally export | **Done.** Every Excel button now downloads a real `.xlsx` (`?format=xlsx`: numbers are numbers, dates are dates, mobile numbers keep their digits, header frozen; streamed row by row), same rights, scope, field hiding and audit as the CSV (CSV still available). **Tally:** `GET /api/export/tally?from&to` (Settings → Accounts export) writes one XML with ledgers first, then Sales, Purchase, Receipt and Payment vouchers that each add to zero; needs export rights over the whole books; records that do not balance are skipped and counted. **Not tested against Tally itself** (not installed here): ledger names (Sales, Purchases, Output CGST/SGST/IGST, Input GST, Cash, Bank Account) follow Tally defaults and may need to match your company. Purchases book one combined *Input GST* ledger because the purchase record has no CGST/SGST split. |
-| Health / monitoring | **Done without a Sentry SDK.** `GET /api/health` (up) and `?deep=1` (also pings the database; 503 when down) for a monitor; unhandled server errors are logged with route and reference and, with `ERROR_WEBHOOK_URL`, posted to Slack/Discord/Teams at most once a minute (`lib/errorReport.ts`, `onRequestError`). |
-| PDF gaps | **Not built.** Invoices, salary slips and gate passes have print pages (browser "Save as PDF") and WhatsApp text sharing. Generating PDFs on the server needs a PDF library plus Devanagari text shaping; it is a separate piece of work and was left out rather than shipped with broken Hindi. |
+| Health / monitoring | **Done; Sentry through its HTTP endpoint, no SDK (Phase 8).** `GET /api/health` (up) and `?deep=1` (also pings the database; 503 when down) for a monitor; unhandled server errors are logged with route and reference and, with `ERROR_WEBHOOK_URL`, posted to Slack/Discord/Teams at most once a minute (`lib/errorReport.ts`, `onRequestError`). |
+| PDF gaps | **Done in Phase 8** (see below): invoice, quotation, gate pass and salary slip (English and Hindi) are generated on the server as real PDFs. |
 
 **Tests:** settings (5), backup/restore (4), health (2), notifications (8), Excel export (2), Tally (3 + 3 unit), error alerts (3).
 
@@ -220,3 +220,119 @@ A scripted end-to-end run against the live site as the Owner (read sweep of 25 s
 | Two employee profiles could share a mobile number silently | The form asks "<name> (E046) already has this mobile number. Save anyway?" (imports confirm automatically). |
 
 Also seen on live, not bugs: `/settings` and `/api/notifications` return 404 because live runs the pre-Phase-7 `main`; every request takes about 1.1 s (see the Phase 8 latency check). The run left only voided test records (and their audit entries) on live.
+
+## Phase 8 — Tests, CI, deploy, docs, measurement  ✅
+
+| Brief item | Status |
+|---|---|
+| Permission matrix tests | Already in place (`tests/permissions/matrix.test.ts`); run in CI with everything else. |
+| Unit / integration tests | 27 files, **584 tests** (in-memory MongoDB replica set, no external account needed). New this phase: PDF documents and their rights (`pdf.test.ts`, 4), Sentry envelope (1). |
+| Browser end-to-end | **Done.** `tests/e2e` (Playwright, 360 px phone, `npm run test:e2e`): wrong password refused; signed-out visitor sent to sign-in; Owner signs in and out; session cookie is HttpOnly; **all 23 Owner screens fit a 360 px phone with no sideways scrolling**; Hindi/English toggle both ways; Worker cannot open settings, books or purchases and the API agrees; Supervisor cannot read salaries or settings; a write from another website is refused (CSRF); Owner creates a customer, finds it, cancels it and sees it in the Audit Trail. 10 tests, ~2 minutes on `next dev` with a throw-away database (`scripts/e2e-server.ts`). |
+| CI | **Done.** `.github/workflows/ci.yml`: install, lint, typecheck, tests, `npm audit` (high and above), build, bundle budget; then a second job runs the browser tests. **Not run on GitHub yet** (no push from here): the first run on the repository is the real check. |
+| Deploy | **Done.** `docs/DEPLOY.md` (first deploy, every deploy, jobs and schedule, backups and restore, monitoring, rollback, checklist), `docs/ENVIRONMENT.md` (every variable and script). `vercel.json` was missing the hourly `send-notifications` job: added. |
+| Docs | `README.md` rewritten (it still described the 20-part demo with a role picker and `/api/seed`); `docs/ARCHITECTURE.md` (layers and how to add a record type, a job or an integration — the "can grow later" requirement); `docs/ROUTES_AND_MODELS.json` regenerated from the source (31 pages, 59 API route files, 32 models; `npm run docs:routes`). |
+| PDF generation (Phase 7 gap) | **Done.** `lib/export/pdf.ts` + `documents.ts` (pdf-lib, Noto Sans Devanagari embedded so Hindi conjuncts and ₹ come out right): `GET /api/sales/:id/pdf` (tax / export invoice, `?type=quotation`), `GET /api/dispatches/:id/pdf` (gate pass), `GET /api/salary/slip/pdf?month&empCode&lang=en|hi`. Same sign-in, scope and hidden-field rules as the screens (a worker gets only their own slip; tested). The "Download PDF" buttons now download a file instead of opening the print dialog. Checked visually by rendering the files. |
+| Error tracker (Phase 7 gap) | **Done without an SDK.** With `SENTRY_DSN` set, errors are posted to Sentry (or GlitchTip) through its envelope endpoint, at most 20 a minute; the Slack/Discord webhook still works alongside. Tested against a stubbed network, **not against a real Sentry project**. |
+
+**Bugs found by the browser tests and fixed:** (1) **Sign out could hang forever** when the browser had no service worker (private window, development): it waited for `navigator.serviceWorker.ready`, which never resolves; now `getRegistration()` (`components/Providers.tsx`). (2) the hourly notification retry job was never scheduled.
+
+**Flaky test fixed:** `import-lists.test.ts` failed twice in full runs (a write inside a transaction while its collection's indexes were still being built). The test database helper now builds every index before the first test; two full runs afterwards were clean. This only affected the test setup: production builds indexes with `npm run db:indexes` at deploy.
+
+### Definition-of-Done measurement
+
+Measured here (local machine, production build, perf dataset of 1 M audit rows, 200 k cash entries, 181 k attendance rows, 20 k sales; details in `docs/PERF_REPORT.md`):
+
+| Requirement | Result |
+|---|---|
+| API latency | Every endpoint p50 ≤ 37 ms, p95 ≤ 44 ms (slowest: dispatch freight totals p50 37 ms, payments list p50 35 ms); owner home p50 8 ms |
+| Hot queries use indexes | Verified with `explain("executionStats")` for every list; audit log at 1 M rows reads 2 ms / index scan |
+| Response size | Lists ≤ 100 KB (largest 52.7 KB for 100 sales), home ≤ 50 KB (largest 11.3 KB); brotli on the wire 0.2–8 KB |
+| Requests per screen | At most 2, one page of rows at a time |
+| Large export | 200 000 rows CSV in 4.5 s, memory flat (123 → 161 MB) |
+| JavaScript | Shared 144 kB gzip (budget 150), every route adds ≤ 35 kB (budget 60); charts load on demand; `check:bundle` gates CI |
+| Phone layout | All 23 Owner screens fit 360 px (browser test) |
+| Offline | Worker report saved with the network off and delivered when it returned (Phase 6 browser check) |
+| Security | `npm audit --omit=dev`: 0 vulnerabilities at Phase 1; permission matrix, scope, field-hiding, CSRF, XSS, injection, rate-limit tests all green |
+| Data integrity | No deletes (void + reversal), audit in the same transaction, idempotent writes, gap-free invoice numbers, no duplicate rawanna, rollups reconciled by a nightly job |
+| Backups | Backup → wipe → restore gives identical documents (test) |
+
+**Not measured or not verified, and why:**
+
+* Lighthouse mobile scores and timings on a real Android phone over 4G: no device or throttled-network rig here.
+* Latency against MongoDB Atlas Mumbai: tests ran on a local database; Atlas adds network time per request.
+* Live WhatsApp Business Cloud API, live Sentry, a real Tally import, the e-way bill GSP: no accounts here; each is built to the provider's documentation behind an adapter with a safe fallback and tested against stubs.
+* The CI workflow has not run on GitHub yet.
+* The nightly backup holds the compressed file in memory (fine at this size); use Atlas continuous backup too for a very large database.
+
+**Left out on purpose:** converting the screens to server components (Phase 6 decision); biometric attendance and the e-way bill GSP integration need outside accounts and hardware.
+
+## Selfie attendance removed
+
+Selfie attendance (the Selfie button on the attendance screen and the worker home card) is gone, ahead of a biometric machine. Nobody marks their own attendance now: a worker's home shows today's mark read-only ("Not marked yet today / Your supervisor marks attendance"), and a supervisor, manager or the Owner marks it from the sheet. The server refuses any attendance create from an Own-scope login (403), the `selfie` and `location` fields are no longer accepted, and the default worker role lost "Add attendance (own)". Old selfie records and files stay readable (history is never deleted). The biometric machine will need its own endpoint with a device key; it is not built yet, and the `biometric` flag on the normal create is only a label for the Owner / supervisor path.
+
+## Employee form: ID and bank validation, automatic employee code
+
+All rules live in `lib/validators.ts` and run twice: in the form (as the person types and on leaving a field) and on the server (Zod, `ruled()` in `lib/resources/zod.ts`), so the Excel import follows exactly the same rules.
+
+| Field | Rule |
+|---|---|
+| Aadhaar | 12 digits, not starting with 0 or 1, valid Verhoeff check digit (spaces and dashes are removed) |
+| PAN | `ABCPE1234F`: 5 letters, 4 digits, 1 letter; 4th letter one of A B C F G H L J P T K; capitals forced |
+| Bank account | 9 to 18 digits, not one repeated digit; digits only |
+| IFSC (new field) | `SBIN0001234`: 4 letters, `0`, 6 letters or digits. Optional, but checked when given |
+| UPI ID | `name@bank`, kept in small letters |
+| PF number | a 12-digit UAN or a PF account number (letters, digits, `/`, `-`) |
+| ESI number | exactly 10 digits |
+| Mobile and emergency mobile | 10 digits starting 6-9 (`+91` and a leading 0 are dropped), not one repeated digit; the emergency number must differ from the employee's own |
+| Names (employee, father, emergency) | start with a letter (Hindi too); letters, digits, spaces, `. ' -`; at least 2 characters |
+| Pay rate | more than 0 and at most 1 crore |
+| Dates | joining not before 1980 and at most 60 days ahead; leaving not before joining (checked only when the request touches a date) |
+
+An edit only checks the fields it changes, so an older profile with a value from before these rules can still be edited for something else. The form shows the reason under the field, stops the save with the first problem and moves the cursor to it; Hindi text is included.
+
+**Employee code** is now numbered by the server only: `EMP-0046`, `EMP-0047` … (one counter, in order, never reused, safe when two are saved at once; a number already taken by a hand-typed code is skipped). The form field is read-only ("Auto-generated when saved"). Older codes (`E045` and so on) stay as they are, and an Excel import may still carry its own code.
+
+**Fixed on the way:** a pasted `+91 98290 12345` was cut short by the input's length limit; the limit is now applied after the number is tidied. The browser tests also build into `.next-e2e`, so they no longer fail when a `next dev` is already open.
+
+**Tests:** 29 unit checks for the rules (`validators.test.ts`), 23 server cases (`employee-validation.test.ts`: every bad value refused, good values tidied and encrypted, old values not blocking an edit, numbering), and a browser test that types into the real form (`employee-form.spec.ts`).
+
+## Daily report: final decisions, locked OK reports, undo
+
+- **A decision is final.** OK or Not OK can be given once. The ✓ / ✗ buttons (table and report sheet) are shown only while the report has no decision; afterwards the sheet shows "Marked OK by <name> · time" and the remark. The server enforces it too: a second decision is refused (409, "already marked OK by …"), and when several people tap at the same moment exactly one is accepted (tested).
+- **Not OK needs a remark** (the prompt already asked; now it must be filled).
+- **An OK report is locked.** Nobody can change what it says (403), and the pencil is hidden.
+- **Not OK goes back for a new check when corrected.** When the employee edits a Not OK report it returns to "not checked", shows an amber "Corrected: check again" badge, and the old remark stays visible as "Earlier remark".
+- **Undo (Owner or Manager only).** A round-arrow button / "Undo decision" asks why, needs at least 3 characters, clears the decision and returns the report to "not checked". The reason, who and when are kept on the report (`undoReason`, `undoneBy`, `undoneAt`) and the change is in the Audit Trail. Supervisors, the employee and anyone checking their own report cannot undo.
+- Check or undo is a request of its own: it cannot be combined with an edit, and `reopenedFrom`, `undoneBy`, `undoneAt` cannot be set from outside.
+- The correction window is unchanged: content can be edited only until the next day, so a Not OK report not corrected by then stays Not OK (piece-rate pay already leaves Not OK reports out). Undo reopens the decision, not the day lock.
+
+**Tests:** `report-decision.test.ts` (10 server cases) and `report-decision.spec.ts` (browser: OK removes the buttons and the pencil, Undo with a reason brings them back).
+
+## Attendance: punches, shifts, weekly off, overtime approval
+
+Attendance now comes from **punches** (the biometric machine later; the Punch In / Punch Out button until then). A day is worked out from the first In and last Out against the person's shift. The older one-tap marks (Present / Absent / Half day / Leave) stay, for days without punches.
+
+**Settings → Working hours (Owner only; every change is audited)**
+- **Shifts:** name, start, end, break, "late after", full-day hours, half-day hours, overtime buffer and rounding. A shift that ends before it starts is a night shift (the day belongs to the evening it starts). A day and a night shift are set up by default; at least one must remain; a shift still used by an employee cannot be removed.
+- **Weekly off:** each weekday is working, off every week, off on the 2nd and 4th, or off on the 1st, 3rd and 5th. Sunday is off by default.
+- **Holidays:** a date or a date range with a name.
+- **Rules:** weekly offs and holidays paid for monthly staff (on by default), Punch In / Out buttons on or off (switch off when the biometric machine is live), repeat-punch gap, flag a missing Out after N hours.
+- **Employee profile:** a Shift (empty = the default) and a **Biometric ID** (unique per person; it is what the machine will send). Both are also in the Excel import.
+
+**Punching:** `POST /api/punches` (own, or for the team / everybody with the right). The server stamps the time. In starts the day, Out closes it; a repeat within the gap is ignored; In while already in is refused; a second In the same day (back from a break) keeps the first In; last Out wins. Every punch is kept as it happened (`Punch` collection). `GET /api/punches` lists them.
+
+**What a day means (`lib/attendance/calc.ts`):** worked = Out − In less the break (the break comes off only for a stay of 4 h or more); late = In after start + grace; full day / half day / absent by the worked hours; overtime = time after the shift end once the buffer has passed, in blocks rounded down; on a weekly off or holiday every worked minute is overtime and nobody is late. In with no Out long after the shift is flagged **Out missing** (counts as present, no overtime) and shows under "Needs a fix".
+
+**Overtime must be approved before it is paid.** New right "Approve overtime" (attendance → Approve; Owner and Manager by default). Approve all or fewer minutes, reject, or reopen; not on your own, not once the month's salary is approved; a changed amount (a correction) needs a new decision. Screens: buttons on each row, an Overtime tab, a count on the sheet. Salary pays approved overtime only and shows what is waiting.
+
+**Wrong punches are fixed by a senior:** new right "Correct punches" (punches → Edit; Owner and Manager by default, the Owner can give it to supervisors for their team in Roles). Fix opens the day's In / Out, needs a reason, keeps the original punches, records who/what/why on the day, recalculates, and goes to the Audit Trail. Not on your own punches, not for a future time, not after the month's salary is approved. A later punch does not move a time a senior set.
+
+**Roles:** new "Punch in / out" row (See punches / Punch in / out / Correct punches) and "Approve overtime" on Attendance. Defaults: workers punch themselves; supervisors punch for their team; accountants see; Manager and Owner correct and approve. A role the Owner saved earlier gets the new rights from the defaults (`known` list on the saved role); a role saved afterwards is taken exactly as saved.
+
+**Salary:** monthly = salary ÷ days in month × paid days, where paid days = days worked + paid leave + every weekly off and holiday in the period (so with Saturday and Sunday off nothing is deducted for either); a day worked on an off day is overtime, not an extra day. Daily wage = days they came (a Sunday worked is a paid day), no weekly-off pay. The hourly rate uses the person's real shift length. Sheet, slip and PDF show weekly-off days and overtime waiting for approval; "unmarked" no longer counts off days.
+
+**Other:** approved leave puts Leave on every working day of the request that has no mark; "mark the rest" and "not marked" skip weekly offs and holidays; a manual mark on a day with punches is refused (use Fix); manual marks and imports no longer have an "overtime" status (OT in an import is read as present). Old records with the overtime status are still paid correctly; `npm run migrate:attendance` (dry run, then `-- --apply`) converts them.
+
+**Tests:** 18 unit (calendar, day calculation), 24 server (punching, night shift, double taps, team scope, overtime, corrections, sheet, weekly off, salary, leave), 9 (settings validation, shifts, biometric ID, role rights), 5 browser (Punch In on a phone, Fix with a reason, overtime approval, supervisor limits, Settings).
+
+**Not done:** the biometric machine connection itself (it needs the machine brand and how it sends data: it will use the same punches and the Biometric ID); a different shift for one day; automatic closing of forgotten Outs (they are flagged and fixed by a senior).

@@ -11,12 +11,15 @@ import { inr, fmtDate } from '@/lib/format';
 import T from '@/components/T';
 
 export default function EmployeesPage() {
-  const { t, can, perm } = useApp();
+  const { t, can, perm, session } = useApp();
   const showPay = ['read', 'write'].includes(perm?.fields?.money);
   const mayLogin = can('users', 'create') || can('users', 'edit'); // managing sign-ins is part of the profile now
   // the password sits right below the mobile number: mobile = sign-in ID, password = how they sign in
   const at = EMPLOYEE_FIELDS.findIndex((f) => f.name === 'mobile') + 1;
-  const fields = mayLogin ? [...EMPLOYEE_FIELDS.slice(0, at), ...loginFields(), ...EMPLOYEE_FIELDS.slice(at)] : EMPLOYEE_FIELDS;
+  // the shift list comes from Settings (Working hours)
+  const shiftOptions = (session?.shifts || []).map((x) => ({ value: x.id, label: `${x.name} (${x.start}–${x.end})` }));
+  const base = EMPLOYEE_FIELDS.map((f) => (f.name === 'shiftId' ? { ...f, options: shiftOptions } : f));
+  const fields = mayLogin ? [...base.slice(0, at), ...loginFields(), ...base.slice(at)] : base;
   const columns = [
     { key: 'name', label: 'Name', primary: true, render: (r) => <span>{r.name} <span className="text-char-500 font-normal text-xs">{r.empCode}</span></span> },
     { key: 'job', label: 'Job' },

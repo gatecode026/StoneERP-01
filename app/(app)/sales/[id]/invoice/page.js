@@ -30,11 +30,10 @@ export default function Invoice() {
   return (
     <RoleGuard perm="sales">
       <PageHeader title={docTitle} back={`/sales/${id}`} actions={<>
-        <button className="btn-primary" onClick={() => window.print()}><Download size={16} /><T> Download PDF</T></button>
+        <a className="btn-primary" href={`/api/sales/${id}/pdf${isQuote ? '?type=quotation' : ''}`} download><Download size={16} /><T> Download PDF</T></a>
         <button className="btn-outline" onClick={() => window.print()}><Printer size={16} /><T> Print</T></button>
         <button className="btn-green" onClick={() => openWA(msg, s.customerMobile)}><MessageCircle size={16} /><T> Share on WhatsApp</T></button>
       </>} />
-      <p className="text-xs text-char-500 mb-2 no-print"><T>Tip: in the print window choose “Save as PDF”.</T></p>
       <div className="print-doc card max-w-4xl mx-auto p-5 md:p-8 text-[13px] overflow-x-auto"><EnglishOnly>
         <div className="min-w-[640px]">
           <div className="flex justify-between items-start border-b-2 border-black pb-3">
