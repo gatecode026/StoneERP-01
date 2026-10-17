@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}', './lib/**/*.{js,ts}'],
+  // Badge builds its class name from the tone (badge-red ...), so Tailwind cannot see it in the source
+  safelist: ['badge-red', 'badge-green', 'badge-amber', 'badge-gray', 'badge-blue'],
   theme: {
     extend: {
       colors: {

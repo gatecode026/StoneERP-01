@@ -86,3 +86,27 @@ test('Owner: Settings has shifts, weekly off and holidays, and a change is kept'
   await page.locator('#hd_name_0').locator('xpath=ancestor::section[1] | ancestor::div[contains(@class,"card")][1]').getByRole('button', { name: /Save/ }).first().click();
   await expect(page.getByText('Saved').first()).toBeVisible();
 });
+
+test.describe('on a computer the day is a ledger table', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('one row per person with shift, punch in / out, hours, overtime, status, source and actions', async ({ page }) => {
+    await signIn(page, 'owner');
+    const set = await page.request.post('/api/attendance/fix', { headers: SAME_ORIGIN, data: { empCode: 'E301', date: yesterday, inAt: `${yesterday}T09:08`, outAt: `${yesterday}T19:05`, reason: 'Entered for the test' } });
+    expect([200, 400], await set.text()).toContain(set.status()); // 400 when an earlier test already set the same times
+    await page.goto(`/attendance?date=${yesterday}`);
+    for (const h of ['Employee', 'Shift', 'Punch in', 'Punch out', 'Worked', 'Overtime', 'Status', 'Source', 'Actions']) await expect(page.getByRole('columnheader', { name: h, exact: true })).toBeVisible();
+    await expect(page.getByText(/\d+ records/)).toBeVisible();
+    const row = page.locator('tr', { hasText: 'E2E worker' });
+    await expect(row).toBeVisible();
+    await expect(row.locator('td').nth(6)).toContainText('Present'); // the Status column
+    await expect(row.getByRole('button', { name: 'Fix punch' })).toBeVisible();
+
+    // a person without a mark is marked from the row (leave, absent, half day or present)
+    const sup = page.locator('tr', { hasText: 'E2E supervisor' });
+    await expect(sup.locator('td').nth(6)).toContainText('Not marked');
+    await sup.getByRole('combobox', { name: 'Mark' }).selectOption('absent');
+    await expect(sup.locator('td').nth(6)).toContainText('Absent');
+    await page.screenshot({ path: 'test-results/attendance-ledger.png' });
+  });
+});

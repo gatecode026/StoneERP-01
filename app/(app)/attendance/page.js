@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
 import { CheckCheck, Check, X, Pencil, RotateCcw } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Badge, StatCard, Empty, DataList, Pager, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Badge, StatCard, Empty, DataList, Pager, ExportBtn, cx } from '@/components/ui';
 import { useDebounced, useNumberedList } from '@/lib/usePaged';
 import CrudPage from '@/components/CrudPage';
 import { submit, api } from '@/lib/client';
@@ -24,10 +24,12 @@ const STATES = [
 ];
 const TONE = { present: 'green', absent: 'red', half: 'amber', leave: 'blue' };
 
-function OtBadge({ m }) {
+function OtBadge({ m, compact }) {
   const tone = m.otStatus === 'approved' ? 'green' : m.otStatus === 'rejected' ? 'gray' : 'amber';
   const text = m.otStatus === 'approved' ? 'OT {n} approved' : m.otStatus === 'rejected' ? 'OT {n} not approved' : 'OT {n} waiting';
   const shown = m.otStatus === 'approved' ? m.otApprovedMinutes : m.otMinutes;
+  // in the table the colour says approved / waiting / not approved; the long wording is in the tooltip
+  if (compact) return <span title={trNow(text, { n: fmtDuration(shown) })}><Badge tone={tone}><T vars={{ n: fmtDuration(shown) }}>{'OT {n}'}</T></Badge></span>;
   return <Badge tone={tone}><T vars={{ n: fmtDuration(shown) }}>{text}</T></Badge>;
 }
 
@@ -130,7 +132,7 @@ export default function AttendancePage() {
       {tabsEl}
       {showMark && (
         <PageHeader title={t('attendance')} subtitle={ownOnly ? 'Your attendance this month' : canMarkOthers ? 'Punches come from the biometric machine. Mark leave, absent or half day here, and fix a wrong punch.' : tr('Your team\'s attendance (view only)')}
-          actions={<>{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}</>} />
+          actions={<>{!ownOnly && (sheet.total ?? 0) > 0 && <Badge tone="amber"><T vars={{ n: sheet.total }}>{'{n} records'}</T></Badge>}{!ownOnly && can('attendance', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&date=${date}`)} />}{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}</>} />
       )}
 
       {canApprove && tab === 'overtime' && <OvertimeTab list={ot} onChanged={() => sheet.reload()} />}
@@ -158,8 +160,8 @@ export default function AttendancePage() {
           </div>
           {canApprove && otCount > 0 && tab === 'mark' && <button className="w-full text-left rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3 min-h-[44px]" onClick={() => setTab('overtime')}><T vars={{ n: otCount }}>{'{n} overtime entries are waiting for your approval. Tap to review.'}</T></button>}
           <div className="flex gap-2 mb-3 flex-wrap"><SearchBox value={q} onChange={setQ} placeholder="Search name or job…" />{canMark && unmarked > 0 && !dayOff && <button className="btn-green" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}</div>
-          {sheet.loading ? <SkeletonList n={6} /> : (
-            <div className="space-y-2.5">
+          {sheet.loading ? <SkeletonList n={6} /> : (<>
+            <div className="space-y-2.5 md:hidden">
               {sheet.rows.map((r) => {
                 const e = r;
                 const m = view(r);
@@ -199,7 +201,64 @@ export default function AttendancePage() {
                 );
               })}
             </div>
-          )}
+            {/* computer: one ledger table, the same information as the cards, one row per person */}
+            <div className="hidden md:block card overflow-x-auto">
+              <table className="w-full text-sm [&_.td]:!px-2.5 [&_.th]:!px-2.5">
+                <thead>
+                  <tr>
+                    <th className="th"><T>Employee</T></th><th className="th"><T>Shift</T></th><th className="th"><T>Punch in</T></th><th className="th"><T>Punch out</T></th>
+                    <th className="th text-right"><T>Worked</T></th><th className="th"><T>Overtime</T></th><th className="th"><T>Status</T></th><th className="th"><T>Source</T></th><th className="th w-px"><T>Actions</T></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sheet.rows.map((r) => {
+                    const m = view(r);
+                    const next = !m.inAt ? 'In' : !m.outAt || m.open ? 'Out' : null;
+                    const showPunch = sheet.meta.appPunching && r.punchable && next && date === todayISO();
+                    const busy = busyRow === r.empCode;
+                    return (
+                      <tr key={r.empCode} className={cx('hover:bg-sand-50', m.open && 'bg-red-50/40')}>
+                        <td className="td whitespace-nowrap"><div className="font-semibold">{r.name}</div><div className="text-xs text-char-500">{r.empCode} · {r.job}</div></td>
+                        <td className="td">{r.shiftName || '—'}</td>
+                        <td className="td whitespace-nowrap">{m.inAt ? <><b>{fmtClock(m.inAt)}</b>{m.late && <Badge tone="red"><T vars={{ n: m.lateMinutes }}>{'Late {n} min'}</T></Badge>}</> : <span className="text-char-300">—</span>}</td>
+                        <td className="td whitespace-nowrap">{m.outAt ? <b>{fmtClock(m.outAt)}</b> : m.open ? <Badge tone="red"><T>Out missing</T></Badge> : <span className="text-char-300">—</span>}</td>
+                        <td className="td whitespace-nowrap text-right">{m.workedMinutes > 0 ? fmtDuration(m.workedMinutes) : <span className="text-char-300">—</span>}</td>
+                        <td className="td whitespace-nowrap">
+                          {m.otMinutes > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              <OtBadge m={m} compact />
+                              {r.canDecideOt && (m.otStatus === 'pending' ? <>
+                                <button className="icon-btn text-emerald-700" disabled={busy} onClick={() => decideOt(r, 'approve')} title={tr('Approve overtime')} aria-label={tr('Approve overtime')}><Check size={15} /></button>
+                                <button className="icon-btn text-red-600" disabled={busy} onClick={() => decideOt(r, 'reject')} title={tr('Reject')} aria-label={tr('Reject')}><X size={15} /></button>
+                              </> : <button className="icon-btn" disabled={busy} onClick={() => decideOt(r, 'reopen')} title={tr('Reopen overtime decision')} aria-label={tr('Reopen overtime decision')}><RotateCcw size={14} /></button>)}
+                            </div>
+                          ) : <span className="text-char-300">—</span>}
+                        </td>
+                        <td className="td whitespace-nowrap">
+                          {m.state ? <Badge tone={TONE[m.state] || 'green'}>{STATES.find((x) => x.v === m.state)?.label || m.state}</Badge> : <Badge tone={dayOff ? 'gray' : 'amber'}><T>{dayOff ? 'Off' : 'Not marked'}</T></Badge>}
+                          {m.corrected && <> <Badge tone="blue"><T>corrected</T></Badge></>}
+                        </td>
+                        <td className="td whitespace-nowrap text-xs text-char-700">{m.method ? (m.method === 'app' ? <T>App</T> : m.method === 'biometric' ? <T>Biometric</T> : <T>Manual</T>) : <span className="text-char-300">—</span>}</td>
+                        <td className="td whitespace-nowrap text-right w-px">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {showPunch && <button className="btn-outline btn-sm" disabled={busy} onClick={() => punch(r)}>{next === 'In' ? <T>Punch In</T> : <T>Punch Out</T>}</button>}
+                            {canMark && r.markable && (
+                              <select className="input !w-auto !min-h-[34px] !py-0 text-xs" aria-label={tr('Mark')} value="" onChange={(ev) => ev.target.value && mark(r, ev.target.value)}>
+                                <option value="">{tr('Mark…')}</option>
+                                {STATES.map((s) => <option key={s.v} value={s.v}>{tr(s.label)}</option>)}
+                              </select>
+                            )}
+                            {r.fixable && <button className="icon-btn" onClick={() => setFix(r)} title={tr('Fix punch')} aria-label={tr('Fix punch')}><Pencil size={15} /></button>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!sheet.rows.length && <tr><td className="td text-center text-char-500" colSpan={9}><T>No employees found</T></td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>)}
           <Pager list={sheet} />
           <p className="text-[11px] text-char-500 mt-3 md:hidden"><T>P = Present · A = Absent · ½ = Half day · L = Leave</T></p>
         </>

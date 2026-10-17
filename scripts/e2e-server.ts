@@ -26,6 +26,8 @@ async function main() {
   process.env.STORAGE_LOCAL_DIR = path.join(os.tmpdir(), 'vss-e2e-files');
   process.env.API_RATE_USER = '100000';
   process.env.API_RATE_IP = '100000';
+  process.env.LOGIN_RATE_USER = '1000'; // the suite signs the same people in many times
+  process.env.LOGIN_RATE_IP = '1000';
   process.env.APP_ORIGIN = `http://localhost:${E2E_PORT}`;
   process.env.LOG_LEVEL = 'warn';
   process.env.NEXT_DIST_DIR = '.next-e2e';

@@ -37,7 +37,7 @@ Cloudinary: `CLOUDINARY_CLOUD`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. `
 
 ## Tuning
 
-`API_RATE_USER` (300/min), `API_RATE_IP` (1500/min), `SLOW_QUERY_MS` (200), `EXPORT_MAX_ROWS` (200000), `MONGO_MAX_POOL` (20), `MONGO_READ_PREFERENCE`, `MONGO_REPORT_READ` (`secondaryPreferred` on Atlas), `MONGO_AUTO_INDEX` (off in production; run `npm run db:indexes`).
+`API_RATE_USER` (300/min), `API_RATE_IP` (1500/min), `LOGIN_RATE_USER` (10 sign-ins per 15 min per person), `LOGIN_RATE_IP` (30 per 10 min per address), `SLOW_QUERY_MS` (200), `EXPORT_MAX_ROWS` (200000), `MONGO_MAX_POOL` (20), `MONGO_READ_PREFERENCE`, `MONGO_REPORT_READ` (`secondaryPreferred` on Atlas), `MONGO_AUTO_INDEX` (off in production; run `npm run db:indexes`).
 
 ## Development only (refused in production)
 
