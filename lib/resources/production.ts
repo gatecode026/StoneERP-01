@@ -218,6 +218,7 @@ export const repairs: ResourceDef = {
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const m = await machineById(ctx, input.machineId);
+      if (input.date && input.date > todayIST()) throw badRequest('Date cannot be in the future');
       return { ...input, date: input.date ?? todayIST(), machineName: m.name, cost: input.cost ?? 0, reportedByCode: auth.user.empCode ?? undefined };
     },
     async afterCreate(ctx, d) { await syncService(ctx, d); },
@@ -228,7 +229,8 @@ async function syncService(ctx: { session?: any }, d: any) {
   if (d.kind === 'service' && d.status === 'closed') {
     const set: any = { lastServiceDate: d.date };
     if (d.hourMeterAtService != null) set.lastServiceHourMeter = d.hourMeterAtService;
-    await Machine.updateOne({ _id: d.machineId }, { $set: set }, { session: ctx.session });
+    // the meter reading taken at the service is also a reading of the machine's meter
+    await Machine.updateOne({ _id: d.machineId }, { $set: set, ...(d.hourMeterAtService != null ? { $max: { hourMeter: d.hourMeterAtService } } : {}) }, { session: ctx.session });
   }
 }
 
@@ -240,11 +242,22 @@ const vehicleFields = {
 };
 export const vehicles: ResourceDef = {
   key: 'vehicles', model: Vehicle, label: (d) => d.name,
-  listFields: ['name', 'regNo', 'kind', 'driverCode', 'insuranceExpiry', 'fitnessExpiry', 'permitExpiry', 'pucExpiry', 'notes'],
+  listFields: ['name', 'regNo', 'kind', 'driverCode', 'driverName', 'insuranceExpiry', 'fitnessExpiry', 'permitExpiry', 'pucExpiry', 'notes'],
   sortable: ['name', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'regNo'], filters: { kind: { enum: ['Truck', 'Tractor', 'Loader', 'Crane', 'Other'] }, driverCode: 'string' },
   named: { expiring: (v) => { const days = Number(v); if (!(days >= 1 && days <= 365)) return {}; const to = addDays(todayIST(), days); return { $or: ['insuranceExpiry', 'fitnessExpiry', 'permitExpiry', 'pucExpiry'].map((f) => ({ [f]: { $gt: '', $lte: to } })) }; } },
+  serverOnly: ['driverName'],
   create: z.object(vehicleFields).strict(), update: z.object(vehicleFields).partial().strict(),
+  lifecycle: {
+    async prepareCreate(ctx, input) { return { ...input, ...(await driverOf(ctx, input.driverCode)) }; },
+    async prepareUpdate(ctx, _prev, patch) { return 'driverCode' in patch ? { ...patch, ...(await driverOf(ctx, patch.driverCode)) } : patch; },
+  },
 };
+/** The regular driver must be a real employee; the name is kept with the code so lists can show it. */
+async function driverOf(ctx: any, code?: string) {
+  if (!code) return { driverCode: '', driverName: '' };
+  const e = await employeeByCode(ctx, code);
+  return { driverCode: e.empCode, driverName: e.name };
+}
 
 export const vehicletrips: ResourceDef = {
   key: 'vehicletrips', model: VehicleTrip, label: (d) => `${d.vehicleName} ${d.date}`,
@@ -259,6 +272,7 @@ export const vehicletrips: ResourceDef = {
     async prepareCreate(ctx, input, auth) {
       const v: any = await Vehicle.findOne({ _id: input.vehicleId, isVoid: false }).session(s(ctx)).lean();
       if (!v) throw badRequest('Vehicle not found');
+      if (input.date && input.date > todayIST()) throw badRequest('Date cannot be in the future');
       const code = auth.scope === 'own' ? auth.user.empCode : input.driverCode ?? v.driverCode;
       const drv = code ? await employeeByCode(ctx, code) : null;
       const unit = input.hours || input.km || 0;

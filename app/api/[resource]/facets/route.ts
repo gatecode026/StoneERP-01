@@ -19,6 +19,7 @@ const def = (params: Record<string, string>) => {
  * Counts and totals for a list, in ONE aggregate, for the stat cards above a screen:
  *   GET /api/<resource>/facets?by=<filter key>&sum=<field,field>&<the same filters as the list>
  *   → { total, sums: {field: n}, groups: { "<value>": { n, sums: {field: n} } } }
+ * `bucket=month` (instead of `by`) groups by the month of the list's date field: groups are keyed "YYYY-MM".
  * `by` must be a filter key of the list; `sum` may only name numeric fields the list declares (and the caller may see).
  * Rows are limited to the caller's scope, exactly like the list.
  */
@@ -29,13 +30,17 @@ export const GET = withAuth((c) => def(c.params).key as Resource, 'view', async 
   const by = sp.get('by');
   const sumRaw = sp.get('sum');
   const namedRaw = sp.get('named');
-  sp.delete('by'); sp.delete('sum'); sp.delete('named');
+  const bucket = sp.get('bucket');
+  sp.delete('by'); sp.delete('sum'); sp.delete('named'); sp.delete('bucket');
   for (const k of ['cursor', 'page', 'limit', 'sort', 'fields', 'count']) sp.delete(k);
 
   if (by && (!Object.prototype.hasOwnProperty.call(d.filters, by) || hidden.has(by))) throw badRequest(`Cannot group by "${by}"`);
+  // bucket=month groups by the month of the list's date field instead (for a trend chart): groups are keyed "YYYY-MM"
+  const dateField = d.dateFields?.[0];
+  if (bucket && (bucket !== 'month' || !dateField || hidden.has(dateField))) throw badRequest('This list cannot be grouped by that');
   const sums = (sumRaw ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   if (sums.length > 6) throw badRequest('Too many sums');
-  const group: Record<string, any> = { _id: by ? `$${by}` : null, n: { $sum: 1 } };
+  const group: Record<string, any> = { _id: bucket ? { $substrBytes: [`$${dateField}`, 0, 7] } : by ? `$${by}` : null, n: { $sum: 1 } };
   for (const f of sums) {
     const computed = Object.prototype.hasOwnProperty.call(d.computed ?? {}, f) ? d.computed![f] : null;
     if (computed) {

@@ -356,3 +356,20 @@ These roles (when the login is linked to an employee profile) now see **My atten
 * Form fix: a create-only required field (date, source, rawanna, size) is now checked on create (it was skipped); the Block and Royalty tabs no longer share the search box.
 
 Tests: 11 server (blocks, royalty), browser test for add / search / edit / cut / mark paid.
+
+## Yield & Cost, Machine Repair and Vehicles: checked, fixed, and real graphs
+
+**Graphs** (all drawn from the records; `components/charts/OpsCharts.js`, loaded on demand):
+* **Yield & Cost:** yield % of each finished block (red under the alert line, dashed average), month by month (yield bars with cost per sq ft line), cost per sq ft split into block / labour / power and diesel / blades; supplier, machine and operator charts have the alert line. Cost graphs are not sent to people who may not see cost.
+* **Machine Repair → Reports:** repair cost (bars) and stopped hours (line) month by month for the last 3 / 6 / 12 months, cost and stopped hours by machine, totals (cost, hours stopped, breakdowns, open now).
+* **Vehicles → Reports:** diesel litres and ₹ month by month, diesel by vehicle, and diesel use per trip of one vehicle (litres per hour or per km) with the vehicle's normal and a "30% above normal" line. **Vehicles & papers** has a graph of how many vehicles are expired / within 30 days / valid / without a date for each paper.
+* Month-by-month graphs use `GET /api/<list>/facets?bucket=month&sum=…` (groups by the month of the list's date field; same scope and filters as the list).
+* Chart animation is off: it works through inline styles that the page's security policy blocks, which left lines half drawn.
+
+**Yield numbers:** the average over several blocks (overall, by supplier, by month) is now worked out on the total stone (saleable ÷ theoretical), so a big block counts for more than a small one (it was a plain mean of percentages). A block marked cut with no slab output says "No slab output" instead of "Not cut". Hand-worked test: 160 CFT at 30 mm, ₹90/CFT, 900 − 20 sq ft → 54.13 %, cost ₹18,060 → ₹20.52 per sq ft.
+
+**Machine Repair fixes:** "Mark serviced" never started the next count of running hours, so machines serviced by hour-meter stayed "overdue" for ever. It now asks what was done and the cost, and records the machine's hour-meter; a service with a meter reading also moves the machine's own meter on (never back). The Service schedule shows the interval in days and hours and the running hours left. A service form has "Hour-meter at service". Repairs cannot be dated in the future.
+
+**Vehicles fixes:** a vehicle has a **Regular driver** (Designation = Driver; the name is kept with the code) which its trips take unless another is picked; the lists show names instead of codes; trips cannot be dated in the future; the papers box separates **Expired** from "Expiring within 30 days" (expired papers were listed under "within 30 days").
+
+Tests: 4 (yield by hand), 7 (repair and vehicle numbers, month buckets, driver, hour-meter), 3 browser (graphs drawn on a phone).
