@@ -1,15 +1,13 @@
 'use client';
-import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from '@/lib/toast';
 import { BadgeCheck, Save, Banknote, FileText, MessageCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, Sheet, KV, ExportBtn, Section, SkeletonList, Empty, Pagination } from '@/components/ui';
-import CrudPage, { StatusBadge } from '@/components/CrudPage';
+import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination } from '@/components/ui';
 import { api, downloadCSV, openWA } from '@/lib/client';
-import { inr, num, fmtMonth, todayISO, monthOf, addDays, fmtDate } from '@/lib/format';
+import { inr, num, fmtMonth, todayISO, monthOf, addDays } from '@/lib/format';
 import { SALARY } from '@/lib/config';
 import T from '@/components/T';
 
@@ -19,7 +17,6 @@ const PT = { monthly: 'Monthly', daily: 'Daily', piece: 'Piece rate' };
 export default function SalaryPage() {
   const { t, tr, can } = useApp();
   const isWorker = !can('salarysheets'); // people without the sheet only ever see their own slip
-  const [tab, setTab] = useState('sheet');
   const [month, setMonth] = useState(prevMonth());
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(25);
@@ -58,14 +55,13 @@ export default function SalaryPage() {
   return (
     <RoleGuard perm={["salarysheets", "salaryslips"]}>
       <PageHeader title={t('salary')} subtitle={isWorker ? 'Your salary slip' : 'Calculated automatically from attendance, pay rate and advances'}
-        actions={<>{!isWorker && <ImportData resource="advances" perm="advances" noun="advances" hint="employee and amount are required" />}
+        actions={<>
           <input type="month" className="input !w-auto" value={month} max={monthOf(todayISO())} onChange={(e) => setMonth(e.target.value || month)} />
           {can('salarysheets', 'export') && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/salary/preview?month=${month}&all=1`); downloadCSV(`salary-sheet-${month}`, all.rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, { key: 'otPay', label: 'Overtime' }, { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }]); } catch (e) { toast.error(e.message); } }} />}
         </>} />
 
-      {!isWorker && can('advances') && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'sheet', label: 'Salary sheet' }, { key: 'advances', label: 'Advance register' }]} />}
 
-      {(isWorker || tab === 'sheet') && (
+      {(
         <>
           {!isWorker && (
             <>
@@ -96,15 +92,6 @@ export default function SalaryPage() {
             <T vars={{ o: SALARY.otMultiplier, p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Monthly = salary ÷ days in month × paid days (days worked + paid leave + weekly offs and holidays) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime (only after it is approved) = {o}× hourly rate · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.'}</T>
           </p>
         </>
-      )}
-
-      {!isWorker && tab === 'advances' && (
-        <CrudPage model="advances" title="Advance register" label="Advance" noHeader sort="-date" searchKeys={['empName', 'reason']} canEdit={() => false}
-          fields={[{ name: 'empCode', label: 'Employee', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'empName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } },
-            { name: 'date', label: 'Date given', type: 'date', required: true }, { name: 'amount', label: 'Advance amount (₹)', type: 'number', required: true }, { name: 'monthlyDeduction', label: 'Cut from each salary (₹)', type: 'number', required: true }, { name: 'reason', label: 'Reason', wide: true }]}
-          columns={[{ key: 'empName', label: 'Employee', primary: true }, { key: 'date', label: 'Given', render: (r) => fmtDate(r.date) }, { key: 'amount', label: 'Advance', render: (r) => inr(r.amount) }, { key: 'monthlyDeduction', label: 'Monthly cut', render: (r) => inr(r.monthlyDeduction) },
-            { key: 'recovered', label: 'Recovered', render: (r) => inr(r.recovered) }, { label: 'Balance', render: (r) => <b>{inr((r.amount || 0) - (r.recovered || 0))}</b> }, { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> }]}
-          rowActions={(row, { reload }) => (row.status === 'pending' && can('advances', 'approve') ? [{ label: 'Approve', tone: 'green', onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'advances', id: row._id, action: 'approve' } }); toast.success('Advance approved'); reload(); } catch (e) { toast.error(e.message); } } }] : [])} />
       )}
 
       <Sheet open={!!sel} onClose={() => setSel(null)} title={`${sel?.name} · ${fmtMonth(month)}`}
