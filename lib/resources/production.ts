@@ -69,11 +69,19 @@ export const machineentries: ResourceDef = {
         if (!b) throw badRequest(`Block ${input.blockNo} does not exist`);
       }
       if (input.breakdown && !stopped) throw badRequest('Enter the stopped minutes for a breakdown');
+      // broken pieces and waste are recorded with the reason (PDF Part 11)
+      if ((input.wasteSqft ?? 0) > 0 && !String(input.wasteReason ?? '').trim()) throw badRequest('Waste reason: say why the stone was broken or wasted');
+      // units used can come from the two meter readings
+      let electricityUnits = input.electricityUnits;
+      if (input.electricityReadingStart != null && input.electricityReadingEnd != null) {
+        if (input.electricityReadingEnd < input.electricityReadingStart) throw badRequest('Electricity meter: the end reading is less than the start reading');
+        electricityUnits ??= round2(input.electricityReadingEnd - input.electricityReadingStart);
+      }
       if (input.stockItemId) {
         const it: any = await StockItem.findOne({ _id: input.stockItemId, isVoid: false, category: 'finished' }).session(s(ctx)).lean();
         if (!it) throw badRequest('Choose a finished-goods stock item');
       }
-      return { ...input, date, machineId: m._id, machineName: m.name, machineType: m.type, operatorName: op.name, hoursRun, stoppedMins: stopped };
+      return { ...input, date, machineId: m._id, machineName: m.name, machineType: m.type, operatorName: op.name, hoursRun, stoppedMins: stopped, ...(electricityUnits != null ? { electricityUnits } : {}) };
     },
     async afterCreate(ctx, d) {
       await roll.machineEntry(d.date, d, 1, ctx.session);

@@ -14,7 +14,7 @@ import T from '@/components/T';
 const MachineChart = dynamic(() => import('@/components/charts/MachineChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
 
 export default function MachinesPage() {
-  const { t, tr, can } = useApp();
+  const { t, tr, can, session } = useApp();
   const [tab, setTab] = useState('entries');
   const sp = useSearchParams();
   const [date, setDate] = useState(sp.get('date') || todayISO());
@@ -25,25 +25,37 @@ export default function MachinesPage() {
   const monthEntries = useFetch(tab === 'monthly' ? `/api/machineentries/monthly?month=${month}` : null, [month]);
   const canManage = can('machines', 'create');
 
+  // start and stop times follow the shift: Day = the default shift in Settings, Night = the night shift (it ends the next morning)
+  const shifts = session?.shifts || [];
+  const timesFor = (v) => {
+    const sh = v === 'Night' ? shifts.find((x) => /night/i.test(x.name) || x.end <= x.start) : shifts.find((x) => x.id === session?.defaultShiftId) || shifts.find((x) => x.end > x.start) || shifts[0];
+    return sh ? { startTime: sh.start, stopTime: sh.end } : v === 'Night' ? { startTime: '20:00', stopTime: '06:00' } : { startTime: '08:00', stopTime: '18:00' };
+  };
+
   const entryFields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'shift', label: 'Shift', type: 'select', options: ['Day', 'Night'], default: 'Day', required: true },
+    { name: 'shift', label: 'Shift', type: 'select', options: ['Day', 'Night'], default: 'Day', required: true, onChange: (v) => timesFor(v) },
     { name: 'machineId', label: 'Machine', type: 'ref', required: true, ref: { model: 'machines', nameField: 'machineName', label: (m) => `${m.name} (${m.type})` } },
     { name: 'operatorCode', label: 'Operator', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'operatorName', label: (e) => `${e.name} · ${e.job}`, query: { status: 'active' } } },
-    { name: 'startTime', label: 'Start time', type: 'time', default: '08:00' },
-    { name: 'stopTime', label: 'Stop time', type: 'time', default: '18:00' },
+    { name: 'startTime', label: 'Start time', type: 'time', default: () => timesFor('Day').startTime },
+    { name: 'stopTime', label: 'Stop time', type: 'time', default: () => timesFor('Day').stopTime },
+    { name: 'hourMeterStart', label: 'Hour-meter at start', type: 'number', hint: 'Optional. With the end reading the hours run come from the meter' },
+    { name: 'hourMeterEnd', label: 'Hour-meter at end', type: 'number' },
     { name: 'workDone', label: 'Work done', wide: true, placeholder: '600 × 600 × 30 mm slabs, natural finish' },
     { name: 'outputSqft', label: 'Output (sq ft)', type: 'number', required: true },
     { name: 'pieces', label: 'Output (pieces)', type: 'number' },
     { name: 'blockNo', label: 'Material used – block no.', type: 'ref', ref: { model: 'blocks', valueKey: 'blockNo', label: (b) => `Block ${b.blockNo} · ${b.cft} CFT · ${b.stage}`, sort: '-blockNo', query: { stage: 'received,cutting' } } },
     { name: 'wasteSqft', label: 'Broken / waste (sq ft)', type: 'number' },
+    { name: 'wasteReason', label: 'Reason for the waste', required: true, show: (f) => Number(f.wasteSqft) > 0, placeholder: 'Slab cracked on the saw' },
     { name: 'stockItemId', label: 'Add output to finished stock', type: 'ref', hint: 'Optional – stock goes up by itself', ref: { model: 'stockitems', label: (x) => `${x.name} (${x.unit})`, query: { category: 'finished' } } },
     { name: 'stoppedMins', label: 'Stopped time (minutes)', type: 'number' },
     { name: 'stopReason', label: 'Reason for stop', show: (f) => Number(f.stoppedMins) > 0, placeholder: 'Power cut' },
     { name: 'breakdown', label: 'Breakdown', type: 'checkbox', checkLabel: 'This was a breakdown – tell the mechanic', show: (f) => Number(f.stoppedMins) > 0 },
     { name: 'bladeChanged', label: 'Blade', type: 'checkbox', checkLabel: 'Blade or spare changed' },
     { name: 'bladeCost', label: 'Blade / spare cost (₹)', type: 'number', show: (f) => f.bladeChanged },
-    { name: 'electricityUnits', label: 'Electricity (units used)', type: 'number' },
+    { name: 'electricityReadingStart', label: 'Electricity meter at start', type: 'number' },
+    { name: 'electricityReadingEnd', label: 'Electricity meter at end', type: 'number', hint: 'Units used are worked out from the two readings' },
+    { name: 'electricityUnits', label: 'Electricity (units used)', type: 'number', hint: 'Or type the units directly' },
     { name: 'dieselLitres', label: 'Diesel (litres)', type: 'number' },
     { name: 'photo', label: 'Photo', type: 'photo' },
     { name: 'remarks', label: 'Remarks', type: 'textarea', wide: true },

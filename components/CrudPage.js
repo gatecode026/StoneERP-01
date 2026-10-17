@@ -74,7 +74,7 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
         input = <textarea id={id} className="input" rows={f.rows || 3} value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={tx(f.placeholder)} disabled={disabled} />; break;
       case 'select':
         input = (
-          <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value })}>
+          <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value, ...(f.onChange ? f.onChange(e.target.value, form) : {}) })}>
             {!f.required || !v ? <option value="">{tx('Select…')}</option> : null}
             {v && !optList(f.options).some((o) => String(o.value) === String(v)) && <option value={v}>{v}</option>}
                 {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
