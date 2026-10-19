@@ -37,7 +37,7 @@ beforeAll(async () => {
   const cust = (await api.create(who.salesperson, 'customers', { name: 'Delhi Builders', mobile: '9811122222', state: 'Delhi' })).json;
   const sale = (await api.create(who.salesperson, 'sales', { customerId: cust._id, stage: 'order', items: [{ stockItemId: item._id, name: item.name, qty: 100, unit: 'sq ft', rate: 80, gstRate: 18 }] })).json;
   await call(who.salesperson, orderRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(sale._id) }).catch(() => undefined);
-  const slip = (await api.create(who.supervisor, 'dispatches', { saleId: sale._id, truckNo: 'RJ1', items: [{ stockItemId: item._id, name: item.name, qty: 40 }] })).json;
+  const slip = (await api.create(who.supervisor, 'dispatches', { saleId: sale._id, truckNo: 'RJ14 GA 0001', items: [{ stockItemId: item._id, name: item.name, qty: 40 }] })).json;
   void outRoute;
   await api.create(who.supervisor, 'expenses', { head: 'Diesel', amount: 7000, paidBy: 'UPI', billPhoto: PNG });
   await api.create(who.worker, 'dailyreports', { narration: 'Cut blocks', quantity: 300, problem: 'Power cut' });
@@ -66,6 +66,24 @@ describe('every role gets its own home, in one request', () => {
     expect(r.profit.orders[0]).toMatchObject({ taxable: 8000, cost: 5000, profit: 3000 });
     expect(r.report.stock.mainItems[0].name).toBe('Pavers'); // the "main items in hand" the demo computed but never showed
     expect(r.report.stock.lowStock.map((x: any) => x.name)).toContain('Pavers');
+  });
+  it('the Owner home carries 30 days of numbers for its graphs, ending on the chosen day, with the cash + bank balance worked back', async () => {
+    const r = (await get(who.owner)).json;
+    expect(r.series).toHaveLength(30);
+    expect(r.series[29].date).toBe(today);
+    expect(r.series[0].date).toBe(addDays(today, -29));
+    expect(r.series[29]).toMatchObject({ expenses: 7000 }); // today's diesel is in today's point
+    for (const k of ['sales', 'received', 'dispatches', 'sqft', 'idleHours', 'present', 'absent', 'leave', 'balance']) expect(r.series[29], k).toHaveProperty(k);
+    expect(r.series[0].expenses).toBe(0); // a day with nothing is a zero, not a gap
+    expect(r.series[29].balance).toBe(r.report.cash.inHand + r.report.cash.bank); // the last point is the balance now
+    expect(r.ageing.buckets.map((b: any) => b.label)).toEqual(['0-15', '16-30', '31-60', '60+']);
+    expect(r.stockLevels[0]).toMatchObject({ name: 'Pavers', minLevel: 2000 });
+    const past = (await get(who.owner, `?date=${addDays(today, -2)}`)).json;
+    expect(past.series[29].date).toBe(addDays(today, -2));
+    expect(past.series[29].balance).toBe(r.series[27].balance); // the same day, seen from either end
+  });
+  it('the Manager and Accountant homes do not carry the Owner graphs', async () => {
+    for (const k of ['manager', 'accountant']) expect((await get(who[k])).json.series, k).toBeUndefined();
   });
   it('a past day can be opened; a future day cannot', async () => {
     expect((await get(who.owner, `?date=${addDays(today, -3)}`)).status).toBe(200);

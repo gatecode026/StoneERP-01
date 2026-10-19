@@ -288,7 +288,7 @@ describe('stock cannot go negative or race', () => {
     const sales = [];
     for (let i = 0; i < 2; i++) sales.push((await api.create(salesperson, 'sales', { customerId: customer._id, stage: 'order', items: [{ stockItemId: it._id, name: it.name, qty: 80, unit: 'sq ft', rate: 10, gstRate: 0 }] })).json);
     const slips = [];
-    for (const s of sales) slips.push((await api.create(supervisor, 'dispatches', { saleId: s._id, truckNo: 'RJ1', items: [{ stockItemId: it._id, name: it.name, qty: 80 }] })).json);
+    for (const s of sales) slips.push((await api.create(supervisor, 'dispatches', { saleId: s._id, truckNo: 'RJ14 GA 0001', items: [{ stockItemId: it._id, name: it.name, qty: 80 }] })).json);
     const results = await Promise.all(slips.map((d) => call(guard, outRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(d._id) })));
     const okCount = results.filter((r) => r.status === 200).length;
     expect(okCount, JSON.stringify(results.map((r) => r.json))).toBe(1);
@@ -297,7 +297,7 @@ describe('stock cannot go negative or race', () => {
   it('cancelling a dispatched truck puts stock back and reopens the order', async () => {
     const it = (await api.create(owner, 'stockitems', { name: 'Reverse item', category: 'finished', unit: 'sq ft', sellRate: 10, openingBalance: 300 })).json;
     const s = (await api.create(salesperson, 'sales', { customerId: customer._id, stage: 'order', items: [{ stockItemId: it._id, name: it.name, qty: 100, unit: 'sq ft', rate: 10, gstRate: 0 }] })).json;
-    const d = (await api.create(supervisor, 'dispatches', { saleId: s._id, truckNo: 'RJ2', items: [{ stockItemId: it._id, name: it.name, qty: 100 }] })).json;
+    const d = (await api.create(supervisor, 'dispatches', { saleId: s._id, truckNo: 'RJ14 GA 0002', items: [{ stockItemId: it._id, name: it.name, qty: 100 }] })).json;
     await call(guard, outRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(d._id) });
     expect((await item(it._id)).balance).toBe(200);
     expect((await api.void(accountant, 'dispatches', d._id)).status).toBe(403); // only those with void on dispatches

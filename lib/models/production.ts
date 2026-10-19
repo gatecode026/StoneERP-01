@@ -137,6 +137,7 @@ export const Vehicle = defineModel(
     regNo: { type: S, uppercase: true, maxlength: 20 },
     kind: { type: S, enum: ['Truck', 'Tractor', 'Loader', 'Crane', 'Other'], required: true },
     driverCode: { type: S, uppercase: true },
+    driverName: S, // the regular driver's name, kept with the code
     insuranceExpiry: dateStr(),
     fitnessExpiry: dateStr(),
     permitExpiry: dateStr(),

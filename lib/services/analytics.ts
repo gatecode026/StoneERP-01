@@ -160,7 +160,9 @@ async function computeYieldUncached(settings: AppSettings, opts: { blockNo?: num
     };
   });
   const measured = rows.filter((r) => r.yieldPct != null);
-  const avg = measured.length ? sum(measured, (r) => r.yieldPct!) / measured.length : 0;
+  // yield of a group = stone we got ÷ stone the blocks could have given (a big block counts for more than a small one)
+  const pct = (rs: typeof rows) => { const t = sum(rs, (r) => (Number(r.cft) * 304.8) / r.thickness); return t ? (sum(rs, (r) => r.saleable) / t) * 100 : 0; };
+  const avg = pct(measured);
   const threshold = Math.max(40, avg - 10);
   rows.forEach((r) => { r.low = r.yieldPct != null && r.yieldPct < threshold; });
   const byNo = new Map(rows.map((r) => [r.blockNo, r]));
@@ -176,9 +178,13 @@ async function computeYieldUncached(settings: AppSettings, opts: { blockNo?: num
     return Object.entries(m).filter(([, v]) => v.w).map(([name, v]) => ({ name, yieldPct: r2(v.y / v.w), sqft: r0(v.w) })).sort((a, b) => b.yieldPct - a.yieldPct);
   };
   const bySupplier = Object.entries(group(measured, (r) => r.supplierName)).map(([name, rs]) => ({
-    name, yieldPct: r2(sum(rs, (r) => r.yieldPct!) / rs.length), blocks: rs.length, sqft: r0(sum(rs, (r) => r.saleable)), costPerSqft: r2(sum(rs, (r) => r.totalCost) / Math.max(1, sum(rs, (r) => r.saleable))),
+    name, yieldPct: r2(pct(rs)), blocks: rs.length, sqft: r0(sum(rs, (r) => r.saleable)), costPerSqft: r2(sum(rs, (r) => r.totalCost) / Math.max(1, sum(rs, (r) => r.saleable))),
   })).sort((a, b) => b.yieldPct - a.yieldPct);
-  return { rows, avg: r2(avg), threshold: r2(threshold), bySupplier, byMachine: weighted('m'), byOperator: weighted('o') };
+  // one point per month the blocks were received in (oldest first), for the trend chart
+  const byMonth = Object.entries(group(measured, (r) => String(r.date).slice(0, 7))).map(([month, rs]) => ({
+    month, yieldPct: r2(pct(rs)), blocks: rs.length, sqft: r0(sum(rs, (r) => r.saleable)), costPerSqft: r2(sum(rs, (r) => r.totalCost) / Math.max(1, sum(rs, (r) => r.saleable))),
+  })).sort((a, b) => a.month.localeCompare(b.month));
+  return { rows, avg: r2(avg), threshold: r2(threshold), bySupplier, byMonth, byMachine: weighted('m'), byOperator: weighted('o') };
 }
 
 // ---------------------------------------------------------------- REMINDERS (Part 15)

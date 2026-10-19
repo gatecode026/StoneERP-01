@@ -74,11 +74,12 @@ test('Owner: Settings has shifts, weekly off and holidays, and a change is kept'
   const sat = page.locator('#wo_sat');
   await expect(sat).toBeVisible();
   await expect(page.locator('#wo_sun')).toHaveValue('all');
-  await sat.selectOption('2nd4th');
+  const next = (await sat.inputValue()) === '2nd4th' ? '1st3rd5th' : '2nd4th'; // a different choice than what is saved (the test database keeps earlier runs)
+  await sat.selectOption(next);
   await sat.locator('xpath=ancestor::section[1] | ancestor::div[contains(@class,"card")][1]').getByRole('button', { name: /Save/ }).first().click();
   await expect(page.getByText('Saved').first()).toBeVisible();
   await page.reload();
-  await expect(page.locator('#wo_sat')).toHaveValue('2nd4th');
+  await expect(page.locator('#wo_sat')).toHaveValue(next);
   // a holiday
   await page.getByRole('button', { name: /Add a holiday/ }).click();
   await page.locator('#hd_from_0').fill('2026-11-08');
@@ -109,4 +110,16 @@ test.describe('on a computer the day is a ledger table', () => {
     await expect(sup.locator('td').nth(6)).toContainText('Absent');
     await page.screenshot({ path: 'test-results/attendance-ledger.png' });
   });
+});
+
+test('Supervisor sees My attendance with Punch In on their own home; the Owner home has no punch card', async ({ page }) => {
+  await signIn(page, 'supervisor');
+  await expect(page.getByText('My attendance')).toBeVisible();
+  await page.getByRole('button', { name: /^Punch In$/ }).click();
+  await expect(page.getByText(/Punched in/i).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Punch Out$/ })).toBeVisible();
+  await page.context().clearCookies();
+  await signIn(page, 'owner');
+  await expect(page.getByText('My attendance')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Punch In$/ })).toHaveCount(0);
 });

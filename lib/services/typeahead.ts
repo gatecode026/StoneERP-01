@@ -4,6 +4,7 @@ import { Block, Customer, Employee, Machine, Sale, StockItem, Supplier, Vehicle 
 import { badRequest, notFound } from '../errors';
 import type { Resource } from '../perm/resources';
 import type { AnyModel } from '../models/_base';
+import { DESIGNATIONS } from '../config';
 
 export const LOOKUP_MAX = 20;
 
@@ -15,7 +16,7 @@ type Kind = {
   /** alternative value fields a dropdown may use as its id (default _id) */
   by?: string[];
   /** query filters a client may pass, each validated */
-  filters?: Record<string, readonly string[] | 'oidlist'>;
+  filters?: Record<string, readonly string[] | 'oidlist' | 'string'>;
   defaults?: Record<string, any>;
   select: string;
   sort: Record<string, 1 | -1>;
@@ -26,14 +27,14 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'] }, defaults: { status: 'active' }, select: 'name empCode job', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS }, defaults: { status: 'active' }, select: 'name empCode job designation', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})` },
   items: { resource: 'stockitems', model: StockItem, search: ['name'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name unit balance category', sort: { name: 1 }, label: (d) => `${d.name} (${n(d.balance)} ${d.unit})`, hint: (d) => d.unit },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
   suppliers: { resource: 'suppliers', model: Supplier, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
   vehicles: { resource: 'vehicles', model: Vehicle, search: ['name', 'regNo'], select: 'name regNo kind', sort: { name: 1 }, label: (d) => (d.regNo ? `${d.name} (${d.regNo})` : d.name) },
-  blocks: { resource: 'blocks', model: Block, search: [], by: ['blockNo'], select: 'blockNo cft rawanna', sort: { blockNo: -1 }, label: (d) => `Block ${d.blockNo} · ${n(d.cft)} CFT`, hint: (d) => d.rawanna },
-  sales: { resource: 'sales', model: Sale, search: ['saleNo', 'customerName'], filters: { stage: ['quotation', 'order', 'dispatched'] }, select: 'saleNo customerName stage', sort: { date: -1 }, label: (d) => `${d.saleNo} · ${d.customerName}`, hint: (d) => d.stage },
+  blocks: { resource: 'blocks', model: Block, search: [], by: ['blockNo'], filters: { stage: ['received', 'cutting', 'cut'], source: ['own', 'supplier'] }, select: 'blockNo cft rawanna', sort: { blockNo: -1 }, label: (d) => `Block ${d.blockNo} · ${n(d.cft)} CFT`, hint: (d) => d.rawanna },
+  sales: { resource: 'sales', model: Sale, search: ['saleNo', 'customerName'], filters: { stage: ['quotation', 'order', 'dispatched'], toSend: ['1'] }, select: 'saleNo customerName stage', sort: { date: -1 }, label: (d) => `${d.saleNo} · ${d.customerName}`, hint: (d) => d.stage },
 };
 export const lookupKind = (k: string) => {
   if (!Object.prototype.hasOwnProperty.call(KINDS, k)) throw notFound();
@@ -57,6 +58,14 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
     if (['q', 'by', 'ids', 'limit', 'includeLeft'].includes(k)) continue;
     const allowed = kind.filters?.[k];
     if (!allowed || allowed === 'oidlist') throw badRequest(`Unknown filter "${k}"`);
+    if (allowed === 'string') { // any one value, matched exactly (a job title)
+      const one = v.trim().slice(0, 60);
+      if (!one) throw badRequest(`Filter "${k}" is empty`);
+      filters[k] = one;
+      continue;
+    }
+    // toSend=1: only orders that still have stone left to send (a loading slip is made for those)
+    if (k === 'toSend') { if (v === '1') filters.fullyDispatched = { $ne: true }; continue; }
     const parts = v.split(',').map((s) => s.trim()).filter(Boolean);
     if (!parts.length || parts.some((p) => !allowed.includes(p))) throw badRequest(`Filter "${k}" must be one of: ${allowed.join(', ')}`);
     filters[k] = parts.length > 1 ? { $in: parts } : parts[0];

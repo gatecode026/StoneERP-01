@@ -103,7 +103,7 @@ describe('Roles: the punch rights', () => {
     expect((await g('manager')).punches).toMatchObject({ view: 'all', create: 'all', edit: 'all' });
     expect((await g('manager')).attendance.approve).toBe('all');
     expect((await g('supervisor')).attendance.approve).toBeUndefined();
-    expect((await g('accountant')).punches).toEqual({ view: 'all' });
+    expect((await g('accountant')).punches).toEqual({ view: 'all', create: 'own' }); // may punch for themselves
   });
 
   it('a role the Owner saved before punching existed gets the new rights from the defaults; one saved afterwards is taken as saved', async () => {

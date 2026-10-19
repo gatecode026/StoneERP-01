@@ -8,6 +8,8 @@ import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
+import StockDaily from '@/components/stock/StockDaily';
+import StockCount from '@/components/stock/StockCount';
 import { inr, num, fmtDate } from '@/lib/format';
 
 const CAT = [{ value: 'raw', label: 'Raw stone' }, { value: 'finished', label: 'Finished goods' }, { value: 'consumable', label: 'Consumables' }];
@@ -51,8 +53,10 @@ export default function StockPage() {
 
   return (
     <RoleGuard perm="stockitems">
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Balance' }, { key: 'moves', label: 'Movements' }]} />
-      {tab === 'items' ? (
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Balance' }, { key: 'moves', label: 'Movements' }, { key: 'daily', label: 'Day by day' }, ...(can('stockcounts', 'view') ? [{ key: 'count', label: 'Monthly count' }] : [])]} />
+      {tab === 'daily' && <StockDaily />}
+      {tab === 'count' && <StockCount />}
+      {tab === 'items' && (
         <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Live balance of every item" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="name, type and unit are required; opening balance becomes the first stock-in" />}
           fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
@@ -74,7 +78,8 @@ export default function StockPage() {
           exportColumns={[{ key: 'name', label: 'Item' }, { key: 'category', label: 'Type' }, { key: 'unit', label: 'Unit' }, { key: 'balance', label: 'Balance' }, { key: 'minLevel', label: 'Minimum' }, { key: 'location', label: 'Location' }]}
           rowActions={(row) => manage ? [{ label: 'Move', icon: <ArrowLeftRight size={14} />, onClick: () => { setTab('moves'); toast('Choose "Add" to record a movement for ' + row.name); } }] : []}
         />
-      ) : (
+      )}
+      {tab === 'moves' && (
         <CrudPage key={'m' + reloadKey} model="stockmovements" headerExtra={<ImportData resource="stockmovements" perm="stockmovements" noun="stock movements" />} title="Stock movements" subtitle="In · out · transfer · damage (damage needs owner approval)" label="Stock movement"
           sort="-date,-createdAt" canAdd={manage} canEdit={() => false} allowVoid={false}
           fields={[

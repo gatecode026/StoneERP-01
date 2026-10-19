@@ -74,7 +74,7 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
         input = <textarea id={id} className="input" rows={f.rows || 3} value={v} onChange={(e) => set({ [f.name]: e.target.value })} placeholder={tx(f.placeholder)} disabled={disabled} />; break;
       case 'select':
         input = (
-          <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value })}>
+          <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value, ...(f.onChange ? f.onChange(e.target.value, form) : {}) })}>
             {!f.required || !v ? <option value="">{tx('Select…')}</option> : null}
             {v && !optList(f.options).some((o) => String(o.value) === String(v)) && <option value={v}>{v}</option>}
                 {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
@@ -175,8 +175,8 @@ export function cleanForm(fields, form) {
   return out;
 }
 
-export function missingRequired(fields, form) {
-  const f = fields.find((x) => x.required && (!x.show || x.show(form)) && !x.createOnly && (form[x.name] === '' || form[x.name] == null || form[x.name] === false));
+export function missingRequired(fields, form, editing = false) {
+  const f = fields.find((x) => x.required && (!x.show || x.show(form)) && !(x.createOnly && editing) && (form[x.name] === '' || form[x.name] == null || form[x.name] === false));
   return f ? f.label : null;
 }
 
@@ -256,7 +256,7 @@ export default function CrudPage({
 
   async function save() {
     if (savingRef.current) return;
-    const miss = missingRequired(fields, form);
+    const miss = missingRequired(fields, form, Boolean(editing));
     if (miss) { setShowErrors(true); toast.error(trNow('{f} is required', { f: trNow(miss) })); return; }
     const bad = firstFieldError(fields, form, editing, (f) => visible(perm, f) && level(perm, f) === 'write');
     if (bad) { setShowErrors(true); toast.error(`${trNow(bad.label)}: ${trNow(bad.message)}`); document.getElementById(`f_${bad.name}`)?.focus(); return; }

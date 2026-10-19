@@ -15,5 +15,9 @@ export const GET = withAuth('yield', 'view', async (auth) => {
     const { costPerSqft, ...rest } = r;
     return hideCost ? rest : { ...rest, costPerSqft };
   });
-  return jsonWithEtag(auth.req, stripNulls({ ...data, rows, bySupplier, hideCost }));
+  const byMonth = data.byMonth.map((r) => {
+    const { costPerSqft, ...rest } = r;
+    return hideCost ? rest : { ...rest, costPerSqft };
+  });
+  return jsonWithEtag(auth.req, stripNulls({ ...data, rows, bySupplier, byMonth, hideCost }));
 });

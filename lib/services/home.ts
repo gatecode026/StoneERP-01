@@ -10,7 +10,7 @@ import { addDays, addMonths, daysBetween, monthEnd, monthOf, monthStart, todayIS
 import { buildDailyReport, workerHome } from './report';
 import { computeReminders, computeYield } from './analytics';
 import { listPending } from './approvals';
-import { getDay } from '../rollup/dailySummary';
+import { getDay, getRange } from '../rollup/dailySummary';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const sum = (a: any[], f: (x: any) => number) => a.reduce((t, x) => t + (Number(f(x)) || 0), 0);
@@ -66,9 +66,55 @@ async function ageing(user: U, perm: EffectivePerm) {
 }
 
 // ------------------------------------------------------------------ OWNER
+/**
+ * The graphs of the Owner's home, drawn from the daily rollup (one small document per day): the last 30 days ending on `date`, a day per
+ * row, with a zero where nothing happened. A field is included only when the Owner may see all of that data. `money` is the running
+ * cash + bank balance at the end of each day, worked back from today's balances through each day's money in and out.
+ */
+export async function ownerSeries(date: string, perm: EffectivePerm, balanceNow: number | null) {
+  const all = (r: any) => perm.scope(r, 'view') === 'all';
+  const from = addDays(date, -29);
+  const today = todayIST();
+  const rows = await getRange(from, date > today ? date : today);
+  const by = new Map<string, any>(rows.map((r: any) => [r._id, r]));
+  const n = (v: unknown) => Number(v) || 0;
+  const flow = (d: any) => n(d?.cash?.cashIn) - n(d?.cash?.cashOut) + n(d?.cash?.bankIn) - n(d?.cash?.bankOut);
+  const days = Array.from({ length: 30 }, (_, i) => addDays(from, i));
+  // balance at the end of `date`: today's balance minus everything that moved after it
+  let bal: number | null = null;
+  if (balanceNow !== null && daysBetween(date, today) <= 365) {
+    bal = balanceNow;
+    for (let d = addDays(date, 1); d <= today; d = addDays(d, 1)) bal -= flow(by.get(d));
+  }
+  const money: Record<string, number> = {};
+  if (bal !== null) { let b = bal; for (let i = days.length - 1; i >= 0; i--) { money[days[i]] = r0(b); b -= flow(by.get(days[i])); } }
+  return days.map((d) => {
+    const x = by.get(d);
+    const row: Record<string, any> = { date: d };
+    if (all('sales')) { row.sales = r0(n(x?.sales?.total)); row.orders = n(x?.sales?.orders); row.received = r0(n(x?.receipts?.total)); row.dispatches = n(x?.dispatches?.out); }
+    if (all('expenses')) row.expenses = r0(n(x?.expenses?.total));
+    if (all('machineentries')) { row.sqft = r0(n(x?.machines?.sqft)); row.idleHours = r2(n(x?.machines?.stoppedMins) / 60); }
+    if (all('attendance')) { const a = x?.attendance ?? {}; row.present = n(a.present) + n(a.overtime) + n(a.half); row.absent = n(a.absent); row.leave = n(a.leave); }
+    if (d in money) row.balance = money[d];
+    return row;
+  });
+}
+
+async function stockLevels(perm: EffectivePerm) {
+  if (!perm.can('stockitems', 'view')) return null;
+  const rows: any[] = await StockItem.find({ isVoid: false, minLevel: { $gt: 0 } }).select('name balance minLevel unit').limit(300).lean();
+  return rows.map((i) => ({ name: i.name, balance: n0(i.balance), minLevel: n0(i.minLevel), unit: i.unit, ratio: n0(i.balance) / i.minLevel })).sort((a, b) => a.ratio - b.ratio).slice(0, 8).map(({ ratio: _r, ...i }) => i);
+}
+const n0 = (v: unknown) => Number(v) || 0;
+
 async function ownerHome(date: string, user: U, perm: EffectivePerm, settings: AppSettings) {
-  const [report, cur, prev, profit] = await Promise.all([buildDailyReport(date, user, perm, settings), daySnapshot(date), daySnapshot(addDays(date, -1)), profitSummary(perm, user, settings)]);
-  return { kind: 'owner', date, report, compare: { today: cur, yesterday: prev }, profit, denied: [] as string[] };
+  const [report, cur, prev, profit, ageingData, stockRows] = await Promise.all([
+    buildDailyReport(date, user, perm, settings), daySnapshot(date), daySnapshot(addDays(date, -1)), profitSummary(perm, user, settings),
+    perm.can('sales', 'view') ? ageing(user, perm) : null, stockLevels(perm),
+  ]);
+  const balanceNow = report.cash ? n0(report.cash.inHand) + n0(report.cash.bank) : null;
+  const series = await ownerSeries(date, perm, balanceNow);
+  return { kind: 'owner', date, report, compare: { today: cur, yesterday: prev }, profit, series, ageing: ageingData, stockLevels: stockRows, denied: [] as string[] };
 }
 
 // ------------------------------------------------------------------ MANAGER
@@ -229,15 +275,20 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
   }
 }
 
+async function withSelf<T extends object>(home: T, date: string, user: SessionUser) {
+  return { ...home, self: await workerHome(date, user as any) };
+}
+
 /** One round trip per role home. The response contains exactly the sections that role is allowed to see. */
 export async function buildHome(date: string, user: SessionUser, perm: EffectivePerm, settings: AppSettings) {
   const kind = homeKind(perm);
   switch (kind) {
     case 'owner': return ownerHome(date, user, perm, settings);
-    case 'manager': return managerHome(date, user, perm, settings);
-    case 'accountant': return accountantHome(date, user, perm, settings);
-    case 'supervisor': return supervisorHome(date, user, perm, settings);
-    case 'salesperson': return salespersonHome(date, user, perm);
+    // everybody who is also an employee sees their own attendance (and the Punch button) at the top of their home
+    case 'manager': return withSelf(await managerHome(date, user, perm, settings), date, user);
+    case 'accountant': return withSelf(await accountantHome(date, user, perm, settings), date, user);
+    case 'supervisor': return withSelf(await supervisorHome(date, user, perm, settings), date, user);
+    case 'salesperson': return withSelf(await salespersonHome(date, user, perm), date, user);
     case 'worker': return { kind, date, self: await workerHome(date, user), denied: [] as string[] };
     default: return presetHome(kind, date, user, perm);
   }

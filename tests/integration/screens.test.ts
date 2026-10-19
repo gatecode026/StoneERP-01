@@ -213,7 +213,7 @@ describe('freight: totals per transporter and one-request payment', () => {
     const item = (await api.create(owner, 'stockitems', { name: 'Slab', category: 'finished', unit: 'sq ft', sellRate: 10, openingBalance: 5000 })).json;
     const cust = (await api.create(owner, 'customers', { name: 'Cust F', mobile: '9811144444' })).json;
     const sale = (await api.create(owner, 'sales', { customerId: cust._id, stage: 'order', items: [{ stockItemId: item._id, name: 'Slab', qty: 500, unit: 'sq ft', rate: 10, gstRate: 0 }] })).json;
-    for (const [truck, fr] of [['RJ01', 1000], ['RJ02', 2500]] as const) {
+    for (const [truck, fr] of [['RJ14 GA 0101', 1000], ['RJ14 GA 0102', 2500]] as const) {
       const slip = (await api.create(sup, 'dispatches', { saleId: sale._id, truckNo: truck, transporter: 'Sharma Roadlines', freight: fr, items: [{ stockItemId: item._id, name: 'Slab', qty: 100 }] })).json;
       await call(guard, outRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(slip._id) });
     }

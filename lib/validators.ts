@@ -6,6 +6,7 @@
  * message, or '' when the value is fine. An empty value is always fine here: whether a field is required is decided
  * by the form that uses it.
  */
+import { GST_STATES } from './gst';
 
 // Verhoeff checksum, the one Aadhaar numbers carry in their last digit
 const D = [
@@ -144,6 +145,77 @@ export function joiningDateProblem(date: unknown, leaving?: unknown, today = new
   return '';
 }
 
+// ---- GST number: 15 characters, a state code first, the party's PAN inside
+export const cleanGstin = (v: unknown) => String(v ?? '').replace(/\s/g, '').toUpperCase();
+export function checkGstin(v: unknown): string {
+  const s = cleanGstin(v);
+  if (!s) return '';
+  if (!/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(s)) return 'GST number must be 15 characters, like 08AAAAA0000A1Z5';
+  if (!GST_STATES[s.slice(0, 2)]) return 'The first two digits of the GST number must be a state code';
+  return '';
+}
+
+// ---- A business or party name (customer, supplier, transporter): letters or digits first; letters, digits, spaces and . , & ' ( ) / - after
+export const cleanParty = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
+export function checkParty(v: unknown): string {
+  const s = cleanParty(v);
+  if (!s) return '';
+  if (s.length < 2) return 'Name is too short';
+  if (!/^[\p{L}\p{N}][\p{L}\p{M}\p{N} .,&'’()/-]*$/u.test(s)) return "Name can have letters, digits, spaces and . , & ' ( ) / - only";
+  return '';
+}
+
+// ---- A city or town
+export function checkPlace(v: unknown): string {
+  const s = cleanParty(v);
+  if (!s) return '';
+  return /^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$/u.test(s) ? '' : 'City can have letters, spaces and . \' - only';
+}
+
+// ---- Truck number: as painted on the truck (RJ06 GA 4521); spaces are tidied, 6 to 12 letters and digits with both kinds present
+export const cleanTruck = (v: unknown) => String(v ?? '').replace(/[^A-Za-z0-9 -]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+export function checkTruck(v: unknown): string {
+  const s = cleanTruck(v);
+  if (!s) return '';
+  const core = s.replace(/[ -]/g, '');
+  if (core.length < 6 || core.length > 12 || !/[A-Z]/.test(core) || !/\d/.test(core)) return 'Enter the truck number as it is painted on the truck, like RJ06 GA 4521';
+  return '';
+}
+
+// ---- E-way bill number: 12 digits
+export const cleanEway = onlyDigits;
+export function checkEway(v: unknown): string {
+  const s = cleanEway(v);
+  if (!s) return '';
+  return /^\d{12}$/.test(s) ? '' : 'E-way bill number must be exactly 12 digits';
+}
+
+// ---- A bill (invoice) number: letters, digits, / and -, capitals; spaces dropped
+export const cleanBill = (v: unknown) => String(v ?? '').replace(/\s+/g, '').toUpperCase();
+export function checkBill(v: unknown): string {
+  const s = cleanBill(v);
+  if (!s) return '';
+  return /^[A-Z0-9/-]{1,40}$/.test(s) ? '' : 'Bill number can have letters, digits, / and - only';
+}
+
+// ---- Cheque / UPI / bank reference: letters, digits, space, - and /
+export const cleanRef = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
+export function checkRef(v: unknown): string {
+  const s = cleanRef(v);
+  if (!s) return '';
+  return /^[A-Za-z0-9 /-]{1,40}$/.test(s) ? '' : 'Reference can have letters, digits, spaces, - and / only (up to 40 characters)';
+}
+/** A payment's reference: a cheque must carry its 6-digit number; UPI / bank / cash may carry a reference. */
+export function checkPaymentRef(mode: unknown, ref: unknown): string {
+  const r = cleanRef(ref);
+  if (String(mode) === 'Cheque') {
+    if (!r) return 'Enter the cheque number';
+    if (!/^\d{6}$/.test(r)) return 'A cheque number is 6 digits';
+    return '';
+  }
+  return checkRef(r);
+}
+
 type Rule = { clean: (v: unknown) => string; check: (v: unknown) => string; maxLength: number; inputMode?: 'numeric' | 'tel' | 'text'; autoCapitalize?: 'characters' | 'none'; live: (v: string) => string };
 // a pasted "+91 98290 12345" is longer than the number inside it, so the length limit is applied after tidying, not as an input attribute
 const digitsOnly = (max: number) => (v: string) => v.replace(/\D/g, '').slice(0, max);
@@ -164,4 +236,12 @@ export const EMPLOYEE_RULES: Record<string, Rule> = {
   upi: { clean: cleanUpi, check: checkUpi, maxLength: 80, autoCapitalize: 'none', live: (v) => v.replace(/\s/g, '').toLowerCase().slice(0, 80) },
   pfNo: { clean: cleanPf, check: checkPf, maxLength: 30, autoCapitalize: 'characters', live: shout(30) },
   esiNo: { clean: cleanEsi, check: checkEsi, maxLength: 12, inputMode: 'numeric', live: digitsOnly(10) },
+  // sales, purchases and dispatch
+  gstin: { clean: cleanGstin, check: checkGstin, maxLength: 15, autoCapitalize: 'characters', live: shout(15) },
+  partyName: { clean: cleanParty, check: checkParty, maxLength: 160, live: keep(160) },
+  place: { clean: cleanParty, check: checkPlace, maxLength: 80, live: keep(80) },
+  truckNo: { clean: cleanTruck, check: checkTruck, maxLength: 16, autoCapitalize: 'characters', live: (v: string) => v.replace(/[^A-Za-z0-9 -]/g, '').toUpperCase().slice(0, 16) },
+  billNo: { clean: cleanBill, check: checkBill, maxLength: 40, autoCapitalize: 'characters', live: (v: string) => v.replace(/[^A-Za-z0-9/-]/g, '').toUpperCase().slice(0, 40) },
+  eway: { clean: cleanEway, check: checkEway, maxLength: 12, inputMode: 'numeric', live: digitsOnly(12) },
+  payRef: { clean: cleanRef, check: checkRef, maxLength: 40, live: (v: string) => v.replace(/[^A-Za-z0-9 /-]/g, '').slice(0, 40) },
 };

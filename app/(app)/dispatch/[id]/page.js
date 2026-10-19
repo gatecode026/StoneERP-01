@@ -1,10 +1,12 @@
 'use client';
 import { useParams } from 'next/navigation';
-import { Printer, MessageCircle, LogOut, Download } from 'lucide-react';
+import { Printer, MessageCircle, LogOut, Download, Banknote } from 'lucide-react';
 import toast from '@/lib/toast';
 import { useApp, useFetch, EnglishOnly } from '@/components/Providers';
 import { PageHeader, SkeletonList, RoleGuard, Photo } from '@/components/ui';
 import { api, openWA } from '@/lib/client';
+import { apiAsk } from '@/components/askApi';
+import { promptDialog } from '@/components/Dialogs';
 import { fmtDate, fmtDateTime, num, inr } from '@/lib/format';
 import T from '@/components/T';
 
@@ -17,13 +19,20 @@ export default function GatePass() {
   const out = d.status === 'out';
   const msg = `Dear ${d.customerName}, your order ${d.saleNo || ''} has left our Bijoliya factory.\nTruck: ${d.truckNo}\nDriver: ${d.driverName || '-'} ${d.driverMobile || ''}\nInvoice: ${d.invoiceNo || '-'}\nE-way bill: ${d.eway || '-'}\n— ${company.name}`;
   async function markOut() {
-    try { await api(`/api/dispatches/${id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out – stock deducted'); reload(); } catch (e) { toast.error(e.message); }
+    try { await apiAsk(`/api/dispatches/${id}/out`); toast.success('Truck marked out – stock deducted'); reload(); } catch (e) { if (!e.data?.cancelled) toast.error(e.message); }
+  }
+  async function payFreight() {
+    const m = await promptDialog(`Freight ${inr(d.freight)} to ${d.transporter || 'the transporter'}. Paid by: Cash / UPI / Bank`, 'Bank');
+    if (m === null) return;
+    const l = m.trim().toLowerCase();
+    try { await api(`/api/dispatches/${id}/freight-paid`, { method: 'POST', body: { mode: l === 'cash' ? 'Cash' : l === 'upi' ? 'UPI' : 'Bank' } }); toast.success('Freight marked paid'); reload(); } catch (e) { toast.error(e.message); }
   }
   const Row = ({ k, v }) => <tr><td className="py-1.5 pr-4 text-gray-500 w-40 align-top">{k}</td><td className="py-1.5 font-medium">{v || '—'}</td></tr>;
   return (
     <RoleGuard perm="dispatches">
       <PageHeader title={tr('Gate pass {n}', { n: d.gatePassNo })} back="/dispatch" actions={<>
         {!out && can('dispatches', 'approve') && <button className="btn-primary" onClick={markOut}><LogOut size={16} /><T> Guard: mark truck out</T></button>}
+        {d.freight > 0 && !d.freightPaid && can('cashentries', 'create') && <button className="btn-outline" onClick={payFreight}><Banknote size={16} /><T> Freight paid</T></button>}
         {out && <button className="btn-green" onClick={() => openWA(msg, d.customerMobile)}><MessageCircle size={16} /><T> Tell customer</T></button>}
         <a className="btn-primary" href={`/api/dispatches/${id}/pdf`} download><Download size={16} /><T> Download PDF</T></a>
         <button className="btn-outline" onClick={() => window.print()}><Printer size={16} /><T> Print</T></button>
@@ -48,6 +57,9 @@ export default function GatePass() {
           {(d.items || []).map((i, k) => <div key={k} className="px-3 py-2 border-t text-sm flex justify-between"><span>{i.name}</span><b>{num(i.qty)} {i.unit}</b></div>)}
           {!(d.items || []).length && <div className="px-3 py-2 text-sm text-gray-500">—</div>}
         </div>
+        {(d.documents || []).length > 0 && (
+          <div className="mt-4 no-print"><div className="text-xs text-gray-500 mb-1"><T>Papers</T></div><div className="grid grid-cols-3 gap-2">{d.documents.map((p, k) => <Photo key={k} src={p} thumb alt={tr('Papers')} className="rounded border w-full" />)}</div></div>
+        )}
         {(d.photoLoaded || d.photoCovered) && (
           <div className="mt-4 grid grid-cols-2 gap-3 no-print">
             {[['Loaded truck', d.photoLoaded], ['Covered truck', d.photoCovered]].map(([l, p]) => p && (

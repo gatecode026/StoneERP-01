@@ -8,17 +8,11 @@ import { fmtDateTime, todayISO } from '@/lib/format';
 import { api } from '@/lib/client';
 import T from '@/components/T';
 import WorkHoursCards from '@/components/settings/WorkHours';
+import CompanyCard from '@/components/settings/CompanyCard';
 
 // One card per group of settings; each card saves on its own, so a mistake in one never blocks another.
 // `scale: 100` shows a rate such as 0.12 as 12 (%).
 const SECTIONS = [
-  { key: 'company', title: 'Company (printed on bills and quotations)', hint: 'The GST number must be set before the first invoice can be issued.', fields: [
-    { k: 'name', label: 'Company name', required: true }, { k: 'brand', label: 'Brand / tagline' },
-    { k: 'address', label: 'Address', wide: true }, { k: 'gstin', label: 'GST number', hint: '15 characters, e.g. 08ABCDE1234F1Z5', upper: true },
-    { k: 'state', label: 'State' }, { k: 'stateCode', label: 'State code', hint: '2 digits, e.g. 08 for Rajasthan' },
-    { k: 'phone', label: 'Phone' }, { k: 'email', label: 'Email' },
-    { k: 'bankName', label: 'Bank name' }, { k: 'bankAccount', label: 'Account number' }, { k: 'ifsc', label: 'IFSC', upper: true },
-  ] },
   { key: 'schedule', title: 'Daily messages', hint: 'Times are in Indian time. The owner report is sent by WhatsApp every evening.', fields: [
     { k: 'ownerReportEnabled', label: 'Send the daily report to the Owner', type: 'bool' },
     { k: 'ownerReportTime', label: 'Owner report time', type: 'time' }, { k: 'reportReminderTime', label: 'Reminder to people who have not filled the day report', type: 'time' },
@@ -160,9 +154,10 @@ function SettingsScreen() {
   const { data, loading, error, reload } = useFetch('/api/settings');
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Company details, daily messages, limits and rates. Every change is recorded in the Audit Trail." />
+      <PageHeader title="Settings" subtitle="Company details and GST number, daily messages, limits and rates. Every change is recorded in the Audit Trail." />
       {loading && !data ? <SkeletonList n={4} className="h-40" /> : error && !data ? <div className="card p-6 text-center text-sm text-red-700">{error.message}</div> : (
         <div className="space-y-4 max-w-3xl">
+          <CompanyCard value={data?.company} onSaved={reload} />
           {SECTIONS.map((def) => <SectionForm key={def.key} def={def} value={data?.[def.key]} onSaved={reload} />)}
           <WorkHoursCards value={data?.workHours} onSaved={reload} />
           <FinancialYear value={data?.fyStartMonth ?? 4} onSaved={reload} />

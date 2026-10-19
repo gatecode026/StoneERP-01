@@ -65,6 +65,9 @@ export default function Shell({ children }) {
   const tabKeys = (BOTTOM_TABS[session.perm.roleKey] || BOTTOM_TABS[role] || BOTTOM_TABS.default);
   const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && canOpen(can, i)).slice(0, 4);
   const quick = QUICK_ADD.filter((q) => can(q.res, 'create'));
+  // who is signed in: the name, and what the person does (designation or job; the role for the Owner)
+  const roleName = ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role;
+  const who = session.title && session.title.toLowerCase() !== String(roleName).toLowerCase() ? `${session.title} · ${roleName}` : roleName;
   const showFab = quick.length > 0;
   const hi = lang === 'hi';
 
@@ -114,7 +117,10 @@ export default function Shell({ children }) {
         {/* Top bar */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-sand-200 no-print">
           <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-14">
-            <div className="md:hidden min-w-0 flex-1"><Brand /></div>
+            <div className="md:hidden min-w-0 flex-1 leading-tight" data-testid="who">
+              <div className="font-bold text-sm truncate">{session.name}</div>
+              <div className="text-[11px] text-char-500 truncate capitalize">{who}</div>
+            </div>
             <div className="hidden md:flex items-center gap-2">
               <span className="font-bold">{t('appName')}</span>
             </div>
@@ -195,6 +201,11 @@ export default function Shell({ children }) {
             <div className="sticky top-0 bg-white px-4 py-3 flex items-center justify-between border-b border-sand-100">
               <div className="font-bold flex items-center gap-2"><Menu size={18} /> {t('menu')}</div>
               <button onClick={() => setDrawer(false)} className="p-2"><X size={20} /></button>
+              <div className="rounded-xl bg-sand-50 border border-sand-200 px-3 py-2.5">
+                <div className="font-bold truncate">{session.name}</div>
+                <div className="text-xs text-char-500 capitalize truncate">{who}</div>
+                <div className="text-[11px] text-char-400 truncate">{session.company?.name}</div>
+              </div>
             </div>
             <div className="p-3 space-y-4">
               <NavLink it={DASH} small />

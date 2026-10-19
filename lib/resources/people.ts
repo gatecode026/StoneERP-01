@@ -10,6 +10,7 @@ import { assertNoPunches, manualFields } from '../services/punch';
 import { nextSeq, oid, postCash, accountFor, round2 } from '../services/core';
 import { withinApprovalLimit } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
+import { DESIGNATIONS } from '../config';
 import { applyLogin, loginSchema, syncLoginIdentity, type LoginInput } from '../services/employeeLogin';
 import type { AuthCtx } from '../api/withAuth';
 import { dateStr, empCode, enumOf, photo, photos, posNum, req, text, num, monthStr, ruled } from './zod';
@@ -23,7 +24,7 @@ const FLAG: Record<string, string> = { docAadhaar: 'aadhaar', docPan: 'pan', doc
 const rate = z.coerce.number().finite().gt(0, 'Pay rate must be more than 0').max(1e7, 'Pay rate is too large');
 const employeeFields = {
   name: ruled('name', { required: true }), mobile: ruled('mobile').optional(), photo: photo.optional(), fatherName: ruled('fatherName').optional(), address: text(400).optional(),
-  job: req(80), site: enumOf(SITES).optional(), shiftId: z.string().trim().max(20).optional(), biometricId: z.string().trim().regex(/^([A-Za-z0-9-]{1,30})?$/, 'Biometric ID: letters, digits and - only').optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
+  job: req(80), designation: enumOf(DESIGNATIONS as unknown as readonly [string, ...string[]]).optional().or(z.literal('')), site: enumOf(SITES).optional(), shiftId: z.string().trim().max(20).optional(), biometricId: z.string().trim().regex(/^([A-Za-z0-9-]{1,30})?$/, 'Biometric ID: letters, digits and - only').optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
   status: enumOf(['active', 'left']).optional(),
   payType: enumOf(['monthly', 'daily', 'piece']).optional(), rate: rate.optional(), pieceUnit: enumOf(['sqft', 'piece']).optional().or(z.literal('')),
   bankAccount: ruled('bankAccount').optional(), ifsc: ruled('ifsc').optional(), upi: ruled('upi').optional(), pfApplicable: z.boolean().optional(), pfNo: ruled('pfNo').optional(),
@@ -95,9 +96,9 @@ async function warnSharedMobile(ctx: any, mobile: string | undefined, selfId?: u
 export const employees: ResourceDef = {
   key: 'employees', model: Employee,
   label: (d) => `${d.name} (${d.empCode})`,
-  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
+  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'designation', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
   sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
-  filters: { status: { enum: ['active', 'left'] }, job: 'string', site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
+  filters: { status: { enum: ['active', 'left'] }, job: 'string', designation: { enum: DESIGNATIONS as unknown as readonly string[] }, site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
   named: { docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}) }, // same rule as the profile's "missing documents" badge
   serverOnly: ['docFlags', 'isVoid', 'hasLogin', 'loginRole'],
   create: z.object({ empCode: empCode.optional(), ...employeeFields, login: loginSchema.optional() }).strict(),

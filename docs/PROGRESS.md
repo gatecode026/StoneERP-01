@@ -336,3 +336,111 @@ Attendance now comes from **punches** (the biometric machine later; the Punch In
 **Tests:** 18 unit (calendar, day calculation), 24 server (punching, night shift, double taps, team scope, overtime, corrections, sheet, weekly off, salary, leave), 9 (settings validation, shifts, biometric ID, role rights), 5 browser (Punch In on a phone, Fix with a reason, overtime approval, supervisor limits, Settings).
 
 **Not done:** the biometric machine connection itself (it needs the machine brand and how it sends data: it will use the same punches and the Biometric ID); a different shift for one day; automatic closing of forgotten Outs (they are flagged and fixed by a senior).
+
+## Punch In / Out for Manager, Accountant, Supervisor and Salesperson
+
+These roles (when the login is linked to an employee profile) now see **My attendance** at the top of their home, with today's In / Out and the Punch In / Punch Out button, the same card the Worker has. The Accountant was given the right to punch for themselves (punches: see all, punch own). The Owner home is unchanged. Tests: all four punch In and Out and their home carries the punch state (server), and a browser test for the Supervisor and the Owner.
+
+## Machine Work and Block Entry fixes
+
+**Machine Work:** the block dropdown and the Employee "Supervisor (team)" dropdown work again (the lookup now accepts the stage / source / job filters the forms send); the shift sets the start and stop times from Settings (Night ends next morning); hour-meter start / end and electricity meter start / end fields (units are worked out from the two readings); waste needs a reason. Employees have an optional **Designation** (Driver, Machine operator, Loader, Mechanic, Guard, Helper); the Trips driver dropdown offers only Drivers.
+
+**Block Entry (PDF Part 10):**
+* Search finds a block by its number (a digit-only search also matches `blockNo`; `searchNumbers` on a resource).
+* A supplier block needs its supplier; an own-quarry block keeps none; the date received cannot be in the future.
+* Weight is sanity-checked against the size (stone is about 0.075 tonne per CFT): a slip far from that asks "Save anyway?".
+* Blocks can be edited after entry: truck, weight, grade, photos, yard, cost, slab thickness. Date, source, supplier, rawanna and size are locked (stock was booked on them; correct a wrong block by cancelling it).
+* The raw-block stock item ("Raw blocks", CFT) is created by the first block, so raw stock is never silently skipped.
+* "Mark cut" on a block that never had machine work takes its CFT out of raw stock (once).
+* Royalty: Paid needs the date paid, Due carries none, the paid date is not in the future, a second record for the same month asks first; overdue records are flagged in red and a "Mark paid" action records today.
+* Form fix: a create-only required field (date, source, rawanna, size) is now checked on create (it was skipped); the Block and Royalty tabs no longer share the search box.
+
+Tests: 11 server (blocks, royalty), browser test for add / search / edit / cut / mark paid.
+
+## Yield & Cost, Machine Repair and Vehicles: checked, fixed, and real graphs
+
+**Graphs** (all drawn from the records; `components/charts/OpsCharts.js`, loaded on demand):
+* **Yield & Cost:** yield % of each finished block (red under the alert line, dashed average), month by month (yield bars with cost per sq ft line), cost per sq ft split into block / labour / power and diesel / blades; supplier, machine and operator charts have the alert line. Cost graphs are not sent to people who may not see cost.
+* **Machine Repair → Reports:** repair cost (bars) and stopped hours (line) month by month for the last 3 / 6 / 12 months, cost and stopped hours by machine, totals (cost, hours stopped, breakdowns, open now).
+* **Vehicles → Reports:** diesel litres and ₹ month by month, diesel by vehicle, and diesel use per trip of one vehicle (litres per hour or per km) with the vehicle's normal and a "30% above normal" line. **Vehicles & papers** has a graph of how many vehicles are expired / within 30 days / valid / without a date for each paper.
+* Month-by-month graphs use `GET /api/<list>/facets?bucket=month&sum=…` (groups by the month of the list's date field; same scope and filters as the list).
+* Chart animation is off: it works through inline styles that the page's security policy blocks, which left lines half drawn.
+
+**Yield numbers:** the average over several blocks (overall, by supplier, by month) is now worked out on the total stone (saleable ÷ theoretical), so a big block counts for more than a small one (it was a plain mean of percentages). A block marked cut with no slab output says "No slab output" instead of "Not cut". Hand-worked test: 160 CFT at 30 mm, ₹90/CFT, 900 − 20 sq ft → 54.13 %, cost ₹18,060 → ₹20.52 per sq ft.
+
+**Machine Repair fixes:** "Mark serviced" never started the next count of running hours, so machines serviced by hour-meter stayed "overdue" for ever. It now asks what was done and the cost, and records the machine's hour-meter; a service with a meter reading also moves the machine's own meter on (never back). The Service schedule shows the interval in days and hours and the running hours left. A service form has "Hour-meter at service". Repairs cannot be dated in the future.
+
+**Vehicles fixes:** a vehicle has a **Regular driver** (Designation = Driver; the name is kept with the code) which its trips take unless another is picked; the lists show names instead of codes; trips cannot be dated in the future; the papers box separates **Expired** from "Expiring within 30 days" (expired papers were listed under "within 30 days").
+
+Tests: 4 (yield by hand), 7 (repair and vehicle numbers, month buckets, driver, hour-meter), 3 browser (graphs drawn on a phone).
+
+## Stock and Purchases: day by day, monthly physical count, fixes
+
+**Checked:** stock already moved by itself for every event: a purchase (after approval), production, a block coming in and going to cutting, a gate-pass dispatch, damage (after owner approval) and manual in / out; it is never taken below zero, and cancelling an entry reverses it. These are covered by tests, now including a check that the whole history of an item adds up to its balance.
+
+**New:**
+* **Stock → Day by day:** for one item, for the last 7 / 30 / 90 days: what came in, what went out and what was in hand at the end of each day (graph and table). It is worked back from the live balance, so the last day is always the real balance, and it says whether every entry adds up to it (`GET /api/stockitems/daily`).
+* **Stock → Monthly count (PDF Part 4, it was missing):** start a count for a month (every item with the app's quantity), type what is really there, see the differences with a reason, save; the owner or manager confirms and the stock is corrected with one "correction" entry per item that differed (signed, kept on record). One count per month; a confirmed count cannot change. Roles: the person who counts needs "Physical stock count" create / edit; confirming needs approve.
+* **Purchases → Day by day:** bought, paid and still to pay per day (graph and table), awaiting approval, top suppliers and top items. Only for people who may see money.
+* `facets` can group by day (`bucket=day`) and returns the name beside an id group (`label`).
+
+**Fixes:** "Paid now" on a purchase above the approval limit was forgotten (it showed as owed after approval); it is now paid when approved, on the purchase date. A credit bill with no due date now falls due 30 days after the purchase (it had none, so it was missed by "We owe" ordering and reminders). A purchase or a stock entry cannot be dated in a future day. A correction movement now keeps its sign.
+
+**Not done (decide):** consumables used by machines (diesel litres, blades) do not reduce the Diesel / Blades stock by themselves; they are entered as a stock-out. The cost rate of an item is the last purchase rate, not an average.
+
+Tests: 12 server (day by day, reversals, paid on approval, due dates, dates, count), 2 browser on a phone.
+
+## Sales & Payments: validation on every form, and flow fixes
+
+**The bug:** the customer's mobile field took any character (letters, symbols). Now every mobile field (customer, supplier, driver) takes digits only as you type, tidies a pasted "+91 98290 12345", and shows a clear message ("10 digits, starting with 6, 7, 8 or 9"). The server uses the same rule, so a form and the server never disagree.
+
+**Rules added (one table, `lib/validators.ts`, used by the forms and the server):** GST number (15 characters, real state code, capitals), party name (customer / supplier / transporter: no formula characters, at least 2 characters), city, truck number (6 to 12 letters and digits, as painted, spaces tidied), e-way bill (12 digits), payment reference (a cheque carries its 6-digit number; UPI / bank are plain text).
+
+**Customer:** a state is chosen from the list (a typo such as "Rajsthan" had made the tax IGST); the state is taken from the GST number when none is chosen and cannot contradict it; "Export" needs a country outside India and "Domestic" is India (the type decides the tax, it used to be decorative); the same mobile or GST number on another customer asks "Save anyway?". Imported customers get their state from the GST number too (it used to default to Rajasthan).
+
+**Quotation / order:** no future date; the same product cannot be on two lines (stock sent was counted by product, so two lines mixed up); a half-filled line is now flagged ("Item 2: Enter the quantity") instead of being silently dropped; the advance cannot be negative or more than the total; a cash advance of ₹2 lakh or more is asked about (it used to fail with no way to confirm).
+
+**Payments:** not more than pending, not zero or negative, not in the future, not before the order date, two decimals at most; cheque number required.
+
+**Dispatch / gate pass (sales screen and the Dispatch screen):** truck number, driver name and mobile, transporter and e-way bill follow the rules above; freight and weights cannot be negative; the loaded truck cannot weigh less than the empty one (it used to be silently set to zero net weight); loaded quantity cannot exceed what is left to send.
+
+**Flow gaps closed:** a quotation can be **changed** (the new-quotation screen, filled in); a quotation or an order can be **cancelled** with a reason (until money or a bill is involved); a wrong **payment can be cancelled** from the order (the cash book and the customer's balance follow).
+
+Tests: 15 server (all the rules above), 2 browser tests on a phone (customer to cancelled payment to truck out). Existing fixtures with placeholder truck numbers ("RJ1"), one-letter customer names and a formula as a customer name were updated to realistic values.
+
+## Dispatch & Gate Pass and Complaints: checked, fixed
+
+**Over-sending (the serious one):** two loading slips for the full order, or one slip with the same product on two lines, could send more than the order asked for (a real test sent 200 of 100 and took 200 from stock). Now the same product on one slip is added up, quantities already on another loading slip at the gate are spoken for, cancelling a slip gives the quantity back, and the gate refuses a truck that would send more than the order has.
+
+**Loading slip screen:** the "New loading slip" form on the Dispatch screen offered the whole order every time (it read a field that does not exist). It is now the same sheet as on the order screen: it shows what is left and what is already on a slip, per-item quantity (partial loads), truck, driver, transporter, freight, e-way bill, weights, photos and **papers** (GST bill, e-way bill, rawanna: in the PDF and in the data, but there was no place to attach them). The Save button is pinned to the bottom: an error appearing above used to push it away from the finger so the tap was lost.
+
+**Asked before it happens:** a loading slip for stone the books do not have; a truck marked out with goods worth more than ₹50,000 and no e-way bill (the guard can say yes). No future dates; weights up to 200 t, freight up to ₹1 crore.
+
+**After the truck has left:** the e-way bill, driver, transporter, freight, papers and note can still be filled in (they often come late); the truck number, weights and photos cannot. A paid freight is fixed. **Freight** can be marked paid per truck (gate pass, truck list) or per transporter, by cash / UPI / bank (it was always bank).
+
+**Gate pass:** shows the papers; the WhatsApp message uses the company name from Settings (it said "Bijoliya factory" and a fixed name).
+
+**Complaints:** no future date; a bill number is tidied and checked against that customer's bills (an unknown one is asked about, not refused); "Other" needs details; reject needs its reason; **a complaint cannot be closed before the action is decided**; the **staff member concerned** can be chosen (it counted on the performance scorecard, but nothing could set it) and must be a real employee; the customer cannot be changed afterwards. "Complaints by problem type" is now **by month** (PDF Part 16) with how many are still open and the average days to close.
+
+Tests: 14 server (slips, dates, e-way bill, late edits, freight modes, cancelling, every complaint rule), 3 browser (loading slips to freight; a complaint end to end; incoming truck and freight tab).
+
+## Important papers as a document vault
+
+The screen was one list. It is now laid out like a document vault, in the app's own look (PDF Part 18):
+* **Overview:** papers kept, expiring in 30 days, expired, without an expiry; "Needs attention" (the most urgent first); papers by folder; added recently.
+* **Folders:** one folder per kind of paper (Company, Licence, Machine, Vehicle, Insurance, Agreement, Loan, Other) with how many papers and how many need attention; open one to see its papers as cards or a list (the choice is remembered). Search by name, tag or description across every folder; filters for expiry state and folder.
+* **Recycle bin:** a deleted paper keeps its reason and can be restored (`POST /api/documents/<id>/restore`); delete and restore stay in the audit trail.
+* **Add / change a paper:** drag a scan onto the box or tap to choose (photo or PDF, with progress), name, folder, issue date, expiry date (reminders 30 and 7 days before), description, tags, and where the original is kept. The scan is required for a new paper. Dates are checked (not issued in the future, not expiring before issue), tags are lower-cased and de-duplicated (up to 10), the name is plain text.
+* The list can be exported to Excel; import from Excel is kept. Who can open the papers is still decided on the Roles screen ("Only the owner and the people he allows").
+* Fix found on the way: the row menu closed itself when a long search text scrolled inside its own box (any scroll anywhere closed it); a scrolling text box no longer closes it.
+
+Tests: 7 server (fields and dates, counts by folder, filters and search, recycle bin and restore, rights), 1 browser on a phone (overview to recycle bin).
+
+## Company details and the GST number in Settings
+
+Settings → **Company details (printed on bills and quotations)** is back, so the company can set its own GST number (a GST bill cannot be issued without it):
+* Typing a valid GST number fills in the **state** and the **state code** (the first two digits), so a bill charges CGST + SGST (same state) or IGST (another state) correctly. The state can also be chosen from the list; its code follows.
+* The number is checked (15 characters, a real state code, capitals); phone takes digits only; bank account (9 to 18 digits), IFSC and email are checked. The server refuses a state code or state that disagrees with the GST number.
+* A yellow note says "The GST number is not set yet" until it is saved; after saving the rest of the app picks it up at once. The order screen shows the same warning (with a link to Settings) instead of a bare error when someone tries "Generate GST bill" without it.
+
+Tests: 6 server (rules, mismatches, then the bill is issued and the tax type follows the company state), 1 browser on a phone (from the warning on the order screen to the issued bill).

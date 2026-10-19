@@ -12,6 +12,22 @@ export const TAX_LABEL: Record<TaxType, string> = {
   export: 'Export under LUT (no GST)',
 };
 
+/** GST state codes (the first two digits of a GST number) and the state they stand for. */
+export const GST_STATES: Record<string, string> = {
+  '01': 'Jammu and Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh', '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan', '09': 'Uttar Pradesh',
+  '10': 'Bihar', '11': 'Sikkim', '12': 'Arunachal Pradesh', '13': 'Nagaland', '14': 'Manipur', '15': 'Mizoram', '16': 'Tripura', '17': 'Meghalaya', '18': 'Assam', '19': 'West Bengal',
+  '20': 'Jharkhand', '21': 'Odisha', '22': 'Chhattisgarh', '23': 'Madhya Pradesh', '24': 'Gujarat', '26': 'Dadra and Nagar Haveli and Daman and Diu', '27': 'Maharashtra', '29': 'Karnataka',
+  '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '35': 'Andaman and Nicobar Islands', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
+};
+export const STATE_NAMES: string[] = Object.values(GST_STATES);
+/** The two-digit GST code of a state name ('' when it is not a state). */
+export const stateCodeOf = (name: unknown): string => Object.entries(GST_STATES).find(([, n]) => n.toLowerCase().replace(/[^a-z]/g, '') === String(name ?? '').toLowerCase().replace(/[^a-z]/g, ''))?.[0] ?? '';
+const lower = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
+/** The state's proper name for what was typed ("rajasthan", "Rajsthan " is not matched), or '' when it is not a state. */
+export const canonicalState = (v: unknown): string => STATE_NAMES.find((n) => lower(n) === lower(v)) ?? '';
+/** The state a GST number belongs to, or '' when the number does not start with a state code. */
+export const stateOfGstin = (g: unknown): string => GST_STATES[String(g ?? '').trim().slice(0, 2)] ?? '';
+
 const norm = (s: string | undefined | null) => String(s ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
 
 /** Place of supply: GSTIN state code when the customer has a GSTIN, otherwise the state name; blank = same state. */

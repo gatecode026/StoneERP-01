@@ -14,6 +14,7 @@ export const Employee = defineModel(
     address: { type: S, maxlength: 400 }, // pii
     job: { type: S, required: true, maxlength: 80 },
     site: { type: S, enum: SITES, default: 'Factory' },
+    designation: { type: S, maxlength: 40 }, // optional: Driver, Machine operator, Loader … (lets a picker show only the right people)
     joiningDate: dateStr(),
     leavingDate: dateStr(),
     status: { type: S, enum: ['active', 'left'], default: 'active' }, // domain status (voiding is separate)

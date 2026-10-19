@@ -109,7 +109,7 @@ describe('Excel import for every list that has entries', () => {
     const slip = await imp('dispatch-out', [['Date', 'Order no.', 'Truck number', 'Driver', 'Item', 'Quantity'], [D, order.saleNo, 'rj06 gx 1', 'Kishan', 'Slab', 60]]);
     expect(slip.json.imported).toBe(1);
     expect((await Dispatch.findOne({ direction: 'out' }).lean() as any)).toMatchObject({ truckNo: 'RJ06 GX 1', status: 'loading', saleNo: order.saleNo });
-    const tooMuch = await imp('dispatch-out', [['Date', 'Order no.', 'Truck number', 'Item', 'Quantity'], [D, order.saleNo, 'RJ1', 'Slab', 500]]);
+    const tooMuch = await imp('dispatch-out', [['Date', 'Order no.', 'Truck number', 'Item', 'Quantity'], [D, order.saleNo, 'RJ14 GA 0001', 'Slab', 500]]);
     expect(tooMuch.status).toBe(400);
     expect(tooMuch.json.error.message).toMatch(/left to send/);
     expect((await imp('dispatch-in', [['Date', 'Truck number', 'Coming with'], [D, 'RJ09 AA 1', 'blocks']])).json.imported).toBe(1);

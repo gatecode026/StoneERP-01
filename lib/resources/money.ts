@@ -6,7 +6,7 @@ import { badRequest, confirmable, conflict } from '../errors';
 import { addDays, todayIST } from '../time';
 import { accountBalance, accountFor, oid, postCash, reverseCashFor, round2, type SvcCtx } from '../services/core';
 import { withinApprovalLimit } from '../perm/engine';
-import { dateStr, empCode, enumOf, num, oidStr, photo, posNum, req, text, PAY_BY } from './zod';
+import { dateStr, empCode, enumOf, num, oidStr, photo, posNum, req, ruled, text, PAY_BY } from './zod';
 import { Types } from 'mongoose';
 import * as roll from '../rollup/dailySummary';
 
@@ -122,13 +122,38 @@ export const cashclosings: ResourceDef = {
 };
 
 // ------------------------------------------------------------------ papers + audit log
-const docFields = { name: req(160), category: enumOf(['Company', 'Licence', 'Machine', 'Vehicle', 'Insurance', 'Agreement', 'Loan', 'Other']).optional(), expiryDate: dateStr.optional().or(z.literal('')), file: photo.optional(), note: text(500).optional() };
+const CATEGORIES = ['Company', 'Licence', 'Machine', 'Vehicle', 'Insurance', 'Agreement', 'Loan', 'Other'] as const;
+const docFields = {
+  name: ruled('partyName', { required: true }), category: enumOf(CATEGORIES).optional(), expiryDate: dateStr.optional().or(z.literal('')), issueDate: dateStr.optional().or(z.literal('')),
+  file: photo.optional(), note: text(500).optional(), tags: z.array(text(30).min(1)).max(10).optional(), originalAt: text(120).optional(),
+};
+/** Dates of a paper: issued today or before, and not expiring before it was issued. */
+function paperDates(d: { issueDate?: string; expiryDate?: string }) {
+  if (d.issueDate && d.issueDate > todayIST()) throw badRequest('Issue date cannot be in the future');
+  if (d.issueDate && d.expiryDate && d.expiryDate < d.issueDate) throw badRequest('The paper expires before it was issued');
+  if (d.expiryDate && d.expiryDate < '1990-01-01') throw badRequest('Expiry date is too old');
+}
+const lowerTags = (t: string[] | undefined) => (t ? [...new Set(t.map((x) => x.trim().toLowerCase()).filter(Boolean))] : undefined);
 export const documents: ResourceDef = {
   key: 'documents', model: PaperDoc, label: (d) => d.name,
-  listFields: ['name', 'category', 'expiryDate', 'note'], sortable: ['expiryDate', 'name', 'createdAt'], defaultSort: 'expiryDate', searchFields: ['name', 'note'],
+  listFields: ['name', 'category', 'expiryDate', 'issueDate', 'note', 'file', 'tags', 'originalAt', 'createdAt', 'voidReason', 'voidedAt', 'voidedByName'], sortable: ['expiryDate', 'name', 'createdAt'], defaultSort: 'expiryDate', searchFields: ['name', 'note', 'tags'],
   filters: { category: 'string' }, dateFields: ['expiryDate'],
-  named: { exp: (v) => (v === 'soon' ? { expiryDate: { $gt: '', $lte: addDays(todayIST(), 30) } } : {}) },
+  named: {
+    exp: (v) => (v === 'soon' ? { expiryDate: { $gt: '', $lte: addDays(todayIST(), 30) } } : {}), // already expired or expiring within 30 days
+    expired: (v) => (v === '1' ? { expiryDate: { $gt: '', $lt: todayIST() } } : {}),
+    expiring: (v) => (v === '1' ? { expiryDate: { $gte: todayIST(), $lte: addDays(todayIST(), 30) } } : {}),
+    noexpiry: (v) => (v === '1' ? { $or: [{ expiryDate: '' }, { expiryDate: { $exists: false } }] } : {}),
+    bin: (v) => (v === '1' ? { isVoid: true } : {}), // the recycle bin (use with includeVoid=1)
+  },
   create: z.object(docFields).strict(), update: z.object(docFields).partial().strict(),
+  lifecycle: {
+    prepareCreate(_ctx, input) { paperDates(input); return { ...input, ...(input.tags ? { tags: lowerTags(input.tags) } : {}) }; },
+    prepareUpdate(_ctx, prev, patch) {
+      paperDates({ issueDate: 'issueDate' in patch ? patch.issueDate : prev.issueDate, expiryDate: 'expiryDate' in patch ? patch.expiryDate : prev.expiryDate });
+      if (patch.tags) patch.tags = lowerTags(patch.tags);
+      return patch;
+    },
+  },
 };
 
 export const auditlogs: ResourceDef = {
