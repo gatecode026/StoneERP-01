@@ -12,6 +12,8 @@ import { DialogHost } from './Dialogs';
 
 export type ClientSession = {
   id: string; username: string; name: string; role: string; preset: string | null; empCode: string | null; lang: string; mustChangePassword: boolean;
+  /** designation or job at work (employees only) */
+  title?: string;
   perm: ClientPerm;
   /** the shifts in Settings (for the employee form) */
   shifts?: { id: string; name: string; start: string; end: string }[]; defaultShiftId?: string;

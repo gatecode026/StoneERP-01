@@ -11,6 +11,7 @@ import { publicUser } from '@/lib/auth/public';
 import type { ClientSession } from '@/components/Providers';
 import { getEffectivePerm, describePerm } from '@/lib/perm/engine';
 import { getSettings } from '@/lib/settings';
+import { Employee } from '@/lib/models';
 
 export const metadata: Metadata = {
   title: 'Vipul Stone Suppliers – ERP',
@@ -30,7 +31,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let session: ClientSession | null = null;
   if (user) {
     const [perm, st] = await Promise.all([getEffectivePerm(user), getSettings()]);
-    session = { ...publicUser(user), perm: describePerm(perm), company: st.company, shifts: st.workHours.shifts.map(({ id, name, start, end }) => ({ id, name, start, end })), defaultShiftId: st.workHours.defaultShiftId } as ClientSession;
+    // what the person is called at work (their designation, else their job) for the name line on phones; none for a login that is not an employee
+    const emp: any = user.empCode ? await Employee.findOne({ empCode: user.empCode, isVoid: false }).select('job designation').lean().exec().catch(() => null) : null;
+    session = { ...publicUser(user), title: emp?.designation || emp?.job || undefined, perm: describePerm(perm), company: st.company, shifts: st.workHours.shifts.map(({ id, name, start, end }) => ({ id, name, start, end })), defaultShiftId: st.workHours.defaultShiftId } as ClientSession;
   }
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';

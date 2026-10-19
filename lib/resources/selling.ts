@@ -168,7 +168,7 @@ export async function confirmOrder(ctx: SvcCtx, saleId: string, advance: number,
 
 /** Gap-free invoice number: allocated in the same transaction that stores it, so an aborted invoice never burns a number. */
 export async function issueInvoice(ctx: SvcCtx, saleId: string) {
-  if (!ctx.settings.company.gstin) throw conflict('Set the company GST number in Settings before issuing invoices');
+  if (!ctx.settings.company.gstin) throw conflict('The company GST number is not set, so invoices cannot be issued yet');
   const sale: any = await Sale.findOne({ _id: saleId, isVoid: false }).session(s(ctx)).lean();
   if (!sale) throw badRequest('Sale not found');
   if (sale.stage === 'quotation') throw conflict('Convert the quotation to an order first');
