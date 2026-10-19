@@ -12,7 +12,7 @@ test('Worker: the phone header shows the name and the designation, and so does t
   await expect(page.locator('div.rounded-xl', { hasText: 'E2E worker' }).first()).toBeVisible();
 });
 
-test('Owner: the name and role are shown, and Settings has no Company card', async ({ page }) => {
+test('Owner: the name and role are shown, and Settings has the Company details with the GST number', async ({ page }) => {
   test.setTimeout(180_000);
   await signIn(page, 'owner');
   await expect(page.getByTestId('who')).toContainText('E2E owner');
@@ -21,8 +21,8 @@ test('Owner: the name and role are shown, and Settings has no Company card', asy
   await page.goto('/settings');
   expect((await loaded).status()).toBe(200);
   await expect(page.getByText('Daily messages', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/Company \(printed on bills/)).toHaveCount(0);
-  await expect(page.getByText('GST number')).toHaveCount(0);
+  await expect(page.getByText('Company details (printed on bills and quotations)')).toBeVisible();
+  await expect(page.getByLabel('GST number')).toBeVisible();
 });
 
 test('Owner: the Settings screen draws its shift cards without looping (no "Maximum update depth" error)', async ({ page }) => {

@@ -7,6 +7,8 @@ import { clearSettingsCache, getSettings } from '@/lib/settings';
 import { diffObjects, writeAudit } from '@/lib/audit';
 import { Employee } from '@/lib/models';
 import { badRequest } from '@/lib/errors';
+import { checkAccount, checkGstin } from '@/lib/validators';
+import { GST_STATES } from '@/lib/gst';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,10 +41,10 @@ const workHours = z.object({
 const body = z.object({
   company: z.object({
     name: text(120).min(1, 'Company name is required'), brand: text(120), address: text(300),
-    gstin: z.string().trim().toUpperCase().refine((v) => v === '' || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v), 'GST number must be 15 characters, like 08ABCDE1234F1Z5'),
+    gstin: z.string().trim().toUpperCase().superRefine((v, ctx) => { const m = checkGstin(v); if (m) ctx.addIssue({ code: 'custom', message: m }); }),
     state: text(60), stateCode: z.string().trim().regex(/^[0-9]{2}$/, 'State code is 2 digits, like 08'),
-    phone: text(20), email: z.string().trim().max(120).refine((v) => v === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'Enter a valid email'),
-    bankName: text(80), bankAccount: text(30), ifsc: z.string().trim().toUpperCase().refine((v) => v === '' || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), 'IFSC looks like SBIN0001234'),
+    phone: z.string().trim().max(20).refine((v) => v === '' || /^[0-9+()\s-]{8,20}$/.test(v), 'Phone can have digits, +, - and spaces only (8 to 20 characters)'), email: z.string().trim().max(120).refine((v) => v === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'Enter a valid email'),
+    bankName: text(80), bankAccount: z.string().trim().refine((v) => v === '' || checkAccount(v) === '', 'Bank account number is 9 to 18 digits'), ifsc: z.string().trim().toUpperCase().refine((v) => v === '' || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v), 'IFSC looks like SBIN0001234'),
   }).partial(),
   schedule: z.object({ ownerReportTime: time, reportReminderTime: time, ownerReportEnabled: z.boolean() }).partial(),
   limits: z.object({ expenseApproval: money, purchaseApproval: money, cashReceipt: money, cashExpense: money }).partial(),
@@ -64,6 +66,15 @@ export const GET = withAuth('settings', 'view', async (auth) => jsonWithEtag(aut
 export const PUT = withAuth('settings', 'edit', async (auth) => {
   const input = await auth.json(body);
   const before = await getSettings();
+  if (input.company) {
+    // the GST number, the state and the state code must tell the same story: they decide CGST + SGST or IGST on every bill
+    const c = { ...before.company, ...input.company };
+    if (c.gstin) {
+      const code = c.gstin.slice(0, 2);
+      if (c.stateCode !== code) throw badRequest(`The state code ${c.stateCode} does not match the GST number, which starts with ${code} (${GST_STATES[code]})`);
+    }
+    if (GST_STATES[c.stateCode] && c.state && GST_STATES[c.stateCode].toLowerCase().replace(/[^a-z]/g, '') !== c.state.toLowerCase().replace(/[^a-z]/g, '')) throw badRequest(`State code ${c.stateCode} is ${GST_STATES[c.stateCode]}, not ${c.state}`);
+  }
   const wh = input.workHours;
   if (wh) {
     const shifts = wh.shifts ?? before.workHours.shifts;

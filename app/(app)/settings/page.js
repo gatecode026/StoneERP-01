@@ -8,6 +8,7 @@ import { fmtDateTime, todayISO } from '@/lib/format';
 import { api } from '@/lib/client';
 import T from '@/components/T';
 import WorkHoursCards from '@/components/settings/WorkHours';
+import CompanyCard from '@/components/settings/CompanyCard';
 
 // One card per group of settings; each card saves on its own, so a mistake in one never blocks another.
 // `scale: 100` shows a rate such as 0.12 as 12 (%).
@@ -153,9 +154,10 @@ function SettingsScreen() {
   const { data, loading, error, reload } = useFetch('/api/settings');
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Daily messages, limits and rates. Every change is recorded in the Audit Trail." />
+      <PageHeader title="Settings" subtitle="Company details and GST number, daily messages, limits and rates. Every change is recorded in the Audit Trail." />
       {loading && !data ? <SkeletonList n={4} className="h-40" /> : error && !data ? <div className="card p-6 text-center text-sm text-red-700">{error.message}</div> : (
         <div className="space-y-4 max-w-3xl">
+          <CompanyCard value={data?.company} onSaved={reload} />
           {SECTIONS.map((def) => <SectionForm key={def.key} def={def} value={data?.[def.key]} onSaved={reload} />)}
           <WorkHoursCards value={data?.workHours} onSaved={reload} />
           <FinancialYear value={data?.fyStartMonth ?? 4} onSaved={reload} />

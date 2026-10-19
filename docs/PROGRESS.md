@@ -435,3 +435,12 @@ The screen was one list. It is now laid out like a document vault, in the app's 
 * Fix found on the way: the row menu closed itself when a long search text scrolled inside its own box (any scroll anywhere closed it); a scrolling text box no longer closes it.
 
 Tests: 7 server (fields and dates, counts by folder, filters and search, recycle bin and restore, rights), 1 browser on a phone (overview to recycle bin).
+
+## Company details and the GST number in Settings
+
+Settings → **Company details (printed on bills and quotations)** is back, so the company can set its own GST number (a GST bill cannot be issued without it):
+* Typing a valid GST number fills in the **state** and the **state code** (the first two digits), so a bill charges CGST + SGST (same state) or IGST (another state) correctly. The state can also be chosen from the list; its code follows.
+* The number is checked (15 characters, a real state code, capitals); phone takes digits only; bank account (9 to 18 digits), IFSC and email are checked. The server refuses a state code or state that disagrees with the GST number.
+* A yellow note says "The GST number is not set yet" until it is saved; after saving the rest of the app picks it up at once. The order screen shows the same warning (with a link to Settings) instead of a bare error when someone tries "Generate GST bill" without it.
+
+Tests: 6 server (rules, mismatches, then the bill is issued and the tax type follows the company state), 1 browser on a phone (from the warning on the order screen to the issued bill).

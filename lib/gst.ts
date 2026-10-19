@@ -20,6 +20,8 @@ export const GST_STATES: Record<string, string> = {
   '30': 'Goa', '31': 'Lakshadweep', '32': 'Kerala', '33': 'Tamil Nadu', '34': 'Puducherry', '35': 'Andaman and Nicobar Islands', '36': 'Telangana', '37': 'Andhra Pradesh', '38': 'Ladakh',
 };
 export const STATE_NAMES: string[] = Object.values(GST_STATES);
+/** The two-digit GST code of a state name ('' when it is not a state). */
+export const stateCodeOf = (name: unknown): string => Object.entries(GST_STATES).find(([, n]) => n.toLowerCase().replace(/[^a-z]/g, '') === String(name ?? '').toLowerCase().replace(/[^a-z]/g, ''))?.[0] ?? '';
 const lower = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
 /** The state's proper name for what was typed ("rajasthan", "Rajsthan " is not matched), or '' when it is not a state. */
 export const canonicalState = (v: unknown): string => STATE_NAMES.find((n) => lower(n) === lower(v)) ?? '';
