@@ -12,6 +12,10 @@ import { api, openWA } from '@/lib/client';
 import { inr, num, fmtDate, todayISO, sum } from '@/lib/format';
 import T from '@/components/T';
 
+// a weight or an amount cannot be below zero; the loaded truck cannot weigh less than the empty one
+const nonNegative = (name) => (f) => (f[name] !== '' && f[name] != null && Number(f[name]) < 0 ? 'Cannot be below zero' : '');
+const weightProblem = (f) => (f.emptyWeight && f.loadedWeight && Number(f.loadedWeight) < Number(f.emptyWeight) ? 'Loaded weight is less than the empty weight' : '');
+
 export default function DispatchPage() {
   const { t, can } = useApp();
   const [tab, setTab] = useState('out');
@@ -24,25 +28,25 @@ export default function DispatchPage() {
     { name: 'saleId', label: 'For order', type: 'ref', required: true, wide: true, ref: { model: 'sales', labelKey: 'saleNo', label: (s) => `${s.saleNo} · ${s.customerName}`, query: { stage: 'order,dispatched', sort: '-date' }, nameField: 'saleNo' },
       onPick: (s) => (s ? { customerName: s.customerName, itemsText: (s.items || []).map((i) => `${i.name} × ${i.qty}`).join(', '), _items: (s.items || []).map((i) => ({ stockItemId: i.stockItemId, name: i.name, qty: Math.max(0, i.qty - (s.dispatched?.[String(i.stockItemId || i.name)] || 0)), unit: i.unit })) } : {}) },
     { name: 'itemsText', label: 'Loading slip', type: 'textarea', hint: 'Items from the order. Quantities loaded = remaining quantity.', wide: true },
-    { name: 'truckNo', label: 'Truck number', required: true, placeholder: 'RJ06 XX 0000' },
-    { name: 'driverName', label: 'Driver name' },
-    { name: 'driverMobile', label: 'Driver mobile', type: 'tel' },
-    { name: 'transporter', label: 'Transporter' },
-    { name: 'freight', label: 'Freight amount (₹)', type: 'number' },
-    { name: 'emptyWeight', label: 'Empty weight (kg)', type: 'number' },
-    { name: 'loadedWeight', label: 'Loaded weight (kg)', type: 'number' },
+    { name: 'truckNo', label: 'Truck number', required: true, placeholder: 'RJ06 XX 0000', rule: 'truckNo' },
+    { name: 'driverName', label: 'Driver name', rule: 'name' },
+    { name: 'driverMobile', label: 'Driver mobile', type: 'tel', rule: 'mobile', hint: '10 digits, starting with 6, 7, 8 or 9' },
+    { name: 'transporter', label: 'Transporter', rule: 'partyName' },
+    { name: 'freight', label: 'Freight amount (₹)', type: 'number', validate: nonNegative('freight') },
+    { name: 'emptyWeight', label: 'Empty weight (kg)', type: 'number', validate: nonNegative('emptyWeight') },
+    { name: 'loadedWeight', label: 'Loaded weight (kg)', type: 'number', validate: (f) => nonNegative('loadedWeight')(f) || weightProblem(f) },
     { name: 'photoLoaded', label: 'Photo – loaded truck', type: 'photo' },
     { name: 'photoCovered', label: 'Photo – covered truck', type: 'photo' },
-    { name: 'eway', label: 'E-way bill number' },
+    { name: 'eway', label: 'E-way bill number', rule: 'eway', hint: '12 digits' },
   ];
   const inFields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
     { name: 'kind', label: 'Coming with', type: 'select', options: ['Blocks', 'Purchase', 'Other'], required: true, default: 'Blocks' },
-    { name: 'truckNo', label: 'Truck number', required: true },
-    { name: 'driverName', label: 'Driver name' },
-    { name: 'transporter', label: 'Transporter / source' },
-    { name: 'emptyWeight', label: 'Empty weight (kg)', type: 'number' },
-    { name: 'loadedWeight', label: 'Loaded weight (kg)', type: 'number' },
+    { name: 'truckNo', label: 'Truck number', required: true, placeholder: 'RJ06 XX 0000', rule: 'truckNo' },
+    { name: 'driverName', label: 'Driver name', rule: 'name' },
+    { name: 'transporter', label: 'Transporter / source', rule: 'partyName' },
+    { name: 'emptyWeight', label: 'Empty weight (kg)', type: 'number', validate: nonNegative('emptyWeight') },
+    { name: 'loadedWeight', label: 'Loaded weight (kg)', type: 'number', validate: (f) => nonNegative('loadedWeight')(f) || weightProblem(f) },
     { name: 'note', label: 'Note', type: 'textarea', wide: true },
     { name: 'photoLoaded', label: 'Photo', type: 'photo' },
   ];

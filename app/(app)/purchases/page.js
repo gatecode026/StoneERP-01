@@ -80,7 +80,7 @@ export default function PurchasesPage() {
       )}
       {tab === 'suppliers' && (
         <CrudPage model="suppliers" title="Suppliers" label="Supplier" sort="name" headerExtra={<ImportData resource="suppliers" noun="suppliers" hint="only the supplier name is required" />}
-          fields={[{ name: 'name', label: 'Supplier name', required: true, wide: true }, { name: 'mobile', label: 'Mobile', type: 'tel' }, { name: 'gstin', label: 'GST number' }, { name: 'city', label: 'City' }, { name: 'supplies', label: 'Supplies', placeholder: 'Blocks, blades, diesel…' }]}
+          fields={[{ name: 'name', label: 'Supplier name', required: true, wide: true, rule: 'partyName' }, { name: 'mobile', label: 'Mobile', type: 'tel', rule: 'mobile', hint: '10 digits, starting with 6, 7, 8 or 9' }, { name: 'gstin', label: 'GST number', rule: 'gstin', hint: '15 characters, like 08AAAAA0000A1Z5' }, { name: 'city', label: 'City', rule: 'place' }, { name: 'supplies', label: 'Supplies', placeholder: 'Blocks, blades, diesel…' }]}
           columns={[{ key: 'name', label: 'Supplier', primary: true }, { key: 'city', label: 'City' }, { key: 'mobile', label: 'Mobile' }, { key: 'gstin', label: 'GST' }, { key: 'supplies', label: 'Supplies' },
             { key: 'outstanding', label: 'We owe', align: 'right', render: (r) => (r.outstanding > 0 ? <b className="text-amber-700">{inr(r.outstanding)}</b> : '—') }]}
         />

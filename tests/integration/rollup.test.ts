@@ -71,15 +71,15 @@ describe('DailySummary stays equal to the source records through a messy day', (
   });
   it('sales, payments, dispatches and cash, including reversals', async () => {
     const item = (await api.create(owner, 'stockitems', { name: 'P', category: 'finished', unit: 'sq ft', sellRate: 10, openingBalance: 1000 })).json;
-    const cust = (await api.create(sales, 'customers', { name: 'C', mobile: '9811122222' })).json;
+    const cust = (await api.create(sales, 'customers', { name: 'City Builders', mobile: '9811122222' })).json;
     const s1 = (await api.create(sales, 'sales', { customerId: cust._id, stage: 'order', items: [{ stockItemId: item._id, name: 'P', qty: 100, unit: 'sq ft', rate: 10, gstRate: 0 }], advance: 300, advanceMode: 'UPI' })).json;
     const q = (await api.create(sales, 'sales', { customerId: cust._id, items: [{ stockItemId: item._id, name: 'P', qty: 50, unit: 'sq ft', rate: 10, gstRate: 0 }] })).json;
     await call(sales, orderRoute.POST as never, '/x', { method: 'POST', body: { advance: 100, advanceMode: 'Cash' }, ...P(q._id) });
     const pay = await api.create(acc, 'payments', { saleId: s1._id, amount: 200, mode: 'Bank' });
     await api.void(acc, 'payments', pay.json._id);
-    const slip = (await api.create(sup, 'dispatches', { saleId: s1._id, truckNo: 'RJ1', items: [{ stockItemId: item._id, name: 'P', qty: 100 }] })).json;
+    const slip = (await api.create(sup, 'dispatches', { saleId: s1._id, truckNo: 'RJ14 GA 0001', items: [{ stockItemId: item._id, name: 'P', qty: 100 }] })).json;
     await call(guard, outRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(slip._id) });
-    await api.create(sup, 'dispatches', { direction: 'in', truckNo: 'RJ9', kind: 'Blocks' });
+    await api.create(sup, 'dispatches', { direction: 'in', truckNo: 'RJ14 GA 0009', kind: 'Blocks' });
     await api.create(acc, 'cashentries', { account: 'cash', type: 'in', amount: 5000, head: 'Cash withdrawn from bank' });
     const day = await getDay(today);
     expect(day.sales).toMatchObject({ total: 1500, orders: 2 });

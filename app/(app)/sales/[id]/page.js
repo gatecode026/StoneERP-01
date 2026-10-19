@@ -4,13 +4,16 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { FileText, MessageCircle, Truck, IndianRupee, Printer, CheckCircle2, ShoppingCart } from 'lucide-react';
+import { FileText, MessageCircle, Truck, IndianRupee, Printer, CheckCircle2, ShoppingCart, Pencil, XCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Section, KV, Badge, Sheet, Field, PhotoInput, SkeletonList, DataList, cx } from '@/components/ui';
 import { api, submit, openWA } from '@/lib/client';
+import RuledField from '@/components/RuledField';
+import { checkPaymentRef } from '@/lib/validators';
 import { TAX_LABEL } from '@/lib/gst';
 import { inr, inr2, num, fmtDate, todayISO, daysBetween } from '@/lib/format';
 import T from '@/components/T';
+import { ruleProblem as ruleBad } from '@/components/RuledField';
 
 const STEPS = ['Quotation', 'Order', 'Dispatch', 'GST bill', 'Payment'];
 
@@ -36,17 +39,40 @@ export default function SaleDetail() {
   const anyLeft = remaining.some((i) => i.left > 0);
   const step = s.stage === 'quotation' ? 0 : s.invoiceNo ? (pending === 0 ? 4 : 3) : s.stage === 'dispatched' ? 2 : 1;
   const link = typeof window !== 'undefined' ? `${location.origin}/sales/${id}/invoice` : '';
+  const today = todayISO();
+
+  // ---- what is wrong in the open sheet (shown under the field once Save has been tried)
+  const amt = Number(f.amount);
+  const payErr = {
+    amount: !(amt > 0) ? 'Enter the amount' : amt > pending + 1e-9 ? tr('The amount is more than the {n} pending', { n: inr(pending) }) : Math.abs(amt * 100 - Math.round(amt * 100)) > 1e-6 ? 'The amount can have two decimals at most' : '',
+    date: !f.date ? 'Choose the date' : f.date > today ? 'Payment date cannot be in the future' : f.date < s.date ? 'Payment date is before the order date' : '',
+    ref: checkPaymentRef(f.mode, f.ref),
+  };
+  const advErr = f.advance !== undefined && f.advance !== '' && Number(f.advance) < 0 ? 'Advance cannot be below zero' : Number(f.advance) > s.total ? 'Advance is more than the order total' : '';
+  const qtyOf = (i) => Number(f.qty?.[i.stockItemId || i.name] ?? i.left);
+  const qtyErr = (i) => (qtyOf(i) < 0 ? 'Cannot be below zero' : qtyOf(i) > i.left + 1e-9 ? tr('Only {n} left to send', { n: num(i.left) }) : '');
+  const money = (v) => (v !== undefined && v !== '' && Number(v) < 0 ? 'Cannot be below zero' : '');
+  const dispErr = {
+    truck: !f.truckNo ? 'Enter truck number' : '',
+    freight: money(f.freight), empty: money(f.emptyWeight), loaded: money(f.loadedWeight) || (f.emptyWeight && f.loadedWeight && Number(f.loadedWeight) < Number(f.emptyWeight) ? 'Loaded weight is less than the empty weight' : ''),
+  };
 
   async function run(fn, ok) {
     setBusy(true);
     try { const r = await fn(); toast.success(r?.queued ? 'Saved offline' : ok); setSheet(null); reload(); pays.reload(); disp.reload(); } catch (e) { if (!e.data?.cancelled) toast.error(e.message); }
     setBusy(false);
   }
-  const act = (action, extra = {}) => api(`/api/sales/${id}/${action}`, { method: 'POST', body: extra });
+  const act = async (action, extra = {}) => {
+    try { return await api(`/api/sales/${id}/${action}`, { method: 'POST', body: extra }); } catch (e) {
+      if (e.status === 409 && e.data?.confirmable && await confirmDialog(e.message)) return api(`/api/sales/${id}/${action}`, { method: 'POST', body: { ...extra, _confirmed: true } });
+      throw e;
+    }
+  };
 
   async function pay() {
     const amount = Number(f.amount);
-    if (!(amount > 0)) { toast.error('Enter the amount'); return; }
+    const bad = payErr.amount || payErr.date || payErr.ref;
+    if (bad) { set({ show: true }); toast.error(bad); return; }
     await run(async () => {
       const body = { saleId: id, amount, mode: f.mode || 'UPI', date: f.date || todayISO(), ref: f.ref || '' };
       try { return await submit('/api/payments', body, { label: 'Payment' }); } catch (e) {
@@ -56,15 +82,33 @@ export default function SaleDetail() {
     }, 'Payment recorded');
   }
   async function dispatch() {
-    if (!f.truckNo) { toast.error('Enter truck number'); return; }
+    const bad = dispErr.truck || ruleBad('truckNo', f.truckNo) || ruleBad('name', f.driverName) || ruleBad('mobile', f.driverMobile) || ruleBad('partyName', f.transporter) || dispErr.freight || dispErr.empty || dispErr.loaded
+      || remaining.filter((i) => i.left > 0).map(qtyErr).find(Boolean);
+    if (bad) { set({ show: true }); toast.error(bad); return; }
     const items = remaining.filter((i) => i.left > 0).map((i) => ({ stockItemId: i.stockItemId, name: i.name, unit: i.unit, qty: Number(f.qty?.[i.stockItemId || i.name] ?? i.left) })).filter((i) => i.qty > 0);
     if (!items.length) { toast.error('Enter quantity loaded'); return; }
     await run(async () => {
-      const slip = await api('/api/dispatches', { method: 'POST', body: { saleId: id, direction: 'out', date: todayISO(), items, truckNo: f.truckNo, driverName: f.driverName, driverMobile: f.driverMobile, transporter: f.transporter, freight: Number(f.freight) || 0, emptyWeight: Number(f.emptyWeight) || 0, loadedWeight: Number(f.loadedWeight) || 0, photoLoaded: f.photoLoaded, photoCovered: f.photoCovered } });
+      const slip = await api('/api/dispatches', { method: 'POST', body: { saleId: id, direction: 'out', date: todayISO(), items, truckNo: f.truckNo, driverName: f.driverName || undefined, driverMobile: f.driverMobile || undefined, transporter: f.transporter || undefined, freight: Number(f.freight) || 0, emptyWeight: Number(f.emptyWeight) || 0, loadedWeight: Number(f.loadedWeight) || 0, photoLoaded: f.photoLoaded, photoCovered: f.photoCovered } });
       // the gate pass is issued now; stock leaves only when the guard marks the truck out
       if (f.markOut !== false && can('dispatches', 'approve')) await api(`/api/dispatches/${slip._id}/out`, { method: 'POST', body: {} });
       return slip;
     }, f.markOut !== false && can('dispatches', 'approve') ? 'Truck out – stock deducted' : 'Gate pass issued – the guard marks the truck out');
+  }
+  async function cancelSale() {
+    const reason = await promptDialog(tr('Why are you cancelling {no}?', { no: s.saleNo }), '');
+    if (reason === null) return;
+    if (!reason.trim()) { toast.error('Write the reason'); return; }
+    setBusy(true);
+    try { await api(`/api/sales/${id}`, { method: 'DELETE', body: { reason: reason.trim() } }); toast.success('Cancelled'); router.push('/sales'); return; } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  }
+  async function cancelPayment(p) {
+    const reason = await promptDialog(tr('Why is this {amount} payment wrong?', { amount: inr(p.amount) }), '');
+    if (reason === null) return;
+    if (!reason.trim()) { toast.error('Write the reason'); return; }
+    setBusy(true);
+    try { await api(`/api/payments/${p._id}`, { method: 'DELETE', body: { reason: reason.trim() } }); toast.success('Payment cancelled'); reload(); } catch (e) { toast.error(e.message); }
+    setBusy(false);
   }
   async function invoice() {
     await run(async () => { await act('invoice'); router.push(`/sales/${id}/invoice`); }, 'GST invoice generated');
@@ -105,7 +149,7 @@ export default function SaleDetail() {
           </Section>
           <div className="grid sm:grid-cols-2 gap-4">
             <Section title="Payments" right={<Badge tone={pending ? 'amber' : 'green'}>{pending ? `Pending ${inr(pending)}` : 'Fully paid'}</Badge>}>
-              {(pays.data || []).length ? pays.data.map((p) => <div key={p._id} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{fmtDate(p.date)} · {p.mode}{p.kind === 'advance' ? ' (advance)' : ''}</span><b className="text-emerald-700">{inr(p.amount)}</b></div>) : <div className="text-sm text-char-500"><T>No payments yet</T></div>}
+              {(pays.data || []).length ? pays.data.map((p) => <div key={p._id} className="flex justify-between text-sm py-1.5 border-b border-sand-100 last:border-0"><span>{fmtDate(p.date)} · {p.mode}{p.kind === 'advance' ? ' (advance)' : ''}{p.ref ? ` · ${p.ref}` : ''}</span><span className="flex items-center gap-2"><b className="text-emerald-700">{inr(p.amount)}</b>{can('payments', 'void') && <button className="text-char-400 hover:text-red-600" title={tr('Cancel this payment')} aria-label={tr('Cancel this payment')} disabled={busy} onClick={() => cancelPayment(p)}><XCircle size={16} /></button>}</span></div>) : <div className="text-sm text-char-500"><T>No payments yet</T></div>}
               {pending > 0 && s.stage !== 'quotation' && <div className="text-xs text-char-500 mt-2"><T vars={{ n: daysBetween(s.invoiceDate || s.date, todayISO()) }}>{s.invoiceDate ? '{n} days since invoice' : '{n} days since order'}</T></div>}
             </Section>
             <Section title="Dispatches">
@@ -128,11 +172,13 @@ export default function SaleDetail() {
 
           <Section title="Next step">
             <div className="space-y-2">
+              {s.stage === 'quotation' && can('sales', 'edit') && <Link href={`/sales/new?edit=${id}`} className="btn-outline w-full"><Pencil size={18} /><T> Change quotation</T></Link>}
               {s.stage === 'quotation' && can('sales', 'edit') && <button className="btn-primary w-full" onClick={() => { setF({ advanceMode: 'UPI' }); setSheet('order'); }}><ShoppingCart size={18} /><T> Convert to order</T></button>}
               {s.stage !== 'quotation' && anyLeft && can('dispatches', 'create') && <button className="btn-primary w-full" onClick={() => { setF({ qty: {}, markOut: true }); setSheet('dispatch'); }}><Truck size={18} /><T> Dispatch truck</T></button>}
               {s.stage !== 'quotation' && can('invoices', 'create') && !s.invoiceNo && <button className="btn-outline w-full" onClick={invoice} disabled={busy}><FileText size={18} /><T> Generate GST bill</T></button>}
               {s.stage !== 'quotation' && pending > 0 && can('payments', 'create') && <button className="btn-green w-full" onClick={() => { setF({ amount: String(pending), mode: 'UPI', date: todayISO() }); setSheet('pay'); }}><IndianRupee size={18} /><T> Add payment</T></button>}
               {s.stage !== 'quotation' && pending > 0 && <button className="btn-outline w-full" onClick={() => openWA(`Dear ${s.customerName}, gentle reminder from ${company.name}: ${inr(pending)} is pending against order ${s.saleNo}${s.invoiceNo ? ` (Invoice ${s.invoiceNo})` : ''}. Kindly arrange the payment. Thank you.`, s.customerMobile)}><MessageCircle size={18} /><T> Send payment reminder</T></button>}
+              {can('sales', 'void') && !s.invoiceNo && !(s.paid > 0) && <button className="btn-outline w-full text-red-700" onClick={cancelSale} disabled={busy}><XCircle size={18} /><T>{s.stage === 'quotation' ? ' Cancel this quotation' : ' Cancel this order'}</T></button>}
               {s.stage !== 'quotation' && !anyLeft && pending === 0 && s.invoiceNo && <div className="text-sm text-emerald-700 font-semibold flex items-center gap-2"><CheckCircle2 size={18} /><T> Completed</T></div>}
             </div>
           </Section>
@@ -140,9 +186,9 @@ export default function SaleDetail() {
       </div>
 
       <Sheet open={sheet === 'order'} onClose={() => setSheet(null)} title="Convert to order"
-        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-primary flex-[2]" disabled={busy} onClick={() => run(() => act('order', { advance: Number(f.advance) || 0, advanceMode: f.advanceMode }), 'Order confirmed')}><T>Confirm order</T></button></>}>
+        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-primary flex-[2]" disabled={busy} onClick={() => { if (advErr) { set({ show: true }); toast.error(advErr); return; } run(() => act('order', { advance: Number(f.advance) || 0, advanceMode: f.advanceMode }), 'Order confirmed'); }}><T>Confirm order</T></button></>}>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Advance received (₹)"><input className="input" type="number" inputMode="decimal" value={f.advance || ''} onChange={(e) => set({ advance: e.target.value })} /></Field>
+          <Field label="Advance received (₹)" error={f.show ? advErr : ''}><input className="input" type="number" inputMode="decimal" min="0" step="any" value={f.advance || ''} onChange={(e) => set({ advance: e.target.value })} /></Field>
           <Field label="Mode"><select className="input" value={f.advanceMode} onChange={(e) => set({ advanceMode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></Field>
         </div>
       </Sheet>
@@ -150,10 +196,10 @@ export default function SaleDetail() {
       <Sheet open={sheet === 'pay'} onClose={() => setSheet(null)} title="Payment received"
         footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-green flex-[2]" disabled={busy} onClick={pay}><T>Save payment</T></button></>}>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Amount (₹)" className="col-span-2"><input className="input text-lg" type="number" inputMode="decimal" value={f.amount || ''} onChange={(e) => set({ amount: e.target.value })} /></Field>
-          <Field label="Mode"><select className="input" value={f.mode} onChange={(e) => set({ mode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></Field>
-          <Field label="Date"><input className="input" type="date" value={f.date || ''} onChange={(e) => set({ date: e.target.value })} /></Field>
-          <Field label="Reference / cheque no." className="col-span-2"><input className="input" value={f.ref || ''} onChange={(e) => set({ ref: e.target.value })} /></Field>
+          <Field label="Amount (₹)" htmlFor="pay_amount" className="col-span-2" required hint={tr('Pending {n}', { n: inr(pending) })} error={f.show ? payErr.amount : ''}><input id="pay_amount" className="input text-lg" type="number" inputMode="decimal" min="0" step="any" value={f.amount || ''} onChange={(e) => set({ amount: e.target.value })} /></Field>
+          <Field label="Mode" htmlFor="pay_mode"><select id="pay_mode" className="input" value={f.mode} onChange={(e) => set({ mode: e.target.value })}>{['UPI', 'Bank', 'Cash', 'Cheque'].map((m) => <option key={m} value={m}>{tr(m)}</option>)}</select></Field>
+          <Field label="Date" error={f.show ? payErr.date : ''}><input className="input" type="date" min={s.date} max={today} value={f.date || ''} onChange={(e) => set({ date: e.target.value })} /></Field>
+          <RuledField rule="payRef" className="col-span-2" label={f.mode === 'Cheque' ? 'Cheque number' : 'Reference (UPI / bank)'} required={f.mode === 'Cheque'} hint={f.mode === 'Cheque' ? '6 digits' : undefined} value={f.ref} onChange={(v) => set({ ref: v })} error={payErr.ref} showError={f.show} />
         </div>
       </Sheet>
 
@@ -165,19 +211,19 @@ export default function SaleDetail() {
             {remaining.filter((i) => i.left > 0).map((i) => (
               <div key={i.stockItemId || i.name} className="flex items-center gap-3 py-1.5">
                 <div className="flex-1 text-sm">{i.name}<div className="text-[11px] text-char-500"><T vars={{ n: num(i.left), u: i.unit }}>{'left to send: {n} {u}'}</T></div></div>
-                <input className="input !w-28" type="number" inputMode="decimal" defaultValue={i.left} onChange={(e) => set({ qty: { ...(f.qty || {}), [i.stockItemId || i.name]: e.target.value } })} />
+                <div><input className={`input !w-28 ${f.show && qtyErr(i) ? '!border-red-500' : ''}`} type="number" inputMode="decimal" min="0" max={i.left} step="any" defaultValue={i.left} aria-label={`${tr('Quantity loaded')} ${i.name}`} onChange={(e) => set({ qty: { ...(f.qty || {}), [i.stockItemId || i.name]: e.target.value } })} />{f.show && qtyErr(i) && <div className="text-[11px] text-red-600 mt-0.5" role="alert">{qtyErr(i)}</div>}</div>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Truck number" required><input className="input" value={f.truckNo || ''} onChange={(e) => set({ truckNo: e.target.value.toUpperCase() })} placeholder="RJ06 XX 0000" /></Field>
-            <Field label="Driver name"><input className="input" value={f.driverName || ''} onChange={(e) => set({ driverName: e.target.value })} /></Field>
-            <Field label="Driver mobile"><input className="input" type="tel" value={f.driverMobile || ''} onChange={(e) => set({ driverMobile: e.target.value })} /></Field>
-            <Field label="Transporter"><input className="input" value={f.transporter || ''} onChange={(e) => set({ transporter: e.target.value })} /></Field>
-            <Field label="Freight (₹)"><input className="input" type="number" value={f.freight || ''} onChange={(e) => set({ freight: e.target.value })} /></Field>
+            <RuledField rule="truckNo" label="Truck number" required value={f.truckNo} onChange={(v) => set({ truckNo: v })} placeholder="RJ06 XX 0000" error={dispErr.truck} showError={f.show} />
+            <RuledField rule="name" label="Driver name" value={f.driverName} onChange={(v) => set({ driverName: v })} showError={f.show} />
+            <RuledField rule="mobile" label="Driver mobile" type="tel" hint="10 digits" value={f.driverMobile} onChange={(v) => set({ driverMobile: v })} showError={f.show} />
+            <RuledField rule="partyName" label="Transporter" value={f.transporter} onChange={(v) => set({ transporter: v })} showError={f.show} />
+            <Field label="Freight (₹)" error={f.show ? dispErr.freight : ''}><input className="input" type="number" inputMode="decimal" min="0" step="any" value={f.freight || ''} onChange={(e) => set({ freight: e.target.value })} /></Field>
             <div />
-            <Field label="Empty weight (kg)"><input className="input" type="number" value={f.emptyWeight || ''} onChange={(e) => set({ emptyWeight: e.target.value })} /></Field>
-            <Field label="Loaded weight (kg)"><input className="input" type="number" value={f.loadedWeight || ''} onChange={(e) => set({ loadedWeight: e.target.value })} /></Field>
+            <Field label="Empty weight (kg)" htmlFor="disp_empty" error={f.show ? dispErr.empty : ''}><input id="disp_empty" className="input" type="number" inputMode="decimal" min="0" step="any" value={f.emptyWeight || ''} onChange={(e) => set({ emptyWeight: e.target.value })} /></Field>
+            <Field label="Loaded weight (kg)" htmlFor="disp_loaded" error={f.show ? dispErr.loaded : ''}><input id="disp_loaded" className="input" type="number" inputMode="decimal" min="0" step="any" value={f.loadedWeight || ''} onChange={(e) => set({ loadedWeight: e.target.value })} /></Field>
             <Field label="Photo – loaded truck"><PhotoInput value={f.photoLoaded} onChange={(x) => set({ photoLoaded: x })} /></Field>
             <Field label="Photo – covered truck"><PhotoInput value={f.photoCovered} onChange={(x) => set({ photoCovered: x })} /></Field>
           </div>

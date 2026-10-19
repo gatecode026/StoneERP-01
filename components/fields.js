@@ -1,18 +1,21 @@
 // Shared field configs for CrudPage forms
 import { JOBS, DESIGNATIONS } from '@/lib/config';
 import { joiningDateProblem } from '@/lib/validators';
+import { STATE_NAMES, canonicalState, stateOfGstin } from '@/lib/gst';
 
 export const yesNo = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
 
 export const CUSTOMER_FIELDS = [
-  { name: 'name', label: 'Customer name', required: true, wide: true },
-  { name: 'mobile', label: 'Mobile / WhatsApp', type: 'tel', required: true },
-  { name: 'gstin', label: 'GST number' },
+  { name: 'name', label: 'Customer name', required: true, wide: true, rule: 'partyName' },
+  { name: 'mobile', label: 'Mobile / WhatsApp', type: 'tel', required: true, rule: 'mobile', hint: '10 digits, starting with 6, 7, 8 or 9' },
+  { name: 'type', label: 'Type', type: 'select', options: ['Domestic', 'Export'], default: 'Domestic', required: true, hint: 'Export = a customer outside India (no GST, LUT)',
+    onChange: (v) => ({ country: v === 'Domestic' ? 'India' : '' }) },
+  { name: 'gstin', label: 'GST number', rule: 'gstin', show: (f) => f.type !== 'Export', hint: 'Leave empty if the customer has none. 15 characters, like 08AAAAA0000A1Z5',
+    validate: (f) => { const st = stateOfGstin(f.gstin); const named = canonicalState(f.state); return st && named && st !== named ? `This GST number is for ${st}, but the state chosen is ${named}` : ''; } },
   { name: 'address', label: 'Address', wide: true },
-  { name: 'city', label: 'City' },
-  { name: 'state', label: 'State', default: 'Rajasthan' },
-  { name: 'country', label: 'Country', default: 'India', hint: 'Anything other than India = export (no GST, LUT)' },
-  { name: 'type', label: 'Type', type: 'select', options: ['Domestic', 'Export'], default: 'Domestic' },
+  { name: 'city', label: 'City', rule: 'place' },
+  { name: 'state', label: 'State', type: 'select', options: STATE_NAMES, default: 'Rajasthan', required: true, show: (f) => f.type !== 'Export', hint: 'Decides CGST + SGST or IGST on the bill' },
+  { name: 'country', label: 'Country', required: true, show: (f) => f.type === 'Export', validate: (f) => (f.type === 'Export' && String(f.country || '').toLowerCase().replace(/[^a-z]/g, '') === 'india' ? 'An export customer is outside India' : '') },
 ];
 
 export const EMPLOYEE_FIELDS = [

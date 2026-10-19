@@ -389,3 +389,21 @@ Tests: 4 (yield by hand), 7 (repair and vehicle numbers, month buckets, driver, 
 **Not done (decide):** consumables used by machines (diesel litres, blades) do not reduce the Diesel / Blades stock by themselves; they are entered as a stock-out. The cost rate of an item is the last purchase rate, not an average.
 
 Tests: 12 server (day by day, reversals, paid on approval, due dates, dates, count), 2 browser on a phone.
+
+## Sales & Payments: validation on every form, and flow fixes
+
+**The bug:** the customer's mobile field took any character (letters, symbols). Now every mobile field (customer, supplier, driver) takes digits only as you type, tidies a pasted "+91 98290 12345", and shows a clear message ("10 digits, starting with 6, 7, 8 or 9"). The server uses the same rule, so a form and the server never disagree.
+
+**Rules added (one table, `lib/validators.ts`, used by the forms and the server):** GST number (15 characters, real state code, capitals), party name (customer / supplier / transporter: no formula characters, at least 2 characters), city, truck number (6 to 12 letters and digits, as painted, spaces tidied), e-way bill (12 digits), payment reference (a cheque carries its 6-digit number; UPI / bank are plain text).
+
+**Customer:** a state is chosen from the list (a typo such as "Rajsthan" had made the tax IGST); the state is taken from the GST number when none is chosen and cannot contradict it; "Export" needs a country outside India and "Domestic" is India (the type decides the tax, it used to be decorative); the same mobile or GST number on another customer asks "Save anyway?". Imported customers get their state from the GST number too (it used to default to Rajasthan).
+
+**Quotation / order:** no future date; the same product cannot be on two lines (stock sent was counted by product, so two lines mixed up); a half-filled line is now flagged ("Item 2: Enter the quantity") instead of being silently dropped; the advance cannot be negative or more than the total; a cash advance of ₹2 lakh or more is asked about (it used to fail with no way to confirm).
+
+**Payments:** not more than pending, not zero or negative, not in the future, not before the order date, two decimals at most; cheque number required.
+
+**Dispatch / gate pass (sales screen and the Dispatch screen):** truck number, driver name and mobile, transporter and e-way bill follow the rules above; freight and weights cannot be negative; the loaded truck cannot weigh less than the empty one (it used to be silently set to zero net weight); loaded quantity cannot exceed what is left to send.
+
+**Flow gaps closed:** a quotation can be **changed** (the new-quotation screen, filled in); a quotation or an order can be **cancelled** with a reason (until money or a bill is involved); a wrong **payment can be cancelled** from the order (the cash book and the customer's balance follow).
+
+Tests: 15 server (all the rules above), 2 browser tests on a phone (customer to cancelled payment to truck out). Existing fixtures with placeholder truck numbers ("RJ1"), one-letter customer names and a formula as a customer name were updated to realistic values.

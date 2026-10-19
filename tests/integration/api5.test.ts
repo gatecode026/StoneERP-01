@@ -225,8 +225,8 @@ describe('CSV export', () => {
     expect(new Set(names).size).toBe(1234);
   });
   it('honours filters and neutralises formulas in data', async () => {
-    await api.create(owner, 'customers', { name: '=cmd|calc', mobile: '9811100001' });
-    const r = await text(owner, '/api/export/customers?q==cmd', { resource: 'customers' });
+    await api.create(owner, 'customers', { name: 'Formula Traders', address: '=cmd|calc', mobile: '9811100001' }); // a name cannot start with =, but an address can
+    const r = await text(owner, '/api/export/customers?q=9811100001', { resource: 'customers' });
     expect(r.body).toContain("'=cmd|calc");
     expect(r.body.trim().split('\r\n').length).toBe(2);
   });

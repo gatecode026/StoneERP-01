@@ -48,7 +48,7 @@ describe('Excel import for master lists', () => {
     const c = await send(owner, 'customers', f, true);
     expect(c.json).toMatchObject({ committed: true, imported: 2, skipped: 2 });
     const d: any = await Customer.findOne({ name: 'Delhi Builders' }).lean();
-    expect(d).toMatchObject({ mobile: '9811122222', gstin: '07AAAAA0000A1Z5', type: 'Domestic', state: 'Rajasthan' });
+    expect(d).toMatchObject({ mobile: '9811122222', gstin: '07AAAAA0000A1Z5', type: 'Domestic', state: 'Delhi' });
     expect(await AuditLog.countDocuments({ action: 'bulk_import', model: 'customers' })).toBe(1);
     const again = await send(owner, 'customers', f);
     expect(again.json.rows.filter((r: any) => r.errors.some((e: string) => /Already in the app/.test(e)))).toHaveLength(2);

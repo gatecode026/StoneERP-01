@@ -7,7 +7,7 @@ import { addDays, todayIST } from '../time';
 import { accountFor, applyStock, oid, postCash, reverseCashFor, reverseStockFor, round2 } from '../services/core';
 import { stockItemById, supplierById } from '../services/lookup';
 import { withinApprovalLimit } from '../perm/engine';
-import { dateStr, enumOf, mobile, monthStr, num, oidStr, photo, posNum, req, text, gstin } from './zod';
+import { dateStr, enumOf, monthStr, num, oidStr, photo, posNum, req, ruled, text } from './zod';
 
 const s = (ctx: { session?: any }) => ctx.session ?? null;
 
@@ -73,7 +73,7 @@ export const stockmovements: ResourceDef = {
 };
 
 // ------------------------------------------------------------------ suppliers
-const supplierFields = { name: req(160), mobile: mobile.optional().or(z.literal('')), gstin: gstin.optional(), city: text(80).optional(), supplies: text(200).optional() };
+const supplierFields = { name: ruled('partyName', { required: true }), mobile: ruled('mobile').optional(), gstin: ruled('gstin').optional(), city: ruled('place').optional(), supplies: text(200).optional() };
 export const suppliers: ResourceDef = {
   key: 'suppliers', model: Supplier, label: (d) => d.name,
   listFields: ['name', 'mobile', 'gstin', 'city', 'supplies', 'outstanding'], sortable: ['name', 'outstanding', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'city', 'supplies'],

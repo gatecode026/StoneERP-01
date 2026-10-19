@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { Complaint, Customer, Dispatch, Payment, Sale, StockItem } from '../models';
 import type { ResourceDef } from '../api/resource';
 import { badRequest, confirmable, conflict, forbidden } from '../errors';
-import { computeTotals, taxTypeFor } from '../gst';
+import { canonicalState, computeTotals, stateOfGstin, taxTypeFor } from '../gst';
+import { checkPaymentRef } from '../validators';
 import { daysBetween, fyLabel, todayIST } from '../time';
 import { accountFor, applyStock, nextSeq, oid, postCash, reverseCashFor, reverseStockFor, round2, type SvcCtx } from '../services/core';
 import { customerById, saleById } from '../services/lookup';
-import { dateStr, empCode, enumOf, gstin, MODES, mobile, num, oidStr, photo, photos, posNum, req, text } from './zod';
+import { dateStr, empCode, enumOf, MODES, num, oidStr, photo, photos, posNum, req, ruled, text } from './zod';
 import { scopeFilter } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
 
@@ -17,8 +18,39 @@ export const lineKey = (l: any) => String(l.stockItemId ?? l.name).replace(/[.$]
 
 // ------------------------------------------------------------------ customers
 const customerFields = {
-  name: req(160), mobile, gstin: gstin.optional(), address: text(400).optional(), city: text(80).optional(), state: text(60).optional(), country: text(60).optional(), type: enumOf(['Domestic', 'Export']).optional(),
+  name: ruled('partyName', { required: true }), mobile: ruled('mobile', { required: true }), gstin: ruled('gstin').optional(), address: text(400).optional(), city: ruled('place').optional(),
+  state: text(60).optional(), country: text(60).optional(), type: enumOf(['Domestic', 'Export']).optional(),
 };
+const letters = (v: unknown) => String(v ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
+
+/**
+ * Domestic or export, the state and the GST number have to agree: together they decide the tax on every bill.
+ * Returns the type / country / state to keep; throws when they contradict each other.
+ */
+function customerPlace(c: { type?: string; country?: string; state?: string; gstin?: string }) {
+  const isIndia = !String(c.country ?? '').trim() || letters(c.country) === 'india';
+  const type = c.type ?? (isIndia ? 'Domestic' : 'Export');
+  if (type === 'Export') {
+    if (isIndia) throw badRequest('Country: an export customer is outside India. Enter the country');
+    return { type: 'Export', country: String(c.country).trim(), state: String(c.state ?? '').trim() };
+  }
+  if (!isIndia) throw badRequest('Country: a domestic customer is in India. Choose "Export" for a customer abroad');
+  const fromGst = stateOfGstin(c.gstin);
+  const named = c.state ? canonicalState(c.state) : '';
+  if (c.state && !named) throw badRequest('State: choose a state from the list');
+  if (fromGst && named && fromGst !== named) throw badRequest(`State: the GST number ${c.gstin} belongs to ${fromGst}, not ${named}`);
+  return { type: 'Domestic', country: 'India', state: named || fromGst || 'Rajasthan' };
+}
+
+/** The same mobile number or GST number on another customer is sometimes right (a branch) but usually a slip: ask before saving. */
+async function warnSameCustomer(ctx: SvcCtx, c: { mobile?: string; gstin?: string }, selfId?: unknown) {
+  if (ctx.confirmed) return;
+  const other = selfId ? { _id: { $ne: selfId } } : {};
+  const m: any = c.mobile ? await Customer.findOne({ mobile: c.mobile, isVoid: false, ...other }).select('name').session(s(ctx)).lean() : null;
+  if (m) throw confirmable(`${m.name} already has this mobile number. Save anyway?`);
+  const g: any = c.gstin ? await Customer.findOne({ gstin: c.gstin, isVoid: false, ...other }).select('name').session(s(ctx)).lean() : null;
+  if (g) throw confirmable(`${g.name} already has this GST number. Save anyway?`);
+}
 export const customers: ResourceDef = {
   key: 'customers', model: Customer, label: (d) => d.name,
   listFields: ['name', 'mobile', 'gstin', 'address', 'city', 'state', 'country', 'type', 'outstanding', 'ownerUserId'],
@@ -27,7 +59,15 @@ export const customers: ResourceDef = {
   create: z.object(customerFields).strict(), update: z.object(customerFields).partial().strict(),
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
-      return { state: 'Rajasthan', country: 'India', ...input, ownerUserId: auth.scope === 'all' && auth.user.role !== 'salesperson' ? undefined : oid(auth.user.id) };
+      const place = customerPlace(input);
+      await warnSameCustomer(ctx, input);
+      return { ...input, ...place, ownerUserId: auth.scope === 'all' && auth.user.role !== 'salesperson' ? undefined : oid(auth.user.id) };
+    },
+    async prepareUpdate(ctx, prev, patch) {
+      const merged = { ...prev, ...patch };
+      if ('type' in patch || 'country' in patch || 'state' in patch || 'gstin' in patch) Object.assign(patch, customerPlace(merged));
+      if ('mobile' in patch || 'gstin' in patch) await warnSameCustomer(ctx, { mobile: 'mobile' in patch ? patch.mobile : undefined, gstin: 'gstin' in patch ? patch.gstin : undefined }, prev._id);
+      return patch;
     },
     async beforeVoid(ctx, d) { if (d.outstanding > 0) throw conflict('This customer still owes money'); },
   },
@@ -37,6 +77,8 @@ export const customers: ResourceDef = {
 const lineSchema = z.object({ stockItemId: oidStr.optional(), name: req(160), hsn: enumOf(['6802', '2516']).optional(), qty: posNum(1e9), unit: text(20).optional(), rate: posNum(1e8), gstRate: z.coerce.number().refine((v) => [0, 5, 12, 18, 28].includes(v)).optional() }).strict();
 
 async function priceSale(ctx: SvcCtx, customer: any, items: z.infer<typeof lineSchema>[]) {
+  const keys = items.map((i) => lineKey(i));
+  if (new Set(keys).size !== keys.length) throw badRequest('The same product is on two lines. Put the whole quantity on one line');
   const taxType = taxTypeFor(customer, ctx.settings.company);
   const t = computeTotals(items as any, taxType);
   if (!t.rows.length || t.taxable <= 0) throw badRequest('Add at least one item with quantity and rate');
@@ -69,6 +111,7 @@ export const sales: ResourceDef = {
       const advance = stage === 'order' ? round2(input.advance ?? 0) : 0;
       if (advance > priced.total) throw badRequest('Advance is more than the order total');
       const date = input.date ?? todayIST();
+      if (date > todayIST()) throw badRequest('Date cannot be in the future');
       const saleNo = 'SO-' + String(await nextSeq('sale', ctx.session, 8)).padStart(4, '0');
       const [sale] = await Sale.create([{
         saleNo, date, stage, customerId: c._id, customerName: c.name, customerGstin: c.gstin, customerState: c.state, customerCountry: c.country, customerAddress: c.address, customerMobile: c.mobile,
@@ -85,6 +128,7 @@ export const sales: ResourceDef = {
     },
     async prepareUpdate(ctx, prev, patch) {
       if (prev.stage !== 'quotation' || prev.invoiceNo) throw conflict('Only a quotation can be edited. Confirmed orders and invoices are fixed.');
+      if (patch.date && patch.date > todayIST()) throw badRequest('Date cannot be in the future');
       if (patch.items) {
         const c = await customerById(ctx, prev.customerId);
         const priced = await priceSale(ctx, c, patch.items);
@@ -113,6 +157,7 @@ export async function confirmOrder(ctx: SvcCtx, saleId: string, advance: number,
   );
   if (!sale) throw conflict('This quotation is already an order or has been cancelled');
   const adv = round2(advance);
+  if (adv < 0) throw badRequest('Advance cannot be negative');
   if (adv > sale.total) throw badRequest('Advance is more than the order total');
   await Sale.updateOne({ _id: sale._id }, { $set: { outstanding: sale.total } }, { session: ctx.session });
   await Customer.updateOne({ _id: sale.customerId }, { $inc: { outstanding: sale.total } }, { session: ctx.session });
@@ -175,6 +220,9 @@ export const payments: ResourceDef = {
       const sale = await saleById(ctx, input.saleId);
       const date = input.date ?? todayIST();
       if (date > todayIST()) throw badRequest('Payment date cannot be in the future');
+      if (date < sale.date) throw badRequest('Payment date is before the order date');
+      const refProblem = checkPaymentRef(input.mode, input.ref);
+      if (refProblem) throw badRequest(refProblem);
       const pay = await receivePayment(ctx, sale, { amount: input.amount, mode: input.mode, date, ref: input.ref });
       return { doc: pay };
     },
@@ -190,8 +238,8 @@ export const payments: ResourceDef = {
 // ------------------------------------------------------------------ dispatch / gate pass
 const dispatchItem = z.object({ stockItemId: oidStr.optional(), name: req(160), unit: text(20).optional(), qty: posNum(1e9) }).strict();
 const dispatchFields = {
-  truckNo: z.string().trim().toUpperCase().min(1).max(20), driverName: text(80).optional(), driverMobile: text(20).optional(), transporter: text(120).optional(), freight: num().optional(),
-  emptyWeight: num().optional(), loadedWeight: num().optional(), photoLoaded: photo.optional(), photoCovered: photo.optional(), eway: text(20).optional(), documents: photos(6).optional(), note: text(500).optional(),
+  truckNo: ruled('truckNo', { required: true }), driverName: ruled('name').optional(), driverMobile: ruled('mobile').optional(), transporter: ruled('partyName').optional(), freight: num().optional(),
+  emptyWeight: num().optional(), loadedWeight: num().optional(), photoLoaded: photo.optional(), photoCovered: photo.optional(), eway: ruled('eway').optional(), documents: photos(6).optional(), note: text(500).optional(),
 };
 export const dispatches: ResourceDef = {
   key: 'dispatches', model: Dispatch, label: (d) => `${d.gatePassNo ?? 'IN'} ${d.truckNo}`,
@@ -206,6 +254,7 @@ export const dispatches: ResourceDef = {
     async prepareCreate(ctx, input, auth) {
       const direction = input.direction ?? 'out';
       const doc: any = { ...input, direction, date: input.date ?? todayIST(), freight: input.freight ?? 0 };
+      if (input.emptyWeight && input.loadedWeight && input.loadedWeight < input.emptyWeight) throw badRequest('Loaded weight is less than the empty weight');
       if (input.emptyWeight && input.loadedWeight) doc.netWeight = Math.max(0, input.loadedWeight - input.emptyWeight);
       if (direction === 'in') { doc.status = 'in'; return doc; }
       if (!input.saleId) throw badRequest('Choose the order this truck is loading for');
@@ -233,7 +282,8 @@ export const dispatches: ResourceDef = {
       if (prev.status === 'out') throw conflict('This truck has already left. Its record is fixed.');
       const w1 = patch.emptyWeight ?? prev.emptyWeight;
       const w2 = patch.loadedWeight ?? prev.loadedWeight;
-      if (w1 && w2) patch.netWeight = Math.max(0, w2 - w1);
+      if (w1 && w2 && w2 < w1) throw badRequest('Loaded weight is less than the empty weight');
+      if (w1 && w2) patch.netWeight = w2 - w1;
       return patch;
     },
     async beforeVoid(ctx, d) {

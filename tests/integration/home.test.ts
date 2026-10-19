@@ -37,7 +37,7 @@ beforeAll(async () => {
   const cust = (await api.create(who.salesperson, 'customers', { name: 'Delhi Builders', mobile: '9811122222', state: 'Delhi' })).json;
   const sale = (await api.create(who.salesperson, 'sales', { customerId: cust._id, stage: 'order', items: [{ stockItemId: item._id, name: item.name, qty: 100, unit: 'sq ft', rate: 80, gstRate: 18 }] })).json;
   await call(who.salesperson, orderRoute.POST as never, '/x', { method: 'POST', body: {}, ...P(sale._id) }).catch(() => undefined);
-  const slip = (await api.create(who.supervisor, 'dispatches', { saleId: sale._id, truckNo: 'RJ1', items: [{ stockItemId: item._id, name: item.name, qty: 40 }] })).json;
+  const slip = (await api.create(who.supervisor, 'dispatches', { saleId: sale._id, truckNo: 'RJ14 GA 0001', items: [{ stockItemId: item._id, name: item.name, qty: 40 }] })).json;
   void outRoute;
   await api.create(who.supervisor, 'expenses', { head: 'Diesel', amount: 7000, paidBy: 'UPI', billPhoto: PNG });
   await api.create(who.worker, 'dailyreports', { narration: 'Cut blocks', quantity: 300, problem: 'Power cut' });
