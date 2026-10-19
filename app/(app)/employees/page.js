@@ -1,13 +1,15 @@
 'use client';
 import ImportEmployees from '@/components/ImportEmployees';
 import { loginFields, toLogin } from '@/components/loginFields';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Badge } from '@/components/ui';
 import { EMPLOYEE_FIELDS, missingDocs } from '@/components/fields';
 import { useApp } from '@/components/Providers';
 import { JOBS } from '@/lib/config';
 import { inr, fmtDate } from '@/lib/format';
+import { api } from '@/lib/client';
+import toast from '@/lib/toast';
 import T from '@/components/T';
 
 export default function EmployeesPage() {
@@ -32,13 +34,33 @@ export default function EmployeesPage() {
       return m.length ? <Badge tone="red"><AlertTriangle size={11} /> <T>Missing:</T> {m.join(', ')}</Badge> : <Badge tone="green"><T>Complete</T></Badge>;
     } },
     ...(mayLogin ? [{ key: 'hasLogin', label: 'Sign-in', render: (r) => (r.hasLogin ? <Badge tone="green">{r.loginRole || 'yes'}</Badge> : <span className="text-char-300">—</span>) }] : []),
-    { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.isVoid ? 'void' : r.status === 'left' ? 'void' : 'active'} /> },
+    { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.isVoid ? 'deactivated' : r.status === 'left' ? 'left' : 'active'} /> },
   ];
   return (
     <RoleGuard perm="employees">
       <CrudPage
         model="employees" title={t('employees')} subtitle="One profile per person, with documents" label="Employee"
         fields={fields} columns={columns} sort="empCode" pagination={25} wide headerExtra={<ImportEmployees />}
+        voidLabel="Deactivate"
+        voidTitle="Deactivate Employee"
+        voidPrompt="Nothing is deleted — the profile will be deactivated, sign-in access disabled, and moved to the deactivated list."
+        voidSuccessMsg="Employee deactivated"
+        rowActions={(row, { reload }) => (
+          row.isVoid && can('employees', 'edit') ? [{
+            label: 'Reactivate',
+            tone: 'green',
+            icon: <RotateCcw size={14} className="shrink-0 text-emerald-600" />,
+            onClick: async () => {
+              try {
+                await api(`/api/employees/${row._id}/reactivate`, { method: 'POST' });
+                toast.success('Employee reactivated');
+                reload();
+              } catch (e) {
+                toast.error(e.message);
+              }
+            },
+          }] : []
+        )}
         loadExtra={async (full) => ({ _job0: full.job, loginPassword: '' })}
         mapBody={(body, mode, form) => {
           const { loginPassword, ...rest } = body;
@@ -51,7 +73,16 @@ export default function EmployeesPage() {
           { key: 'job', label: 'All jobs', options: JOBS },
           { key: 'site', label: 'All sites', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] },
           { key: 'docs', label: 'Documents', options: [{ value: 'missing', label: 'Missing documents' }] },
-          { key: 'status', label: 'Working + left', options: [{ value: 'active', label: 'Working' }, { value: 'left', label: 'Left' }] },
+          {
+            key: 'status',
+            label: 'All status',
+            options: [
+              { value: 'active', label: 'Working' },
+              { value: 'left', label: 'Left' },
+              { value: 'deactivated', label: 'Deactivated' },
+            ],
+            toQuery: (val) => (val === 'deactivated' ? { includeVoid: '1', deactivated: '1' } : { status: val }),
+          },
         ]}
         facets={{ by: 'status', query: { docs: 'missing', status: 'active' } }}
         summary={(rows, { facets: f }) => {

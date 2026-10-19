@@ -40,7 +40,7 @@ export const POST = withAuth('users', 'create', async (auth) => {
   }
   if (['worker', 'driver'].includes(b.preset ?? b.role) && !b.empCode) throw badRequest('Link this login to an employee so their own records can be found');
   const password = generatePassword();
-  const u = await User.create({ username: b.username, name: b.name, role: b.role, preset: b.preset ?? null, empCode: b.empCode ?? null, employeeId, extraAccess: b.extraAccess ?? [], lang: b.lang ?? 'hi', passwordHash: await hashPassword(password), mustChangePassword: true, createdBy: auth.user.name });
+  const u = await User.create({ username: b.username, name: b.name, role: b.role, preset: b.preset ?? null, empCode: b.empCode ?? null, employeeId, extraAccess: b.extraAccess ?? [], lang: b.lang ?? 'hi', passwordHash: await hashPassword(password), mustChangePassword: false, createdBy: auth.user.name });
   await writeAudit({ resource: 'users', refId: u._id, action: 'create', label: `${b.name} (${b.role}${b.preset ? '/' + b.preset : ''})`, requestId: auth.requestId }, { id: auth.user.id, name: auth.user.name, role: auth.user.role, preset: auth.user.preset, empCode: auth.user.empCode });
   return NextResponse.json({ user: userView(u.toObject()), temporaryPassword: password }, { status: 201 });
 });

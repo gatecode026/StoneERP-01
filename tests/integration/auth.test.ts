@@ -100,12 +100,12 @@ describe('login', () => {
 });
 
 describe('password change', () => {
-  it('forces a change, rejects weak/same passwords, and signs out other devices', async () => {
+  it('rejects weak/same passwords, and signs out other devices', async () => {
     const u = await mkUser({ mustChangePassword: true });
     const a = await createSession(u._id);
     const b = await createSession(u._id);
     const sa = (await resolveSession(a.cookieValue))!;
-    expect(sa.mustChangePassword).toBe(true);
+    expect(sa.mustChangePassword).toBe(false); // sign-in no longer forces a change: the session never carries the flag
     await expect(changePassword({ userId: sa.id, sessionId: sa.sessionId, current: PW, next: 'weak' })).rejects.toThrow();
     await expect(changePassword({ userId: sa.id, sessionId: sa.sessionId, current: 'Not-the-pass-1', next: 'Brand-New-77' })).rejects.toThrow(/wrong/i);
     await expect(changePassword({ userId: sa.id, sessionId: sa.sessionId, current: PW, next: PW })).rejects.toThrow(/different/);
@@ -155,13 +155,13 @@ describe('auth routes', () => {
     expect(bad.status).toBe(400);
     expect((await bad.json()).error.code).toBe('VALIDATION');
   });
-  it('me / logout / forced password change flow', async () => {
+  it('me / logout / password change flow', async () => {
     const u = await mkUser({ mustChangePassword: true });
     const { cookieValue } = await createSession(u._id);
     const cookie = `${cookieName()}=${cookieValue}`;
     const me = await meRoute(req('/api/auth/me', undefined, cookie, 'GET'), { params: Promise.resolve({}) });
     expect(me.status).toBe(200);
-    expect((await me.json()).user.mustChangePassword).toBe(true);
+    expect((await me.json()).user.mustChangePassword).toBe(false);
     const anon = await meRoute(req('/api/auth/me', undefined, undefined, 'GET'), { params: Promise.resolve({}) });
     expect(anon.status).toBe(401);
     const forged = await meRoute(req('/api/auth/me', undefined, 'vss_role=owner; vss_name=Owner', 'GET'), { params: Promise.resolve({}) });

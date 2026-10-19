@@ -4,9 +4,9 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, Lock, Check, X, Pencil, RotateCcw } from 'lucide-react';
+import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu, cx } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
@@ -103,6 +103,53 @@ export default function DailyReportPage() {
   const canUndoRow = (r) => canCheck && !isOwn(r) && !!r.supCheck && ['owner', 'manager'].includes(session?.role);
   const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green"><T>OK</T></Badge> : r.supCheck === 'not_ok' ? <Badge tone="red"><T>Not OK</T></Badge> : r.reopenedFrom === 'not_ok' ? <Badge tone="amber"><T>Corrected: check again</T></Badge> : canCheck ? <Badge tone="gray"><T>Not checked</T></Badge> : null);
 
+  const getReportActions = (r) => {
+    const items = [];
+    if (canCheckRow(r)) {
+      items.push({
+        key: 'ok',
+        label: tr('Mark OK'),
+        icon: <Check size={15} className="text-emerald-600" />,
+        tone: 'green',
+        disabled: checking,
+        onClick: () => check(r, 'ok'),
+      });
+      items.push({
+        key: 'not_ok',
+        label: tr('Mark not OK'),
+        icon: <X size={15} className="text-red-500" />,
+        danger: true,
+        disabled: checking,
+        onClick: () => check(r, 'not_ok'),
+      });
+    }
+    if (canUndoRow(r)) {
+      items.push({
+        key: 'undo',
+        label: tr('Undo decision'),
+        icon: <RotateCcw size={15} className="text-char-500" />,
+        disabled: checking,
+        onClick: () => undo(r),
+      });
+    }
+    if (canEditRow(r)) {
+      items.push({
+        key: 'edit',
+        label: tr('Edit'),
+        icon: <Pencil size={15} className="text-char-500" />,
+        onClick: () => openNew(r),
+      });
+    }
+    items.push({
+      key: 'view',
+      label: tr('View details'),
+      icon: <Eye size={15} className="text-char-500" />,
+      dividerBefore: items.length > 0,
+      onClick: () => setDetail(r),
+    });
+    return items;
+  };
+
   // one table on a computer, one compact list on a phone: tap a row for the whole report
   const renderList = (items) => (
     <div className="card overflow-hidden">
@@ -126,7 +173,7 @@ export default function DailyReportPage() {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="th"><T>Employee</T></th>{isWorker && <th className="th"><T>Date</T></th>}<th className="th"><T>Work done</T></th><th className="th text-right"><T>Hours</T></th><th className="th text-right"><T>Sq ft</T></th><th className="th"><T>Problem</T></th><th className="th"><T>Status</T></th><th className="th w-px" />
+              <th className="th"><T>Employee</T></th>{isWorker && <th className="th"><T>Date</T></th>}<th className="th"><T>Work done</T></th><th className="th text-right"><T>Hours</T></th><th className="th text-right"><T>Sq ft</T></th><th className="th"><T>Problem</T></th><th className="th"><T>Status</T></th><th className="th text-right w-px"><T>Actions</T></th>
             </tr>
           </thead>
           <tbody>
@@ -140,12 +187,7 @@ export default function DailyReportPage() {
                 <td className="td max-w-[12rem]">{r.problem ? <span className="text-red-600 line-clamp-2 break-words">{r.problem}</span> : <span className="text-char-300">—</span>}</td>
                 <td className="td whitespace-nowrap">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="inline ml-1.5 text-char-300" aria-label="Locked" />}</td>
                 <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>
-                  {canCheckRow(r) && <>
-                    <button className="icon-btn" onClick={() => check(r, 'ok')} disabled={checking} title={tr('Mark OK')} aria-label={tr('Mark OK')}><Check size={16} /></button>
-                    <button className="icon-btn" onClick={() => check(r, 'not_ok')} disabled={checking} title={tr('Mark not OK')} aria-label={tr('Mark not OK')}><X size={16} /></button>
-                  </>}
-                  {canUndoRow(r) && <button className="icon-btn" onClick={() => undo(r)} disabled={checking} title={tr('Undo decision')} aria-label={tr('Undo decision')}><RotateCcw size={15} /></button>}
-                  {canEditRow(r) && <button className="icon-btn" onClick={() => openNew(r)} title={tr('Edit')} aria-label={tr('Edit')}><Pencil size={15} /></button>}
+                  <ActionMenu items={getReportActions(r)} />
                 </td>
               </tr>
             ))}

@@ -13,20 +13,26 @@ test('Owner: OK removes the buttons, Undo (with a reason) brings them back', asy
   await page.goto('/daily-report');
   const row = page.locator('tr', { hasText: 'Report Person' });
   await expect(row).toBeVisible();
-  await expect(row.getByRole('button', { name: 'Mark OK' })).toBeVisible();
-  await expect(row.getByRole('button', { name: 'Mark not OK' })).toBeVisible();
+  // the row's actions are in its "Actions" menu (the menu opens over the page, not inside the row)
+  const menu = async () => { await row.getByRole('button', { name: 'Actions' }).click(); };
+  const item = (name: string) => page.getByRole('menuitem', { name });
+  await menu();
+  await expect(item('Mark OK')).toBeVisible();
+  await expect(item('Mark not OK')).toBeVisible();
 
-  await row.getByRole('button', { name: 'Mark OK' }).click();
+  await item('Mark OK').click();
   await expect(page.getByText('Marked OK').first()).toBeVisible();
-  await expect(row.getByRole('button', { name: 'Mark OK' })).toHaveCount(0);
-  await expect(row.getByRole('button', { name: 'Mark not OK' })).toHaveCount(0);
-  await expect(row.getByRole('button', { name: 'Edit' })).toHaveCount(0); // an OK report is locked
-  await expect(row.getByRole('button', { name: 'Undo decision' })).toBeVisible();
+  await menu();
+  await expect(item('Mark OK')).toHaveCount(0);
+  await expect(item('Mark not OK')).toHaveCount(0);
+  await expect(item('Edit')).toHaveCount(0); // an OK report is locked
+  await expect(item('Undo decision')).toBeVisible();
 
-  await row.getByRole('button', { name: 'Undo decision' }).click();
+  await item('Undo decision').click();
   await page.getByRole('textbox').last().fill('Tapped OK by mistake');
   await page.getByRole('button', { name: /^OK$/ }).last().click();
   await expect(page.getByText('Decision undone').first()).toBeVisible();
-  await expect(row.getByRole('button', { name: 'Mark OK' })).toBeVisible();
-  await expect(row.getByRole('button', { name: 'Undo decision' })).toHaveCount(0);
+  await menu();
+  await expect(item('Mark OK')).toBeVisible();
+  await expect(item('Undo decision')).toHaveCount(0);
 });

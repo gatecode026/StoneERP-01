@@ -96,7 +96,6 @@ export function route(opts: Opts, fn: Handler) {
       const user = auth === 'none' && !req.cookies.get(cookieName()) ? null : await resolveSession(req.cookies.get(cookieName())?.value);
       if (auth !== 'none') {
         if (!user) throw unauthorized();
-        if (auth === 'required' && user.mustChangePassword) throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'Please set a new password first');
       }
       uid = user?.id;
       const rate = await apiRateLimit(user?.id ?? null, clientIp(req.headers));

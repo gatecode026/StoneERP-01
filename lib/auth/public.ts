@@ -16,6 +16,6 @@ export function publicUser(u: UserLike | SessionUser) {
     preset: u.preset ?? null,
     empCode: u.empCode ?? null,
     lang: u.lang ?? 'hi',
-    mustChangePassword: Boolean(u.mustChangePassword),
+    mustChangePassword: false,
   };
 }

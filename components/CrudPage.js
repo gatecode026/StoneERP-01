@@ -3,7 +3,8 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, History as HistoryIcon, Pencil, Ban } from 'lucide-react';
+import { Plus, History as HistoryIcon, Pencil, Ban, MoreVertical } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useApp, useFetch, useTx } from './Providers';
 import { trNow } from '@/lib/trNow';
 import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, LoadMore, Pagination, Badge, cx } from './ui';
@@ -17,11 +18,131 @@ import T from '@/components/T';
 const TONE = {
   active: 'gray', approved: 'green', applied: 'green', paid: 'green', closed: 'green', done: 'green', ok: 'green', in: 'blue', out: 'green',
   pending: 'amber', open: 'red', in_progress: 'amber', loading: 'amber', due: 'amber', rejected: 'red', void: 'red', draft: 'amber', not_ok: 'red',
+  deactivated: 'red', left: 'amber',
 };
 export function StatusBadge({ value, isVoid }) {
   const v = isVoid ? 'void' : value;
   if (!v) return null;
   return <Badge tone={TONE[v] || 'gray'}>{String(v).replace('_', ' ')}</Badge>;
+}
+
+function RowActionMenu({ menuRow, onClose }) {
+  const tx = useTx();
+  const menuRef = useRef(null);
+  const [coords] = useState(() => {
+    if (typeof window === 'undefined') return { top: 0, right: 0 };
+    const { rect } = menuRow;
+    const menuWidth = 176;
+    const estimatedHeight = (menuRow.items?.length || 3) * 40 + 16;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+    const right = Math.max(8, Math.min(window.innerWidth - menuWidth, window.innerWidth - rect.right));
+    return {
+      top: showAbove ? undefined : rect.bottom + 4,
+      bottom: showAbove ? window.innerHeight - rect.top + 4 : undefined,
+      right,
+    };
+  });
+
+  useEffect(() => {
+    const handleDown = (e) => {
+      if (e.target.closest('[data-action-trigger]')) return;
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    const handleScroll = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      onClose();
+    };
+
+    document.addEventListener('mousedown', handleDown, true);
+    document.addEventListener('touchstart', handleDown, true);
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', onClose);
+
+    return () => {
+      document.removeEventListener('mousedown', handleDown, true);
+      document.removeEventListener('touchstart', handleDown, true);
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [onClose]);
+
+  const normalItems = menuRow.items.filter((it) => !it.danger);
+  const dangerItems = menuRow.items.filter((it) => it.danger);
+
+  return (
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        top: coords.top !== undefined ? `${coords.top}px` : undefined,
+        bottom: coords.bottom !== undefined ? `${coords.bottom}px` : undefined,
+        right: `${coords.right}px`,
+        zIndex: 70,
+      }}
+      role="menu"
+      aria-orientation="vertical"
+      className="w-44 bg-white/95 backdrop-blur-md rounded-2xl border border-sand-200/90 shadow-2xl p-1.5 focus:outline-none transition-all duration-150 animate-in fade-in zoom-in-95"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {normalItems.length > 0 && (
+        <div className="space-y-0.5">
+          {normalItems.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              className={cx(
+                'w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left transition-colors',
+                it.tone === 'primary' ? 'text-terra hover:bg-terra-50' :
+                it.tone === 'green' ? 'text-emerald-700 hover:bg-emerald-50' :
+                'text-char-700 hover:text-char-900 hover:bg-sand-100',
+                it.disabled && 'opacity-50 cursor-not-allowed'
+              )}
+              onClick={() => {
+                onClose();
+                it.onClick();
+              }}
+            >
+              <span className="shrink-0 text-char-500">{it.icon}</span>
+              <span className="truncate">{tx(it.label)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {dangerItems.length > 0 && (
+        <div className={cx(normalItems.length > 0 && 'pt-1 mt-1 border-t border-sand-100', 'space-y-0.5')}>
+          {dangerItems.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              className={cx(
+                'w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left transition-colors text-red-600 hover:text-red-700 hover:bg-red-50',
+                it.disabled && 'opacity-50 cursor-not-allowed'
+              )}
+              onClick={() => {
+                onClose();
+                it.onClick();
+              }}
+            >
+              <span className="shrink-0">{it.icon}</span>
+              <span className="truncate">{tx(it.label)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const optList = (o) => (o || []).map((x) => (typeof x === 'string' ? { value: x, label: x } : x));
@@ -199,6 +320,7 @@ export default function CrudPage({
   model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination = 25, mapBody, loadExtra,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
+  voidLabel, voidTitle, voidPrompt, voidSuccessMsg,
 }) {
   const { t, can, perm } = useApp();
   const tx = useTx();
@@ -239,6 +361,8 @@ export default function CrudPage({
   const [reason, setReason] = useState('');
   const [voidBusy, setVoidBusy] = useState(false);
   const voidBusyRef = useRef(false);
+  const [menuRow, setMenuRow] = useState(null);
+  useEffect(() => { setMenuRow(null); }, [narrowing, page, pageSize]);
 
   const mayAdd = canAdd && can(model, 'create');
   const openNew = () => { setEditing(null); setShowErrors(false); setForm({ date: todayISO(), ...Object.fromEntries(fields.filter((f) => f.default !== undefined).map((f) => [f.name, typeof f.default === 'function' ? f.default() : f.default])), ...defaults }); setOpen(true); };
@@ -298,7 +422,7 @@ export default function CrudPage({
     const row = voiding;
     try {
       await api(`/api/${model}/${row._id}`, { method: 'DELETE', body: { reason } });
-      toast.success('Entry cancelled');
+      toast.success(voidSuccessMsg ? tx(voidSuccessMsg) : (voidLabel ? trNow('{label} deactivated', { label: trNow(label) }) : 'Entry cancelled'));
       setVoiding(null);
       setReason('');
       reload();
@@ -316,25 +440,76 @@ export default function CrudPage({
   const rowActs = (row) => {
     const isVoid = Boolean(row.isVoid || row.status === 'void' || row.status === 'cancelled');
     const acts = rowActions ? rowActions(row, { reload }) : [];
+    const items = [];
+
+    acts.filter((a) => a && (a.show ? a.show(row) : true)).forEach((a, i) => {
+      items.push({
+        key: `custom-${i}`,
+        label: a.label,
+        icon: a.icon,
+        tone: a.tone,
+        onClick: () => a.onClick(row, reload),
+      });
+    });
+
+    if (can(model, 'edit') && canEdit(row) && !isVoid) {
+      items.push({
+        key: 'edit',
+        label: t('edit'),
+        icon: <Pencil size={15} className="shrink-0 text-char-500" />,
+        onClick: () => startEdit(row),
+      });
+    }
+
+    if (can('auditlogs')) {
+      items.push({
+        key: 'history',
+        label: t('history'),
+        icon: <HistoryIcon size={15} className="shrink-0 text-char-500" />,
+        onClick: () => showHistory(row),
+      });
+    }
+
+    if (allowVoid && can(model, 'void') && !isVoid) {
+      items.push({
+        key: 'void',
+        label: voidLabel ? tx(voidLabel) : t('cancelEntry'),
+        icon: <Ban size={15} className="shrink-0 text-red-500" />,
+        danger: true,
+        disabled: voidBusy,
+        onClick: () => { setReason(''); setVoiding(row); },
+      });
+    }
+
+    if (!items.length) return null;
+
+    const isOpen = menuRow?.row?._id === row._id;
+
     return (
-      <div className="flex items-center gap-1 justify-end shrink-0 whitespace-nowrap">
-        {acts.filter((a) => a && (a.show ? a.show(row) : true)).map((a, i) => (
-          <button key={i} className={cx('btn-sm', a.tone === 'primary' ? 'btn-primary' : a.tone === 'green' ? 'btn-green' : 'btn-outline')} onClick={() => a.onClick(row, reload)}>{a.icon}{a.label}</button>
-        ))}
-        {can(model, 'edit') && canEdit(row) && !isVoid && <button className="icon-btn" title={t('edit')} aria-label={t('edit')} onClick={() => startEdit(row)}><Pencil size={16} /></button>}
-        {can('auditlogs') && <button className="icon-btn" title={t('history')} aria-label={t('history')} onClick={() => showHistory(row)}><HistoryIcon size={16} /></button>}
-        {allowVoid && can(model, 'void') && !isVoid && (
-          <button
-            type="button"
-            className="icon-btn text-red-600 hover:!bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={t('cancelEntry')}
-            aria-label={t('cancelEntry')}
-            disabled={voidBusy}
-            onClick={() => { setReason(''); setVoiding(row); }}
-          >
-            <Ban size={16} />
-          </button>
-        )}
+      <div className="flex items-center justify-end shrink-0 whitespace-nowrap">
+        <button
+          type="button"
+          data-action-trigger="true"
+          className={cx(
+            'icon-btn text-char-600 hover:text-char-900 transition-colors',
+            isOpen && 'bg-sand-200/80 text-char-900'
+          )}
+          title={t('actions')}
+          aria-label={t('actions')}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isOpen) {
+              setMenuRow(null);
+            } else {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuRow({ row, items, rect });
+            }
+          }}
+        >
+          <MoreVertical size={18} />
+        </button>
       </div>
     );
   };
@@ -375,7 +550,7 @@ export default function CrudPage({
         <FormFields fields={fields} form={form} set={set} mode={editing ? 'edit' : 'new'} showErrors={showErrors} />
       </Sheet>
 
-      <Sheet open={!!voiding} onClose={() => { if (!voidBusy) setVoiding(null); }} title={t('cancelEntry')}
+      <Sheet open={!!voiding} onClose={() => { if (!voidBusy) setVoiding(null); }} title={voidTitle ? tx(voidTitle) : voidLabel ? `${tx(voidLabel)} – ${voiding?.name || voiding?.title || tx(label)}` : t('cancelEntry')}
         footer={<>
           <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[110px]" disabled={voidBusy} onClick={() => setVoiding(null)}>{t('cancel')}</button>
           <button
@@ -384,11 +559,11 @@ export default function CrudPage({
             disabled={voidBusy}
             onClick={confirmVoid}
           >
-            {voidBusy ? tx('Cancelling…') : t('cancelEntry')}
+            {voidBusy ? (voidLabel ? tx('Deactivating…') : tx('Cancelling…')) : (voidLabel ? tx(voidLabel) : t('cancelEntry'))}
           </button>
         </>}>
-        <p className="text-sm text-char-700 mb-3">{tx('Nothing is deleted — the entry stays in the audit trail, and any stock or money it moved is reversed.')}</p>
-        <Field label="Reason" htmlFor="void_reason">
+        <p className="text-sm text-char-700 mb-3">{voidPrompt ? tx(voidPrompt) : tx('Nothing is deleted — the entry stays in the audit trail, and any stock or money it moved is reversed.')}</p>
+        <Field label={voidLabel ? tx('Reason for deactivation') : tx('Reason')} htmlFor="void_reason">
           <input id="void_reason" className="input" value={reason} disabled={voidBusy} onChange={(e) => setReason(e.target.value)} autoFocus />
         </Field>
       </Sheet>
@@ -404,6 +579,14 @@ export default function CrudPage({
           </div>
         )) : <div className="text-sm text-char-500"><T>No history</T></div>)}
       </Sheet>
+
+      {typeof document !== 'undefined' && menuRow && createPortal(
+        <RowActionMenu
+          menuRow={menuRow}
+          onClose={() => setMenuRow(null)}
+        />,
+        document.body
+      )}
     </div>
   );
 }

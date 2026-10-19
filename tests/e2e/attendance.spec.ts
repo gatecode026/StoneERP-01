@@ -3,7 +3,8 @@ import { signIn, SAME_ORIGIN } from './helpers';
 
 // Punch In / Out, the senior's fix, overtime approval, and the working-hours settings, on a phone-size screen.
 const ymd = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
-const yesterday = ymd(new Date(Date.now() - 86400000));
+// the last day before today that is a working day: Sunday is the weekly off, and a day off cannot be marked or have overtime
+const yesterday = (() => { let t = Date.now() - 86400000; while (new Date(ymd(new Date(t)) + 'T12:00:00Z').getUTCDay() === 0) t -= 86400000; return ymd(new Date(t)); })();
 
 test('Worker: Punch In from the home screen shows the time, and the button becomes Punch Out', async ({ page }) => {
   await signIn(page, 'worker');
@@ -37,7 +38,8 @@ test('Owner: a day with an Out that is wrong is fixed with a reason, then the ov
   await expect(card.getByText(/corrected/i)).toBeVisible();
 
   // the senior fixes the Out through the screen
-  await card.getByRole('button', { name: 'Fix punch' }).click();
+  await card.getByRole('button', { name: 'Actions' }).click(); // a row's actions are in its menu
+  await page.getByRole('menuitem', { name: 'Fix punch' }).click();
   const out = page.locator('#fx_out');
   await expect(out).toBeVisible();
   await out.fill(`${yesterday}T19:05`);
@@ -61,8 +63,14 @@ test('Supervisor: sees the team, may punch for them, has no Fix and no overtime 
   await page.goto(`/attendance?date=${yesterday}`);
   const card = page.locator('div.card', { hasText: 'E2E worker' }).first();
   await expect(card).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Fix punch' })).toHaveCount(0);
-  await expect(card.getByRole('button', { name: /Approve overtime/i })).toHaveCount(0);
+  // the row's menu has the supervisor's marks when the day is still open (and no menu at all once the day is settled), never a fix or an overtime decision
+  const actions = card.getByRole('button', { name: 'Actions' });
+  if (await actions.count()) {
+    await actions.click();
+    await expect(page.getByRole('menuitem', { name: 'Fix punch' })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: /Approve overtime/i })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  }
   await expect(page.getByRole('button', { name: 'Overtime' })).toHaveCount(0);
 });
 
@@ -101,12 +109,15 @@ test.describe('on a computer the day is a ledger table', () => {
     const row = page.locator('tr', { hasText: 'E2E worker' });
     await expect(row).toBeVisible();
     await expect(row.locator('td').nth(6)).toContainText('Present'); // the Status column
-    await expect(row.getByRole('button', { name: 'Fix punch' })).toBeVisible();
+    await row.getByRole('button', { name: 'Actions' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Fix punch' })).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // a person without a mark is marked from the row (leave, absent, half day or present)
     const sup = page.locator('tr', { hasText: 'E2E supervisor' });
     await expect(sup.locator('td').nth(6)).toContainText('Not marked');
-    await sup.getByRole('combobox', { name: 'Mark' }).selectOption('absent');
+    await sup.getByRole('button', { name: 'Actions' }).click();
+    await page.getByRole('menuitem', { name: 'Mark Absent' }).click();
     await expect(sup.locator('td').nth(6)).toContainText('Absent');
     await page.screenshot({ path: 'test-results/attendance-ledger.png' });
   });

@@ -6,6 +6,7 @@ import { Employee, User } from '@/lib/models';
 import { loginWithPassword } from '@/lib/auth/login';
 import { call } from '../api';
 import * as loginInfo from '@/app/api/employees/[id]/login/route';
+import * as reactivate from '@/app/api/employees/[id]/reactivate/route';
 
 let db: Awaited<ReturnType<typeof useTestDb>>;
 let owner: Who, mgr: Who;
@@ -31,7 +32,7 @@ describe('sign-in belongs to the employee profile', () => {
     expect(((await Employee.findById(id).lean()) as any)).toMatchObject({ hasLogin: true, loginRole: 'worker' });
     expect(r.json.login).toBeUndefined(); // the password / login block is never stored or echoed
     const u: any = await User.findOne({ employeeId: id }).lean();
-    expect(u).toMatchObject({ username: '9829012345', role: 'worker', active: true, mustChangePassword: true, name: 'Ramesh Meena' });
+    expect(u).toMatchObject({ username: '9829012345', role: 'worker', active: true, name: 'Ramesh Meena' });
     const withHash: any = await User.findOne({ employeeId: id }).select('+passwordHash').lean();
     expect(withHash.passwordHash).toMatch(/argon2/); // stored hashed, never the clear password
     expect(withHash.passwordHash).not.toContain(PW);
@@ -107,14 +108,14 @@ describe('sign-in with an email', () => {
 });
 
 describe('the starting password in the employee form', () => {
-  it('can be a simple one such as 123456, but not shorter than 6; the person must change it to a strong one', async () => {
+  it('can be a simple one such as 123456, but not shorter than 6', async () => {
     const short = await api.create(owner, 'employees', emp({ name: 'Short Pass', mobile: '9829077001', login: { enabled: true, role: 'worker', password: '12345' } }));
     expect(short.status).toBe(400);
     expect(JSON.stringify(short.json.error.details)).toContain('at least 6');
     const ok = await api.create(owner, 'employees', emp({ name: 'Simple Pass', mobile: '9829077002', login: { enabled: true, role: 'worker', password: '123456' } }));
     expect(ok.status).toBe(201);
     const session: any = await loginWithPassword({ username: '9829077002', password: '123456' });
-    expect(session.user.mustChangePassword).toBe(true); // forced to choose a strong password at first sign-in
+    expect(session.user.role).toBe('worker'); // signs in with it as it is (no forced change at first sign-in)
   });
 });
 
@@ -127,6 +128,22 @@ describe('cancelling an employee profile', () => {
     expect((await api.void(owner, 'employees', r.json._id)).status).toBe(200);
     await expect(loginWithPassword({ username: '9829088001', password: PW })).rejects.toThrow();
     expect((await api.get(who as any, 'employees', r.json._id)).status).toBe(401); // the open session stops working too
+  });
+});
+
+describe('reactivating a deactivated employee', () => {
+  const again = (who: Who, id: string) => call(who, reactivate.POST as never, '/x', { method: 'POST', body: {}, params: { id } });
+  it('brings the profile and its sign-in back; an active profile cannot be reactivated', async () => {
+    const r = await api.create(owner, 'employees', emp({ name: 'Back Again', mobile: '9829088002', login: { enabled: true, role: 'worker', password: PW } }));
+    expect(r.status).toBe(201);
+    expect((await again(owner, r.json._id)).status).toBe(409); // not deactivated
+    expect((await api.void(owner, 'employees', r.json._id)).status).toBe(200);
+    await expect(loginWithPassword({ username: '9829088002', password: PW })).rejects.toThrow();
+    const back = await again(owner, r.json._id);
+    expect(back.status, JSON.stringify(back.json)).toBe(200);
+    expect(await Employee.findById(r.json._id).lean()).toMatchObject({ isVoid: false, status: 'active' });
+    await expect(loginWithPassword({ username: '9829088002', password: PW })).resolves.toBeTruthy();
+    expect((await again(owner, '000000000000000000000000')).status).toBe(404);
   });
 });
 

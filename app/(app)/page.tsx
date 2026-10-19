@@ -15,14 +15,18 @@ export const dynamic = 'force-dynamic';
  * (date changes, refresh after an entry) through the same /api/home endpoint. Same rights, same cache as the API.
  */
 async function TodayHome() {
-  const user = await getSessionUser();
   const date = todayIST();
   let initial: any = null;
-  if (user) {
-    const perm = await getEffectivePerm(user);
-    if (perm.can('dashboard', 'view')) {
-      try { initial = JSON.parse(JSON.stringify(await homeFor(user, perm, date))); } catch { initial = null; } // on any trouble the browser fetches it itself
+  try {
+    const user = await getSessionUser();
+    if (user) {
+      const perm = await getEffectivePerm(user);
+      if (perm.can('dashboard', 'view')) {
+        try { initial = JSON.parse(JSON.stringify(await homeFor(user, perm, date))); } catch { initial = null; }
+      }
     }
+  } catch {
+    initial = null;
   }
   return <HomeClient initialData={initial} initialDate={date} />;
 }

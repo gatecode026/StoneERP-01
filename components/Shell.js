@@ -21,15 +21,13 @@ const isActive = (pathname, href) => {
 
 function Brand({ compact }) {
   const { t } = useApp();
+  if (compact) return null;
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <div className="w-8 h-8 rounded-lg bg-terra text-white flex items-center justify-center font-bold shrink-0">V</div>
-      {!compact && (
-        <div className="min-w-0 leading-tight">
-          <div className="font-bold text-sm truncate">{t('appName')}</div>
-          <div className="text-[10px] text-char-500 truncate"><T>RD Natural Stones · Bijoliya</T></div>
-        </div>
-      )}
+      <div className="min-w-0 leading-tight">
+        <div className="font-bold text-sm truncate">{t('appName')}</div>
+        <div className="text-[10px] text-char-500 truncate"><T>RD Natural Stones · Bijoliya</T></div>
+      </div>
     </div>
   );
 }
@@ -65,11 +63,11 @@ export default function Shell({ children }) {
   const tabKeys = (BOTTOM_TABS[session.perm.roleKey] || BOTTOM_TABS[role] || BOTTOM_TABS.default);
   const tabs = tabKeys.map((k) => ALL_ITEMS.find((i) => i.key === k)).filter((i) => i && canOpen(can, i)).slice(0, 4);
   const quick = QUICK_ADD.filter((q) => can(q.res, 'create'));
+  const showFab = quick.length > 0;
+  const hi = lang === 'hi';
   // who is signed in: the name, and what the person does (designation or job; the role for the Owner)
   const roleName = ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role;
   const who = session.title && session.title.toLowerCase() !== String(roleName).toLowerCase() ? `${session.title} · ${roleName}` : roleName;
-  const showFab = quick.length > 0;
-  const hi = lang === 'hi';
 
   const NavLink = ({ it, small }) => {
     const Icon = it.icon;
@@ -92,7 +90,7 @@ export default function Shell({ children }) {
           collapsed ? 'w-[68px]' : 'w-64'
         )}
       >
-        <div className="p-2.5 flex items-center justify-between border-b border-sand-100 shrink-0">
+        <div className={cx('p-2.5 flex items-center border-b border-sand-100 shrink-0', collapsed ? 'justify-center' : 'justify-between')}>
           <Brand compact={collapsed} />
           <button className="p-1.5 rounded-lg hover:bg-sand-100 text-char-500" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
@@ -201,13 +199,13 @@ export default function Shell({ children }) {
             <div className="sticky top-0 bg-white px-4 py-3 flex items-center justify-between border-b border-sand-100">
               <div className="font-bold flex items-center gap-2"><Menu size={18} /> {t('menu')}</div>
               <button onClick={() => setDrawer(false)} className="p-2"><X size={20} /></button>
+            </div>
+            <div className="p-3 space-y-4">
               <div className="rounded-xl bg-sand-50 border border-sand-200 px-3 py-2.5">
                 <div className="font-bold truncate">{session.name}</div>
                 <div className="text-xs text-char-500 capitalize truncate">{who}</div>
                 <div className="text-[11px] text-char-400 truncate">{session.company?.name}</div>
               </div>
-            </div>
-            <div className="p-3 space-y-4">
               <NavLink it={DASH} small />
               {groups.map((g) => (
                 <div key={g.key}>

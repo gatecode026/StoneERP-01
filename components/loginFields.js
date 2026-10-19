@@ -5,7 +5,7 @@ import { roleOfJob } from '@/lib/roles';
 
 export function loginFields() {
   return [
-    { name: 'loginPassword', label: 'Password', type: 'password', noGenerate: true, section: 'Personal Details', placeholder: 'Password to sign in (leave empty if not needed)' },
+    { name: 'loginPassword', label: 'Password', type: 'password', noGenerate: true, section: 'Personal Details', placeholder: 'Enter password to sign in' },
   ];
 }
 

@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon } from 'lucide-react';
+import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon, MoreVertical } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useApp, useTx } from './Providers';
 import toast from '@/lib/toast';
 import { compressImage, fileUrl, uploadFile } from '@/lib/client';
@@ -446,3 +447,140 @@ export function Section({ title, right, children, className }) {
     </section>
   );
 }
+
+export function ActionMenu({ items = [], title = 'Actions', className }) {
+  const tx = useTx();
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: undefined, bottom: undefined, right: 8 });
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const validItems = (items || []).filter(Boolean);
+
+  const updatePos = (rect) => {
+    if (!rect) return;
+    const menuWidth = 180;
+    const estimatedHeight = validItems.length * 38 + 16;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const showAbove = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+    const right = Math.max(8, Math.min(window.innerWidth - menuWidth, window.innerWidth - rect.right));
+    setCoords({
+      top: showAbove ? undefined : rect.bottom + 4,
+      bottom: showAbove ? window.innerHeight - rect.top + 4 : undefined,
+      right,
+    });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleDown = (e) => {
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    const handleScroll = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    const handleResize = () => setOpen(false);
+
+    document.addEventListener('mousedown', handleDown, true);
+    document.addEventListener('touchstart', handleDown, true);
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      document.removeEventListener('mousedown', handleDown, true);
+      document.removeEventListener('touchstart', handleDown, true);
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [open]);
+
+  if (!validItems.length) return null; // after the hooks above, so they run in the same order every render
+
+  return (
+    <div className={cx('inline-flex items-center justify-end shrink-0', className)}>
+      <button
+        ref={btnRef}
+        type="button"
+        data-action-trigger="true"
+        className={cx(
+          'icon-btn text-char-600 hover:text-char-900 transition-colors',
+          open && 'bg-sand-200/80 text-char-900'
+        )}
+        title={tx(title)}
+        aria-label={tx(title)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (open) {
+            setOpen(false);
+          } else {
+            const rect = e.currentTarget.getBoundingClientRect();
+            updatePos(rect);
+            setOpen(true);
+          }
+        }}
+      >
+        <MoreVertical size={18} />
+      </button>
+
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: coords.top !== undefined ? `${coords.top}px` : undefined,
+            bottom: coords.bottom !== undefined ? `${coords.bottom}px` : undefined,
+            right: `${coords.right}px`,
+            zIndex: 70,
+          }}
+          role="menu"
+          aria-orientation="vertical"
+          className="w-48 bg-white/95 backdrop-blur-md rounded-2xl border border-sand-200/90 shadow-2xl p-1.5 focus:outline-none transition-all duration-150 animate-in fade-in zoom-in-95 max-h-[85vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="space-y-0.5">
+            {validItems.map((it, idx) => (
+              <div key={it.key || idx}>
+                {it.dividerBefore && <div className="my-1 border-t border-sand-100" />}
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={it.disabled}
+                  className={cx(
+                    'w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left transition-colors',
+                    it.danger || it.tone === 'danger' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' :
+                    it.tone === 'primary' ? 'text-terra hover:bg-terra-50' :
+                    it.tone === 'green' ? 'text-emerald-700 hover:bg-emerald-50' :
+                    it.tone === 'amber' ? 'text-amber-800 hover:bg-amber-50' :
+                    'text-char-700 hover:text-char-900 hover:bg-sand-100',
+                    it.disabled && 'opacity-50 cursor-not-allowed'
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    it.onClick?.();
+                  }}
+                >
+                  {it.icon && <span className="shrink-0">{it.icon}</span>}
+                  <span className="truncate">{tx(it.label)}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+

@@ -99,7 +99,10 @@ export const employees: ResourceDef = {
   listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'designation', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
   sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
   filters: { status: { enum: ['active', 'left'] }, job: 'string', designation: { enum: DESIGNATIONS as unknown as readonly string[] }, site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
-  named: { docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}) }, // same rule as the profile's "missing documents" badge
+  named: {
+    docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}),
+    deactivated: (v) => (v === '1' ? { isVoid: true } : {}),
+  },
   serverOnly: ['docFlags', 'isVoid', 'hasLogin', 'loginRole'],
   create: z.object({ empCode: empCode.optional(), ...employeeFields, login: loginSchema.optional() }).strict(),
   update: z.object({ ...employeeFields, login: loginSchema.optional() }).partial().strict(),

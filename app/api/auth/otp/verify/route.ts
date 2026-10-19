@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const POST = route({ auth: 'none' }, async (ctx) => {
   const { username, code } = await ctx.json(z.object({ username: z.string().max(20), code: z.string().regex(/^\d{6}$/) }));
   const { user, cookieValue, expiresAt } = await verifyOtp(username, code, { ip: ctx.ip, userAgent: ctx.req.headers.get('user-agent') });
-  const res = NextResponse.json({ user: publicUser(user), mustChangePassword: user.mustChangePassword });
+  const res = NextResponse.json({ user: publicUser(user), mustChangePassword: false });
   res.cookies.set(cookieName(), cookieValue, cookieOptions(expiresAt));
   return res;
 });
