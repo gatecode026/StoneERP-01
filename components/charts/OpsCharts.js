@@ -240,3 +240,67 @@ export function PapersChart({ data }) {
     </Frame>
   );
 }
+
+// ------------------------------------------------------------------ Stock and purchases, day by day
+const dayLabel = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+
+/** One item: what came in and went out each day (bars) and the balance at the end of each day (line). */
+export function StockDailyChart({ days, unit, minLevel }) {
+  const { tr } = useApp();
+  const data = days.map((d) => ({ name: dayLabel(d.date), date: d.date, in: d.in, out: d.out, closing: d.closing }));
+  const names = { in: tr('In'), out: tr('Out'), closing: tr('Balance at end of day') };
+  return (
+    <Frame title="Stock, day by day" empty={!data.length} emptyText="No entries in this period." note={tr('Bars = stock in and out that day. Line = what was in hand at the end of the day.')}>
+      <ComposedChart data={data} margin={{ left: -6, right: -6, top: 6 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID} />
+        <XAxis dataKey="name" tick={{ fontSize: 10 }} interval="preserveStartEnd" minTickGap={14} />
+        <YAxis yAxisId="m" tick={axis} />
+        <YAxis yAxisId="b" orientation="right" tick={axis} />
+        <Tooltip formatter={(v, n) => [`${num2(v)} ${unit}`, names[n]]} labelFormatter={(_l, p) => p?.[0]?.payload?.date ?? ''} />
+        <Legend formatter={(v) => names[v]} wrapperStyle={{ fontSize: 11 }} />
+        {minLevel > 0 && <ReferenceLine yAxisId="b" y={minLevel} stroke={RED} strokeDasharray="4 3" />}
+        <Bar isAnimationActive={false} yAxisId="m" dataKey="in" fill="#16A34A" radius={[4, 4, 0, 0]} />
+        <Bar isAnimationActive={false} yAxisId="m" dataKey="out" fill={DARK} radius={[4, 4, 0, 0]} />
+        <Line isAnimationActive={false} yAxisId="b" dataKey="closing" stroke={BROWN} strokeWidth={2} dot={false} />
+      </ComposedChart>
+    </Frame>
+  );
+}
+
+/** What was bought each day: the part already paid and the part still owed. */
+export function PurchaseDailyChart({ days }) {
+  const { tr } = useApp();
+  const data = days.map((d) => ({ name: dayLabel(d.date), date: d.date, paid: d.paid, due: d.due, bills: d.bills }));
+  const names = { paid: tr('Paid'), due: tr('Still to pay') };
+  const empty = !data.some((d) => d.paid || d.due);
+  return (
+    <Frame title="Purchases, day by day" empty={empty} emptyText="No purchase in this period." note={tr('Each bar is what was bought that day: green is paid, amber is still to pay.')}>
+      <BarChart data={data} margin={{ left: -6, right: 6, top: 6 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={GRID} />
+        <XAxis dataKey="name" tick={{ fontSize: 10 }} interval="preserveStartEnd" minTickGap={14} />
+        <YAxis tick={axis} tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : v)} />
+        <Tooltip formatter={(v, n) => [inr(v), names[n]]} labelFormatter={(_l, p) => `${p?.[0]?.payload?.date ?? ''} · ${p?.[0]?.payload?.bills ?? 0} ${tr('bills')}`} />
+        <Legend formatter={(v) => names[v]} wrapperStyle={{ fontSize: 11 }} />
+        <Bar isAnimationActive={false} dataKey="paid" stackId="p" fill="#16A34A" />
+        <Bar isAnimationActive={false} dataKey="due" stackId="p" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </Frame>
+  );
+}
+
+/** Top suppliers or items by money spent. */
+export function PurchaseByChart({ rows, title }) {
+  const { tr } = useApp();
+  const data = rows.slice(0, 8).map((r) => ({ name: short(r.name, 16), full: r.name, total: r.total, bills: r.bills }));
+  return (
+    <Frame title={title} height={Math.max(200, data.length * 34)} empty={!data.length} emptyText="No purchase in this period.">
+      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16, top: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={GRID} />
+        <XAxis type="number" tick={axis} tickFormatter={(v) => (v >= 1000 ? `${v / 1000}k` : v)} />
+        <YAxis type="category" dataKey="name" width={104} tick={axis} />
+        <Tooltip formatter={(v, _n, p) => [`${inr(v)} (${p.payload.bills} ${tr('bills')})`, tr('Bought')]} labelFormatter={(l, p) => p?.[0]?.payload?.full || l} />
+        <Bar isAnimationActive={false} dataKey="total" fill={BROWN} radius={[0, 6, 6, 0]} />
+      </BarChart>
+    </Frame>
+  );
+}

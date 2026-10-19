@@ -78,7 +78,7 @@ export async function applyStock(
   const [mv] = await StockMovement.create(
     [{
       itemId: item._id, itemName: item.name, type: m.type, qty, date: m.date ?? todayIST(), ref: m.ref, note: m.note, location: m.location,
-      status: m.status ?? 'applied', refModel: m.refModel, refId: m.refId ? oid(m.refId) : undefined, reversalOf: m.reversalOf ? oid(m.reversalOf) : undefined,
+      ...(m.type === 'adjust' ? { delta: m.delta } : {}), status: m.status ?? 'applied', refModel: m.refModel, refId: m.refId ? oid(m.refId) : undefined, reversalOf: m.reversalOf ? oid(m.reversalOf) : undefined,
       ...stamp(ctx.actor),
     }],
     { session: ctx.session }

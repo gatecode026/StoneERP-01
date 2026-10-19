@@ -38,6 +38,7 @@ export const StockMovement = defineModel(
     refModel: S, // the document that caused this movement (for reversal)
     refId: OID,
     reversalOf: OID,
+    delta: N, // adjust only: the signed change (a correction can go either way); in / out / damage are signed by their type
     approvedBy: S,
     approvedAt: Date,
   },
@@ -52,6 +53,8 @@ export const StockCount = defineModel(
     date: dateStr({ required: true }),
     lines: [countLine],
     status: { type: S, enum: ['draft', 'confirmed'], default: 'draft' },
+    counted: { type: N, default: 0 }, // how many items have a counted quantity
+    withDifference: { type: N, default: 0 }, // how many of those differ from the app
     confirmedBy: S,
     confirmedAt: Date,
     note: S,
@@ -96,6 +99,7 @@ export const Purchase = defineModel(
     approvedBy: S,
     approvedAt: Date,
     approvalRemark: S,
+    payOnApproval: { type: B, default: false }, // entered as "paid now" but waiting for approval: paid when it is approved
     stockMovementId: OID,
   },
   {

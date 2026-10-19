@@ -94,7 +94,7 @@ describe('vehicles: regular driver, trips and the diesel numbers', () => {
     expect(month.groups['2026-09']).toEqual({ n: 3, sums: { dieselLitres: 124, dieselAmount: 7728 } }); // truck 40 + 40, loader 44
     expect(month.groups['2026-10'].sums.dieselLitres).toBe(78);
     const byV = (await fac('vehicletrips', 'by=vehicleId&sum=dieselLitres&from=2026-09-01&to=2026-10-31')).json;
-    expect(byV.groups[loader._id]).toEqual({ n: 2, sums: { dieselLitres: 92 } });
+    expect(byV.groups[loader._id]).toEqual({ n: 2, label: 'JCB Loader', sums: { dieselLitres: 92 } }); // grouped by vehicle: the name comes with it
     // the trips that carry a use figure (hours or km entered) are what the efficiency graph draws
     const measured = await api.list(owner, 'vehicletrips', `vehicleId=${loader._id}&measured=1&sort=-date`);
     expect(measured.json.data.map((r: any) => r.dieselPerUnit)).toEqual([8, 5.5]);

@@ -373,3 +373,19 @@ Tests: 11 server (blocks, royalty), browser test for add / search / edit / cut /
 **Vehicles fixes:** a vehicle has a **Regular driver** (Designation = Driver; the name is kept with the code) which its trips take unless another is picked; the lists show names instead of codes; trips cannot be dated in the future; the papers box separates **Expired** from "Expiring within 30 days" (expired papers were listed under "within 30 days").
 
 Tests: 4 (yield by hand), 7 (repair and vehicle numbers, month buckets, driver, hour-meter), 3 browser (graphs drawn on a phone).
+
+## Stock and Purchases: day by day, monthly physical count, fixes
+
+**Checked:** stock already moved by itself for every event: a purchase (after approval), production, a block coming in and going to cutting, a gate-pass dispatch, damage (after owner approval) and manual in / out; it is never taken below zero, and cancelling an entry reverses it. These are covered by tests, now including a check that the whole history of an item adds up to its balance.
+
+**New:**
+* **Stock → Day by day:** for one item, for the last 7 / 30 / 90 days: what came in, what went out and what was in hand at the end of each day (graph and table). It is worked back from the live balance, so the last day is always the real balance, and it says whether every entry adds up to it (`GET /api/stockitems/daily`).
+* **Stock → Monthly count (PDF Part 4, it was missing):** start a count for a month (every item with the app's quantity), type what is really there, see the differences with a reason, save; the owner or manager confirms and the stock is corrected with one "correction" entry per item that differed (signed, kept on record). One count per month; a confirmed count cannot change. Roles: the person who counts needs "Physical stock count" create / edit; confirming needs approve.
+* **Purchases → Day by day:** bought, paid and still to pay per day (graph and table), awaiting approval, top suppliers and top items. Only for people who may see money.
+* `facets` can group by day (`bucket=day`) and returns the name beside an id group (`label`).
+
+**Fixes:** "Paid now" on a purchase above the approval limit was forgotten (it showed as owed after approval); it is now paid when approved, on the purchase date. A credit bill with no due date now falls due 30 days after the purchase (it had none, so it was missed by "We owe" ordering and reminders). A purchase or a stock entry cannot be dated in a future day. A correction movement now keeps its sign.
+
+**Not done (decide):** consumables used by machines (diesel litres, blades) do not reduce the Diesel / Blades stock by themselves; they are entered as a stock-out. The cost rate of an item is the last purchase rate, not an average.
+
+Tests: 12 server (day by day, reversals, paid on approval, due dates, dates, count), 2 browser on a phone.

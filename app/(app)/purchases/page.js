@@ -11,9 +11,11 @@ import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
 import { inr, num, fmtDate, todayISO } from '@/lib/format';
 import T from '@/components/T';
+import PurchaseDaily from '@/components/purchases/PurchaseDaily';
 
 export default function PurchasesPage() {
-  const { t, can } = useApp();
+  const { t, can, perm } = useApp();
+  const showMoney = ['read', 'write'].includes(perm.fields.cost); // the day-by-day totals are money
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'purchases');
   const approver = can('purchases', 'approve');
@@ -39,7 +41,7 @@ export default function PurchasesPage() {
     { name: 'billPhoto', label: 'Bill photo', type: 'photo' },
     { name: 'paidNow', label: 'Payment', type: 'checkbox', checkLabel: 'Paid now (otherwise credit)', default: false },
     { name: 'payMode', label: 'Paid by', type: 'select', options: ['Cash', 'UPI', 'Bank'], show: (f) => f.paidNow },
-    { name: 'dueDate', label: 'Pay later – due date', type: 'date', show: (f) => !f.paidNow },
+    { name: 'dueDate', label: 'Pay later – due date', type: 'date', show: (f) => !f.paidNow, hint: 'Leave empty for 30 days after the purchase' },
   ];
 
   const columns = [
@@ -60,7 +62,8 @@ export default function PurchasesPage() {
 
   return (
     <RoleGuard perm="purchases">
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'purchases', label: 'Purchases' }, { key: 'payable', label: 'We owe' }, { key: 'suppliers', label: 'Suppliers' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'purchases', label: 'Purchases' }, { key: 'payable', label: 'We owe' }, { key: 'suppliers', label: 'Suppliers' }, ...(showMoney ? [{ key: 'daily', label: 'Day by day' }] : [])]} />
+      {tab === 'daily' && showMoney && <PurchaseDaily />}
       {tab === 'purchases' && (
         <CrudPage model="purchases" headerExtra={<ImportData resource="purchases" perm="purchases" noun="purchases" hint="supplier, item, quantity and rate are required" />} title={t('purchases')} subtitle="Stock goes up by itself when a purchase is saved" label="Purchase" fields={fields} columns={columns}
           sort="-date,-createdAt" canEdit={() => false} allowVoid
