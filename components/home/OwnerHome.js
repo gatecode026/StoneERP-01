@@ -8,7 +8,7 @@ import { api, openWA } from '@/lib/client';
 import { fmtDate, inr, inrShort, num } from '@/lib/format';
 import { reportLines, reportText } from '@/lib/report';
 import { useApp } from '@/components/Providers';
-import { Card, Delta, ExpensePie, TrendChart } from './parts';
+import { Card, Delta } from './parts';
 import { useH } from './strings';
 import T from '@/components/T';
 import { trNow } from '@/lib/trNow';
@@ -73,11 +73,11 @@ export function AlertsCard({ d }) {
   );
 }
 
-export function ProfitCard({ profit }) {
+export function ProfitCard({ profit, className = 'mt-4' }) {
   const h = useH();
   if (!profit) return null;
   return (
-    <Card title={`${h('profit')} · ${h('last30')}`} className="mt-4" empty={!profit.orders.length && !profit.blocks.length}>
+    <Card title={`${h('profit')} · ${h('last30')}`} className={className} empty={!profit.orders.length && !profit.blocks.length}>
       <div className="grid grid-cols-3 gap-2 mb-3 text-center">
         <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500"><T>Revenue</T></div><div className="font-bold">{inrShort(profit.orderTotals.revenue)}</div></div>
         <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500"><T>Cost</T></div><div className="font-bold">{inrShort(profit.orderTotals.cost)}</div></div>
@@ -168,39 +168,5 @@ export function ReportPreview({ d }) {
       <button className="btn-green w-full mt-3" onClick={() => openWA(reportText(d, lang))}><MessageCircle size={18} /> {t('shareWA')}</button>
       <p className="text-[11px] text-char-500 mt-2">{h('today')}: {fmtDate(d.date)}</p>
     </Card>
-  );
-}
-
-export function OwnerHome({ data, reload, canDecide }) {
-  const h = useH();
-  const d = data.report;
-  return (
-    <div>
-      <ReportCards d={d} compare={data.compare} />
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
-        <div className="lg:col-span-1 order-last lg:order-none"><ReportPreview d={d} /></div>
-        <Card className="lg:col-span-2" title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}>
-          <Approvals items={d.approvals || []} reload={reload} canDecide={canDecide} />
-        </Card>
-      </div>
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
-        {d.trend && <Card title={h('trend')}><TrendChart data={d.trend} /></Card>}
-        {d.expenses && <Card title={h('byHead')} empty={!d.expenses.byHead.length}><ExpensePie data={d.expenses.byHead} /></Card>}
-        <StockCard d={d} />
-      </div>
-      <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
-        <AlertsCard d={d} />
-        {d.reports && (
-          <Card title={`${h('reports')} · ${h('missing')} (${d.reports.missing})`} empty={!d.reports.missing && !d.reports.problems.length} emptyText="✔">
-            <div className="flex flex-wrap gap-1.5">{d.reports.missingNames.map((n) => <span key={n} className="badge-amber">{n}</span>)}</div>
-            {d.reports.problems.length > 0 && <>
-              <div className="text-xs font-bold uppercase text-red-600 mt-4 mb-1">{h('problems')}</div>
-              {d.reports.problems.map((p, i) => <div key={i} className="text-sm py-1"><b>{p.name}:</b> <span className="text-red-600">{p.problem}</span></div>)}
-            </>}
-          </Card>
-        )}
-      </div>
-      <ProfitCard profit={data.profit} />
-    </div>
   );
 }

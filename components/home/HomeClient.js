@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
-import { PageHeader, Empty } from '@/components/ui';
+import { useEffect, useState } from 'react';
+import { PageHeader } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { todayISO, fmtDate } from '@/lib/format';
-import { HomeError, HomeSkeleton } from '@/components/home/parts';
-import { OwnerHome } from '@/components/home/OwnerHome';
+import { HomeError, HomeSkeleton, LiveBadge } from '@/components/home/parts';
+import { OwnerHome } from '@/components/home/OwnerDash';
 import { AccountantHome, ManagerHome, PresetHome, SalespersonHome, SupervisorHome, WorkerHome } from '@/components/home/RoleHomes';
 
 const WITH_DATE = ['owner', 'manager', 'accountant', 'supervisor'];
@@ -20,13 +20,28 @@ export default function HomeClient({ initialData = null, initialDate }) {
   const canDecide = ['expenses', 'purchases', 'advances', 'leaves', 'stockmovements'].some((r) => can(r, 'approve'));
   const title = kind === 'owner' ? t('ownerReport') : TITLES[kind] || `Namaste, ${session?.name}`;
 
+  // real time: today's numbers are read again every few seconds while the tab is open (the server drops its 30 s cache the moment anything is saved)
+  const isToday = date === todayISO();
+  const [arrival, setArrival] = useState({ data, n: 0 });
+  if (arrival.data !== data) setArrival({ data, n: arrival.n + 1 }); // a new key each time numbers arrive: the badge starts counting again
+  useEffect(() => {
+    if (!isToday) return undefined;
+    const id = setInterval(() => { if (document.visibilityState === 'visible') reload(); }, kind === 'owner' ? 15_000 : 30_000);
+    return () => clearInterval(id);
+  }, [isToday, kind, reload]);
+
   const subtitle = [data?.self?.me?.job, fmtDate(date)].filter(Boolean).join(' · ');
   const header = (
     <PageHeader title={title} subtitle={subtitle}
-      actions={WITH_DATE.includes(kind) ? <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} /> : null} />
+      actions={WITH_DATE.includes(kind) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {data && <LiveBadge key={arrival.n} live={isToday} onRefresh={reload} />}
+          <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />
+        </div>
+      ) : null} />
   );
 
-  if (error) return <>{header}<HomeError error={error} onRetry={reload} /></>;
+  if (error && !data) return <>{header}<HomeError error={error} onRetry={reload} /></>;
   if (loading || !data) return <>{header}<HomeSkeleton /></>;
 
   const body = (() => {
