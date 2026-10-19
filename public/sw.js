@@ -1,10 +1,11 @@
 /* Service worker: lets the app open and a worker fill in the day's report with no network.
  *  - /_next/static, icons, manifest: cache-first (they never change for a given build hash)
- *  - page navigations: network-first (4 s), falling back to the last copy of that screen
+ *  - page navigations: network-first (10 s, so a slow phone connection still gets the CURRENT screen), falling back to the last copy only when the network fails
  *  - GET /api reads: network-first, falling back to the last answer (stale but usable); a miss answers { error.code: "OFFLINE" }
  *  - writes are never touched here: the app's IndexedDB queue sends them later with idempotency keys
  * Private data never outlives the sign-in: the page tells us to wipe every cache on sign-out. */
-const V = 'vss-v1';
+// Bump this on a release that must reach everyone at once: every cache of an older version (old screens and old data) is deleted when the new worker starts.
+const V = 'vss-v2';
 const SHELL = V + '-shell';
 const PAGES = V + '-pages';
 const DATA = V + '-data';
@@ -50,7 +51,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (req.mode === 'navigate') {
-    e.respondWith(networkFirst(req, PAGES, 4000).catch(() => new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font-family:system-ui;padding:24px"><h2>You are offline</h2><p>Open this screen once with a connection and it will be available here next time. Entries you save are kept and sent when the network returns.</p>', { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
+    e.respondWith(networkFirst(req, PAGES, 10000).catch(() => new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><body style="font-family:system-ui;padding:24px"><h2>You are offline</h2><p>Open this screen once with a connection and it will be available here next time. Entries you save are kept and sent when the network returns.</p>', { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } })));
   }
 });
 
