@@ -47,11 +47,16 @@ export async function processImage(input: Buffer) {
   try { meta = await sharp(input, { limitInputPixels: MAX_PIXELS }).metadata(); } catch { throw badRequest('This file is not a valid image'); }
   if (!meta.format || !['jpeg', 'png', 'webp'].includes(meta.format)) throw badRequest('Only JPEG, PNG or WebP photos are allowed');
   const base = sharp(input, { limitInputPixels: MAX_PIXELS }).rotate().flatten({ background: '#ffffff' });
-  const [full, thumb] = await Promise.all([
-    base.clone().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80, mozjpeg: true }).toBuffer(),
-    base.clone().resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer(),
-  ]);
-  return { full, thumb };
+  try {
+    const [full, thumb] = await Promise.all([
+      base.clone().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80, mozjpeg: true }).toBuffer(),
+      base.clone().resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer(),
+    ]);
+    return { full, thumb };
+  } catch {
+    // the header is fine but the picture itself is cut short or damaged (a dropped upload): the person is told, instead of "something went wrong"
+    throw badRequest('This photo is damaged or was not sent completely. Please choose it again');
+  }
 }
 
 const isPdf = (b: Buffer) => b.subarray(0, 5).toString('latin1') === '%PDF-';
