@@ -22,7 +22,7 @@ async function main() {
   process.env.SESSION_SECRET = 'e2e-secret-e2e-secret-e2e-secret-123456';
   process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
   process.env.MONGO_AUTO_INDEX = 'yes';
-  process.env.STORAGE_DRIVER = 'local';
+  process.env.STORAGE_DRIVER = 'mongo'; // the same as the live site: files kept in the database
   process.env.STORAGE_LOCAL_DIR = path.join(os.tmpdir(), 'vss-e2e-files');
   process.env.API_RATE_USER = '100000';
   process.env.API_RATE_IP = '100000';

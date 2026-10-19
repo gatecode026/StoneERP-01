@@ -2,10 +2,13 @@ import { createHash, createHmac, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getEnv, isProd } from '../env';
+import { MongoDriver } from './mongo';
 
 /**
  * File storage behind one small interface so the app never cares where bytes live.
  *   local      – a folder on disk (development / tests only; refused in production)
+ *   mongo      – the app's own MongoDB (a `fileblobs` collection): nothing else to set up, so a new site can take photos at once.
+ *                Photos are shrunk to ~100-300 KB before they get here. Move to s3 / cloudinary when the files grow into gigabytes.
  *   s3         – any S3-compatible bucket: AWS S3, Cloudflare R2, MinIO …  (private objects, short-lived signed URLs)
  *   cloudinary – Cloudinary (signed REST upload, private delivery)
  * Selected by STORAGE_DRIVER. The database stores only the object KEY (e.g. "photos/2026/10/<uuid>.jpg").
@@ -148,8 +151,11 @@ let driver: StorageDriver | null = null;
 export function getStorage(): StorageDriver {
   if (driver) return driver;
   const e = process.env;
-  const kind = e.STORAGE_DRIVER ?? (isProd() ? '' : 'local');
-  if (kind === 'local') {
+  // with nothing chosen: a folder on disk while developing, the database in production (a serverless host has no disk to keep files on)
+  const kind = e.STORAGE_DRIVER || (isProd() ? 'mongo' : 'local');
+  if (kind === 'mongo') {
+    driver = new MongoDriver();
+  } else if (kind === 'local') {
     if (isProd()) throw new Error('STORAGE_DRIVER=local is not allowed in production');
     driver = new LocalDriver(path.resolve(/*turbopackIgnore: true*/ e.STORAGE_LOCAL_DIR ?? 'uploads'));
   } else if (kind === 's3') {
@@ -159,7 +165,7 @@ export function getStorage(): StorageDriver {
     for (const k of ['CLOUDINARY_CLOUD', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']) if (!e[k]) throw new Error(`${k} is required when STORAGE_DRIVER=cloudinary`);
     driver = new CloudinaryDriver({ cloud: e.CLOUDINARY_CLOUD!, key: e.CLOUDINARY_API_KEY!, secret: e.CLOUDINARY_API_SECRET! });
   } else {
-    throw new Error('Set STORAGE_DRIVER to s3, cloudinary (or local for development)');
+    throw new Error('Set STORAGE_DRIVER to mongo, s3, cloudinary (or local for development)');
   }
   return driver;
 }
