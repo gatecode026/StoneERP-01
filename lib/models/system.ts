@@ -8,7 +8,10 @@ export const PaperDoc = defineModel(
     category: { type: S, enum: ['Company', 'Licence', 'Machine', 'Vehicle', 'Insurance', 'Agreement', 'Loan', 'Other'], default: 'Company' },
     expiryDate: dateStr(),
     file: S,
-    note: { type: S, maxlength: 500 },
+    note: { type: S, maxlength: 500 }, // the description
+    issueDate: dateStr(),
+    tags: { type: [String], default: [] },
+    originalAt: { type: S, maxlength: 120 }, // where the paper original is kept (locker, file)
   },
   { indexes: [[{ expiryDate: 1 }, { partialFilterExpression: { expiryDate: { $gt: '' } } }], [{ category: 1, name: 1 }]] }
 );

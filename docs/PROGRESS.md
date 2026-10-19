@@ -423,3 +423,15 @@ Tests: 15 server (all the rules above), 2 browser tests on a phone (customer to 
 **Complaints:** no future date; a bill number is tidied and checked against that customer's bills (an unknown one is asked about, not refused); "Other" needs details; reject needs its reason; **a complaint cannot be closed before the action is decided**; the **staff member concerned** can be chosen (it counted on the performance scorecard, but nothing could set it) and must be a real employee; the customer cannot be changed afterwards. "Complaints by problem type" is now **by month** (PDF Part 16) with how many are still open and the average days to close.
 
 Tests: 14 server (slips, dates, e-way bill, late edits, freight modes, cancelling, every complaint rule), 3 browser (loading slips to freight; a complaint end to end; incoming truck and freight tab).
+
+## Important papers as a document vault
+
+The screen was one list. It is now laid out like a document vault, in the app's own look (PDF Part 18):
+* **Overview:** papers kept, expiring in 30 days, expired, without an expiry; "Needs attention" (the most urgent first); papers by folder; added recently.
+* **Folders:** one folder per kind of paper (Company, Licence, Machine, Vehicle, Insurance, Agreement, Loan, Other) with how many papers and how many need attention; open one to see its papers as cards or a list (the choice is remembered). Search by name, tag or description across every folder; filters for expiry state and folder.
+* **Recycle bin:** a deleted paper keeps its reason and can be restored (`POST /api/documents/<id>/restore`); delete and restore stay in the audit trail.
+* **Add / change a paper:** drag a scan onto the box or tap to choose (photo or PDF, with progress), name, folder, issue date, expiry date (reminders 30 and 7 days before), description, tags, and where the original is kept. The scan is required for a new paper. Dates are checked (not issued in the future, not expiring before issue), tags are lower-cased and de-duplicated (up to 10), the name is plain text.
+* The list can be exported to Excel; import from Excel is kept. Who can open the papers is still decided on the Roles screen ("Only the owner and the people he allows").
+* Fix found on the way: the row menu closed itself when a long search text scrolled inside its own box (any scroll anywhere closed it); a scrolling text box no longer closes it.
+
+Tests: 7 server (fields and dates, counts by folder, filters and search, recycle bin and restore, rights), 1 browser on a phone (overview to recycle bin).
