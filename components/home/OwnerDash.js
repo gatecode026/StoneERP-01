@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, CheckCircle2, ClipboardList, Cog, Hourglass, IndianRupee, Landmark, PackageX, Receipt, ShieldCheck, Truck, Users, Wallet, HandCoins, Wrench } from 'lucide-react';
+import { Cog, Hourglass, IndianRupee, Landmark, Receipt, Truck, Users, HandCoins } from 'lucide-react';
 import { cx } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { inr, inrShort, num } from '@/lib/format';
@@ -41,34 +41,6 @@ function Kpi({ icon: Icon, label, value, sub, href, tone = 'default', spark, spa
     </div>
   );
   return href ? <Link href={href} className="block hover:shadow-sm transition">{body}</Link> : body;
-}
-
-const CHIP = { red: 'bg-red-50 text-red-700 border-red-200', amber: 'bg-amber-50 text-amber-800 border-amber-200' };
-
-/** "What needs you now": one chip per thing that is not in order, each opening the screen where it is fixed. All clear when there is none. */
-function Attention({ d }) {
-  const h = useH();
-  const items = [];
-  const add = (n, label, href, icon, tone = 'amber') => { if (n > 0) items.push({ n, label, href, icon, tone }); };
-  add(d.approvals?.length, h('approvals'), '#approvals', ShieldCheck);
-  add(d.reports?.missing, `${h('reports')} · ${h('missing')}`, '/daily-report', ClipboardList);
-  add(d.attendance?.unmarked, `${h('attendance')} · ${h('notMarked')}`, '/attendance', Users);
-  add(d.machines?.breakdowns?.length, h('breakdowns'), '/repairs?status=open', AlertTriangle, 'red');
-  add(d.stock?.lowStock?.length, h('lowStock'), '/stock?low=1', PackageX, 'red');
-  add(d.machines?.openRepairs, h('openRepairs'), '/repairs?status=open', Wrench);
-  if (d.cash && !d.cash.closed) items.push({ n: 1, label: h('closingNo'), href: '/cash', icon: Wallet, tone: 'amber' });
-  if (!items.length) {
-    return <div className="rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 px-4 py-2.5 text-sm font-semibold flex items-center gap-2 mb-4"><CheckCircle2 size={16} /><T>All clear. Nothing needs you right now.</T></div>;
-  }
-  return (
-    <div className="flex flex-wrap gap-2 mb-4" aria-label="Needs your attention">
-      {items.map((i) => (
-        <Link key={i.label} href={i.href} className={cx('inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full border text-xs font-semibold', CHIP[i.tone])}>
-          <i.icon size={14} /><b className="text-sm">{i.n}</b> {i.label}
-        </Link>
-      ))}
-    </div>
-  );
 }
 
 function RangeTabs({ value, onChange }) {
@@ -215,7 +187,6 @@ export function OwnerHome({ data, reload, canDecide }) {
   const total = d.cash ? d.cash.inHand + d.cash.bank : 0;
   return (
     <div>
-      <Attention d={d} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {d.sales && <Kpi icon={Receipt} label={t('todaySales')} value={inrShort(d.sales.today)} sub={<>{d.sales.orders} {h('orders')}{cur && <> · <Delta now={cur.sales} before={prev.sales} /></>}</>} href="/sales" spark={col(week, 'sales')} />}
         {d.sales && <Kpi icon={HandCoins} label={h('received')} value={inrShort(d.sales.received)} tone="green" sub={cur && <Delta now={cur.received} before={prev.received} />} href="/sales?tab=pending" spark={col(week, 'received')} sparkClass="text-emerald-700" />}

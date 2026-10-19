@@ -27,9 +27,8 @@ test('Owner: the home shows live numbers and real graphs, and a new entry appear
   await expect(page.locator('.recharts-surface').first()).toBeVisible();
   expect(await page.locator('.recharts-surface').count()).toBeGreaterThanOrEqual(4);
   await expect(page.locator('main svg path[stroke="currentColor"]').first()).toBeAttached(); // the sparklines under the numbers
-  // the item below its minimum is on the stock card, and in the attention chips
+  // the item below its minimum is on the stock card
   await expect(page.getByText(`Dash slab ${uid}`).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: /Below minimum/ }).first()).toBeVisible();
   // the 7 / 14 / 30 day switch works
   await page.getByRole('button', { name: '30d' }).click();
   await expect(page.getByRole('button', { name: '30d' })).toHaveAttribute('aria-pressed', 'true');
