@@ -4,11 +4,13 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { LogOut, Printer, MessageCircle } from 'lucide-react';
+import { LogOut, Printer, MessageCircle, Plus, Banknote } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, DataList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { api, openWA } from '@/lib/client';
+import { apiAsk } from '@/components/askApi';
+import LoadingSheet from '@/components/dispatch/LoadingSheet';
 import { inr, num, fmtDate, todayISO, sum } from '@/lib/format';
 import T from '@/components/T';
 
@@ -17,30 +19,31 @@ const nonNegative = (name) => (f) => (f[name] !== '' && f[name] != null && Numbe
 const weightProblem = (f) => (f.emptyWeight && f.loadedWeight && Number(f.loadedWeight) < Number(f.emptyWeight) ? 'Loaded weight is less than the empty weight' : '');
 
 export default function DispatchPage() {
-  const { t, can } = useApp();
+  const { t, can, session } = useApp();
   const [tab, setTab] = useState('out');
+  const [loadOpen, setLoadOpen] = useState(false); // the new loading slip sheet
+  const [reloadKey, setReloadKey] = useState(0);
   // the Freight tab asks the server for per-transporter totals; the truck lists page by themselves
   const fr = useFetch(tab === 'freight' ? '/api/dispatches/freight' : null);
   const canMark = can('dispatches', 'approve');
 
+  // changing a loading slip (a new one is made in the loading-slip sheet, which knows what is left to send on the order)
   const outFields = [
-    { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'saleId', label: 'For order', type: 'ref', required: true, wide: true, ref: { model: 'sales', labelKey: 'saleNo', label: (s) => `${s.saleNo} · ${s.customerName}`, query: { stage: 'order,dispatched', sort: '-date' }, nameField: 'saleNo' },
-      onPick: (s) => (s ? { customerName: s.customerName, itemsText: (s.items || []).map((i) => `${i.name} × ${i.qty}`).join(', '), _items: (s.items || []).map((i) => ({ stockItemId: i.stockItemId, name: i.name, qty: Math.max(0, i.qty - (s.dispatched?.[String(i.stockItemId || i.name)] || 0)), unit: i.unit })) } : {}) },
-    { name: 'itemsText', label: 'Loading slip', type: 'textarea', hint: 'Items from the order. Quantities loaded = remaining quantity.', wide: true },
     { name: 'truckNo', label: 'Truck number', required: true, placeholder: 'RJ06 XX 0000', rule: 'truckNo' },
     { name: 'driverName', label: 'Driver name', rule: 'name' },
     { name: 'driverMobile', label: 'Driver mobile', type: 'tel', rule: 'mobile', hint: '10 digits, starting with 6, 7, 8 or 9' },
     { name: 'transporter', label: 'Transporter', rule: 'partyName' },
     { name: 'freight', label: 'Freight amount (₹)', type: 'number', validate: nonNegative('freight') },
-    { name: 'emptyWeight', label: 'Empty weight (kg)', type: 'number', validate: nonNegative('emptyWeight') },
+    { name: 'eway', label: 'E-way bill number', rule: 'eway', hint: '12 digits. Goods worth more than ₹50,000 need one' },
+    { name: 'emptyWeight', label: 'Empty weight (kg)', type: 'number', validate: nonNegative('emptyWeight'), hint: 'Cannot be changed once the truck has left' },
     { name: 'loadedWeight', label: 'Loaded weight (kg)', type: 'number', validate: (f) => nonNegative('loadedWeight')(f) || weightProblem(f) },
     { name: 'photoLoaded', label: 'Photo – loaded truck', type: 'photo' },
     { name: 'photoCovered', label: 'Photo – covered truck', type: 'photo' },
-    { name: 'eway', label: 'E-way bill number', rule: 'eway', hint: '12 digits' },
+    { name: 'documents', label: 'Papers (GST bill, e-way bill, rawanna)', type: 'photos', wide: true },
+    { name: 'note', label: 'Note', type: 'textarea', wide: true },
   ];
   const inFields = [
-    { name: 'date', label: 'Date', type: 'date', required: true },
+    { name: 'date', label: 'Date', type: 'date', required: true, createOnly: true, validate: (f) => (f.date && f.date > todayISO() ? 'Date cannot be in the future' : '') },
     { name: 'kind', label: 'Coming with', type: 'select', options: ['Blocks', 'Purchase', 'Other'], required: true, default: 'Blocks' },
     { name: 'truckNo', label: 'Truck number', required: true, placeholder: 'RJ06 XX 0000', rule: 'truckNo' },
     { name: 'driverName', label: 'Driver name', rule: 'name' },
@@ -51,19 +54,19 @@ export default function DispatchPage() {
     { name: 'photoLoaded', label: 'Photo', type: 'photo' },
   ];
 
-  // only fields the server accepts (it owns status, numbers and weights)
-  const OUT_KEYS = ['date', 'saleId', 'truckNo', 'driverName', 'driverMobile', 'transporter', 'freight', 'emptyWeight', 'loadedWeight', 'photoLoaded', 'photoCovered', 'eway'];
-  const prep = (b) => {
-    const body = Object.fromEntries(OUT_KEYS.filter((k) => b[k] !== undefined && b[k] !== '').map((k) => [k, b[k]]));
-    body.direction = 'out';
-    if (b._items) body.items = b._items.filter((i) => i.qty > 0).map(({ stockItemId, name, unit, qty }) => ({ stockItemId, name, unit, qty }));
-    return body;
-  };
   const markOut = async (row, reload) => {
     if (!await confirmDialog(`Mark truck ${row.truckNo} OUT? Stock will be deducted.`)) return;
-    try { await api(`/api/dispatches/${row._id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out ✔'); reload(); } catch (e) { toast.error(e.message); }
+    try { await apiAsk(`/api/dispatches/${row._id}/out`); toast.success('Truck marked out ✔'); reload(); } catch (e) { if (!e.data?.cancelled) toast.error(e.message); }
   };
-  const waMsg = (r) => `Dear ${r.customerName}, your order ${r.saleNo || ''} has left our Bijoliya factory.\nTruck: ${r.truckNo}\nDriver: ${r.driverName || '-'} ${r.driverMobile || ''}\nInvoice: ${r.invoiceNo || '-'}\nE-way bill: ${r.eway || '-'}\n— Vipul Stone Suppliers`;
+  const waMsg = (r) => `Dear ${r.customerName}, your order ${r.saleNo || ''} has left our ${session.company.name} factory.\nTruck: ${r.truckNo}\nDriver: ${r.driverName || '-'} ${r.driverMobile || ''}\nInvoice: ${r.invoiceNo || '-'}\nE-way bill: ${r.eway || '-'}\n— ${session.company.name}`;
+
+  const payFreight = async (row, reload) => {
+    const m = (await promptDialog(`Freight ${inr(row.freight)} to ${row.transporter || 'the transporter'}. Paid by: Cash / UPI / Bank`, 'Bank'));
+    if (m === null) return;
+    const lower = m.trim().toLowerCase();
+    const mode = lower === 'cash' ? 'Cash' : lower === 'upi' ? 'UPI' : 'Bank';
+    try { await api(`/api/dispatches/${row._id}/freight-paid`, { method: 'POST', body: { mode } }); toast.success('Freight marked paid'); reload(); } catch (e) { toast.error(e.message); }
+  };
 
   const outCols = [
     { key: 'gatePassNo', label: 'Gate pass', primary: true, render: (r) => <span>{r.gatePassNo}<div className="text-[11px] text-char-500 font-normal">{r.customerName}</div></span> },
@@ -77,6 +80,7 @@ export default function DispatchPage() {
     row.status === 'loading' && canMark && { label: 'Mark out', tone: 'primary', icon: <LogOut size={14} />, onClick: () => markOut(row, reload) },
     { label: 'Gate pass', icon: <Printer size={14} />, onClick: () => window.open(`/dispatch/${row._id}`, '_blank') },
     row.status === 'out' && { label: '', icon: <MessageCircle size={14} />, onClick: () => openWA(waMsg(row), row.customerMobile) },
+    row.freight > 0 && !row.freightPaid && can('cashentries', 'create') && { label: 'Freight paid', icon: <Banknote size={14} />, onClick: () => payFreight(row, reload) },
   ].filter(Boolean);
 
   const freight = fr.data?.rows || [];
@@ -85,10 +89,9 @@ export default function DispatchPage() {
     <RoleGuard perm="dispatches">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'out', label: 'Trucks out' }, { key: 'in', label: 'Trucks in' }, { key: 'freight', label: 'Freight' }]} />
       {tab === 'out' && (
-        <CrudPage model="dispatches" baseQuery={{ direction: 'out' }} headerExtra={<ImportData resource="dispatch-out" perm="dispatches" noun="loading slips" hint="order, truck, item and quantity are required" />} title={t('dispatch')} subtitle="No truck leaves the gate without a gate pass" label="Loading slip" addLabel="New loading slip" wide
+        <CrudPage key={'o' + reloadKey} model="dispatches" baseQuery={{ direction: 'out' }} canAdd={false} headerExtra={<>{can('dispatches', 'create') && <button className="btn-primary" onClick={() => setLoadOpen(true)}><Plus size={18} /><T> New loading slip</T></button>}<ImportData resource="dispatch-out" perm="dispatches" noun="loading slips" hint="order, truck, item and quantity are required" /></>} title={t('dispatch')} subtitle="No truck leaves the gate without a gate pass" label="Loading slip" wide
           fields={outFields} columns={outCols} sort="-date,-createdAt"
-          canEdit={(r) => r.status === 'loading'}
-          beforeSave={async (b) => prep(b)}
+          canEdit={() => true}
           filters={[{ key: 'status', label: 'All status', options: [{ value: 'loading', label: 'Loading' }, { value: 'out', label: 'Truck out' }] }]}
           facets={{ by: 'status', query: { direction: 'out', from: todayISO() } }}
           summary={(rows, { facets: f }) => <div className="grid grid-cols-3 gap-3"><StatCard label="Out today" value={f?.groups?.out?.n ?? 0} tone="green" /><StatCard label="Loading today" value={f?.groups?.loading?.n ?? 0} tone="amber" /><StatCard label="Trucks today" value={f?.total ?? 0} /></div>}
@@ -104,9 +107,10 @@ export default function DispatchPage() {
         <div>
           <div className="grid grid-cols-2 gap-3 mb-3"><StatCard label="Freight pending" value={inr(sum(freight, 'pending'))} tone="amber" /><StatCard label="Freight paid" value={inr(sum(freight, 'paid'))} tone="green" /></div>
           <DataList loading={fr.loading} rows={freight} rowKey="name" empty="No freight entered" columns={[{ key: 'name', label: 'Transporter', primary: true }, { key: 'trips', label: 'Trips' }, { key: 'total', label: 'Total', render: (r) => inr(r.total) }, { key: 'paid', label: 'Paid', render: (r) => inr(r.paid) }, { key: 'pending', label: 'Pending', render: (r) => <b className={r.pending ? 'text-amber-700' : ''}>{inr(r.pending)}</b> }]}
-            actions={(r) => r.pending > 0 && can('cashentries', 'create') && <button className="btn-outline btn-sm" onClick={async () => { if (!await confirmDialog(`Mark ${inr(r.pending)} freight as paid to ${r.name}?`)) return; try { await api('/api/bulk/freight-paid', { method: 'POST', body: { ...(r.transporter ? { transporter: r.transporter } : {}), mode: 'Bank' } }); toast.success('Marked paid'); fr.reload(); } catch (e) { toast.error(e.message); } }}><T>Mark paid</T></button>} />
+            actions={(r) => r.pending > 0 && can('cashentries', 'create') && <button className="btn-outline btn-sm" onClick={async () => { const m = await promptDialog(`Mark ${inr(r.pending)} freight as paid to ${r.name}. Paid by: Cash / UPI / Bank`, 'Bank'); if (m === null) return; const l = m.trim().toLowerCase(); const mode = l === 'cash' ? 'Cash' : l === 'upi' ? 'UPI' : 'Bank'; try { await api('/api/bulk/freight-paid', { method: 'POST', body: { ...(r.transporter ? { transporter: r.transporter } : {}), mode } }); toast.success('Marked paid'); fr.reload(); } catch (e) { toast.error(e.message); } }}><T>Mark paid</T></button>} />
         </div>
       )}
+      <LoadingSheet open={loadOpen} onClose={() => setLoadOpen(false)} onDone={() => setReloadKey((k) => k + 1)} />
     </RoleGuard>
   );
 }

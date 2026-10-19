@@ -152,6 +152,7 @@ export const Complaint = defineModel(
     closedDate: dateStr(),
     daysTaken: N,
     linkedCode: { type: S, uppercase: true }, // employee whose work the complaint is about (Part 20)
+    linkedName: S,
     salespersonUserId: OID,
   },
   { indexes: [[{ complaintNo: 1 }, liveUnique()], [{ state: 1, date: -1 }], [{ customerId: 1, date: -1 }], [{ linkedCode: 1, date: -1 }]] }

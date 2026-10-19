@@ -6,14 +6,14 @@ import Link from 'next/link';
 import toast from '@/lib/toast';
 import { FileText, MessageCircle, Truck, IndianRupee, Printer, CheckCircle2, ShoppingCart, Pencil, XCircle } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Section, KV, Badge, Sheet, Field, PhotoInput, SkeletonList, DataList, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Section, KV, Badge, Sheet, Field, SkeletonList, DataList, cx } from '@/components/ui';
 import { api, submit, openWA } from '@/lib/client';
 import RuledField from '@/components/RuledField';
 import { checkPaymentRef } from '@/lib/validators';
 import { TAX_LABEL } from '@/lib/gst';
 import { inr, inr2, num, fmtDate, todayISO, daysBetween } from '@/lib/format';
 import T from '@/components/T';
-import { ruleProblem as ruleBad } from '@/components/RuledField';
+import LoadingSheet, { remainingLines } from '@/components/dispatch/LoadingSheet';
 
 const STEPS = ['Quotation', 'Order', 'Dispatch', 'GST bill', 'Payment'];
 
@@ -35,7 +35,7 @@ export default function SaleDetail() {
 
   if (loading || !s) return <SkeletonList />;
   const pending = Math.max(0, s.total - (s.paid || 0));
-  const remaining = (s.items || []).map((i) => ({ ...i, left: Math.max(0, i.qty - (s.dispatchedQty?.[lineKey(i)] || 0)) }));
+  const remaining = remainingLines(s, full.data?.dispatches); // what is left after what has gone and what is on a loading slip
   const anyLeft = remaining.some((i) => i.left > 0);
   const step = s.stage === 'quotation' ? 0 : s.invoiceNo ? (pending === 0 ? 4 : 3) : s.stage === 'dispatched' ? 2 : 1;
   const link = typeof window !== 'undefined' ? `${location.origin}/sales/${id}/invoice` : '';
@@ -49,13 +49,6 @@ export default function SaleDetail() {
     ref: checkPaymentRef(f.mode, f.ref),
   };
   const advErr = f.advance !== undefined && f.advance !== '' && Number(f.advance) < 0 ? 'Advance cannot be below zero' : Number(f.advance) > s.total ? 'Advance is more than the order total' : '';
-  const qtyOf = (i) => Number(f.qty?.[i.stockItemId || i.name] ?? i.left);
-  const qtyErr = (i) => (qtyOf(i) < 0 ? 'Cannot be below zero' : qtyOf(i) > i.left + 1e-9 ? tr('Only {n} left to send', { n: num(i.left) }) : '');
-  const money = (v) => (v !== undefined && v !== '' && Number(v) < 0 ? 'Cannot be below zero' : '');
-  const dispErr = {
-    truck: !f.truckNo ? 'Enter truck number' : '',
-    freight: money(f.freight), empty: money(f.emptyWeight), loaded: money(f.loadedWeight) || (f.emptyWeight && f.loadedWeight && Number(f.loadedWeight) < Number(f.emptyWeight) ? 'Loaded weight is less than the empty weight' : ''),
-  };
 
   async function run(fn, ok) {
     setBusy(true);
@@ -80,19 +73,6 @@ export default function SaleDetail() {
         throw e;
       }
     }, 'Payment recorded');
-  }
-  async function dispatch() {
-    const bad = dispErr.truck || ruleBad('truckNo', f.truckNo) || ruleBad('name', f.driverName) || ruleBad('mobile', f.driverMobile) || ruleBad('partyName', f.transporter) || dispErr.freight || dispErr.empty || dispErr.loaded
-      || remaining.filter((i) => i.left > 0).map(qtyErr).find(Boolean);
-    if (bad) { set({ show: true }); toast.error(bad); return; }
-    const items = remaining.filter((i) => i.left > 0).map((i) => ({ stockItemId: i.stockItemId, name: i.name, unit: i.unit, qty: Number(f.qty?.[i.stockItemId || i.name] ?? i.left) })).filter((i) => i.qty > 0);
-    if (!items.length) { toast.error('Enter quantity loaded'); return; }
-    await run(async () => {
-      const slip = await api('/api/dispatches', { method: 'POST', body: { saleId: id, direction: 'out', date: todayISO(), items, truckNo: f.truckNo, driverName: f.driverName || undefined, driverMobile: f.driverMobile || undefined, transporter: f.transporter || undefined, freight: Number(f.freight) || 0, emptyWeight: Number(f.emptyWeight) || 0, loadedWeight: Number(f.loadedWeight) || 0, photoLoaded: f.photoLoaded, photoCovered: f.photoCovered } });
-      // the gate pass is issued now; stock leaves only when the guard marks the truck out
-      if (f.markOut !== false && can('dispatches', 'approve')) await api(`/api/dispatches/${slip._id}/out`, { method: 'POST', body: {} });
-      return slip;
-    }, f.markOut !== false && can('dispatches', 'approve') ? 'Truck out – stock deducted' : 'Gate pass issued – the guard marks the truck out');
   }
   async function cancelSale() {
     const reason = await promptDialog(tr('Why are you cancelling {no}?', { no: s.saleNo }), '');
@@ -203,33 +183,7 @@ export default function SaleDetail() {
         </div>
       </Sheet>
 
-      <Sheet open={sheet === 'dispatch'} onClose={() => setSheet(null)} title="Dispatch truck + gate pass" wide
-        footer={<><button className="btn-outline flex-1" onClick={() => setSheet(null)}><T>Cancel</T></button><button className="btn-primary flex-[2]" disabled={busy} onClick={dispatch}>{f.markOut === false ? 'Save loading slip' : 'Truck out · deduct stock'}</button></>}>
-        <div className="space-y-3">
-          <div className="rounded-xl border border-sand-200 p-3">
-            <div className="text-xs font-bold uppercase text-char-500 mb-2"><T>Loading slip – quantity loaded</T></div>
-            {remaining.filter((i) => i.left > 0).map((i) => (
-              <div key={i.stockItemId || i.name} className="flex items-center gap-3 py-1.5">
-                <div className="flex-1 text-sm">{i.name}<div className="text-[11px] text-char-500"><T vars={{ n: num(i.left), u: i.unit }}>{'left to send: {n} {u}'}</T></div></div>
-                <div><input className={`input !w-28 ${f.show && qtyErr(i) ? '!border-red-500' : ''}`} type="number" inputMode="decimal" min="0" max={i.left} step="any" defaultValue={i.left} aria-label={`${tr('Quantity loaded')} ${i.name}`} onChange={(e) => set({ qty: { ...(f.qty || {}), [i.stockItemId || i.name]: e.target.value } })} />{f.show && qtyErr(i) && <div className="text-[11px] text-red-600 mt-0.5" role="alert">{qtyErr(i)}</div>}</div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <RuledField rule="truckNo" label="Truck number" required value={f.truckNo} onChange={(v) => set({ truckNo: v })} placeholder="RJ06 XX 0000" error={dispErr.truck} showError={f.show} />
-            <RuledField rule="name" label="Driver name" value={f.driverName} onChange={(v) => set({ driverName: v })} showError={f.show} />
-            <RuledField rule="mobile" label="Driver mobile" type="tel" hint="10 digits" value={f.driverMobile} onChange={(v) => set({ driverMobile: v })} showError={f.show} />
-            <RuledField rule="partyName" label="Transporter" value={f.transporter} onChange={(v) => set({ transporter: v })} showError={f.show} />
-            <Field label="Freight (₹)" error={f.show ? dispErr.freight : ''}><input className="input" type="number" inputMode="decimal" min="0" step="any" value={f.freight || ''} onChange={(e) => set({ freight: e.target.value })} /></Field>
-            <div />
-            <Field label="Empty weight (kg)" htmlFor="disp_empty" error={f.show ? dispErr.empty : ''}><input id="disp_empty" className="input" type="number" inputMode="decimal" min="0" step="any" value={f.emptyWeight || ''} onChange={(e) => set({ emptyWeight: e.target.value })} /></Field>
-            <Field label="Loaded weight (kg)" htmlFor="disp_loaded" error={f.show ? dispErr.loaded : ''}><input id="disp_loaded" className="input" type="number" inputMode="decimal" min="0" step="any" value={f.loadedWeight || ''} onChange={(e) => set({ loadedWeight: e.target.value })} /></Field>
-            <Field label="Photo – loaded truck"><PhotoInput value={f.photoLoaded} onChange={(x) => set({ photoLoaded: x })} /></Field>
-            <Field label="Photo – covered truck"><PhotoInput value={f.photoCovered} onChange={(x) => set({ photoCovered: x })} /></Field>
-          </div>
-          <label className="flex items-center gap-3 min-h-[44px]"><input type="checkbox" className="w-5 h-5 accent-[#B5651D]" checked={f.markOut !== false} onChange={(e) => set({ markOut: e.target.checked })} /><span className="text-sm"><T>Guard marks the truck out now (stock is deducted)</T></span></label>
-        </div>
-      </Sheet>
+      <LoadingSheet open={sheet === 'dispatch'} saleId={id} onClose={() => setSheet(null)} onDone={() => reload()} />
     </RoleGuard>
   );
 }

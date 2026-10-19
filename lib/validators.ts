@@ -190,6 +190,14 @@ export function checkEway(v: unknown): string {
   return /^\d{12}$/.test(s) ? '' : 'E-way bill number must be exactly 12 digits';
 }
 
+// ---- A bill (invoice) number: letters, digits, / and -, capitals; spaces dropped
+export const cleanBill = (v: unknown) => String(v ?? '').replace(/\s+/g, '').toUpperCase();
+export function checkBill(v: unknown): string {
+  const s = cleanBill(v);
+  if (!s) return '';
+  return /^[A-Z0-9/-]{1,40}$/.test(s) ? '' : 'Bill number can have letters, digits, / and - only';
+}
+
 // ---- Cheque / UPI / bank reference: letters, digits, space, - and /
 export const cleanRef = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
 export function checkRef(v: unknown): string {
@@ -233,6 +241,7 @@ export const EMPLOYEE_RULES: Record<string, Rule> = {
   partyName: { clean: cleanParty, check: checkParty, maxLength: 160, live: keep(160) },
   place: { clean: cleanParty, check: checkPlace, maxLength: 80, live: keep(80) },
   truckNo: { clean: cleanTruck, check: checkTruck, maxLength: 16, autoCapitalize: 'characters', live: (v: string) => v.replace(/[^A-Za-z0-9 -]/g, '').toUpperCase().slice(0, 16) },
+  billNo: { clean: cleanBill, check: checkBill, maxLength: 40, autoCapitalize: 'characters', live: (v: string) => v.replace(/[^A-Za-z0-9/-]/g, '').toUpperCase().slice(0, 40) },
   eway: { clean: cleanEway, check: checkEway, maxLength: 12, inputMode: 'numeric', live: digitsOnly(12) },
   payRef: { clean: cleanRef, check: checkRef, maxLength: 40, live: (v: string) => v.replace(/[^A-Za-z0-9 /-]/g, '').slice(0, 40) },
 };

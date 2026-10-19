@@ -7,7 +7,7 @@ import { canonicalState, computeTotals, stateOfGstin, taxTypeFor } from '../gst'
 import { checkPaymentRef } from '../validators';
 import { daysBetween, fyLabel, todayIST } from '../time';
 import { accountFor, applyStock, nextSeq, oid, postCash, reverseCashFor, reverseStockFor, round2, type SvcCtx } from '../services/core';
-import { customerById, saleById } from '../services/lookup';
+import { customerById, employeeByCode, saleById } from '../services/lookup';
 import { dateStr, empCode, enumOf, MODES, num, oidStr, photo, photos, posNum, req, ruled, text } from './zod';
 import { scopeFilter } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
@@ -238,8 +238,8 @@ export const payments: ResourceDef = {
 // ------------------------------------------------------------------ dispatch / gate pass
 const dispatchItem = z.object({ stockItemId: oidStr.optional(), name: req(160), unit: text(20).optional(), qty: posNum(1e9) }).strict();
 const dispatchFields = {
-  truckNo: ruled('truckNo', { required: true }), driverName: ruled('name').optional(), driverMobile: ruled('mobile').optional(), transporter: ruled('partyName').optional(), freight: num().optional(),
-  emptyWeight: num().optional(), loadedWeight: num().optional(), photoLoaded: photo.optional(), photoCovered: photo.optional(), eway: ruled('eway').optional(), documents: photos(6).optional(), note: text(500).optional(),
+  truckNo: ruled('truckNo', { required: true }), driverName: ruled('name').optional(), driverMobile: ruled('mobile').optional(), transporter: ruled('partyName').optional(), freight: num(0, 1e7).optional(),
+  emptyWeight: num(0, 200000).optional(), loadedWeight: num(0, 200000).optional(), photoLoaded: photo.optional(), photoCovered: photo.optional(), eway: ruled('eway').optional(), documents: photos(6).optional(), note: text(500).optional(),
 };
 export const dispatches: ResourceDef = {
   key: 'dispatches', model: Dispatch, label: (d) => `${d.gatePassNo ?? 'IN'} ${d.truckNo}`,
@@ -249,10 +249,11 @@ export const dispatches: ResourceDef = {
   statFields: ['freight'],
   serverOnly: ['gatePassNo', 'status', 'saleNo', 'customerName', 'customerMobile', 'invoiceNo', 'netWeight', 'outAt', 'guard', 'freightPaid', 'salespersonUserId'],
   create: z.object({ date: dateStr.optional(), direction: enumOf(['out', 'in']).optional(), saleId: oidStr.optional(), items: z.array(dispatchItem).max(60).optional(), kind: enumOf(['Blocks', 'Purchase', 'Other']).optional(), ...dispatchFields }).strict(),
-  update: z.object(dispatchFields).partial().strict(),
+  update: z.object({ ...dispatchFields, kind: enumOf(['Blocks', 'Purchase', 'Other']) }).partial().strict(),
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const direction = input.direction ?? 'out';
+      if (input.date && input.date > todayIST()) throw badRequest('Date cannot be in the future');
       const doc: any = { ...input, direction, date: input.date ?? todayIST(), freight: input.freight ?? 0 };
       if (input.emptyWeight && input.loadedWeight && input.loadedWeight < input.emptyWeight) throw badRequest('Loaded weight is less than the empty weight');
       if (input.emptyWeight && input.loadedWeight) doc.netWeight = Math.max(0, input.loadedWeight - input.emptyWeight);
@@ -266,20 +267,49 @@ export const dispatches: ResourceDef = {
       const sale = await saleById(ctx, input.saleId);
       if (sale.stage === 'quotation') throw conflict('Confirm the order before loading a truck');
       if (!doc.items?.length) throw badRequest('Add the items loaded on the truck');
+      // one line per product (the same product typed twice is added up), and the total of each product within what is left to send
+      const wanted = new Map<string, any>();
+      for (const it of doc.items) {
+        const k = lineKey(it);
+        const had = wanted.get(k);
+        wanted.set(k, had ? { ...had, qty: round2(had.qty + it.qty) } : { ...it });
+      }
+      doc.items = [...wanted.values()];
+      // quantities already on other loading slips of this order (trucks still at the gate) are spoken for as well
+      const waiting = new Map<string, number>();
+      const slips: any[] = await Dispatch.find({ saleId: sale._id, direction: 'out', status: 'loading', isVoid: false }).select('items').session(s(ctx)).lean();
+      for (const sl of slips) for (const it of sl.items ?? []) waiting.set(lineKey(it), (waiting.get(lineKey(it)) ?? 0) + it.qty);
+      const short: string[] = [];
       for (const it of doc.items) {
         const key = lineKey(it);
         const line = sale.items.find((l: any) => lineKey(l) === key);
         if (!line) throw badRequest(`${it.name} is not on this order`);
         const sent = Number(sale.dispatchedQty?.[key] ?? 0);
-        if (sent + it.qty > line.qty + 1e-9) throw conflict(`Only ${round2(line.qty - sent)} ${line.unit ?? ''} of ${line.name} is left to send`);
+        const spoken = waiting.get(key) ?? 0;
+        const left = round2(line.qty - sent - spoken);
+        if (it.qty > left + 1e-9) throw conflict(`Only ${Math.max(0, left)} ${line.unit ?? ''} of ${line.name} is left to send${spoken ? ` (${round2(spoken)} is already on another loading slip)` : ''}`);
+        if (it.stockItemId) {
+          const st: any = await StockItem.findOne({ _id: it.stockItemId, isVoid: false }).select('balance unit name').session(s(ctx)).lean();
+          if (st && Number(st.balance ?? 0) + 1e-9 < it.qty) short.push(`${st.name}: ${round2(st.balance ?? 0)} ${st.unit} in stock`);
+        }
       }
+      // a truck loaded with stone the books do not have cannot leave the gate: ask before issuing the slip
+      if (short.length && !ctx.confirmed) throw confirmable(`Not enough stock: ${short.join('; ')}. The truck cannot be marked out until the stock is there. Issue the loading slip anyway?`);
       Object.assign(doc, { saleNo: sale.saleNo, customerName: sale.customerName, customerMobile: sale.customerMobile, invoiceNo: sale.invoiceNo, salespersonUserId: sale.salespersonUserId, status: 'loading' });
       doc.gatePassNo = 'GP-' + String(await nextSeq('gatepass', ctx.session, 40)).padStart(4, '0');
       return doc;
     },
     async afterCreate(ctx, d) { if (d.direction === 'in') await roll.truck(d.date, 'in', 1, ctx.session); },
     async prepareUpdate(ctx, prev, patch) {
-      if (prev.status === 'out') throw conflict('This truck has already left. Its record is fixed.');
+      if (prev.status === 'out') {
+        // the truck, the weights and the photos are what was at the gate; the e-way bill, driver, freight and papers often come later
+        const later = ['driverName', 'driverMobile', 'transporter', 'freight', 'eway', 'documents', 'note'];
+        const same = (a: unknown, b: unknown) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
+        const changed = Object.keys(patch).filter((k) => !same(patch[k], prev[k]));
+        if (changed.some((k) => !later.includes(k))) throw conflict('This truck has already left. Only the driver, transporter, freight, e-way bill, documents and note can still be changed.');
+        if (prev.freightPaid && changed.some((k) => k === 'freight' || k === 'transporter')) throw conflict('The freight of this truck is already paid. It cannot be changed.');
+        return patch;
+      }
       const w1 = patch.emptyWeight ?? prev.emptyWeight;
       const w2 = patch.loadedWeight ?? prev.loadedWeight;
       if (w1 && w2 && w2 < w1) throw badRequest('Loaded weight is less than the empty weight');
@@ -299,6 +329,9 @@ export const dispatches: ResourceDef = {
   },
 };
 
+/** Goods above this value move with an e-way bill (GST rule). */
+export const EWAY_LIMIT = 50000;
+
 /** The guard marks the truck out: stock leaves (conditional, never negative), the order's sent quantities move on. */
 export async function markTruckOut(ctx: SvcCtx, id: string) {
   const d: any = await Dispatch.findOneAndUpdate(
@@ -307,6 +340,18 @@ export async function markTruckOut(ctx: SvcCtx, id: string) {
     { returnDocument: 'after', session: ctx.session, lean: true }
   );
   if (!d) throw conflict('This truck is not waiting at the gate (already out or cancelled)');
+  // the order cannot send more than it asked for, even when two loading slips were issued for the same stone
+  const order: any = await Sale.findById(d.saleId).session(s(ctx)).lean();
+  let value = 0;
+  for (const it of d.items ?? []) {
+    const line = order?.items?.find((l: any) => lineKey(l) === lineKey(it));
+    if (!line) continue;
+    const sent = Number(order.dispatchedQty?.[lineKey(it)] ?? 0);
+    if (sent + it.qty > line.qty + 1e-9) throw conflict(`This truck would send more ${it.name} than the order has (${round2(line.qty - sent)} ${line.unit ?? ''} left). Cancel this loading slip or change its quantity`);
+    value += it.qty * (Number(line.rate) || 0);
+  }
+  // goods worth more than ₹50,000 move with an e-way bill
+  if (value > EWAY_LIMIT && !d.eway && !ctx.confirmed) throw confirmable(`No e-way bill number is entered. Goods worth ₹${Math.round(value).toLocaleString('en-IN')} usually need one. Mark the truck out anyway?`);
   await roll.truck(d.date, 'out', 1, ctx.session);
   for (const it of d.items ?? []) {
     if (it.stockItemId) await applyStock(ctx, { itemId: it.stockItemId, delta: -it.qty, type: 'out', date: d.date, ref: `Gate pass ${d.gatePassNo}`, note: d.customerName, refModel: 'dispatches', refId: d._id });
@@ -329,20 +374,47 @@ const complaintFields = {
   details: text(2000).optional(), photos: photos(6).optional(), action: enumOf(['', 'replace', 'discount', 'credit_note', 'reject']).optional(), actionNote: text(500).optional(),
   state: enumOf(['open', 'in_progress', 'closed']).optional(), linkedCode: empCode.optional().or(z.literal('')),
 };
+/** A bill number on a complaint should be one of this customer's bills; an unknown one is asked about, not refused (an old or paper bill). */
+async function checkBill(ctx: SvcCtx, invoiceNo: string | undefined, customer: any) {
+  const no = String(invoiceNo ?? '').trim().replace(/\s+/g, '').toUpperCase();
+  if (!no) return undefined;
+  if (!/^[A-Z0-9/-]{1,40}$/.test(no)) throw badRequest('Bill number can have letters, digits, / and - only');
+  const found = await Sale.exists({ invoiceNo: no, customerId: customer._id, isVoid: false }).session(s(ctx));
+  if (!found && !ctx.confirmed) throw confirmable(`Bill ${no} was not found for ${customer.name}. Save anyway?`);
+  return no;
+}
+/** The staff member whose work the complaint is about (it counts on that person's scorecard): a real, current employee. */
+async function linkedStaff(ctx: SvcCtx, code: string | undefined) {
+  if (!code) return { linkedCode: '', linkedName: '' };
+  const e = await employeeByCode(ctx, code);
+  return { linkedCode: e.empCode, linkedName: e.name };
+}
+
 export const complaints: ResourceDef = {
   key: 'complaints', model: Complaint, label: (d) => `${d.complaintNo} ${d.customerName}`,
-  listFields: ['complaintNo', 'date', 'customerId', 'customerName', 'invoiceNo', 'problem', 'details', 'action', 'actionNote', 'state', 'closedDate', 'daysTaken', 'linkedCode'],
+  listFields: ['complaintNo', 'date', 'customerId', 'customerName', 'invoiceNo', 'problem', 'details', 'action', 'actionNote', 'state', 'closedDate', 'daysTaken', 'linkedCode', 'linkedName'],
   sortable: ['date', 'createdAt'], defaultSort: '-date', searchFields: ['complaintNo', 'customerName', 'invoiceNo'],
   dateFields: ['date'], filters: { state: { enum: ['open', 'in_progress', 'closed'] }, problem: 'string', customerId: 'oid', linkedCode: 'string' },
-  serverOnly: ['complaintNo', 'customerName', 'closedDate', 'daysTaken', 'salespersonUserId'],
+  statFields: ['daysTaken'],
+  serverOnly: ['complaintNo', 'customerName', 'closedDate', 'daysTaken', 'salespersonUserId', 'linkedName'],
   create: z.object(complaintFields).strict(), update: z.object(complaintFields).partial().omit({ customerId: true }).strict(),
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const c = await customerById(ctx, input.customerId);
+      if (input.date && input.date > todayIST()) throw badRequest('Date cannot be in the future');
       if (input.action === 'reject' && !input.actionNote) throw badRequest('Give a reason for rejecting the complaint');
-      return { ...input, customerName: c.name, date: input.date ?? todayIST(), state: input.state ?? 'open', complaintNo: 'CMP-' + String(await nextSeq('complaint', ctx.session)).padStart(3, '0'), salespersonUserId: oid(auth.user.id) };
+      if (input.problem === 'Other' && !String(input.details ?? '').trim()) throw badRequest('Details: describe the problem');
+      if (input.state === 'closed' && !input.action) throw badRequest('Decide the action (replace, discount, credit note or reject) before closing the complaint');
+      const invoiceNo = await checkBill(ctx, input.invoiceNo, c);
+      const staff = await linkedStaff(ctx, input.linkedCode);
+      return { ...input, ...(invoiceNo ? { invoiceNo } : {}), ...staff, customerName: c.name, date: input.date ?? todayIST(), state: input.state ?? 'open', complaintNo: 'CMP-' + String(await nextSeq('complaint', ctx.session)).padStart(3, '0'), salespersonUserId: oid(auth.user.id) };
     },
     async prepareUpdate(ctx, prev, patch) {
+      if (patch.date && patch.date > todayIST()) throw badRequest('Date cannot be in the future');
+      if ((patch.problem ?? prev.problem) === 'Other' && !String(patch.details ?? prev.details ?? '').trim()) throw badRequest('Details: describe the problem');
+      if ((patch.state ?? prev.state) === 'closed' && !(patch.action ?? prev.action)) throw badRequest('Decide the action (replace, discount, credit note or reject) before closing the complaint');
+      if ('invoiceNo' in patch) { const c = await customerById(ctx, prev.customerId); const no = await checkBill(ctx, patch.invoiceNo, c); patch.invoiceNo = no ?? ''; }
+      if ('linkedCode' in patch) Object.assign(patch, await linkedStaff(ctx, patch.linkedCode));
       if (patch.state === 'closed' && prev.state !== 'closed') { patch.closedDate = todayIST(); patch.daysTaken = Math.max(0, daysBetween(prev.date, todayIST())); }
       if (patch.state && patch.state !== 'closed') { patch.closedDate = undefined; }
       if ((patch.action ?? prev.action) === 'reject' && !(patch.actionNote ?? prev.actionNote)) throw badRequest('Give a reason for rejecting the complaint');

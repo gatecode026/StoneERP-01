@@ -407,3 +407,19 @@ Tests: 12 server (day by day, reversals, paid on approval, due dates, dates, cou
 **Flow gaps closed:** a quotation can be **changed** (the new-quotation screen, filled in); a quotation or an order can be **cancelled** with a reason (until money or a bill is involved); a wrong **payment can be cancelled** from the order (the cash book and the customer's balance follow).
 
 Tests: 15 server (all the rules above), 2 browser tests on a phone (customer to cancelled payment to truck out). Existing fixtures with placeholder truck numbers ("RJ1"), one-letter customer names and a formula as a customer name were updated to realistic values.
+
+## Dispatch & Gate Pass and Complaints: checked, fixed
+
+**Over-sending (the serious one):** two loading slips for the full order, or one slip with the same product on two lines, could send more than the order asked for (a real test sent 200 of 100 and took 200 from stock). Now the same product on one slip is added up, quantities already on another loading slip at the gate are spoken for, cancelling a slip gives the quantity back, and the gate refuses a truck that would send more than the order has.
+
+**Loading slip screen:** the "New loading slip" form on the Dispatch screen offered the whole order every time (it read a field that does not exist). It is now the same sheet as on the order screen: it shows what is left and what is already on a slip, per-item quantity (partial loads), truck, driver, transporter, freight, e-way bill, weights, photos and **papers** (GST bill, e-way bill, rawanna: in the PDF and in the data, but there was no place to attach them). The Save button is pinned to the bottom: an error appearing above used to push it away from the finger so the tap was lost.
+
+**Asked before it happens:** a loading slip for stone the books do not have; a truck marked out with goods worth more than ₹50,000 and no e-way bill (the guard can say yes). No future dates; weights up to 200 t, freight up to ₹1 crore.
+
+**After the truck has left:** the e-way bill, driver, transporter, freight, papers and note can still be filled in (they often come late); the truck number, weights and photos cannot. A paid freight is fixed. **Freight** can be marked paid per truck (gate pass, truck list) or per transporter, by cash / UPI / bank (it was always bank).
+
+**Gate pass:** shows the papers; the WhatsApp message uses the company name from Settings (it said "Bijoliya factory" and a fixed name).
+
+**Complaints:** no future date; a bill number is tidied and checked against that customer's bills (an unknown one is asked about, not refused); "Other" needs details; reject needs its reason; **a complaint cannot be closed before the action is decided**; the **staff member concerned** can be chosen (it counted on the performance scorecard, but nothing could set it) and must be a real employee; the customer cannot be changed afterwards. "Complaints by problem type" is now **by month** (PDF Part 16) with how many are still open and the average days to close.
+
+Tests: 14 server (slips, dates, e-way bill, late edits, freight modes, cancelling, every complaint rule), 3 browser (loading slips to freight; a complaint end to end; incoming truck and freight tab).

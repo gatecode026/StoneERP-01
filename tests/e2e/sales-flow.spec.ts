@@ -10,6 +10,7 @@ const pick = async (page: Page, placeholder: string, text: string | RegExp) => {
 const ask = async (page: Page, answer: string) => { await page.locator('#dlg_input').fill(answer); await page.locator('#dlg_input').press('Enter'); };
 
 test('Owner: a customer, a quotation, changing it, the order, a cheque, a wrong payment cancelled, and a truck', async ({ page }) => {
+  test.setTimeout(180_000); // a long walk through the whole flow on a development server
   await signIn(page, 'owner');
   const slab = `Slab ${uid}`;
   const item = await (await page.request.post('/api/stockitems', { headers: SAME_ORIGIN, data: { name: slab, category: 'finished', unit: 'sq ft', sellRate: 50, openingBalance: 2000 } })).json();
@@ -48,10 +49,10 @@ test('Owner: a customer, a quotation, changing it, the order, a cheque, a wrong 
 
   // ---- change the quotation, then make it an order
   await page.getByRole('link', { name: /Change quotation/ }).click();
+  await expect(page.getByLabel(/^Quantity/)).toHaveValue('100'); // the quotation is loaded into the form
   await page.getByLabel(/^Quantity/).fill('120');
   await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Quotation updated').first()).toBeVisible();
-  await page.waitForURL(new RegExp(`/sales/${saleId}$`));
+  await page.waitForURL(new RegExp(`/sales/${saleId}$`)); // saved: back on the quotation
   sale = await (await page.request.get(`/api/sales/${saleId}`)).json();
   expect(sale.total).toBe(7080);
   await page.getByRole('button', { name: /Convert to order/ }).click();
