@@ -8,6 +8,7 @@ import * as outRoute from '@/app/api/dispatches/[id]/out/route';
 import * as freightPaid from '@/app/api/dispatches/[id]/freight-paid/route';
 import * as freightAll from '@/app/api/bulk/freight-paid/route';
 import * as facets from '@/app/api/[resource]/facets/route';
+import * as lookup from '@/app/api/lookup/[kind]/route';
 
 let db: Awaited<ReturnType<typeof useTestDb>>;
 let owner: Who;
@@ -83,6 +84,23 @@ describe('loading slips: quantities', () => {
     expect(ok.status, msg(ok)).toBe(201);
     expect((await out(ok.json._id)).status).toBe(409); // the gate refuses: only 30 in stock
     expect(await bal(thin._id)).toBe(30);
+  });
+});
+
+describe('the order picker on the loading slip', () => {
+  it('lists only confirmed orders that still have stone to send, newest first', async () => {
+    const look = (qs: string) => call(owner, lookup.GET as never, `/api/lookup/sales?${qs}`, { params: { kind: 'sales' } });
+    const open = await newOrder(100);
+    const sent = await newOrder(10);
+    expect((await out((await slip(sent, 10)).json._id)).status).toBe(200); // everything on it has gone
+    const quote = (await api.create(owner, 'sales', { customerId: (await api.create(owner, 'customers', { name: `Quote ${++n}`, mobile: `98290${String(30000 + n).padStart(5, '0')}` })).json._id, items: [{ stockItemId: slab._id, name: slab.name, qty: 5, unit: 'sq ft', rate: 50, gstRate: 0 }] })).json;
+    const r = await look('stage=order%2Cdispatched&toSend=1');
+    expect(r.status, msg(r)).toBe(200);
+    const ids = r.json.data.map((x: any) => x.id);
+    expect(ids).toContain(String(open._id));
+    expect(ids).not.toContain(String(sent._id)); // nothing left to send
+    expect(ids).not.toContain(String(quote._id)); // not an order yet
+    expect((await look('stage=order&toSend=2')).status).toBe(200); // anything but 1 is just ignored
   });
 });
 

@@ -196,3 +196,12 @@ test('Owner: an incoming truck is entered and corrected, and the freight of a tr
   const after = (await (await page.request.get(`/api/dispatches?saleId=${order._id}`)).json()).data;
   expect(after.every((d: { freightPaid: boolean }) => d.freightPaid)).toBe(true);
 });
+
+test('Owner: the loading-slip order picker lists orders to load, or says what to do when there are none', async ({ page }) => {
+  await signIn(page, 'owner');
+  await page.goto('/dispatch');
+  await page.getByRole('button', { name: /New loading slip/ }).click();
+  await page.getByPlaceholder('Search order or customer…').click();
+  // a database with orders lists them (SO-…); an empty one explains how to get one instead of a bare "Nothing to choose"
+  await expect(page.getByText(/No confirmed order has stone left to send|SO-\d+/).first()).toBeVisible({ timeout: 60_000 });
+});

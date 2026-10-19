@@ -9,7 +9,7 @@ import { useTx } from '@/components/Providers';
 
 // Typeahead over /api/lookup/<kind>: only {id, label, hint}, at most 20 rows, fetched as you type (debounced).
 // Replaces "download a thousand rows into every dropdown".
-export default function LookupSelect({ id, kind, value, valueLabel, onChange, query = {}, by, placeholder = 'Search…', disabled, className }) {
+export default function LookupSelect({ id, kind, value, valueLabel, onChange, query = {}, by, placeholder = 'Search…', emptyText, disabled, className }) {
   const tx = useTx();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -72,7 +72,7 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
       {open && (
         <ul role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-auto rounded-xl border border-sand-300 bg-white shadow-lg">
           {busy && !items.length && <li className="px-3 py-2 text-sm text-char-500"><T>Searching…</T></li>}
-          {!busy && !items.length && <li className="px-3 py-2 text-sm text-char-500">{dq ? <T>No match</T> : <T>Nothing to choose</T>}</li>}
+          {!busy && !items.length && <li className="px-3 py-2 text-sm text-char-500">{dq ? <T>No match</T> : <T>{emptyText || 'Nothing to choose'}</T>}</li>}
           {items.map((it, i) => (
             <li key={it.id} role="option" aria-selected={String(it.id) === String(value)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(it)}
               className={cx('px-3 py-2.5 text-sm cursor-pointer flex items-baseline justify-between gap-2', i === active ? 'bg-sand-100' : 'hover:bg-sand-50', String(it.id) === String(value) && 'font-semibold')}>

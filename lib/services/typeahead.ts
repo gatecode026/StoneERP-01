@@ -34,7 +34,7 @@ export const KINDS: Record<string, Kind> = {
   suppliers: { resource: 'suppliers', model: Supplier, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
   vehicles: { resource: 'vehicles', model: Vehicle, search: ['name', 'regNo'], select: 'name regNo kind', sort: { name: 1 }, label: (d) => (d.regNo ? `${d.name} (${d.regNo})` : d.name) },
   blocks: { resource: 'blocks', model: Block, search: [], by: ['blockNo'], filters: { stage: ['received', 'cutting', 'cut'], source: ['own', 'supplier'] }, select: 'blockNo cft rawanna', sort: { blockNo: -1 }, label: (d) => `Block ${d.blockNo} · ${n(d.cft)} CFT`, hint: (d) => d.rawanna },
-  sales: { resource: 'sales', model: Sale, search: ['saleNo', 'customerName'], filters: { stage: ['quotation', 'order', 'dispatched'] }, select: 'saleNo customerName stage', sort: { date: -1 }, label: (d) => `${d.saleNo} · ${d.customerName}`, hint: (d) => d.stage },
+  sales: { resource: 'sales', model: Sale, search: ['saleNo', 'customerName'], filters: { stage: ['quotation', 'order', 'dispatched'], toSend: ['1'] }, select: 'saleNo customerName stage', sort: { date: -1 }, label: (d) => `${d.saleNo} · ${d.customerName}`, hint: (d) => d.stage },
 };
 export const lookupKind = (k: string) => {
   if (!Object.prototype.hasOwnProperty.call(KINDS, k)) throw notFound();
@@ -64,6 +64,8 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
       filters[k] = one;
       continue;
     }
+    // toSend=1: only orders that still have stone left to send (a loading slip is made for those)
+    if (k === 'toSend') { if (v === '1') filters.fullyDispatched = { $ne: true }; continue; }
     const parts = v.split(',').map((s) => s.trim()).filter(Boolean);
     if (!parts.length || parts.some((p) => !allowed.includes(p))) throw badRequest(`Filter "${k}" must be one of: ${allowed.join(', ')}`);
     filters[k] = parts.length > 1 ? { $in: parts } : parts[0];

@@ -34,7 +34,7 @@ export default function LoadingSheet({ open, onClose, saleId: fixedSale, onDone 
     <Sheet open={open} onClose={onClose} title="Loading slip + gate pass" wide>
       {!fixedSale && (
         <Field label="For order" required className="mb-3">
-          <LookupSelect kind="sales" query={{ stage: 'order,dispatched' }} value={picked} onChange={(it) => setPicked(it ? it.id : '')} placeholder="Search order or customer…" />
+          <LookupSelect kind="sales" query={{ stage: 'order,dispatched', toSend: '1' }} value={picked} onChange={(it) => setPicked(it ? it.id : '')} placeholder="Search order or customer…" emptyText="No confirmed order has stone left to send. In Sales & Payments, make a quotation and convert it to an order first." />
         </Field>
       )}
       {saleId && full.data?.sale && <LoadingForm key={saleId + (open ? 'o' : 'c')} sale={full.data.sale} slips={full.data.dispatches} onClose={onClose} onDone={onDone} />}
