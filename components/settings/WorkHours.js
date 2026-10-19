@@ -28,7 +28,10 @@ function SaveBtn({ dirty, busy, onClick }) {
 function useCard(value, apply) {
   const [draft, setDraft] = useState(value);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setDraft(value); }, [value]);
+  // start again from the saved values when THEY change. The cards pass a freshly built object on every render, so its identity says nothing:
+  // keying on the object made this effect run on every render, set the draft, render again... without end
+  const saved = JSON.stringify(value);
+  useEffect(() => { setDraft(JSON.parse(saved)); }, [saved]);
   const dirty = !same(draft, value);
   async function save(body, onSaved) {
     setBusy(true);

@@ -24,3 +24,19 @@ test('Owner: the name and role are shown, and Settings has no Company card', asy
   await expect(page.getByText(/Company \(printed on bills/)).toHaveCount(0);
   await expect(page.getByText('GST number')).toHaveCount(0);
 });
+
+test('Owner: the Settings screen draws its shift cards without looping (no "Maximum update depth" error)', async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await signIn(page, 'owner');
+  await page.goto('/settings');
+  await expect(page.getByText('Shifts', { exact: true }).first()).toBeVisible({ timeout: 90_000 });
+  await page.waitForTimeout(2500);
+  expect(errors.filter((e) => /Maximum update depth/i.test(e))).toEqual([]);
+  // changing a shift then saving still works: the card follows the saved values, not every render
+  await page.getByLabel('Shift name').first().fill('Day shift');
+  const card = page.locator('section', { has: page.getByRole('heading', { name: 'Shifts', exact: true }) });
+  await expect(card.getByRole('button', { name: 'Save' })).toBeEnabled();
+});
