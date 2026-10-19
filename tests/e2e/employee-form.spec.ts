@@ -8,8 +8,7 @@ test('Owner: employee form validates every ID field and numbers the new employee
   await page.getByRole('button', { name: /^\s*\+?\s*Add\b/i }).first().click();
 
   const f = (name: string) => page.locator(`#f_${name}`);
-  await expect(f('empCode')).toBeDisabled();
-  await expect(f('empCode')).toHaveValue('');
+  await expect(f('empCode')).toHaveCount(0); // the number is given by the server when saved: there is nothing to type
 
   await f('name').fill('Ramesh Meena');
   await f('mobile').fill('+91 98290 77777');

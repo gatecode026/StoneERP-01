@@ -7,7 +7,6 @@ import { getSessionUser } from '@/lib/auth/session';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect('/login');
-  if (user.mustChangePassword) redirect('/change-password');
   return (
     <Shell>
       <Suspense fallback={<div className="skeleton h-40" />}>{children}</Suspense>

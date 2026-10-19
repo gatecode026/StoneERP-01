@@ -23,7 +23,7 @@ const userSchema = new Schema(
       default: [],
     },
     active: { type: Boolean, default: true, index: true },
-    mustChangePassword: { type: Boolean, default: true },
+    mustChangePassword: { type: Boolean, default: false },
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },

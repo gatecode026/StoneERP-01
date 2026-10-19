@@ -69,29 +69,33 @@ export async function createSession(userId: Types.ObjectId | string, meta: { ip?
 export async function resolveSession(cookieValue: string | undefined | null): Promise<SessionUser | null> {
   const token = verifySigned(cookieValue);
   if (!token) return null;
-  await connect();
-  const now = Date.now();
-  const s = await Session.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date(now) }, absoluteExpiresAt: { $gt: new Date(now) } }).lean();
-  if (!s) return null;
-  const u = await User.findOne({ _id: s.userId, active: true }).lean();
-  if (!u) return null;
-  if (now - new Date(s.lastSeenAt ?? 0).getTime() > TOUCH_EVERY_MS) {
-    const idle = new Date(Math.min(now + IDLE_DAYS * DAY, new Date(s.absoluteExpiresAt).getTime()));
-    await Session.updateOne({ _id: s._id }, { $set: { lastSeenAt: new Date(now), expiresAt: idle } });
+  try {
+    await connect();
+    const now = Date.now();
+    const s = await Session.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date(now) }, absoluteExpiresAt: { $gt: new Date(now) } }).lean();
+    if (!s) return null;
+    const u = await User.findOne({ _id: s.userId, active: true }).lean();
+    if (!u) return null;
+    if (now - new Date(s.lastSeenAt ?? 0).getTime() > TOUCH_EVERY_MS) {
+      const idle = new Date(Math.min(now + IDLE_DAYS * DAY, new Date(s.absoluteExpiresAt).getTime()));
+      await Session.updateOne({ _id: s._id }, { $set: { lastSeenAt: new Date(now), expiresAt: idle } });
+    }
+    return {
+      id: String(u._id),
+      username: u.username,
+      name: u.name,
+      role: u.role as BaseRole,
+      preset: (u.preset as Preset | null) ?? null,
+      employeeId: u.employeeId ? String(u.employeeId) : null,
+      empCode: u.empCode ?? null,
+      extraAccess: (u.extraAccess ?? []).map((x: { resource: string; actions?: string[]; scope?: string }) => ({ resource: x.resource, actions: [...(x.actions ?? [])], scope: (x.scope ?? 'all') as 'own' | 'team' | 'all' })),
+      lang: (u.lang as 'en' | 'hi') ?? 'hi',
+      mustChangePassword: false,
+      sessionId: String(s._id),
+    };
+  } catch {
+    return null;
   }
-  return {
-    id: String(u._id),
-    username: u.username,
-    name: u.name,
-    role: u.role as BaseRole,
-    preset: (u.preset as Preset | null) ?? null,
-    employeeId: u.employeeId ? String(u.employeeId) : null,
-    empCode: u.empCode ?? null,
-    extraAccess: (u.extraAccess ?? []).map((x: { resource: string; actions?: string[]; scope?: string }) => ({ resource: x.resource, actions: [...(x.actions ?? [])], scope: (x.scope ?? 'all') as 'own' | 'team' | 'all' })),
-    lang: (u.lang as 'en' | 'hi') ?? 'hi',
-    mustChangePassword: Boolean(u.mustChangePassword),
-    sessionId: String(s._id),
-  };
 }
 
 export async function destroySession(cookieValue: string | undefined | null) {

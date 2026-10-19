@@ -57,12 +57,12 @@ export async function applyLogin(ctx: SvcCtx, auth: AuthCtx, emp: any, login: Lo
   const base = { username: mobile.data, name: emp.name, role, preset, empCode: emp.empCode, employeeId: emp._id, active: true, ...(login.extraAccess ? { extraAccess: login.extraAccess } : {}) };
   if (existing) {
     const set: any = { ...base };
-    if (login.password) { set.passwordHash = await hashPassword(login.password); set.mustChangePassword = true; }
+    if (login.password) { set.passwordHash = await hashPassword(login.password); set.mustChangePassword = false; }
     await User.updateOne({ _id: existing._id }, { $set: set }, { session: ctx.session });
     if (login.password || role !== existing.role || preset !== (existing.preset ?? null) || !existing.active) await destroyUserSessions(existing._id);
   } else {
     if (!login.password) throw badRequest('Set a password for the new sign-in');
-    await User.create([{ ...base, extraAccess: login.extraAccess ?? [], lang: 'hi', passwordHash: await hashPassword(login.password), mustChangePassword: true, createdBy: auth.user.name }], { session: session as any });
+    await User.create([{ ...base, extraAccess: login.extraAccess ?? [], lang: 'hi', passwordHash: await hashPassword(login.password), mustChangePassword: false, createdBy: auth.user.name }], { session: session as any });
   }
   await Employee.updateOne({ _id: emp._id }, { $set: { hasLogin: true, loginRole: role } }, { session: ctx.session });
   clearTeamCache();

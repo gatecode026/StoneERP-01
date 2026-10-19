@@ -6,6 +6,7 @@ import LookupSelect from '@/components/LookupSelect';
 import RuledField, { ruleProblem } from '@/components/RuledField';
 import { apiAsk } from '@/components/askApi';
 import { useApp, useFetch } from '@/components/Providers';
+import { api } from '@/lib/client';
 import { num, todayISO } from '@/lib/format';
 import T from '@/components/T';
 
@@ -30,6 +31,11 @@ export default function LoadingSheet({ open, onClose, saleId: fixedSale, onDone 
   const [picked, setPicked] = useState('');
   const saleId = fixedSale || picked;
   const full = useFetch(open && saleId ? `/api/sales/${saleId}/full` : null);
+  // a saved slip changes what is left on the order: read the order again NOW, so the next slip opened straight after is offered only what remains
+  const saved = async (slip) => {
+    try { full.setData(await api(`/api/sales/${saleId}/full`)); } catch { /* the next open reads it again */ }
+    onDone?.(slip);
+  };
   return (
     <Sheet open={open} onClose={onClose} title="Loading slip + gate pass" wide>
       {!fixedSale && (
@@ -37,7 +43,7 @@ export default function LoadingSheet({ open, onClose, saleId: fixedSale, onDone 
           <LookupSelect kind="sales" query={{ stage: 'order,dispatched', toSend: '1' }} value={picked} onChange={(it) => setPicked(it ? it.id : '')} placeholder="Search order or customer…" emptyText="No confirmed order has stone left to send. In Sales & Payments, make a quotation and convert it to an order first." />
         </Field>
       )}
-      {saleId && full.data?.sale && <LoadingForm key={saleId + (open ? 'o' : 'c')} sale={full.data.sale} slips={full.data.dispatches} onClose={onClose} onDone={onDone} />}
+      {saleId && full.data?.sale && <LoadingForm key={saleId + (open ? 'o' : 'c')} sale={full.data.sale} slips={full.data.dispatches} onClose={onClose} onDone={saved} />}
       {saleId && full.loading && <div className="h-24 skeleton" />}
     </Sheet>
   );

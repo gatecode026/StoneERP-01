@@ -22,7 +22,6 @@ export const EMPLOYEE_FIELDS = [
   { name: 'name', label: 'Name', required: true, rule: 'name', section: 'Personal Details' },
   { name: 'mobile', label: 'Mobile number', type: 'tel', required: true, rule: 'mobile', hint: '10 digits, starting with 6, 7, 8 or 9. This is also their sign-in ID', section: 'Personal Details' },
   { name: 'photo', label: 'Photo', type: 'photo', buttonLabel: 'Add photo', section: 'Personal Details', half: true },
-  { name: 'empCode', label: 'Employee code', readOnly: true, placeholder: 'Auto-generated when saved (EMP-0001, EMP-0002 …)', hint: 'Numbered automatically; it cannot be typed or changed', section: 'Personal Details' },
   { name: 'fatherName', label: "Father's name", group: 'pii', rule: 'fatherName', section: 'Personal Details' },
   { name: 'address', label: 'Address', group: 'pii', wide: true, section: 'Personal Details' },
 

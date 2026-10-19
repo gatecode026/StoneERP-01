@@ -3,9 +3,9 @@ import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { CheckCheck, Check, X, Pencil, RotateCcw } from 'lucide-react';
+import { CheckCheck, Check, X, Pencil, RotateCcw, LogIn, LogOut } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Badge, StatCard, Empty, DataList, Pager, ExportBtn, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Badge, StatCard, Empty, DataList, Pager, ExportBtn, ActionMenu, cx } from '@/components/ui';
 import { useDebounced, useNumberedList } from '@/lib/usePaged';
 import CrudPage from '@/components/CrudPage';
 import { submit, api } from '@/lib/client';
@@ -124,6 +124,70 @@ export default function AttendancePage() {
 
   const dayOff = sheet.meta.dayKind && sheet.meta.dayKind !== 'working';
   const otCount = ot.data?.data?.length || 0;
+
+  const getAttendanceRowActions = (r, m, next, showPunch, busy) => {
+    const items = [];
+    if (showPunch) {
+      items.push({
+        key: 'punch',
+        label: next === 'In' ? 'Punch In' : 'Punch Out',
+        icon: next === 'In' ? <LogIn size={15} className="text-emerald-600" /> : <LogOut size={15} className="text-amber-600" />,
+        tone: next === 'In' ? 'green' : 'amber',
+        disabled: busy,
+        onClick: () => punch(r),
+      });
+    }
+    if (r.fixable) {
+      items.push({
+        key: 'fix',
+        label: tr('Fix punch'),
+        icon: <Pencil size={15} className="text-char-500" />,
+        onClick: () => setFix(r),
+      });
+    }
+    if (r.canDecideOt && m.otMinutes > 0) {
+      if (m.otStatus === 'pending') {
+        items.push({
+          key: 'approve-ot',
+          label: tr('Approve overtime'),
+          icon: <Check size={15} className="text-emerald-600" />,
+          tone: 'green',
+          dividerBefore: items.length > 0,
+          disabled: busy,
+          onClick: () => decideOt(r, 'approve'),
+        });
+        items.push({
+          key: 'reject-ot',
+          label: tr('Reject overtime'),
+          icon: <X size={15} className="text-red-500" />,
+          danger: true,
+          disabled: busy,
+          onClick: () => decideOt(r, 'reject'),
+        });
+      } else {
+        items.push({
+          key: 'reopen-ot',
+          label: tr('Reopen overtime decision'),
+          icon: <RotateCcw size={15} className="text-char-500" />,
+          dividerBefore: items.length > 0,
+          disabled: busy,
+          onClick: () => decideOt(r, 'reopen'),
+        });
+      }
+    }
+    if (canMark && r.markable) {
+      STATES.forEach((s, idx) => {
+        items.push({
+          key: `mark-${s.v}`,
+          label: `Mark ${tr(s.label)}`,
+          icon: <span className={cx('w-2.5 h-2.5 rounded-full shrink-0', s.v === 'present' ? 'bg-emerald-500' : s.v === 'absent' ? 'bg-red-500' : s.v === 'half' ? 'bg-amber-500' : 'bg-violet-500')} />,
+          dividerBefore: idx === 0 && items.length > 0,
+          onClick: () => mark(r, s.v),
+        });
+      });
+    }
+    return items;
+  };
   const tabsEl = (canApprove || leavesOn) && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Attendance' }, ...(canApprove ? [{ key: 'overtime', label: 'Overtime' }] : []), ...(leavesOn ? [{ key: 'leaves', label: 'Leave requests' }] : [])]} />;
   const showMark = tab === 'mark' || (!leavesOn && !canApprove);
 
@@ -174,8 +238,7 @@ export default function AttendancePage() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         {m.state && !(canMark && r.markable) && <Badge tone={TONE[m.state] || 'green'}>{STATES.find((x) => x.v === m.state)?.label || m.state}</Badge>}
                         {!m.state && <Badge tone={dayOff ? 'gray' : 'amber'}><T>{dayOff ? 'Off' : 'not marked'}</T></Badge>}
-                        {showPunch && <button className="btn-outline btn-sm" disabled={busyRow === e.empCode} onClick={() => punch(e)}>{next === 'In' ? <T>Punch In</T> : <T>Punch Out</T>}</button>}
-                        {r.fixable && <button className="icon-btn" onClick={() => setFix(r)} title={tr('Fix punch')} aria-label={tr('Fix punch')}><Pencil size={15} /></button>}
+                        <ActionMenu items={getAttendanceRowActions(e, m, next, showPunch, busyRow === e.empCode)} />
                       </div>
                     </div>
                     <PunchLine m={m} />
@@ -239,17 +302,8 @@ export default function AttendancePage() {
                           {m.corrected && <> <Badge tone="blue"><T>corrected</T></Badge></>}
                         </td>
                         <td className="td whitespace-nowrap text-xs text-char-700">{m.method ? (m.method === 'app' ? <T>App</T> : m.method === 'biometric' ? <T>Biometric</T> : <T>Manual</T>) : <span className="text-char-300">—</span>}</td>
-                        <td className="td whitespace-nowrap text-right w-px">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {showPunch && <button className="btn-outline btn-sm" disabled={busy} onClick={() => punch(r)}>{next === 'In' ? <T>Punch In</T> : <T>Punch Out</T>}</button>}
-                            {canMark && r.markable && (
-                              <select className="input !w-auto !min-h-[34px] !py-0 text-xs" aria-label={tr('Mark')} value="" onChange={(ev) => ev.target.value && mark(r, ev.target.value)}>
-                                <option value="">{tr('Mark…')}</option>
-                                {STATES.map((s) => <option key={s.v} value={s.v}>{tr(s.label)}</option>)}
-                              </select>
-                            )}
-                            {r.fixable && <button className="icon-btn" onClick={() => setFix(r)} title={tr('Fix punch')} aria-label={tr('Fix punch')}><Pencil size={15} /></button>}
-                          </div>
+                        <td className="td whitespace-nowrap text-right w-px" onClick={(e) => e.stopPropagation()}>
+                          <ActionMenu items={getAttendanceRowActions(r, m, next, showPunch, busy)} />
                         </td>
                       </tr>
                     );

@@ -18,30 +18,7 @@ import {
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
 
-function VipulLogoMark({ className = 'w-12 h-10' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 80"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden="true"
-    >
-      {/* Faceted geometric stone peak / mountain */}
-      <polygon points="50,4 28,34 50,38" fill="#D8C8B5" />
-      <polygon points="50,4 72,34 50,38" fill="#C2AB92" />
-      <polygon points="12,50 28,34 50,38" fill="#AB9176" />
-      <polygon points="88,50 72,34 50,38" fill="#957A60" />
-      <polygon points="12,50 50,74 50,38" fill="#8B7057" />
-      <polygon points="88,50 50,74 50,38" fill="#785D44" />
-      <polygon points="26,74 50,74 50,38" fill="#A1866C" />
-      <polygon points="74,74 50,74 50,38" fill="#80654D" />
-      {/* Sheen reflection */}
-      <polygon points="50,4 38,36 50,38" fill="#F2E8DC" opacity="0.65" />
-      <polygon points="50,4 62,36 50,38" fill="#695139" opacity="0.25" />
-    </svg>
-  );
-}
+
 
 const TEXTS = {
   en: {
@@ -128,7 +105,7 @@ export default function LoginPage() {
         method: 'POST',
         body: { username: username.trim(), password },
       });
-      router.replace(res.mustChangePassword ? '/change-password' : '/');
+      router.replace('/');
       router.refresh();
     } catch (err) {
       setError((err as Error).message || 'Invalid credentials. Please try again.');
@@ -170,13 +147,11 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-between h-full">
           {/* Top Brand Logo */}
           <div className="flex flex-col items-start">
-            <VipulLogoMark className="w-12 h-9 sm:w-14 sm:h-11" />
-            <span className="text-xs sm:text-sm font-black tracking-[0.24em] text-gray-900 uppercase mt-1">
-              VIPUL
-            </span>
-            <span className="text-[9px] sm:text-[10px] font-semibold tracking-[0.28em] text-gray-600 uppercase">
-              STONE SUPPLIERS
-            </span>
+            <img
+              src="/logo.png"
+              alt="Vipul Stone Suppliers"
+              className="h-14 sm:h-16 w-auto object-contain"
+            />
           </div>
 
           {/* Hero Headline & Subtext */}
@@ -263,15 +238,13 @@ export default function LoginPage() {
         />
 
         <div className="relative z-10 w-full max-w-[390px] lg:max-w-[420px] bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-7 xl:p-8 shadow-[0_12px_40px_rgba(0,0,0,0.06)] border border-gray-100 flex flex-col justify-between">
-          {/* Card Header with Centered Faceted Logo */}
+          {/* Card Header with Centered Logo */}
           <div className="flex flex-col items-center text-center">
-            <VipulLogoMark className="w-14 h-10 sm:w-16 sm:h-11" />
-            <span className="text-xs sm:text-sm font-black tracking-[0.22em] text-gray-900 uppercase mt-0.5">
-              VIPUL
-            </span>
-            <span className="text-[8px] sm:text-[9px] font-semibold tracking-[0.28em] text-gray-500 uppercase">
-              STONE SUPPLIERS
-            </span>
+            <img
+              src="/logo.png"
+              alt="Vipul Stone Suppliers"
+              className="h-20 sm:h-24 w-auto object-contain mb-1"
+            />
 
             {/* ERP SYSTEM flanked by subtle accent lines */}
             <div className="flex items-center justify-center gap-2.5 w-full my-2.5">
