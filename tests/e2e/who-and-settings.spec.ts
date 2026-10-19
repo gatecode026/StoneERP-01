@@ -36,7 +36,7 @@ test('Owner: the Settings screen draws its shift cards without looping (no "Maxi
   await page.waitForTimeout(2500);
   expect(errors.filter((e) => /Maximum update depth/i.test(e))).toEqual([]);
   // changing a shift then saving still works: the card follows the saved values, not every render
-  await page.getByLabel('Shift name').first().fill('Day shift');
+  await page.getByLabel('Shift name').first().fill(`Day shift ${Date.now()}`); // a name that is not saved yet, so the card is changed
   const card = page.locator('section', { has: page.getByRole('heading', { name: 'Shifts', exact: true }) });
   await expect(card.getByRole('button', { name: 'Save' })).toBeEnabled();
 });
