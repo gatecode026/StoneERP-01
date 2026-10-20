@@ -17,7 +17,7 @@ export const H = {
   alerts: { en: 'Alerts', hi: 'चेतावनी' }, noAlerts: { en: 'No urgent alerts', hi: 'कोई ज़रूरी चेतावनी नहीं' }, all: { en: 'All', hi: 'सभी' },
   profit: { en: 'Profit', hi: 'मुनाफ़ा' }, profitOrders: { en: 'Profit per order', hi: 'ऑर्डर के अनुसार मुनाफ़ा' }, profitBlocks: { en: 'Profit per block', hi: 'ब्लॉक के अनुसार मुनाफ़ा' }, margin: { en: 'margin', hi: 'मार्जिन' }, last30: { en: 'last 30 days', hi: 'पिछले 30 दिन' },
   trend: { en: 'Machine output – last 7 days (sq ft)', hi: 'मशीन उत्पादन – पिछले 7 दिन (sq ft)' },
-  noPermission: { en: 'You do not have access to this', hi: 'आपको इसकी अनुमति नहीं है' }, nothingYet: { en: 'Nothing here yet', hi: 'अभी कुछ नहीं' }, retry: { en: 'Try again', hi: 'फिर कोशिश करें' }, loadFail: { en: 'Could not load this screen', hi: 'यह स्क्रीन लोड नहीं हो सकी' },
+  noPermission: { en: 'You do not have access to this', hi: 'आपको इसकी अनुमति नहीं है' }, noSections: { en: 'Nothing to show on your home screen. Ask the Owner to give your role access in Settings → Roles.', hi: 'आपकी होम स्क्रीन पर दिखाने के लिए कुछ नहीं है। मालिक से कहें कि सेटिंग्स → रोल्स में आपके रोल को अनुमति दें।' }, nothingYet: { en: 'Nothing here yet', hi: 'अभी कुछ नहीं' }, retry: { en: 'Try again', hi: 'फिर कोशिश करें' }, loadFail: { en: 'Could not load this screen', hi: 'यह स्क्रीन लोड नहीं हो सकी' },
   // manager
   opsBoard: { en: "Today's operations", hi: 'आज का संचालन' }, noEntry: { en: 'Machines with no entry yet', hi: 'जिन मशीनों की एंट्री बाकी है' }, toCheck: { en: 'Reports to check', hi: 'जाँचने वाली रिपोर्ट' }, overdue: { en: 'Overdue tasks', hi: 'देर वाले काम' }, escalate: { en: 'Above your limit – escalate to Owner', hi: 'आपकी सीमा से ऊपर – मालिक को भेजें' },
   // accountant

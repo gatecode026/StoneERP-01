@@ -26,26 +26,41 @@ export function PageHeader({ title, subtitle, actions, back }) {
   );
 }
 
-const TONES = {
-  default: 'bg-white border-sand-200',
-  red: 'bg-red-50 border-red-200',
-  green: 'bg-emerald-50 border-emerald-200',
-  amber: 'bg-amber-50 border-amber-200',
-  terra: 'bg-terra-50 border-terra-100',
+const ICON_TONES = {
+  default: 'bg-stone-100 text-char-500',
+  red: 'bg-rose-50 text-rose-600',
+  green: 'bg-emerald-50 text-emerald-600',
+  amber: 'bg-amber-50 text-amber-600',
+  terra: 'bg-terra-50 text-terra',
 };
+
+const BORDER_ACCENTS = {
+  default: 'border-stone-200/90',
+  red: 'border-stone-200/90 border-l-[3px] border-l-rose-500',
+  green: 'border-stone-200/90 border-l-[3px] border-l-emerald-500',
+  amber: 'border-stone-200/90 border-l-[3px] border-l-amber-500',
+  terra: 'border-stone-200/90 border-l-[3px] border-l-terra',
+};
+
 export function StatCard({ label, value, sub, tone = 'default', icon: Icon, href, valueClass }) {
   const tx = useTx();
   const body = (
-    <div className={cx('rounded-2xl border p-3.5 h-full', TONES[tone])}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-char-500">{tx(label)}</div>
-        {Icon && <Icon size={16} className="text-terra shrink-0" />}
+    <div className={cx('rounded-2xl border bg-white p-3.5 h-full flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] hover:border-stone-300 hover:shadow-xs transition-all duration-150', BORDER_ACCENTS[tone] || BORDER_ACCENTS.default)}>
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-char-500 truncate">{tx(label)}</div>
+          {Icon && (
+            <div className={cx('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', ICON_TONES[tone] || ICON_TONES.default)}>
+              <Icon size={15} />
+            </div>
+          )}
+        </div>
+        <div className={cx('text-2xl font-bold tracking-tight text-char mt-1 leading-tight break-words', valueClass)}>{value}</div>
       </div>
-      <div className={cx('text-2xl font-bold mt-1 leading-tight break-words', valueClass)}>{value}</div>
-      {sub && <div className="text-xs text-char-500 mt-1">{tx(sub)}</div>}
+      {sub && <div className="text-xs text-char-500 mt-2 font-normal">{tx(sub)}</div>}
     </div>
   );
-  return href ? <Link href={href} className="block">{body}</Link> : body;
+  return href ? <Link href={href} className="block group h-full">{body}</Link> : body;
 }
 
 export function Skeleton({ className = 'h-20' }) { return <div className={cx('skeleton', className)} />; }

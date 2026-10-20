@@ -21,11 +21,18 @@ const isActive = (pathname, href) => {
 
 function Brand({ compact }) {
   const { t } = useApp();
-  if (compact) return null;
+  if (compact) return (
+    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-terra to-terra-700 flex items-center justify-center text-white font-bold text-sm shadow-xs">
+      V
+    </div>
+  );
   return (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex items-center gap-2.5 min-w-0">
+      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-terra to-terra-700 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
+        V
+      </div>
       <div className="min-w-0 leading-tight">
-        <div className="font-bold text-sm truncate">{t('appName')}</div>
+        <div className="font-bold text-sm tracking-tight text-char truncate">{t('appName')}</div>
         <div className="text-[10px] text-char-500 truncate"><T>RD Natural Stones · Bijoliya</T></div>
       </div>
     </div>
@@ -35,8 +42,8 @@ function Brand({ compact }) {
 function LangToggle() {
   const { lang, setLang, tr } = useApp();
   return (
-    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1 h-11 min-w-[44px] px-2.5 rounded-lg border border-sand-300 bg-white text-xs font-bold" aria-label={tr('Language')}>
-      <Languages size={14} /> {lang === 'en' ? 'हिं' : 'EN'}
+    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1.5 h-10 px-2.5 rounded-xl border border-stone-200 bg-white text-xs font-semibold text-char-700 hover:bg-stone-50 transition shadow-2xs" aria-label={tr('Language')}>
+      <Languages size={14} className="text-terra" /> {lang === 'en' ? 'हिं' : 'EN'}
     </button>
   );
 }
@@ -56,6 +63,19 @@ export default function Shell({ children }) {
   useEffect(() => { if (session === null) router.replace('/login'); }, [session, router]);
   useEffect(() => { try { setCollapsed(localStorage.getItem('vss_side') === '1'); } catch {} }, []);
 
+  // Keyboard shortcut Ctrl+K / Cmd+K to open search
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setFq('');
+        setFinder((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (!session) return <div className="p-6 max-w-md mx-auto"><SkeletonList n={5} /></div>;
 
   const role = session.role;
@@ -74,8 +94,8 @@ export default function Shell({ children }) {
     const active = isActive(pathname, it.href);
     return (
       <Link href={it.href} title={t(it.key)}
-        className={cx('flex items-center gap-3 rounded-xl px-3 min-h-[40px] md:min-h-[34px] md:py-1 text-sm md:text-[13px] font-medium transition', active ? 'bg-terra text-white shadow-sm' : 'text-char-700 hover:bg-sand-200', small && 'min-h-[44px]')}>
-        <Icon size={18} className="shrink-0" />
+        className={cx('flex items-center gap-3 rounded-xl px-3 min-h-[40px] md:min-h-[36px] md:py-1.5 text-sm md:text-[13px] font-medium transition', active ? 'bg-terra text-white shadow-xs font-semibold' : 'text-char-700 hover:bg-stone-100', small && 'min-h-[44px]')}>
+        <Icon size={17} className={cx('shrink-0', active ? 'text-white' : 'text-char-500')} />
         {!(collapsed && !small) && <span className="truncate">{t(it.key)}</span>}
       </Link>
     );
@@ -86,47 +106,69 @@ export default function Shell({ children }) {
       {/* Desktop sidebar */}
       <aside
         className={cx(
-          'hidden md:flex flex-col shrink-0 bg-white border-r border-sand-200 h-screen fixed top-0 left-0 bottom-0 z-30 transition-all duration-200 ease-in-out',
+          'hidden md:flex flex-col shrink-0 bg-white border-r border-stone-200/90 h-screen fixed top-0 left-0 bottom-0 z-30 transition-all duration-200 ease-in-out shadow-[1px_0_4px_rgba(0,0,0,0.02)]',
           collapsed ? 'w-[68px]' : 'w-64'
         )}
       >
-        <div className={cx('p-2.5 flex items-center border-b border-sand-100 shrink-0', collapsed ? 'justify-center' : 'justify-between')}>
+        <div className={cx('p-3.5 flex items-center border-b border-stone-100 shrink-0', collapsed ? 'justify-center' : 'justify-between')}>
           <Brand compact={collapsed} />
-          <button className="p-1.5 rounded-lg hover:bg-sand-100 text-char-500" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
+          <button className="p-1.5 rounded-lg hover:bg-stone-100 text-char-400 hover:text-char transition" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
-        <nav className="flex-1 p-2 space-y-2 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 p-2 space-y-1.5 overflow-y-auto pb-4">
           <NavLink it={DASH} />
           {groups.map((g) => (
-            <div key={g.key} className="pt-1">
+            <div key={g.key} className="pt-2">
               {!collapsed && <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-char-400">{t(g.key)}</div>}
               <div className="space-y-0.5">{g.items.map((it) => <NavLink key={it.key} it={it} />)}</div>
             </div>
           ))}
         </nav>
-        <div className="p-2.5 border-t border-sand-100 text-xs shrink-0">
-          {!collapsed && <div className="mb-1.5 leading-tight"><span className="font-semibold">{session.name}</span> <span className="text-char-500 capitalize">· {ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span></div>}
-          <button onClick={logout} className="btn-outline btn-sm w-full"><LogOut size={14} />{!collapsed && t('logout')}</button>
+        <div className="p-2.5 border-t border-stone-100 shrink-0 bg-stone-50/50">
+          {!collapsed ? (
+            <div className="flex items-center justify-between gap-2 p-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-terra-50 border border-terra-100 text-terra font-bold text-xs flex items-center justify-center shrink-0">
+                  {session.name ? session.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="min-w-0 leading-tight">
+                  <div className="font-semibold text-xs text-char truncate">{session.name}</div>
+                  <div className="text-[10px] text-char-500 truncate capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</div>
+                </div>
+              </div>
+              <button onClick={logout} title={t('logout')} className="p-1.5 rounded-lg text-char-400 hover:text-rose-600 hover:bg-rose-50 transition" aria-label={t('logout')}>
+                <LogOut size={16} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={logout} title={t('logout')} className="w-full flex justify-center p-2 rounded-xl text-char-400 hover:text-rose-600 hover:bg-rose-50 transition" aria-label={t('logout')}>
+              <LogOut size={18} />
+            </button>
+          )}
         </div>
       </aside>
 
       <div className={cx('min-w-0 flex flex-col transition-all duration-200 ease-in-out', collapsed ? 'md:pl-[68px]' : 'md:pl-64')}>
         {/* Top bar */}
-        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-sand-200 no-print">
-          <div className="flex items-center justify-between gap-2 px-3 sm:px-4 h-14">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-stone-200/90 no-print">
+          <div className="flex items-center justify-between gap-2 px-4 sm:px-6 h-14">
             <div className="md:hidden min-w-0 flex-1 leading-tight" data-testid="who">
-              <div className="font-bold text-sm truncate">{session.name}</div>
+              <div className="font-bold text-sm truncate text-char">{session.name}</div>
               <div className="text-[11px] text-char-500 truncate capitalize">{who}</div>
             </div>
-            <div className="hidden md:flex items-center gap-2">
-              <span className="font-bold">{t('appName')}</span>
+            <div className="hidden md:flex items-center gap-3">
+              <button onClick={() => { setFq(''); setFinder(true); }} className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-stone-200/90 bg-stone-50/70 text-xs text-char-500 hover:text-char hover:bg-white hover:border-stone-300 transition shadow-2xs">
+                <Search size={14} className="text-char-400" />
+                <span>{tr('Search screens')}</span>
+                <kbd className="text-[10px] bg-white px-1.5 py-0.5 rounded border border-stone-200 font-mono text-char-400">⌘K</kbd>
+              </button>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="hidden sm:inline-flex badge-gray capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
-              <button className="h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={() => { setFq(''); setFinder(true); }} aria-label={tr('Search screens')}><Search size={16} /></button>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="hidden sm:inline-flex badge-gray capitalize font-medium">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
+              <button className="md:hidden h-10 w-10 flex items-center justify-center rounded-xl border border-stone-200 bg-white text-char-500 hover:bg-stone-50 transition shadow-2xs" onClick={() => { setFq(''); setFinder(true); }} aria-label={tr('Search screens')}><Search size={16} /></button>
               <LangToggle />
-              <button className="md:hidden h-11 w-11 flex items-center justify-center rounded-lg border border-sand-300" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
+              <button className="md:hidden h-10 w-10 flex items-center justify-center rounded-xl border border-stone-200 bg-white text-char-500 hover:bg-stone-50 transition shadow-2xs" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>
             </div>
           </div>
           {(!online || queued > 0) && (

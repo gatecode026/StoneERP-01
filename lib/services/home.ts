@@ -187,7 +187,7 @@ async function supervisorHome(date: string, user: U, perm: EffectivePerm, settin
     reports: { toCheck: (reps as any[]).filter((r) => !r.supCheck).slice(0, 12), filled: reported.size, missing: team.filter((t) => !reported.has(t.empCode)).map((t) => t.name).slice(0, 12) },
     machines: { dueEntries: (machines as any[]).filter((m) => !ran.has(String(m._id))).map((m) => ({ id: String(m._id), name: m.name })), outputSqft: sum(entries as any[], (e) => e.outputSqft), breakdowns: (entries as any[]).filter((e) => e.breakdown || e.stoppedMins >= 60).map((e) => ({ name: e.machineName, mins: e.stoppedMins })), openRepairs: repairs },
     safetyDue: safety, tasks,
-  }, { team: 'attendance', reports: 'dailyreports', machines: 'machineentries', tasks: 'tasks' });
+  }, { team: 'attendance', reports: 'dailyreports', machines: 'machineentries', tasks: 'tasks', safetyDue: 'safetyrecords' });
 }
 
 // ------------------------------------------------------------------ SALESPERSON
@@ -230,9 +230,9 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
     }
     case 'store_keeper': {
       const [low, pending, moves, recentBuys] = await Promise.all([
-        StockItem.find({ belowMin: true, isVoid: false }).sort({ name: 1 }).limit(12).select('name balance minLevel unit').lean(),
-        StockMovement.countDocuments({ status: 'pending', isVoid: false }),
-        StockMovement.find({ isVoid: false, date }).sort({ createdAt: -1 }).limit(8).select('itemName type qty ref status').lean(),
+        perm.can('stockitems', 'view') ? StockItem.find({ belowMin: true, isVoid: false }).sort({ name: 1 }).limit(12).select('name balance minLevel unit').lean() : [],
+        perm.can('stockmovements', 'view') ? StockMovement.countDocuments({ status: 'pending', isVoid: false }) : 0,
+        perm.can('stockmovements', 'view') ? StockMovement.find({ isVoid: false, date }).sort({ createdAt: -1 }).limit(8).select('itemName type qty ref status').lean() : [],
         perm.can('purchases', 'view') ? Purchase.find({ isVoid: false }).sort({ date: -1 }).limit(5).select('itemName qty supplierName date status').lean() : [],
       ]);
       return withDenied(perm, { ...base, store: { low, pendingDamage: pending, movementsToday: moves, recentPurchases: recentBuys } }, { store: 'stockitems' });
@@ -249,7 +249,12 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
       return withDenied(perm, { ...base, workshop: { open, serviceDue: due, machines: (machines as any[]).length } }, { workshop: 'repairs' });
     }
     case 'cashier': {
-      const [accts, closing, flows] = await Promise.all([Account.find({ _id: { $in: ['cash', 'bank'] } }).lean(), CashClosing.findOne({ date, isVoid: false }).lean(), CashEntry.find({ date, isVoid: false }).sort({ createdAt: -1 }).limit(10).select('head account type amount').lean()]);
+      const csf = await scopeFilter(user, perm, 'cashentries', 'view');
+      const [accts, closing, flows] = await Promise.all([
+        perm.can('accounts', 'view') ? Account.find({ _id: { $in: ['cash', 'bank'] } }).lean() : [],
+        perm.can('cashclosings', 'view') ? CashClosing.findOne({ date, isVoid: false }).lean() : null,
+        CashEntry.find({ $and: [{ date, isVoid: false }, csf] }).sort({ createdAt: -1 }).limit(10).select('head account type amount').lean(),
+      ]);
       const bal = (id: string) => (accts as any[]).find((a) => a._id === id)?.balance ?? 0;
       return withDenied(perm, { ...base, till: { cash: bal('cash'), bank: bal('bank'), closed: Boolean(closing), closing, today: flows } }, { till: 'cashentries' });
     }
@@ -264,9 +269,11 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
       return withDenied(perm, { ...base, drive: { trips, monthLitres: month[0]?.litres ?? 0, monthTrips: month[0]?.n ?? 0, vehicles } }, { drive: 'vehicletrips' });
     }
     case 'yard_incharge': {
+      const bsf = await scopeFilter(user, perm, 'blocks', 'view');
+      const dsf = await scopeFilter(user, perm, 'dispatches', 'view');
       const [inYard, inToday] = await Promise.all([
-        Block.find({ isVoid: false, stage: 'received' }).sort({ blockNo: -1 }).limit(12).select('blockNo rawanna cft yardLocation date').lean(),
-        Dispatch.find({ date, direction: 'in', isVoid: false }).select('truckNo kind driverName').lean(),
+        Block.find({ $and: [{ isVoid: false, stage: 'received' }, bsf] }).sort({ blockNo: -1 }).limit(12).select('blockNo rawanna cft yardLocation date').lean(),
+        Dispatch.find({ $and: [{ date, direction: 'in', isVoid: false }, dsf] }).select('truckNo kind driverName').lean(),
       ]);
       return withDenied(perm, { ...base, yard: { inYard, trucksInToday: inToday } }, { yard: 'blocks' });
     }

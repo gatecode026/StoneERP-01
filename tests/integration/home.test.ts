@@ -149,6 +149,28 @@ describe('every role gets its own home, in one request', () => {
     await resetRoleConfig('manager');
     resetCaches();
   });
+  it('a preset that loses a right gets none of that data in the payload, not just a hidden card', async () => {
+    const { saveRoleConfig, resetRoleConfig } = await import('@/lib/perm/store');
+    const { ROLE_DEFAULTS } = await import('@/lib/perm/defaults');
+    const strip = async (key: 'cashier' | 'store_keeper', drop: string[]) => {
+      const g = JSON.parse(JSON.stringify(ROLE_DEFAULTS[key].grants));
+      for (const r of drop) delete g[r];
+      await saveRoleConfig(key, { grants: g, fields: ROLE_DEFAULTS[key].fields, approvalLimit: 0 }, 'test');
+      resetCaches();
+    };
+    await strip('cashier', ['accounts', 'cashclosings']);
+    const till = (await get(who.cashier)).json.till;
+    expect(till.cash).toBe(0);
+    expect(till.bank).toBe(0);
+    expect(till.closing).toBeNull();
+    await resetRoleConfig('cashier');
+    await strip('store_keeper', ['stockitems', 'stockmovements']);
+    const store = (await get(who.store_keeper)).json.store;
+    expect(store.low).toEqual([]);
+    expect(store.movementsToday).toEqual([]);
+    await resetRoleConfig('store_keeper');
+    resetCaches();
+  });
   it('unauthenticated callers get 401', async () => {
     expect((await call(null, home.GET as never, '/api/home')).status).toBe(401);
   });
