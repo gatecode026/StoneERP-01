@@ -1,5 +1,6 @@
 import { RolePermission } from '../models';
 import { connect } from '../db';
+import { invalidate as invalidateCache } from '../cache';
 import { ROLE_DEFAULTS, type RoleDefault } from './defaults';
 import { ACTIONS, FIELD_GROUPS, FIELD_LEVELS, RESOURCE_KEYS, SCOPES, type Grants } from './resources';
 import { BASE_ROLES, PRESETS } from '../roles';
@@ -93,6 +94,7 @@ export async function saveRoleConfig(key: string, input: { grants: Grants; field
   const meta = await RolePermission.findOneAndUpdate({ _id: '_meta' }, { $inc: { version: 1 } }, { upsert: true, returnDocument: 'after' });
   await RolePermission.updateOne({ _id: key }, { $set: { ...v, known: RESOURCE_KEYS as string[], updatedBy: by, version: meta.version } }, { upsert: true });
   invalidate();
+  invalidateCache('home');
 }
 
 export async function resetRoleConfig(key: string) {
@@ -101,5 +103,6 @@ export async function resetRoleConfig(key: string) {
   await RolePermission.deleteOne({ _id: key });
   await RolePermission.findOneAndUpdate({ _id: '_meta' }, { $inc: { version: 1 } }, { upsert: true });
   invalidate();
+  invalidateCache('home');
 }
 export const permVersion = () => cache.version;

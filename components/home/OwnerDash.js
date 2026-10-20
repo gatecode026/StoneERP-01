@@ -6,7 +6,7 @@ import { cx } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { inr, inrShort, num } from '@/lib/format';
 import { Card, Delta, OwnerAttendanceChart, OwnerBalanceChart, OwnerExpenseDonut, OwnerOutputChart, OwnerOwedChart, OwnerPulseChart, HEAD_COLORS } from './parts';
-import { AlertsCard, Approvals, ProfitCard, ReportPreview } from './OwnerHome';
+import { AlertsCard, ProfitCard, ReportPreview } from './OwnerHome';
 import { useH } from './strings';
 import T from '@/components/T';
 
@@ -26,21 +26,37 @@ export function Sparkline({ values, className = 'text-terra' }) {
   );
 }
 
-const TONE = { default: 'bg-white border-sand-200', amber: 'bg-amber-50 border-amber-200', green: 'bg-emerald-50 border-emerald-200', red: 'bg-red-50 border-red-200' };
+const KPI_ICON_TONES = {
+  default: 'bg-stone-100 text-char-500',
+  amber: 'bg-amber-50 text-amber-600',
+  green: 'bg-emerald-50 text-emerald-600',
+  red: 'bg-rose-50 text-rose-600',
+};
+
+const KPI_BORDER_ACCENTS = {
+  default: 'border-stone-200/90',
+  amber: 'border-stone-200/90 border-l-[3px] border-l-amber-500',
+  green: 'border-stone-200/90 border-l-[3px] border-l-emerald-500',
+  red: 'border-stone-200/90 border-l-[3px] border-l-rose-500',
+};
 
 function Kpi({ icon: Icon, label, value, sub, href, tone = 'default', spark, sparkClass, valueClass }) {
   const body = (
-    <div className={cx('rounded-2xl border p-3.5 h-full flex flex-col', TONE[tone])}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-char-500 leading-tight"><T>{label}</T></div>
-        <Icon size={16} className="text-terra shrink-0" />
+    <div className={cx('rounded-2xl border bg-white p-3.5 h-full flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] hover:border-stone-300 hover:shadow-xs transition-all duration-150', KPI_BORDER_ACCENTS[tone] || KPI_BORDER_ACCENTS.default)}>
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-char-500 leading-tight truncate"><T>{label}</T></div>
+          <div className={cx('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', KPI_ICON_TONES[tone] || KPI_ICON_TONES.default)}>
+            <Icon size={15} />
+          </div>
+        </div>
+        <div className={cx('text-2xl font-bold tracking-tight text-char mt-1 leading-tight break-words', valueClass)}>{value}</div>
+        <div className="text-xs text-char-500 mt-1 min-h-[16px]">{sub}</div>
       </div>
-      <div className={cx('text-2xl font-bold mt-1 leading-tight break-words', valueClass)}>{value}</div>
-      <div className="text-xs text-char-500 mt-1 min-h-[16px]">{sub}</div>
-      <div className="mt-auto pt-2"><Sparkline values={spark} className={sparkClass} /></div>
+      <div className="mt-2 pt-2 border-t border-stone-100/80"><Sparkline values={spark} className={sparkClass} /></div>
     </div>
   );
-  return href ? <Link href={href} className="block hover:shadow-sm transition">{body}</Link> : body;
+  return href ? <Link href={href} className="block group h-full">{body}</Link> : body;
 }
 
 function RangeTabs({ value, onChange }) {
@@ -174,7 +190,7 @@ function StockLevels({ rows }) {
 }
 
 /** The Owner's home: what needs them, the numbers with their trend, then the graphs, all from the day's records and refreshed by the page every few seconds. */
-export function OwnerHome({ data, reload, canDecide }) {
+export function OwnerHome({ data }) {
   const h = useH();
   const { t } = useApp();
   const d = data.report;
@@ -198,14 +214,7 @@ export function OwnerHome({ data, reload, canDecide }) {
         {d.cash && <Kpi icon={Landmark} label={<T>Cash + bank</T>} value={inrShort(total)} sub={<>{h('cash')} {inrShort(d.cash.inHand)} · {h('bank')} {inrShort(d.cash.bank)}</>} href="/cash" tone={d.cash.inHand < 0 ? 'red' : 'default'} valueClass={total < 0 ? 'text-red-700' : ''} spark={col(week, 'balance')} sparkClass="text-amber-700" />}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
-        <div className="lg:col-span-2"><Pulse series={s} /></div>
-        <div id="approvals" className="order-first lg:order-none scroll-mt-20">
-          <Card title={`${h('approvals')} (${d.approvals?.length || 0})`} empty={!d.approvals?.length} emptyText={h('nothingWaiting')}>
-            <Approvals items={d.approvals || []} reload={reload} canDecide={canDecide} />
-          </Card>
-        </div>
-      </div>
+      <div className="mt-4"><Pulse series={s} /></div>
 
       <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card title={<T>Machine output and idle time</T>} href="/machines" denied={!d.machines} empty={!s.length || !('sqft' in s[0]) || quiet(s.slice(-14), ['sqft', 'idleHours'])} emptyText={<T>No machine output in the last 14 days</T>}><OwnerOutputChart series={s.slice(-14)} /><p className="text-[11px] text-char-500 mt-1"><T>Last 14 days. The line is the hours machines stood idle.</T></p></Card>
@@ -223,7 +232,7 @@ export function OwnerHome({ data, reload, canDecide }) {
         <StockLevels rows={data.stockLevels} />
         <AlertsCard d={d} />
         {d.reports && (
-          <Card title={`${h('reports')} · ${h('missing')} (${d.reports.missing})`} href="/daily-report" empty={!d.reports.missing && !d.reports.problems.length} emptyText="✔">
+          <Card title={`${h('reports')} · ${h('missing')} (${d.reports.missing})`} href="/daily-report" empty={!d.reports.missing && !d.reports.problems.length} emptyText={h('nothingYet')}>
             <div className="flex flex-wrap gap-1.5">{d.reports.missingNames.map((n) => <span key={n} className="badge-amber">{n}</span>)}</div>
             {d.reports.problems.length > 0 && <>
               <div className="text-xs font-bold uppercase text-red-600 mt-4 mb-1">{h('problems')}</div>

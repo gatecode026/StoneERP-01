@@ -1,8 +1,8 @@
 'use client';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { RefreshCw, ShieldAlert, TrendingDown, TrendingUp } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 import { Section, Skeleton, cx } from '@/components/ui';
 import { useH } from './strings';
 
@@ -23,13 +23,12 @@ export const HEAD_COLORS = ['#B5651D', '#2B2B2B', '#D9A066', '#7F4412', '#A8A8A8
 
 /** A home-screen card with the four states every card needs: ready, empty, no permission (loading and error are handled by the page). */
 export function Card({ title, right, denied, empty, emptyText, className, children, href }) {
-  const h = useH();
+  const h = useH(); // before the early return: hooks must run in the same order on every render
+  if (denied) return null;
   const head = href ? <Link href={href} className="hover:underline">{title}</Link> : title;
   return (
     <Section title={head} right={right} className={className}>
-      {denied ? (
-        <div className="flex items-center gap-2 text-sm text-char-500 py-3"><ShieldAlert size={16} className="text-terra" /> {h('noPermission')}</div>
-      ) : empty ? (
+      {empty ? (
         <div className="text-sm text-char-500 py-4 text-center">{emptyText || h('nothingYet')}</div>
       ) : children}
     </Section>
@@ -46,6 +45,29 @@ export function Delta({ now, before, goodWhenUp = true }) {
   const good = up === goodWhenUp;
   const Icon = up ? TrendingUp : TrendingDown;
   return <span className={cx('inline-flex items-center gap-0.5 text-[11px] font-semibold', good ? 'text-emerald-700' : 'text-red-600')}><Icon size={12} />{Math.abs(pct)}% {h('yesterday')}</span>;
+}
+
+/**
+ * Wraps a role's home. Every card hides itself when the role has no view right for it, so a role with every right switched off would see a
+ * blank page; when nothing at all was drawn, say why. Checked in the DOM after each render (no state, so no second render) because the sections
+ * differ per role. Charts count as content (svg / canvas) and so do the skeletons they show while loading.
+ */
+export function HomeBody({ children }) {
+  const h = useH();
+  const body = useRef(null);
+  const note = useRef(null);
+  useLayoutEffect(() => {
+    const el = body.current;
+    if (!el || !note.current) return;
+    const blank = !el.textContent.trim() && !el.querySelector('svg, canvas, img, input, button, .skeleton');
+    note.current.hidden = !blank;
+  });
+  return (
+    <>
+      <div ref={body}>{children}</div>
+      <div ref={note} hidden role="status" className="card p-6 text-center text-sm text-char-500">{h('noSections')}</div>
+    </>
+  );
 }
 
 export function HomeError({ error, onRetry }) {
@@ -76,10 +98,10 @@ export function LiveBadge({ onRefresh, live }) {
   const secs = Math.max(0, Math.round((now - at) / 1000));
   const ago = secs < 5 ? 'just now' : secs < 60 ? `${secs} s ago` : `${Math.round(secs / 60)} min ago`;
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-sand-300 bg-white pl-3 pr-1 min-h-[40px] text-xs text-char-500" role="status">
-      <span className={cx('w-2 h-2 rounded-full', live ? 'bg-emerald-500 animate-pulse' : 'bg-char-300')} aria-hidden="true" />
+    <div className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white pl-3 pr-1 min-h-[40px] text-xs text-char-500 shadow-2xs" role="status">
+      <span className={cx('w-2 h-2 rounded-full', live ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-char-300')} aria-hidden="true" />
       <span><b className="text-char">{live ? 'Live' : 'Past day'}</b> · {ago}</span>
-      <button type="button" aria-label="Refresh" onClick={onRefresh} className="w-8 h-8 rounded-full grid place-items-center hover:bg-sand-100"><RefreshCw size={14} /></button>
+      <button type="button" aria-label="Refresh" onClick={onRefresh} className="w-8 h-8 rounded-lg grid place-items-center hover:bg-stone-100 transition text-char-500 hover:text-char"><RefreshCw size={13} /></button>
     </div>
   );
 }

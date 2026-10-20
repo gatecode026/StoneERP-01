@@ -43,15 +43,35 @@ function RolesEditor() {
     return { ...d, grants: g };
   });
 
+  function broadcastSync() {
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('vss_sync');
+        bc.postMessage({ type: 'perm_change' });
+        bc.close();
+      }
+    } catch {}
+  }
+
   async function save() {
     setBusy(true);
-    try { await api(`/api/roles/${sel}`, { method: 'PUT', body: draft }); toast.success('Saved. The change applies to this role immediately.'); reload(); } catch (e) { toast.error(e.message); }
+    try {
+      await api(`/api/roles/${sel}`, { method: 'PUT', body: draft });
+      toast.success('Saved. The change applies to this role immediately.');
+      broadcastSync();
+      reload();
+    } catch (e) { toast.error(e.message); }
     setBusy(false);
   }
   async function reset() {
     if (!await confirmDialog('Reset this role to the standard permissions from the requirements document?')) return;
     setBusy(true);
-    try { await api(`/api/roles/${sel}/reset`, { method: 'POST', body: {} }); toast.success('Reset to defaults'); reload(); } catch (e) { toast.error(e.message); }
+    try {
+      await api(`/api/roles/${sel}/reset`, { method: 'POST', body: {} });
+      toast.success('Reset to defaults');
+      broadcastSync();
+      reload();
+    } catch (e) { toast.error(e.message); }
     setBusy(false);
   }
 

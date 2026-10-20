@@ -1,9 +1,10 @@
 import './globals.css';
 import { headers } from 'next/headers';
-import { Noto_Sans_Devanagari } from 'next/font/google';
+import { Noto_Sans_Devanagari, Inter } from 'next/font/google';
 
 // Hindi text: self-hosted, Devanagari subset only, shown at once in the fallback font and swapped in when loaded (never blocks rendering)
 const deva = Noto_Sans_Devanagari({ subsets: ['devanagari'], display: 'swap', weight: ['400', '600', '700'], variable: '--font-deva' });
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-sans' });
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/Providers';
 import { getSessionUser } from '@/lib/auth/session';
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';
   const hiDict = lang === 'hi' ? ((await import('@/lib/hi')).HI as Record<string, string>) : null; // only people who use Hindi receive the dictionary
   return (
-    <html lang={lang} className={deva.variable} suppressHydrationWarning>
+    <html lang={lang} className={`${deva.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         {/* react-hot-toast (goober) injects a <style> at runtime; it reads its CSP nonce from window.__nonce__ */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__nonce__=${JSON.stringify(nonce ?? '')}` }} />

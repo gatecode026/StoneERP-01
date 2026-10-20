@@ -97,7 +97,19 @@ export function Providers({ children, initialSession = null, initialLang = 'en',
     let last = Date.now();
     const back = () => { if (document.visibilityState === 'visible' && Date.now() - last > 30_000) { last = Date.now(); router.refresh(); } };
     document.addEventListener('visibilitychange', back);
-    return () => document.removeEventListener('visibilitychange', back);
+    let bc: BroadcastChannel | undefined;
+    try {
+      bc = new BroadcastChannel('vss_sync');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'perm_change') {
+          router.refresh();
+        }
+      };
+    } catch {}
+    return () => {
+      document.removeEventListener('visibilitychange', back);
+      try { bc?.close(); } catch {}
+    };
   }, [initialSession, router]);
 
   // offline shell: register the service worker (production only) and, once signed in, warm the screens a worker needs without a network

@@ -11,6 +11,7 @@ import { useApp } from '@/components/Providers';
 import { Card, Delta } from './parts';
 import { useH } from './strings';
 import T from '@/components/T';
+import { can as canPerm } from '@/lib/clientPerm';
 import { trNow } from '@/lib/trNow';
 
 /** The 8 pm report from the PDF, plus approvals inbox, profit and a day-vs-yesterday comparison. Used by the Owner and (with fewer sections) the Manager. */
@@ -108,25 +109,26 @@ export function ProfitCard({ profit, className = 'mt-4' }) {
   );
 }
 
-export function ReportCards({ d, compare }) {
+export function ReportCards({ d, compare, perm }) {
   const h = useH();
-  const { t } = useApp();
+  const { t, can: appCan } = useApp();
+  const can = (res) => (perm ? canPerm(perm, res, 'view') : appCan(res, 'view'));
   const cur = compare?.today, prev = compare?.yesterday;
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {d.attendance && <StatCard icon={Users} label={t('attendance')} value={`${d.attendance.present}/${d.attendance.total}`} sub={`${d.attendance.absent} ${h('absent')} · ${d.attendance.leave} ${h('leave')} · ${d.attendance.unmarked} ${h('notMarked')}`} href="/attendance" tone={d.attendance.unmarked ? 'amber' : 'default'} />}
-      {d.reports && <StatCard icon={ClipboardList} label={h('reports')} value={`${d.reports.filled}/${d.attendance?.total ?? '—'}`} sub={`${d.reports.missing} ${h('missing')}`} tone={d.reports.missing ? 'amber' : 'green'} href="/daily-report" />}
-      {d.machines && <StatCard icon={Cog} label={h('machines')} value={`${num(d.machines.totalSqft)} sq ft`} sub={<>{d.machines.idleHours} h {h('idle')}{cur && <> · <Delta now={cur.sqft} before={prev.sqft} /></>}</>} href="/machines" />}
-      {d.machines && <StatCard icon={AlertTriangle} label={h('breakdowns')} value={d.machines.breakdowns.length} sub={d.machines.breakdowns.map((m) => m.name).join(', ') || h('allRunning')} tone={d.machines.breakdowns.length ? 'red' : 'green'} valueClass={d.machines.breakdowns.length ? 'text-red-700' : ''} href="/repairs?status=open" />}
-      {d.stock && <StatCard icon={PackageX} label={h('lowStock')} value={d.stock.lowStock.length} sub={d.stock.lowStock[0]?.name || h('allAbove')} tone={d.stock.lowStock.length ? 'red' : 'green'} valueClass={d.stock.lowStock.length ? 'text-red-700' : ''} href="/stock?low=1" />}
-      {d.sales && <>
+      {d.attendance && can('attendance') && <StatCard icon={Users} label={t('attendance')} value={`${d.attendance.present}/${d.attendance.total}`} sub={`${d.attendance.absent} ${h('absent')} · ${d.attendance.leave} ${h('leave')} · ${d.attendance.unmarked} ${h('notMarked')}`} href="/attendance" tone={d.attendance.unmarked ? 'amber' : 'default'} />}
+      {d.reports && can('dailyreports') && <StatCard icon={ClipboardList} label={h('reports')} value={`${d.reports.filled}/${d.attendance?.total ?? '—'}`} sub={`${d.reports.missing} ${h('missing')}`} tone={d.reports.missing ? 'amber' : 'green'} href="/daily-report" />}
+      {d.machines && (can('machines') || can('machineentries')) && <StatCard icon={Cog} label={h('machines')} value={`${num(d.machines.totalSqft)} sq ft`} sub={<>{d.machines.idleHours} h {h('idle')}{cur && <> · <Delta now={cur.sqft} before={prev.sqft} /></>}</>} href="/machines" />}
+      {d.machines && can('repairs') && <StatCard icon={AlertTriangle} label={h('breakdowns')} value={d.machines.breakdowns.length} sub={d.machines.breakdowns.map((m) => m.name).join(', ') || h('allRunning')} tone={d.machines.breakdowns.length ? 'red' : 'green'} valueClass={d.machines.breakdowns.length ? 'text-red-700' : ''} href="/repairs?status=open" />}
+      {d.stock && can('stockitems') && <StatCard icon={PackageX} label={h('lowStock')} value={d.stock.lowStock.length} sub={d.stock.lowStock[0]?.name || h('allAbove')} tone={d.stock.lowStock.length ? 'red' : 'green'} valueClass={d.stock.lowStock.length ? 'text-red-700' : ''} href="/stock?low=1" />}
+      {d.sales && can('sales') && <>
         <StatCard icon={Receipt} label={t('todaySales')} value={inrShort(d.sales.today)} sub={<>{d.sales.orders} {h('orders')}{cur && <> · <Delta now={cur.sales} before={prev.sales} /></>}</>} href="/sales" />
         <StatCard icon={Truck} label={t('dispatches')} value={d.sales.dispatches} sub={h('trucks')} href="/dispatch?status=out" />
         <StatCard icon={HandCoins} label={h('received')} value={inrShort(d.sales.received)} tone="green" sub={cur && <Delta now={cur.received} before={prev.received} />} href="/sales?tab=pending" />
         <StatCard icon={Hourglass} label={h('pending')} value={inrShort(d.sales.pending)} tone="amber" href="/sales?tab=pending" />
       </>}
-      {d.expenses && <StatCard icon={IndianRupee} label={t('expensesToday')} value={inr(d.expenses.total)} sub={<>{d.expenses.count} {h('entries')}{cur && <> · <Delta now={cur.expenses} before={prev.expenses} goodWhenUp={false} /></>}</>} href="/expenses" />}
-      {d.cash && <>
+      {d.expenses && can('expenses') && <StatCard icon={IndianRupee} label={t('expensesToday')} value={inr(d.expenses.total)} sub={<>{d.expenses.count} {h('entries')}{cur && <> · <Delta now={cur.expenses} before={prev.expenses} goodWhenUp={false} /></>}</>} href="/expenses" />}
+      {d.cash && can('cashentries') && <>
         <StatCard icon={Wallet} label={h('cash')} value={inr(d.cash.inHand)} sub={d.cash.closed ? h('closingOk') : h('closingNo')} tone={d.cash.closed ? 'default' : 'amber'} href="/cash" />
         <StatCard icon={Landmark} label={h('bank')} value={inrShort(d.cash.bank)} href="/cash" />
       </>}
