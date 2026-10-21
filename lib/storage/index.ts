@@ -11,6 +11,7 @@ import { MongoDriver } from './mongo';
  *                Photos are shrunk to ~100-300 KB before they get here. Move to s3 / cloudinary when the files grow into gigabytes.
  *   s3         – any S3-compatible bucket: AWS S3, Cloudflare R2, MinIO …  (private objects, short-lived signed URLs)
  *   cloudinary – Cloudinary (signed REST upload, private delivery)
+ *   imagekit   – ImageKit (REST upload as private files, read back through short-lived signed URLs)
  * Selected by STORAGE_DRIVER. The database stores only the object KEY (e.g. "photos/2026/10/<uuid>.jpg").
  */
 export type Stored = { key: string; thumbKey?: string; size: number; contentType: string };
@@ -147,12 +148,74 @@ class CloudinaryDriver implements StorageDriver {
   async health() { return Boolean(this.cfg.cloud && this.cfg.key); }
 }
 
+// ------------------------------------------------------------------ ImageKit (REST, no SDK)
+/**
+ * Files are uploaded as PRIVATE, so a bare ik.imagekit.io address does not work: reading needs a signature (HMAC-SHA1 of the path + expiry with
+ * the private key, the same as ImageKit's own SDK). The browser never sees an ImageKit address: signedUrl() is null, so /api/files/… checks who
+ * may see the file and streams the bytes itself (which also keeps the page's CSP unchanged).
+ */
+class ImageKitDriver implements StorageDriver {
+  readonly name = 'imagekit';
+  private endpoint: string;
+  constructor(private cfg: { privateKey: string; urlEndpoint: string }) { this.endpoint = cfg.urlEndpoint.replace(/\/+$/, ''); }
+  private auth() { return 'Basic ' + Buffer.from(`${this.cfg.privateKey}:`).toString('base64'); }
+  private readUrl(key: string, ttlSec = 300) {
+    const expiry = String(Math.floor(Date.now() / 1000) + ttlSec);
+    const sig = createHmac('sha1', this.cfg.privateKey).update(key + expiry).digest('hex');
+    return `${this.endpoint}/${key}?ik-t=${expiry}&ik-s=${sig}`;
+  }
+  async put(key: string, body: Buffer, contentType: string) {
+    const form = new FormData();
+    form.set('file', new Blob([new Uint8Array(body)], { type: contentType }), path.posix.basename(key));
+    form.set('fileName', path.posix.basename(key));
+    form.set('folder', '/' + path.posix.dirname(key));
+    form.set('useUniqueFileName', 'false');
+    form.set('overwriteFile', 'true');
+    form.set('isPrivateFile', 'true');
+    const r = await fetch('https://upload.imagekit.io/api/v1/files/upload', { method: 'POST', headers: { Authorization: this.auth() }, body: form });
+    if (!r.ok) throw new Error(`imagekit upload failed (${r.status})`);
+  }
+  async get(key: string) {
+    const r = await fetch(this.readUrl(key));
+    if (!r.ok) return null;
+    return { body: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') ?? 'application/octet-stream' };
+  }
+  async exists(key: string) {
+    const r = await fetch(this.readUrl(key), { method: 'HEAD' });
+    return r.ok;
+  }
+  async remove(key: string) {
+    const fileName = path.posix.basename(key);
+    const folder = '/' + path.posix.dirname(key);
+    const q = new URLSearchParams({ path: folder, name: fileName, limit: '1' });
+    let rows: { fileId?: string }[] = [];
+    try {
+      const found = await fetch(`https://api.imagekit.io/v1/files?${q}`, { headers: { Authorization: this.auth() } });
+      if (found.ok) rows = (await found.json()) as { fileId?: string }[];
+    } catch {}
+    if (!rows[0]?.fileId) {
+      try {
+        const qFallback = new URLSearchParams({ searchQuery: `name = "${fileName}"`, limit: '1' });
+        const foundFallback = await fetch(`https://api.imagekit.io/v1/files?${qFallback}`, { headers: { Authorization: this.auth() } });
+        if (foundFallback.ok) rows = (await foundFallback.json()) as { fileId?: string }[];
+      } catch {}
+    }
+    if (!rows[0]?.fileId) return; // already gone
+    const r = await fetch(`https://api.imagekit.io/v1/files/${rows[0].fileId}`, { method: 'DELETE', headers: { Authorization: this.auth() } });
+    if (!r.ok && r.status !== 404) throw new Error(`imagekit delete failed (${r.status})`);
+  }
+  async signedUrl() { return null; }
+  async health() {
+    try { return (await fetch('https://api.imagekit.io/v1/files?limit=1', { headers: { Authorization: this.auth() } })).ok; } catch { return false; }
+  }
+}
+
 let driver: StorageDriver | null = null;
 export function getStorage(): StorageDriver {
   if (driver) return driver;
   const e = process.env;
-  // with nothing chosen: a folder on disk while developing, the database in production (a serverless host has no disk to keep files on)
-  const kind = e.STORAGE_DRIVER || (isProd() ? 'mongo' : 'local');
+  // with nothing chosen: imagekit if keys are configured, otherwise disk in dev and database in production
+  const kind = e.STORAGE_DRIVER || (e.IMAGEKIT_PRIVATE_KEY && e.IMAGEKIT_URL_ENDPOINT ? 'imagekit' : isProd() ? 'mongo' : 'local');
   if (kind === 'mongo') {
     driver = new MongoDriver();
   } else if (kind === 'local') {
@@ -164,8 +227,11 @@ export function getStorage(): StorageDriver {
   } else if (kind === 'cloudinary') {
     for (const k of ['CLOUDINARY_CLOUD', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']) if (!e[k]) throw new Error(`${k} is required when STORAGE_DRIVER=cloudinary`);
     driver = new CloudinaryDriver({ cloud: e.CLOUDINARY_CLOUD!, key: e.CLOUDINARY_API_KEY!, secret: e.CLOUDINARY_API_SECRET! });
+  } else if (kind === 'imagekit') {
+    for (const k of ['IMAGEKIT_PRIVATE_KEY', 'IMAGEKIT_URL_ENDPOINT']) if (!e[k]) throw new Error(`${k} is required when STORAGE_DRIVER=imagekit`);
+    driver = new ImageKitDriver({ privateKey: e.IMAGEKIT_PRIVATE_KEY!, urlEndpoint: e.IMAGEKIT_URL_ENDPOINT! });
   } else {
-    throw new Error('Set STORAGE_DRIVER to mongo, s3, cloudinary (or local for development)');
+    throw new Error('Set STORAGE_DRIVER to mongo, s3, cloudinary, imagekit (or local for development)');
   }
   return driver;
 }

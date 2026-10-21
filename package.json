@@ -15,6 +15,7 @@
     "dev:db": "tsx scripts/dev-db.ts",
     "perf:bench": "tsx scripts/perf-bench.ts",
     "migrate:photos": "tsx scripts/migrate-photos.ts",
+    "migrate:imagekit": "tsx scripts/migrate-to-imagekit.ts",
     "job:reconcile": "tsx scripts/reconcile.ts",
     "job": "tsx scripts/job.ts",
     "check:bundle": "tsx scripts/check-bundle.ts",
