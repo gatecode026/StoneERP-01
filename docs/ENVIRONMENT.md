@@ -20,7 +20,8 @@
 
 ## Storage (photos, documents, backups)
 
-`STORAGE_DRIVER` = `s3` | `cloudinary` | `local` (development and tests only).
+`STORAGE_DRIVER` = `mongo` (default in production) | `s3` | `cloudinary` | `imagekit` | `local` (development and tests only).
+ImageKit: `IMAGEKIT_URL_ENDPOINT` (e.g. `https://ik.imagekit.io/<id>`), `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_PUBLIC_KEY` (not used by the server). Files are uploaded as private and read through short-lived signed URLs; downloads are streamed by the app after the permission check.
 S3 / R2 / MinIO: `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` (`auto` for R2, `ap-south-1` for AWS), `S3_ENDPOINT` (R2/MinIO), `S3_FORCE_PATH_STYLE=yes` (MinIO).
 Cloudinary: `CLOUDINARY_CLOUD`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. `STORAGE_LOCAL_DIR` for the local driver.
 
@@ -57,3 +58,7 @@ Cloudinary: `CLOUDINARY_CLOUD`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. `
 | `npm run lint`, `typecheck`, `test`, `test:e2e`, `check:bundle` | Quality gates (CI runs all) |
 | `npm run perf:bench` | API latency benchmark against a seeded database |
 | `npm run docs:routes` | Regenerate `docs/ROUTES_AND_MODELS.json` |
+
+## Owner dashboard assistant
+
+`OPENROUTER_API_KEY` (secret) and optional `OPENROUTER_MODEL` (default `nvidia/nemotron-3.5-super-vl:free`). The chat button appears only on the Owner's dashboard and `/api/assistant` refuses every other role. The model gets no tools: the server gives it the dashboard's own numbers and it may answer only from them. Limits: 12 questions a minute and 300 a day per Owner.

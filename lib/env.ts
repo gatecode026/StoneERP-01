@@ -21,6 +21,12 @@ const schema = z.object({
   CRON_SECRET: z.string().optional(),
   BACKUP_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14), // nightly backups older than this are removed from storage
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  STORAGE_DRIVER: z.enum(['mongo', 's3', 'cloudinary', 'imagekit', 'local']).optional(),
+  IMAGEKIT_URL_ENDPOINT: z.string().optional(),
+  IMAGEKIT_PRIVATE_KEY: z.string().optional(),
+  IMAGEKIT_PUBLIC_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().optional(), // the Owner's dashboard assistant; without it the assistant says it is not set up
+  OPENROUTER_MODEL: z.string().default('nvidia/nemotron-3.5-super-vl:free'),
 });
 
 export type Env = z.infer<typeof schema>;

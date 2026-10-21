@@ -7,6 +7,7 @@ import { useApp } from '@/components/Providers';
 import { inr, inrShort, num } from '@/lib/format';
 import { Card, Delta, OwnerAttendanceChart, OwnerBalanceChart, OwnerExpenseDonut, OwnerOutputChart, OwnerOwedChart, OwnerPulseChart, HEAD_COLORS } from './parts';
 import { AlertsCard, ProfitCard, ReportPreview } from './OwnerHome';
+import OwnerChat from './OwnerChat';
 import { useH } from './strings';
 import T from '@/components/T';
 
@@ -246,6 +247,7 @@ export function OwnerHome({ data }) {
         <div className="lg:col-span-2"><ProfitCard profit={data.profit} className="" /></div>
         <ReportPreview d={d} />
       </div>
+      <OwnerChat date={data.date} />
     </div>
   );
 }

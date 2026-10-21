@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
@@ -152,5 +152,63 @@ describe('production refuses the local driver', () => {
     (process.env as any).NODE_ENV = keep.n;
     process.env.STORAGE_DRIVER = keep.d;
     setStorageForTests(null);
+  });
+});
+
+describe('the ImageKit driver', () => {
+  const env = { d: process.env.STORAGE_DRIVER, k: process.env.IMAGEKIT_PRIVATE_KEY, u: process.env.IMAGEKIT_URL_ENDPOINT };
+  afterAll(async () => {
+    vi.unstubAllGlobals();
+    process.env.STORAGE_DRIVER = env.d;
+    if (env.k === undefined) delete process.env.IMAGEKIT_PRIVATE_KEY; else process.env.IMAGEKIT_PRIVATE_KEY = env.k;
+    if (env.u === undefined) delete process.env.IMAGEKIT_URL_ENDPOINT; else process.env.IMAGEKIT_URL_ENDPOINT = env.u;
+    (await import('@/lib/storage')).setStorageForTests(null);
+  });
+
+  it('needs its key and endpoint, uploads private files with the key as basic auth, reads with a signed URL, deletes by looking the file up', async () => {
+    const { setStorageForTests, getStorage: gs } = await import('@/lib/storage');
+    const { createHmac } = await import('node:crypto');
+    process.env.STORAGE_DRIVER = 'imagekit';
+    delete process.env.IMAGEKIT_PRIVATE_KEY;
+    setStorageForTests(null);
+    expect(() => gs()).toThrow(/IMAGEKIT_PRIVATE_KEY/);
+    process.env.IMAGEKIT_PRIVATE_KEY = 'private_test_key=';
+    process.env.IMAGEKIT_URL_ENDPOINT = 'https://ik.imagekit.io/testid/';
+    setStorageForTests(null);
+    const d = gs();
+    expect(d.name).toBe('imagekit');
+    expect(await d.signedUrl('photos/2026/10/a.jpg', 300)).toBeNull(); // bytes are streamed by the app, after its permission check
+
+    const calls: { url: string; init: any }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: any = {}) => {
+      calls.push({ url: String(url), init });
+      if (String(url).startsWith('https://upload.imagekit.io')) return new Response('{}', { status: 200 });
+      if (String(url).startsWith('https://api.imagekit.io/v1/files?')) return new Response(JSON.stringify([{ fileId: 'F1' }]), { status: 200 });
+      if (String(url).startsWith('https://api.imagekit.io/v1/files/F1')) return new Response(null, { status: 204 });
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/jpeg' } });
+    }));
+
+    const key = 'photos/2026/10/abc.jpg';
+    await d.put(key, Buffer.from([9, 9]), 'image/jpeg');
+    const up = calls[0];
+    expect(up.init.headers.Authorization).toBe('Basic ' + Buffer.from('private_test_key=:').toString('base64'));
+    const form = up.init.body as FormData;
+    expect(form.get('fileName')).toBe('abc.jpg');
+    expect(form.get('folder')).toBe('/photos/2026/10');
+    expect(form.get('isPrivateFile')).toBe('true');
+    expect(form.get('useUniqueFileName')).toBe('false');
+
+    const got = await d.get(key);
+    expect(got?.contentType).toBe('image/jpeg');
+    expect([...got!.body]).toEqual([1, 2, 3]);
+    const u = new URL(calls[1].url);
+    expect(u.origin + u.pathname).toBe('https://ik.imagekit.io/testid/' + key);
+    const expiry = u.searchParams.get('ik-t')!;
+    expect(u.searchParams.get('ik-s')).toBe(createHmac('sha1', 'private_test_key=').update(key + expiry).digest('hex')); // ImageKit's rule: HMAC-SHA1 of path + expiry
+    expect(Number(expiry)).toBeGreaterThan(Date.now() / 1000);
+
+    await d.remove(key);
+    expect(calls.at(-1)!.url).toBe('https://api.imagekit.io/v1/files/F1');
+    expect(calls.at(-1)!.init.method).toBe('DELETE');
   });
 });
