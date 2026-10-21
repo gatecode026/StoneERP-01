@@ -1,8 +1,10 @@
-// Runs once when the server starts: fail fast if the production environment is misconfigured (missing secrets etc.).
+// Runs once when the server starts: check the environment (missing secrets etc.) and say so loudly in the logs.
+// It does not throw: a thrown error turns every request (even the icon) into a bare "Internal Server Error" with nothing to read.
+// Instead proxy.ts answers every page with a 503 that names the setting at fault (names only, never values).
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { getEnv } = await import('./lib/env');
-    getEnv();
+    try { getEnv(); } catch (e) { console.error(`[startup] ${(e as Error).message}`); }
   }
 }
 
