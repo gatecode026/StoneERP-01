@@ -51,9 +51,11 @@ export default function ProjectsPage() {
   });
   const [taskBusy, setTaskBusy] = useState(false);
 
-  // Fetch supervisors for assignment dropdown
-  const supervisorsFetch = useFetch('/api/employees?job=Supervisor&status=active&limit=100');
-  const supervisors = supervisorsFetch.data?.rows || supervisorsFetch.data || [];
+  // Fetch supervisors and operators for project task assignment dropdown
+  const assigneesFetch = useFetch('/api/employees?job=Supervisor,Operator&status=active&limit=100');
+  const assignees = assigneesFetch.data?.rows || assigneesFetch.data || [];
+  const supervisorsList = assignees.filter((a) => a.job?.toLowerCase() === 'supervisor');
+  const operatorsList = assignees.filter((a) => a.job?.toLowerCase() === 'operator');
 
   // Fetch tasks linked to selected project
   const projectTasksFetch = useFetch(
@@ -114,7 +116,7 @@ export default function ProjectsPage() {
         valueKey: 'empCode',
         nameField: 'supervisorName',
         label: (e) => `${e.name} (${e.empCode})`,
-        query: { status: 'active' },
+        query: { status: 'active', job: 'Supervisor' },
       },
     },
     { name: 'startDate', label: 'Start Date', type: 'date', default: () => todayISO() },
@@ -502,19 +504,32 @@ export default function ProjectsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="label">Assign to Supervisor / Person *</label>
+                <label className="label">Assign to (Supervisor / Operator) *</label>
                 <select
                   className="input"
                   value={taskForm.assignedCode}
                   onChange={(e) => setTaskForm({ ...taskForm, assignedCode: e.target.value })}
                   required
                 >
-                  <option value="">Select Supervisor...</option>
-                  {supervisors.map((s) => (
-                    <option key={s.empCode} value={s.empCode}>
-                      {s.name} ({s.empCode} - {s.job})
-                    </option>
-                  ))}
+                  <option value="">Choose Assignee…</option>
+                  {supervisorsList.length > 0 && (
+                    <optgroup label="── Supervisors ──">
+                      {supervisorsList.map((s) => (
+                        <option key={s.empCode} value={s.empCode}>
+                          {s.name} ({s.empCode} · Supervisor)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {operatorsList.length > 0 && (
+                    <optgroup label="── Machine Operators ──">
+                      {operatorsList.map((o) => (
+                        <option key={o.empCode} value={o.empCode}>
+                          {o.name} ({o.empCode} · Operator)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <div>

@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Types } from 'mongoose';
-import { Block, Customer, Employee, Machine, Sale, StockItem, Supplier, Vehicle } from '../models';
+import { Block, Customer, Employee, Machine, Project, Sale, StockItem, Supplier, Vehicle } from '../models';
 import { badRequest, notFound } from '../errors';
 import type { Resource } from '../perm/resources';
 import type { AnyModel } from '../models/_base';
 import { DESIGNATIONS } from '../config';
 
-export const LOOKUP_MAX = 20;
+export const LOOKUP_MAX = 50;
 
 type Kind = {
   resource: Resource;
@@ -27,7 +27,7 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS }, defaults: { status: 'active' }, select: 'name empCode job designation', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS, role: ['supervisor', 'worker', 'manager', 'owner', 'admin'], loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})` },
   items: { resource: 'stockitems', model: StockItem, search: ['name'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name unit balance category', sort: { name: 1 }, label: (d) => `${d.name} (${n(d.balance)} ${d.unit})`, hint: (d) => d.unit },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
@@ -35,6 +35,7 @@ export const KINDS: Record<string, Kind> = {
   vehicles: { resource: 'vehicles', model: Vehicle, search: ['name', 'regNo'], select: 'name regNo kind', sort: { name: 1 }, label: (d) => (d.regNo ? `${d.name} (${d.regNo})` : d.name) },
   blocks: { resource: 'blocks', model: Block, search: [], by: ['blockNo'], filters: { stage: ['received', 'cutting', 'cut'], source: ['own', 'supplier'] }, select: 'blockNo cft rawanna', sort: { blockNo: -1 }, label: (d) => `Block ${d.blockNo} · ${n(d.cft)} CFT`, hint: (d) => d.rawanna },
   sales: { resource: 'sales', model: Sale, search: ['saleNo', 'customerName'], filters: { stage: ['quotation', 'order', 'dispatched'], toSend: ['1'] }, select: 'saleNo customerName stage', sort: { date: -1 }, label: (d) => `${d.saleNo} · ${d.customerName}`, hint: (d) => d.stage },
+  projects: { resource: 'projects', model: Project, search: ['name', 'projectCode', 'clientName'], select: 'name projectCode clientName status', sort: { name: 1 }, label: (d) => `${d.name} (${d.projectCode})`, hint: (d) => d.clientName },
 };
 export const lookupKind = (k: string) => {
   if (!Object.prototype.hasOwnProperty.call(KINDS, k)) throw notFound();
@@ -45,7 +46,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export type LookupItem = { id: string; label: string; hint?: string };
 
-/** {id, label} pairs for a dropdown: prefix search, max 20, only what the caller is allowed to see (scope filter applied by the caller). */
+/** {id, label} pairs for a dropdown: search, max 50, only what the caller is allowed to see (scope filter applied by the caller). */
 export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<string, any>): Promise<{ data: LookupItem[] }> {
   const by = sp.get('by');
   if (by && !(kind.by ?? []).includes(by)) throw badRequest(`Cannot use "${by}" as the id`);
@@ -58,10 +59,12 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
     if (['q', 'by', 'ids', 'limit', 'includeLeft'].includes(k)) continue;
     const allowed = kind.filters?.[k];
     if (!allowed || allowed === 'oidlist') throw badRequest(`Unknown filter "${k}"`);
-    if (allowed === 'string') { // any one value, matched exactly (a job title)
-      const one = v.trim().slice(0, 60);
-      if (!one) throw badRequest(`Filter "${k}" is empty`);
-      filters[k] = one;
+    if (allowed === 'string') { // any one or comma-separated values (e.g. "Operator" or "Supervisor,Operator")
+      const parts = v.split(',').map((s) => s.trim()).filter(Boolean);
+      if (!parts.length) throw badRequest(`Filter "${k}" is empty`);
+      filters[k] = parts.length > 1
+        ? { $in: parts.map((p) => new RegExp(`^${escapeRe(p)}$`, 'i')) }
+        : new RegExp(`^${escapeRe(parts[0])}$`, 'i');
       continue;
     }
     // toSend=1: only orders that still have stone left to send (a loading slip is made for those)
@@ -84,7 +87,7 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
   } else {
     const q = sp.get('q')?.trim().slice(0, 40);
     if (q && kind.search.length) {
-      const re = new RegExp('^' + escapeRe(q), 'i');
+      const re = new RegExp(escapeRe(q), 'i');
       and.push({ $or: kind.search.map((f) => ({ [f]: re })) });
     } else if (q && kind.model === Block) {
       const no = Number(q);

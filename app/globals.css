@@ -11,14 +11,14 @@ body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(
   .grid > * { min-width: 0; }
   .card { @apply bg-white rounded-2xl border border-stone-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] transition-shadow duration-150; }
   .card:hover { @apply shadow-[0_4px_12px_rgba(0,0,0,0.04)]; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[42px] text-sm font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none select-none; }
-  .btn-primary { @apply btn bg-terra text-white hover:bg-terra-600 shadow-sm hover:shadow active:scale-[.98]; }
-  .btn-outline { @apply btn border border-stone-200 bg-white text-char hover:bg-stone-50 hover:border-stone-300; }
-  .btn-ghost { @apply btn text-char-700 hover:bg-sand-100; }
-  .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 shadow-sm; }
-  .btn-green { @apply btn bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm; }
-  .btn-sm { @apply min-h-[40px] px-3.5 text-xs rounded-xl; }
-  .input { @apply w-full min-h-[42px] rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-sm text-char transition focus:outline-none focus:ring-2 focus:ring-terra/20 focus:border-terra disabled:bg-stone-100 disabled:text-char-500 disabled:cursor-not-allowed; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[42px] text-sm font-semibold transition-all duration-75 active:scale-[0.97] active:brightness-95 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer; }
+  .btn-primary { @apply btn bg-terra text-white hover:bg-terra-600 active:bg-terra-700 shadow-sm hover:shadow active:scale-[0.97] active:shadow-inner; }
+  .btn-outline { @apply btn border border-stone-200 bg-white text-char hover:bg-stone-50 hover:border-stone-300 active:bg-stone-100 active:scale-[0.97]; }
+  .btn-ghost { @apply btn text-char-700 hover:bg-sand-100 active:bg-sand-200 active:scale-[0.97]; }
+  .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-sm active:scale-[0.97]; }
+  .btn-green { @apply btn bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-sm active:scale-[0.97]; }
+  .btn-sm { @apply min-h-[38px] px-3 text-xs rounded-xl; }
+  .input { @apply w-full min-h-[42px] rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-sm text-char transition-colors duration-75 focus:outline-none focus:ring-2 focus:ring-terra/20 focus:border-terra disabled:bg-stone-100 disabled:text-char-500 disabled:cursor-not-allowed; }
   select.input {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B6B6B'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
     background-position: right 0.75rem center;
@@ -35,7 +35,7 @@ body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(
   .badge-amber { @apply badge bg-amber-50 text-amber-800 border border-amber-200/70; }
   .badge-gray { @apply badge bg-stone-100 text-char-700 border border-stone-200/80; }
   .badge-blue { @apply badge bg-sky-50 text-sky-700 border border-sky-200/70; }
-  .icon-btn { @apply inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-xl hover:bg-stone-100 transition text-char-500 hover:text-char; }
+  .icon-btn { @apply inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-xl hover:bg-stone-100 active:bg-stone-200 active:scale-90 transition-all duration-75 text-char-500 hover:text-char cursor-pointer; }
   .th { @apply text-left text-[11px] uppercase tracking-wider text-char-500 font-semibold px-3 py-2.5 bg-stone-50 border-b border-stone-200/80 whitespace-nowrap; }
   .td { @apply px-3 py-2.5 text-sm border-t border-stone-100 align-top; }
 }
@@ -49,8 +49,16 @@ body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(
 .skeleton { background: linear-gradient(90deg, #F1F5F9 25%, #FFFFFF 37%, #F1F5F9 63%); background-size: 400% 100%; animation: sk 1.4s ease infinite; border-radius: 12px; }
 @keyframes sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 .safe-pb { padding-bottom: calc(var(--safe-bottom) + 4px); }
-.sheet-enter { animation: sheet .22s ease-out; }
-@keyframes sheet { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* Jitter-free sheet and modal animation */
+@media (max-width: 767px) {
+  .sheet-enter { animation: sheetMobile .18s cubic-bezier(0.16, 1, 0.3, 1); will-change: transform, opacity; }
+  @keyframes sheetMobile { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+@media (min-width: 768px) {
+  .sheet-enter { animation: sheetDesktop .14s cubic-bezier(0.16, 1, 0.3, 1); will-change: transform, opacity; }
+  @keyframes sheetDesktop { from { transform: scale(0.98); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+}
 
 /* printable documents (invoice, gate pass, salary slip) */
 .print-doc { background: #fff; color: #111; }

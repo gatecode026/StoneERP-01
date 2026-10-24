@@ -53,7 +53,7 @@ export default function TasksPage() {
         label: (p) => `${p.name} (${p.projectCode})`,
       },
     },
-    { name: 'assignedCode', label: 'Assign to', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } },
+    { name: 'assignedCode', label: 'Assign to', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor,Operator' } } },
     { name: 'dueDate', label: 'Due date', type: 'date', required: true },
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];

@@ -101,7 +101,7 @@ export default function SupervisorPage() {
     },
     {
       name: 'assignedCode',
-      label: 'Assign to (Worker / Supervisor)',
+      label: 'Assign to (Supervisor)',
       type: 'ref',
       required: true,
       ref: {
@@ -109,7 +109,7 @@ export default function SupervisorPage() {
         valueKey: 'empCode',
         nameField: 'assignedName',
         label: (e) => `${e.name} (${e.job} · ${e.empCode})`,
-        query: { status: 'active' },
+        query: { status: 'active', job: 'Supervisor' },
       },
     },
     { name: 'dueDate', label: 'Due date', type: 'date', required: true },
@@ -143,7 +143,7 @@ export default function SupervisorPage() {
           <span className="text-char-400 text-xs">—</span>
         ),
     },
-    { key: 'assignedName', label: 'Worker / Team' },
+    { key: 'assignedName', label: 'Supervisor' },
     {
       key: 'dueDate',
       label: 'Due',

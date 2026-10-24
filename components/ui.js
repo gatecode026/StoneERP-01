@@ -146,8 +146,8 @@ export function Tabs({ tabs, value, onChange }) {
     <div className="tabs-row flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
       {tabs.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
-          className={cx('shrink-0 min-h-[40px] px-4 rounded-full text-sm font-semibold border transition',
-            value === t.key ? 'bg-terra text-white border-terra' : 'bg-white text-char-700 border-sand-300 hover:bg-sand-100')}>
+          className={cx('shrink-0 min-h-[40px] px-4 rounded-full text-sm font-semibold border transition-all duration-75 active:scale-95 cursor-pointer select-none',
+            value === t.key ? 'bg-terra text-white border-terra shadow-sm' : 'bg-white text-char-700 border-sand-300 hover:bg-sand-100 active:bg-sand-200')}>
           {tx(t.label)}{t.count != null && <span className={cx('ml-1.5 text-xs', value === t.key ? 'text-white/80' : 'text-char-500')}>{t.count}</span>}
         </button>
       ))}

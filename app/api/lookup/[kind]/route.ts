@@ -11,6 +11,6 @@ export const GET = withAuth(
   async (auth) => {
     const kind = lookupKind(auth.params.kind);
     const out = await runLookup(kind, auth.query, await auth.filter('view'));
-    return jsonWithEtag(auth.req, out);
+    return jsonWithEtag(auth.req, out, { maxAge: 15 });
   }
 );

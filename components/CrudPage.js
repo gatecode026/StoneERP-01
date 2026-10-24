@@ -148,7 +148,7 @@ function RowActionMenu({ menuRow, onClose }) {
 const optList = (o) => (o || []).map((x) => (typeof x === 'string' ? { value: x, label: x } : x));
 
 // model name used in forms -> /api/lookup kind
-const LOOKUP_KIND = { employees: 'employees', machines: 'machines', stockitems: 'items', customers: 'customers', suppliers: 'suppliers', vehicles: 'vehicles', blocks: 'blocks', sales: 'sales' };
+const LOOKUP_KIND = { employees: 'employees', machines: 'machines', stockitems: 'items', customers: 'customers', suppliers: 'suppliers', vehicles: 'vehicles', blocks: 'blocks', sales: 'sales', projects: 'projects' };
 
 function RefSelect({ field, form, set, id }) {
   const r = field.ref;
