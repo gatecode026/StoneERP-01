@@ -54,7 +54,7 @@ export default function TasksPage() {
       },
     },
     { name: 'assignedCode', label: 'Assign to', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor,Operator' } } },
-    { name: 'dueDate', label: 'Due date', type: 'date', required: true },
+    { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true },
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];
   const columns = [
@@ -72,7 +72,7 @@ export default function TasksPage() {
       ),
     },
     { key: 'assignedName', label: 'Assigned to' },
-    { key: 'dueDate', label: 'Due', render: (r) => <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>{fmtDate(r.dueDate)}</span> },
+    { key: 'dueDate', label: 'Date', render: (r) => <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>{fmtDate(r.dueDate)}</span> },
     { key: 'state', label: 'Status', render: (r) => (r.state === 'done' ? <Badge tone="green"><T>Done</T></Badge> : r.dueDate < today ? <Badge tone="red"><T>Overdue</T></Badge> : <Badge tone="amber"><T>Pending</T></Badge>) },
     { key: 'doneNote', label: 'Done note', render: (r) => r.doneNote || '—' },
   ];

@@ -404,24 +404,36 @@ export const tasks: ResourceDef = {
   key: 'tasks', model: Task, label: (d) => d.title,
   listFields: ['title', 'details', 'assignedCode', 'assignedName', 'assignedBy', 'dueDate', 'priority', 'state', 'doneAt', 'doneNote', 'projectId', 'projectCode', 'projectName'],
   sortable: ['dueDate', 'createdAt'], defaultSort: 'dueDate', searchFields: ['title', 'assignedName', 'projectName', 'projectCode'],
-  dateFields: ['dueDate'], filters: { state: { enum: ['pending', 'done'] }, assignedCode: 'string', priority: { enum: ['Normal', 'High'] }, projectId: 'string' },
-  named: { overdue: (v) => (v === '1' ? { state: 'pending', dueDate: { $lt: todayIST() } } : {}) },
+  dateFields: ['dueDate'],
+  filters: { dueDate: 'date', state: { enum: ['pending', 'done'] }, assignedCode: 'string', priority: { enum: ['Normal', 'High', 'Project'] }, projectId: 'string' },
+  named: {
+    overdue: (v) => (v === '1' ? { state: 'pending', dueDate: { $lt: todayIST() } } : {}),
+    date: (v) => ({ dueDate: v }),
+  },
   serverOnly: ['assignedName', 'assignedBy', 'assignedById', 'doneAt', 'projectCode', 'projectName'],
   create: z.object({
-    title: req(200), details: text(2000).optional(), assignedCode: empCode, dueDate: dateStr,
-    priority: enumOf(['Normal', 'High']).optional(),
+    title: req(200), details: text(2000).optional(), assignedCode: empCode, dueDate: dateStr.optional(),
+    priority: enumOf(['Normal', 'High', 'Project']).optional(),
     projectId: z.string().optional().or(z.literal('')),
   }).strict(),
   update: z.object({
     title: req(200), details: text(2000), assignedCode: empCode, dueDate: dateStr,
-    priority: enumOf(['Normal', 'High']), state: enumOf(['pending', 'done']),
+    priority: enumOf(['Normal', 'High', 'Project']), state: enumOf(['pending', 'done']),
     doneNote: text(1000), donePhoto: photo,
     projectId: z.string().optional().or(z.literal('')),
   }).partial().strict(),
   lifecycle: {
     async prepareCreate(ctx, input) {
       const e = await employeeByCode(ctx, input.assignedCode, { active: true });
-      const doc: any = { ...input, assignedCode: e.empCode, assignedName: e.name, assignedBy: ctx.actor.name, assignedById: oid(ctx.actor.id), state: 'pending' };
+      const doc: any = {
+        ...input,
+        dueDate: input.dueDate || todayIST(),
+        assignedCode: e.empCode,
+        assignedName: e.name,
+        assignedBy: ctx.actor.name,
+        assignedById: oid(ctx.actor.id),
+        state: 'pending',
+      };
       if (input.projectId) {
         const { Project } = await import('../models/projects');
         const p: any = await Project.findById(input.projectId).lean();

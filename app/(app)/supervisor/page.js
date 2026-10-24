@@ -60,15 +60,10 @@ export default function SupervisorPage() {
     if (mySupervisorCode) setSelectedSupCode(mySupervisorCode);
   }, [mySupervisorCode]);
 
-  // Today's tasks for this supervisor's team
-  const todayTasks = useFetch(tab === 'today' ? `/api/tasks?dueDate=${today}&limit=200&count=1` : null, [today, tab]);
-  // Ongoing projects (tasks with priority=High or tagged as project, pending)
-  const ongoingTasks = useFetch(tab === 'ongoing' ? `/api/tasks?state=pending&limit=200&count=1` : null, [tab]);
-  // Completed tasks
-  const doneTasks = useFetch(tab === 'completed' ? `/api/tasks?state=done&limit=200&count=1` : null, [tab]);
-
-  // Summary counts for stat cards (always fetch)
-  const summary = useFetch('/api/tasks?count=1&limit=1', [today]);
+  // Summary counts for stat cards (always fetch exact counts)
+  const todayTasksCount = useFetch(`/api/tasks?dueDate=${today}&limit=1&count=1`, [today]);
+  const doneTasksCount = useFetch('/api/tasks?state=done&limit=1&count=1');
+  const summary = useFetch('/api/tasks?state=pending&count=1&limit=1');
   const pendingCount = summary.data?.total ?? 0;
   const overdueTasks = useFetch('/api/tasks?overdue=1&count=1&limit=1', [today]);
   const overdueCount = overdueTasks.data?.total ?? 0;
@@ -112,7 +107,7 @@ export default function SupervisorPage() {
         query: { status: 'active', job: 'Supervisor' },
       },
     },
-    { name: 'dueDate', label: 'Due date', type: 'date', required: true },
+    { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true, hint: 'Work date for this task' },
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High', 'Project'], default: 'Normal' },
   ];
 
@@ -146,7 +141,7 @@ export default function SupervisorPage() {
     { key: 'assignedName', label: 'Supervisor' },
     {
       key: 'dueDate',
-      label: 'Due',
+      label: 'Date',
       render: (r) => (
         <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>
           {fmtDate(r.dueDate)}
@@ -191,9 +186,9 @@ export default function SupervisorPage() {
       {/* Summary KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <StatCard label="Pending Tasks" value={pendingCount} tone={pendingCount > 0 ? 'amber' : 'green'} />
-        <StatCard label="Overdue" value={overdueCount} tone={overdueCount > 0 ? 'red' : 'green'} />
-        <StatCard label="Today's Tasks" value={todayTasks.data?.total ?? '…'} />
-        <StatCard label="Completed" value={doneTasks.data?.total ?? '…'} tone="green" />
+        <StatCard label="Delayed Tasks" value={overdueCount} tone={overdueCount > 0 ? 'red' : 'green'} />
+        <StatCard label="Today's Tasks" value={todayTasksCount.data?.total ?? 0} />
+        <StatCard label="Completed" value={doneTasksCount.data?.total ?? 0} tone="green" />
       </div>
 
       {overdueCount > 0 && (
@@ -223,9 +218,9 @@ export default function SupervisorPage() {
         <CrudPage
           model="tasks"
           title="Today's Work Assignments"
-          subtitle={`Tasks due on ${fmtDate(today)}`}
-          label="Task"
-          addLabel="Assign today's work"
+          subtitle={`Daily work for ${fmtDate(today)}`}
+          label="Daily Task"
+          addLabel="Assign daily work"
           baseQuery={{ dueDate: today }}
           sort="dueDate"
           fields={taskFields}
