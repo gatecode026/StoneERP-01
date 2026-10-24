@@ -13,3 +13,8 @@ next-env.d.ts
 .vitest-cache
 .dev-db
 .next-e2e
+
+# Context & reference files
+/context/
+chat.txt
+*.xlsx

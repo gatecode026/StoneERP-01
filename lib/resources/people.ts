@@ -50,7 +50,7 @@ function crossChecks(next: Record<string, any>, prev: Record<string, any> | unde
 export const EMP_CODE_PREFIX = 'EMP-';
 async function nextEmployeeCode(ctx: any) {
   for (let i = 0; i < 20; i++) {
-    const code = EMP_CODE_PREFIX + String(await nextSeq('emp', ctx.session, 45)).padStart(4, '0');
+    const code = EMP_CODE_PREFIX + String(await nextSeq('emp', ctx.session, 0)).padStart(4, '0');
     if (!(await Employee.exists({ empCode: code }).session(ctx.session ?? null))) return code;
   }
   throw conflict('Could not number the employee. Please try again.');

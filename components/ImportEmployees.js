@@ -24,17 +24,24 @@ export default function ImportEmployees() {
   const [res, setRes] = useState(null);
   const [busy, setBusy] = useState(false);
   const input = useRef(null);
+  // Guard against browsers/React firing the change event twice (double-upload bug)
+  const checkingRef = useRef(false);
   if (!can('employees', 'create')) return null;
 
   const reset = () => { setFile(null); setRes(null); if (input.current) input.current.value = ''; };
   async function check(f) {
+    // Prevent double-fire: bail immediately if a check is already running
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     setFile(f); setRes(null);
-    if (!f) return;
+    if (!f) { checkingRef.current = false; return; }
     setBusy(true);
     try { setRes(await post(f, false)); } catch (e) { toast.error(e.message); setFile(null); if (input.current) input.current.value = ''; }
     setBusy(false);
+    checkingRef.current = false;
   }
   async function run() {
+    if (busy) return; // prevent double-click
     setBusy(true);
     try {
       const r = await post(file, true);

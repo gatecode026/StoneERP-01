@@ -23,18 +23,25 @@ export default function ImportData({ resource, perm, noun, hint }) {
   const [res, setRes] = useState(null);
   const [busy, setBusy] = useState(false);
   const input = useRef(null);
+  // Guard against browsers/React firing the change event twice (double-upload bug)
+  const checkingRef = useRef(false);
   if (!can(perm || resource, 'create')) return null;
 
   const reset = () => { setFile(null); setRes(null); if (input.current) input.current.value = ''; };
   const close = () => { setOpen(false); reset(); };
   async function check(f) {
+    // Prevent double-fire: if a check is already running, bail out immediately
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     setFile(f); setRes(null);
-    if (!f) return;
+    if (!f) { checkingRef.current = false; return; }
     setBusy(true);
     try { setRes(await post(resource, f, false)); } catch (e) { toast.error(e.message); setFile(null); if (input.current) input.current.value = ''; }
     setBusy(false);
+    checkingRef.current = false;
   }
   async function run() {
+    if (busy) return; // prevent double-click submitting twice
     setBusy(true);
     try {
       const r = await post(resource, file, true);

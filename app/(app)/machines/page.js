@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
-import { MACHINE_TYPES } from '@/lib/config';
+import { MACHINE_TYPES, MACHINE_NAMES } from '@/lib/config';
 import { todayISO, addDays, fmtDate, monthOf, num, fmtMonth } from '@/lib/format';
 import T from '@/components/T';
 
@@ -101,9 +101,10 @@ export default function MachinesPage() {
       )}
 
       {tab === 'machines' && (
-        <CrudPage model="machines" title="Machine list" subtitle="Entered once" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" headerExtra={<ImportData resource="machines" noun="machines" hint="name and type are required" />}
+        <CrudPage model="machines" title="Machine list" subtitle="Entered once — 30 machines as configured" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" headerExtra={<ImportData resource="machines" noun="machines" hint="name and type are required" />}
           fields={[
-            { name: 'name', label: 'Machine name / number', required: true }, { name: 'type', label: 'Type', type: 'select', options: MACHINE_TYPES, required: true },
+            { name: 'name', label: 'Machine name', required: true, type: 'select', options: MACHINE_NAMES, hint: 'Select from the configured list' },
+            { name: 'type', label: 'Type', type: 'select', options: MACHINE_TYPES, required: true },
             { name: 'location', label: 'Location', type: 'select', options: ['Factory', 'Yard', 'Quarry'], default: 'Factory' }, { name: 'purchaseDate', label: 'Purchase date', type: 'date' },
             { name: 'serviceIntervalDays', label: 'Service every (days)', type: 'number', default: 90 }, { name: 'lastServiceDate', label: 'Last service date', type: 'date' },
           ]}

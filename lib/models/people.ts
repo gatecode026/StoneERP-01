@@ -238,7 +238,7 @@ export const Task = defineModel(
     assignedById: { type: OID },
     assignedBy: S,
     dueDate: dateStr({ required: true }),
-    priority: { type: S, enum: ['Normal', 'High'], default: 'Normal' },
+    priority: { type: S, enum: ['Normal', 'High', 'Project'], default: 'Normal' },
     state: { type: S, enum: ['pending', 'done'], default: 'pending' },
     doneAt: Date,
     doneNote: { type: S, maxlength: 1000 },

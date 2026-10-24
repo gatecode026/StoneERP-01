@@ -42,7 +42,7 @@ export default function CashPage() {
     { name: 'date', label: 'Date', type: 'date', required: true },
     { name: 'account', label: 'Cash or bank', type: 'select', required: true, options: [{ value: 'cash', label: 'Cash' }, { value: 'bank', label: 'Bank' }], default: 'cash' },
     { name: 'type', label: 'In or out', type: 'select', required: true, options: [{ value: 'in', label: 'Money IN' }, { value: 'out', label: 'Money OUT' }], default: 'in' },
-    { name: 'amount', label: 'Amount (₹)', type: 'number', required: true },
+    { name: 'amount', label: 'Amount (₹)', type: 'number', required: true, hint: cash > 0 ? `Cash in hand: ${inr(cash)} — entering more than this as cash-out will make it negative` : undefined },
     { name: 'head', label: 'Head', type: 'select', options: ['Customer payment', 'Cash withdrawn from bank', 'Cash deposited to bank', 'Supplier payment', 'Salary', 'Salary advance', 'Expense', 'Other'], required: true, hint: 'Withdrawn / deposited moves money between bank and cash (both sides are written)' },
     { name: 'ref', label: 'Reference' },
     { name: 'note', label: 'Narration', type: 'textarea', wide: true },
@@ -50,6 +50,12 @@ export default function CashPage() {
 
   return (
     <RoleGuard perm="cashentries">
+      {/* ⚠️ Negative cash warning */}
+      {cash < 0 && (
+        <div className="mb-3 rounded-xl bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 font-semibold">
+          ⚠️ Cash balance is negative ({inr(cash)}). This usually means an expense was recorded against a zero opening balance. Please set the correct opening balance or check recent entries.
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <StatCard label="Cash in hand (app)" value={inr(cash)} tone="terra" />
         <StatCard label="Bank balance" value={inr(bank)} />
