@@ -404,7 +404,10 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
           <div key={r[rowKey] || i} onClick={() => onRowClick?.(r)}
             className={cx('card p-3.5 cv-auto', onRowClick && 'active:bg-sand-100 cursor-pointer', rowClass?.(r))}>
             <div className="flex items-start justify-between gap-2">
-              <div className="font-semibold text-[15px] min-w-0 break-words">{cell(primary, r)}</div>
+              <div className="flex items-center gap-2 font-semibold text-[15px] min-w-0 break-words">
+                {columns.find((c) => c.key === '__sel')?.render?.(r)}
+                <span>{cell(primary, r)}</span>
+              </div>
               {actions && <div className="shrink-0" onClick={(e) => e.stopPropagation()}>{actions(r)}</div>}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
@@ -433,6 +436,7 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
                       onClick={isSortable ? () => onSort(isAsc ? `-${c.key}` : isDesc ? '' : c.key) : undefined}
                       className={cx(
                         'th',
+                        c.key === '__sel' && '!w-12 !px-2 text-center',
                         c.align === 'right' && 'text-right',
                         isSortable && 'cursor-pointer select-none hover:text-terra transition-colors'
                       )}
@@ -451,7 +455,7 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r[rowKey] || i} onClick={() => onRowClick?.(r)} className={cx('hover:bg-sand-50', onRowClick && 'cursor-pointer', rowClass?.(r))}>
-                  {columns.map((c) => <td key={c.key || c.label} className={cx('td', c.align === 'right' && 'text-right', c === primary && 'font-semibold')}>{cell(c, r)}</td>)}
+                  {columns.map((c) => <td key={c.key || c.label} className={cx('td', c.key === '__sel' && '!w-12 !px-2 text-center', c.align === 'right' && 'text-right', c === primary && 'font-semibold')}>{cell(c, r)}</td>)}
                   {actions && <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>{actions(r)}</td>}
                 </tr>
               ))}

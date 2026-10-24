@@ -193,4 +193,65 @@ export async function voidResource(auth: AuthCtx, def: ResourceDef, id: string) 
   return NextResponse.json(projectDoc(auth.perm, def.key, result));
 }
 
+const bulkVoidBody = z.object({
+  ids: z.array(z.string().trim()).min(1).max(500),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export async function bulkVoidResource(auth: AuthCtx, def: ResourceDef) {
+  const parsed = bulkVoidBody.parse(await auth.json(z.record(z.string(), z.any())));
+  const reason = parsed.reason ?? '';
+  if (def.lifecycle?.noVoid) throw conflict(def.lifecycle.noVoid);
+
+  const validIds = parsed.ids.filter(isId).map(oid);
+  if (!validIds.length) return NextResponse.json({ ok: 0, total: 0 });
+
+  const ctx = await auth.svc();
+  const result = await withTxn(async (session) => {
+    const c: SvcCtx = { ...ctx, session };
+    const docs: any[] = await def.model
+      .find({ _id: { $in: validIds }, isVoid: false })
+      .session(session ?? null)
+      .lean();
+
+    let ok = 0;
+    for (const doc of docs) {
+      const f = await scopedIdFilter(auth.user, auth.perm, def.key, 'void', String(doc._id));
+      if (!f) continue;
+      if (def.lifecycle?.beforeVoid) await def.lifecycle.beforeVoid(c, doc, reason);
+      await def.model.updateOne(
+        { _id: doc._id, isVoid: false },
+        {
+          $set: {
+            isVoid: true,
+            voidedAt: new Date(),
+            voidedById: oid(auth.user.id),
+            voidedByName: auth.user.name,
+            voidReason: reason,
+            updatedById: oid(auth.user.id),
+            updatedByName: auth.user.name,
+          },
+        },
+        { session }
+      );
+      await writeAudit(
+        {
+          resource: def.key,
+          refId: doc._id,
+          action: 'void',
+          label: def.label(doc),
+          changes: { isVoid: { from: false, to: true }, reason: { to: reason } },
+          requestId: auth.requestId,
+        },
+        c.actor,
+        session
+      );
+      ok++;
+    }
+    return { ok, total: parsed.ids.length };
+  });
+
+  return NextResponse.json(result);
+}
+
 export const isId = (id: string) => Types.ObjectId.isValid(id);

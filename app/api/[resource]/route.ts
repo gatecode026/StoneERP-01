@@ -1,6 +1,6 @@
 import { withAuth } from '@/lib/api/withAuth';
 import { notFound } from '@/lib/errors';
-import { createResource, listResource } from '@/lib/api/resource';
+import { createResource, listResource, bulkVoidResource } from '@/lib/api/resource';
 import { defFor } from '@/lib/resources';
 import type { Resource } from '@/lib/perm/resources';
 
@@ -14,3 +14,5 @@ const def = (params: Record<string, string>) => {
 // the resource is resolved BEFORE the permission check, from the URL; an unknown name is a 404, a known one is checked
 export const GET = withAuth((c) => def(c.params).key as Resource, 'view', (auth) => listResource(auth, def(auth.params)));
 export const POST = withAuth((c) => def(c.params).key as Resource, 'create', (auth) => createResource(auth, def(auth.params)));
+export const DELETE = withAuth((c) => def(c.params).key as Resource, 'void', (auth) => bulkVoidResource(auth, def(auth.params)));
+
