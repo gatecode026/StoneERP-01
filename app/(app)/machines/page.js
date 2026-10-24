@@ -77,24 +77,39 @@ export default function MachinesPage() {
   const byMachine = monthEntries.data?.byMachine || [];
   const byOperator = monthEntries.data?.byOperator || [];
 
+  const blockStats = useFetch('/api/blocks/facets?by=stage');
+  const stageGroups = blockStats.data?.groups || {};
+  const yardBlocksCount = stageGroups?.received?.n || 0;
+  const cuttingBlocksCount = stageGroups?.cutting?.n || 0;
+  const cutBlocksCount = stageGroups?.cut?.n || 0;
+
   return (
     <RoleGuard perm="machineentries">
       <Tabs value={tab} onChange={setTab} tabs={[{ key: 'entries', label: 'Shift entries' }, { key: 'machines', label: 'Machine list' }, { key: 'monthly', label: 'Monthly output' }]} />
 
       {tab === 'entries' && (
-        <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift" label="Machine entry" addLabel="New entry" wide
+        <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift · Daily cutting output & block consumption" label="Machine entry" addLabel="New entry" wide
           fields={entryFields} columns={columns} sort="-date,-createdAt" canEdit={() => false}
           exportName={`machine-entries-${date}`} onSaved={() => {}}
           headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">{tr('This day')}</option><option value="month">{tr('Month to date')}</option></select></>}
           facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
-          summary={(rows, { facets: f }) => (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Output" value={`${num(f?.sums.outputSqft || 0)} sq ft`} tone="terra" />
-              <StatCard label="Entries" value={f?.total ?? 0} />
-              <StatCard label="Idle / stopped" value={`${Math.round((f?.sums.stoppedMins || 0) / 6) / 10} h`} tone={f?.sums.stoppedMins ? 'amber' : 'green'} />
-              <StatCard label="Breakdowns" value={f?.groups?.true?.n || 0} tone={f?.groups?.true?.n ? 'red' : 'green'} />
-            </div>
-          )}
+          summary={(rows, { facets: f }) => {
+            const totalSqft = f?.sums.outputSqft || 0;
+            const entriesCount = f?.total || 1;
+            const uniqueBlocksCut = new Set(rows.map(r => r.blockNo).filter(Boolean)).size;
+            return (
+              <div className="space-y-3">
+                {/* Machine & Block Performance KPI Banner */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
+                  <StatCard label="Machine Output" value={`${num(totalSqft)} sq ft`} tone="terra" />
+                  <StatCard label="Blocks Cut Today" value={`${uniqueBlocksCut} cut`} tone="green" />
+                  <StatCard label="Incoming Yard Blocks" value={`${yardBlocksCount} in yard`} tone="blue" />
+                  <StatCard label="Blocks On Machines" value={`${cuttingBlocksCount} cutting`} tone="amber" />
+                  <StatCard label="Idle / Breakdowns" value={`${Math.round((f?.sums.stoppedMins || 0) / 6) / 10} h`} tone={f?.sums.stoppedMins ? 'red' : 'green'} />
+                </div>
+              </div>
+            );
+          }}
           rowClass={(r) => (r.breakdown ? 'bg-red-50/60' : '')}
           exportColumns={[{ key: 'date', label: 'Date' }, { key: 'shift', label: 'Shift' }, { key: 'machineName', label: 'Machine' }, { key: 'operatorName', label: 'Operator' }, { key: 'outputSqft', label: 'Output sq ft' }, { key: 'pieces', label: 'Pieces' }, { key: 'blockNo', label: 'Block' }, { key: 'stoppedMins', label: 'Stopped min' }, { key: 'stopReason', label: 'Reason' }]}
         />

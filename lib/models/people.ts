@@ -118,6 +118,9 @@ export const DailyReport = defineModel(
     empCode: { type: S, required: true, uppercase: true },
     empName: { type: S },
     job: { type: S },
+    projectId: { type: OID, ref: 'Project' },
+    projectCode: { type: S },
+    projectName: { type: S },
     narration: { type: S, required: true, maxlength: 4000 },
     hours: { type: N, min: 0, max: 24, default: 0 },
     quantity: { type: N, min: 0, default: 0 },
@@ -137,7 +140,7 @@ export const DailyReport = defineModel(
     submittedAt: { type: Date },
     filledBy: { type: S },
   },
-  { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ isVoid: 1, empCode: 1, date: 1, _id: 1 }], [{ isVoid: 1, date: 1, empName: 1, _id: 1 }], [{ date: 1, supCheck: 1 }]] }
+  { indexes: [[{ date: 1, empCode: 1 }, liveUnique()], [{ isVoid: 1, empCode: 1, date: 1, _id: 1 }], [{ isVoid: 1, date: 1, empName: 1, _id: 1 }], [{ date: 1, supCheck: 1 }], [{ projectId: 1 }]] }
 );
 
 export const Leave = defineModel(

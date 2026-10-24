@@ -162,12 +162,19 @@ const checkKeys = ['supCheck', 'supRemark'] as const;
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'job', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
-  sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode'],
-  dateFields: ['date'], filters: { date: 'date', empCode: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
+  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
+  sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName'],
+  dateFields: ['date'], filters: { date: 'date', empCode: 'string', projectId: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
   serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job'],
-  create: z.object({ date: dateStr.optional(), empCode: empCode.optional(), narration: req(4000), hours: num(0, 24).optional(), quantity: num(0, 1e6).optional(), problem: text(1000).optional(), plan: text(1000).optional(), photos: photos().optional() }).strict(),
-  update: z.object({ narration: req(4000), hours: num(0, 24), quantity: num(0, 1e6), problem: text(1000), plan: text(1000), photos: photos(), supCheck: enumOf(['', 'ok', 'not_ok']), supRemark: text(500), undoReason: text(300) }).partial().strict(),
+  create: z.object({
+    date: dateStr.optional(), empCode: empCode.optional(),
+    projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
+    narration: req(4000), hours: num(0, 24).optional(), quantity: num(0, 1e6).optional(), problem: text(1000).optional(), plan: text(1000).optional(), photos: photos().optional()
+  }).strict(),
+  update: z.object({
+    projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
+    narration: req(4000), hours: num(0, 24), quantity: num(0, 1e6), problem: text(1000), plan: text(1000), photos: photos(), supCheck: enumOf(['', 'ok', 'not_ok']), supRemark: text(500), undoReason: text(300)
+  }).partial().strict(),
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
       const today = todayIST();
@@ -180,7 +187,25 @@ export const dailyreports: ResourceDef = {
       const e = await employeeByCode(ctx, code, { active: true });
       const dup: any = await DailyReport.findOne({ date, empCode: e.empCode, isVoid: false }).session(s(ctx)).select('_id').lean();
       if (dup) throw conflict('A report for this employee and date already exists — open it to edit', { existingId: String(dup._id) });
-      const doc: any = { ...input, date, empCode: e.empCode, empName: e.name, job: e.job, quantity: input.quantity ?? 0, hours: input.hours ?? 0, submittedAt: new Date(), onTime: date === today, filledBy: ctx.actor.name, photoCount: input.photos?.length ?? 0 };
+      let projectCode = input.projectCode;
+      let projectName = input.projectName;
+      if (input.projectId && (!projectCode || !projectName)) {
+        try {
+          const { Project } = await import('../models/projects');
+          const prj: any = await Project.findById(input.projectId).session(s(ctx)).lean();
+          if (prj) {
+            projectCode = prj.projectCode;
+            projectName = prj.name;
+          }
+        } catch { /* proceed */ }
+      }
+      const doc: any = {
+        ...input, date, empCode: e.empCode, empName: e.name, job: e.job,
+        projectId: input.projectId ? oid(input.projectId) : undefined,
+        projectCode, projectName,
+        quantity: input.quantity ?? 0, hours: input.hours ?? 0,
+        submittedAt: new Date(), onTime: date === today, filledBy: ctx.actor.name, photoCount: input.photos?.length ?? 0
+      };
       return doc;
     },
     async afterCreate(ctx, d) { await roll.reportFiled(d.date, 1, ctx.session); },
