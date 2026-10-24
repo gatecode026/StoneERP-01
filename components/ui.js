@@ -390,7 +390,7 @@ export function SpeakButton({ onText, lang = 'hi-IN', label }) {
 }
 
 // Table on desktop, stacked cards on mobile.
-export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loading, rowClass, actions }) {
+export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loading, rowClass, actions, sortKey, onSort }) {
   const tx = useTx();
   if (loading) return <SkeletonList n={4} className="h-24" />;
   if (!rows?.length) return <Empty text={empty} />;
@@ -422,7 +422,31 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr>{columns.map((c) => <th key={c.key || c.label} className={cx('th', c.align === 'right' && 'text-right')}>{tx(c.label)}</th>)}{actions && <th className="th text-right whitespace-nowrap w-px" />}</tr>
+              <tr>
+                {columns.map((c) => {
+                  const isSortable = Boolean(onSort && c.key && c.key !== '__sel');
+                  const isAsc = sortKey === c.key;
+                  const isDesc = sortKey === `-${c.key}`;
+                  return (
+                    <th
+                      key={c.key || c.label}
+                      onClick={isSortable ? () => onSort(isAsc ? `-${c.key}` : isDesc ? '' : c.key) : undefined}
+                      className={cx(
+                        'th',
+                        c.align === 'right' && 'text-right',
+                        isSortable && 'cursor-pointer select-none hover:text-terra transition-colors'
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {tx(c.label)}
+                        {isAsc && <span className="text-terra font-bold text-xs">▲</span>}
+                        {isDesc && <span className="text-terra font-bold text-xs">▼</span>}
+                      </span>
+                    </th>
+                  );
+                })}
+                {actions && <th className="th text-right whitespace-nowrap w-px" />}
+              </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (

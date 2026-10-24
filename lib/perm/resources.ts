@@ -66,6 +66,9 @@ export const RESOURCES = {
   tasks: { label: { en: 'Tasks', hi: 'काम' }, group: 'people', part: 15, model: true, actions: CRUD,
     own: [{ field: 'assignedCode', value: 'empCode' }, { field: 'assignedById', value: 'userId' }],
     team: [{ field: 'assignedCode', in: 'codes' }, { field: 'assignedById', in: 'userIds' }] },
+  projects: { label: { en: 'Projects', hi: 'प्रोजेक्ट' }, group: 'people', part: 15, model: true, actions: CRUD,
+    own: [{ field: 'supervisorCode', value: 'empCode' }, { field: 'createdById', value: 'userId' }],
+    team: [{ field: 'supervisorCode', in: 'codes' }, { field: 'createdById', in: 'userIds' }] },
 
   // ---- Production ----
   machines: { label: { en: 'Machines', hi: 'मशीनें' }, group: 'production', part: 3, model: true, actions: CRUD,

@@ -36,7 +36,7 @@ const ALL_STAR = 'v* c* e* x* a* o*';
 const MANAGER = parse({
   employees: 'v* c* e* x* o*', dailyreports: 'v* c* e* x* a* o*', attendance: 'v* c* e* x* a* o*', punches: 'v* c* e*', leaves: 'v* c* e* x* a* o*',
   advances: 'v* c* e* x* a* o*', salarysheets: 'v* o*', salaryslips: 'v* o*', safetyrecords: 'v* c* e* x* o*', performance: 'v* o*',
-  perfremarks: 'v* c* e*', tasks: 'v* c* e* x* o*', machines: 'v* c* e* x* o*', machineentries: 'v* c* e* x* o*', blocks: 'v* c* e* x* o*',
+  perfremarks: 'v* c* e*', tasks: 'v* c* e* x* o*', projects: 'v* c* e* x* o*', machines: 'v* c* e* x* o*', machineentries: 'v* c* e* x* o*', blocks: 'v* c* e* x* o*',
   royalties: 'v* c* e* x* o*', yield: 'v* o*', repairs: 'v* c* e* x* o*', vehicles: 'v* c* e* x* o*', vehicletrips: 'v* c* e* x* o*',
   stockitems: 'v* c* e* x* o*', stockmovements: 'v* c* e* x* o*', stockcounts: 'v* c* e* a* o*', suppliers: 'v* c* e* x* o*', purchases: ALL_STAR,
   customers: 'v* c* e* x* o*', sales: ALL_STAR, invoices: 'v* c* o*', payments: 'v* c* e* x* o*', dispatches: ALL_STAR, complaints: 'v* c* e* x* o*',
@@ -46,7 +46,7 @@ const MANAGER = parse({
 
 const ACCOUNTANT = parse({
   employees: 'v* c* e* o*', dailyreports: 'v* o*', attendance: 'v* o*', punches: 'v* cm', leaves: 'v*', advances: 'v* c* e* o*', salarysheets: 'v* c* e* o*',
-  salarypayments: 'v* c*', salaryslips: 'v* o*', tasks: 'vm em', blocks: 'v*', royalties: 'v* c* e* o*', yield: 'v* o*', repairs: 'v*',
+  salarypayments: 'v* c*', salaryslips: 'v* o*', tasks: 'vm em', projects: 'v*', blocks: 'v*', royalties: 'v* c* e* o*', yield: 'v* o*', repairs: 'v*',
   vehicles: 'v*', stockitems: 'v* o*', stockmovements: 'v* o*', suppliers: 'v* c* e* x* o*', purchases: 'v* c* e* x* o*',
   customers: 'v* c* e* x* o*', sales: 'v* c* e* x* o*', invoices: 'v* c* o*', payments: 'v* c* e* x* o*', dispatches: 'v* o*', complaints: 'v* o*',
   expenses: 'v* c* e* x* o*', expenseheads: 'v* c* e*', cashentries: 'v* c* e* x* o*', cashclosings: 'v* c* o*', accounts: 'v*', pettycash: 'v* c*',
@@ -55,7 +55,7 @@ const ACCOUNTANT = parse({
 
 const SUPERVISOR = parse(withOwn({
   employees: 'vt', dailyreports: 'vt ct et ot at', attendance: 'vt ct et ot', punches: 'vt ct', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
-  tasks: 'vt ct et', machines: 'vt', machineentries: 'vt ct et ot', blocks: 'v* c*', repairs: 'vt ct et', vehicles: 'v* c* e*', vehicletrips: 'v* c* e*',
+  tasks: 'vt ct et', projects: 'vt ct et', machines: 'vt', machineentries: 'vt ct et ot', blocks: 'v* c*', repairs: 'vt ct et', vehicles: 'v* c* e*', vehicletrips: 'v* c* e*',
   stockitems: 'v*', stockmovements: 'v* c*', dispatches: 'v* c* e* a*', complaints: 'v*', expenses: 'vm cm', reminders: 'vt', yield: 'v*',
 }));
 

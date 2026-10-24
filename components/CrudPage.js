@@ -3,7 +3,7 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, History as HistoryIcon, Pencil, Ban, MoreVertical } from 'lucide-react';
+import { Plus, History as HistoryIcon, Pencil, Ban, MoreVertical, CheckSquare, Square, Download, Share2, Trash2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useApp, useFetch, useTx } from './Providers';
 import { trNow } from '@/lib/trNow';
@@ -317,7 +317,7 @@ export async function saveWithConfirm(path, body, opts) {
 const same = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
 export default function CrudPage({
-  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination = 25, mapBody, loadExtra,
+  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, sortOptions, facets, pagination = 25, mapBody, loadExtra,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
   voidLabel, voidTitle, voidPrompt, voidSuccessMsg,
@@ -327,11 +327,19 @@ export default function CrudPage({
   const sp = useSearchParams();
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
+  const [currentSort, setCurrentSort] = useState(sort || (model === 'employees' ? 'empCode' : ''));
+  const effectiveSortOptions = sortOptions || (model === 'employees' ? [
+    { value: 'empCode', label: 'Sort: Code (EMP-0001…)' },
+    { value: 'name', label: 'Sort: Name (A–Z)' },
+    { value: '-name', label: 'Sort: Name (Z–A)' },
+    { value: 'joiningDate', label: 'Sort: Joining Date' },
+    { value: '-createdAt', label: 'Sort: Recently Added' },
+  ] : null);
   // drill-down links from the home screens arrive as ?<filter>=<value> (e.g. /stock?low=1, /expenses?status=pending)
   const [fv, setFv] = useState(() => Object.fromEntries(filters.map((f) => [f.key, sp.get(f.key) || '']).filter(([, v]) => v)));
   // everything that narrows the list is sent to the server (search, filters, sort); the browser never filters or sorts a big list itself
   const filterParams = Object.assign({}, ...filters.map((f) => (fv[f.key] ? (f.toQuery ? f.toQuery(fv[f.key]) : { [f.key]: fv[f.key] }) : {})));
-  const params = { ...(sort ? { sort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
+  const params = { ...(currentSort ? { sort: currentSort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
   // numbered pages (opt-in with `pagination`): ?page=N, the server counts the total; searching or filtering goes back to page 1
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(typeof pagination === 'number' ? pagination : 25);
@@ -364,9 +372,56 @@ export default function CrudPage({
   const [menuRow, setMenuRow] = useState(null);
   useEffect(() => { setMenuRow(null); }, [narrowing, page, pageSize]);
 
+  // ── Bulk select state ─────────────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(new Set()); // Set of _id strings
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // Clear selection whenever list changes
+  useEffect(() => { setSelected(new Set()); setSelectMode(false); }, [narrowing, page, pageSize]);
+  const allIds = rows.map((r) => String(r._id));
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someSelected = selected.size > 0;
+  const toggleRow = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(allIds));
+
+  async function bulkVoid() {
+    const ids = [...selected];
+    if (!await confirmDialog(`Delete/cancel ${ids.length} selected record(s)? This cannot be undone.`)) return;
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      try { await api(`/api/${model}/${id}`, { method: 'DELETE', body: { reason: 'Bulk delete by ' + (session?.name || 'admin') } }); ok++; } catch { fail++; }
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    setSelectMode(false);
+    toast[fail ? 'error' : 'success'](`${ok} deleted${fail ? `, ${fail} failed` : ''}`);
+    reload();
+  }
+
+  function bulkExport() {
+    const ids = [...selected];
+    const exportRows = rows.filter((r) => ids.includes(String(r._id)));
+    const cols = (exportColumns || columns).filter((c) => c.key);
+    const header = cols.map((c) => c.label || c.key).join(',');
+    const body = exportRows.map((r) => cols.map((c) => { const v = r[c.key]; return `"${String(v ?? '').replace(/"/g, '""')}"`; }).join(',')).join('\n');
+    const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${model}-selected.csv`; a.click();
+    toast.success(`Exported ${exportRows.length} rows as CSV`);
+  }
+
+  function bulkShare() {
+    const ids = [...selected];
+    const shareRows = rows.filter((r) => ids.includes(String(r._id)));
+    const primaryCol = (columns || []).find((c) => c.primary) || columns?.[0];
+    const text = shareRows.map((r, i) => `${i + 1}. ${primaryCol ? (typeof primaryCol.render === 'function' ? r[primaryCol.key] : r[primaryCol.key]) : Object.values(r).slice(0, 3).join(' | ')}`).join('\n');
+    if (navigator.share) { navigator.share({ title: model, text }); } else { navigator.clipboard.writeText(text); toast.success('Copied to clipboard'); }
+  }
+
   const mayAdd = canAdd && can(model, 'create');
+  const { session } = useApp();
   const openNew = () => { setEditing(null); setShowErrors(false); setForm({ date: todayISO(), ...Object.fromEntries(fields.filter((f) => f.default !== undefined).map((f) => [f.name, typeof f.default === 'function' ? f.default() : f.default])), ...defaults }); setOpen(true); };
-  useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew();   }, []);
+  useEffect(() => { if (sp.get('new') === '1' && mayAdd) openNew(); }, []);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   // lists carry no photos or documents, so editing loads the full record first
@@ -525,8 +580,100 @@ export default function CrudPage({
           </>} />
       )}
       {topContent}
-      <div className="filter-row flex flex-wrap gap-2 mb-3">
+      {/* ── Bulk action bar (appears in selectMode) ── */}
+      {selectMode && (
+        <div className="mb-2.5 flex flex-wrap items-center gap-2 rounded-xl bg-terra-50 border border-terra-200 px-3.5 py-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-terra-800">
+              {selected.size === 0 ? 'Click rows or checkboxes to select' : `${selected.size} selected`}
+            </span>
+            {rows.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleAll}
+                className="text-xs text-terra-600 hover:text-terra-900 underline font-medium ml-1.5"
+              >
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+          </div>
+          <div className="flex-1" />
+          <button
+            className="btn-outline !text-xs !py-1 !px-2.5 flex items-center gap-1.5 bg-white disabled:opacity-50"
+            onClick={bulkExport}
+            disabled={selected.size === 0}
+            title="Export selected as CSV"
+          >
+            <Download size={13} /> Export CSV
+          </button>
+          <button
+            className="btn-outline !text-xs !py-1 !px-2.5 flex items-center gap-1.5 bg-white disabled:opacity-50"
+            onClick={bulkShare}
+            disabled={selected.size === 0}
+            title="Share selected"
+          >
+            <Share2 size={13} /> Share
+          </button>
+          {allowVoid && can(model, 'void') && (
+            <button
+              className="btn-danger !text-xs !py-1 !px-2.5 flex items-center gap-1.5 disabled:opacity-50"
+              onClick={bulkVoid}
+              disabled={selected.size === 0 || bulkBusy}
+              title="Delete selected"
+            >
+              <Trash2 size={13} /> {bulkBusy ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-outline !text-xs !py-1 !px-2 flex items-center gap-1 ml-1 text-char-600 bg-white"
+            onClick={() => { setSelectMode(false); setSelected(new Set()); }}
+            title="Exit selection mode"
+          >
+            <X size={13} /> Done
+          </button>
+        </div>
+      )}
+      <div className="filter-row flex flex-wrap gap-2 mb-3 items-center">
+        {/* Dedicated Select Mode Toggle button */}
+        {rows.length > 0 && (
+          <button
+            type="button"
+            title={selectMode ? 'Exit selection mode' : 'Select items from this list'}
+            onClick={() => {
+              if (selectMode) {
+                setSelectMode(false);
+                setSelected(new Set());
+              } else {
+                setSelectMode(true);
+              }
+            }}
+            className={cx(
+              'flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors border shadow-sm font-medium',
+              selectMode
+                ? 'bg-terra text-white border-terra hover:bg-terra-600'
+                : 'text-char-700 bg-white border-sand-300 hover:border-terra-400 hover:bg-sand-50'
+            )}
+          >
+            {selectMode ? <X size={14} /> : <CheckSquare size={14} className="text-terra" />}
+            <span>{selectMode ? 'Done' : 'Select'}</span>
+          </button>
+        )}
         <SearchBox value={q} onChange={setQ} />
+        {effectiveSortOptions && (
+          <select
+            aria-label="Sort order"
+            className="input !w-auto min-w-[150px] text-xs font-medium"
+            value={currentSort}
+            onChange={(e) => setCurrentSort(e.target.value)}
+          >
+            {effectiveSortOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {tx(o.label)}
+              </option>
+            ))}
+          </select>
+        )}
         {filters.map((f) => (
           <select key={f.key} aria-label={tx(f.label)} className="input !w-auto min-w-[130px]" value={fv[f.key] || ''} onChange={(e) => setFv({ ...fv, [f.key]: e.target.value })}>
             <option value="">{tx(f.label)}</option>
@@ -537,7 +684,40 @@ export default function CrudPage({
       {summary && !loading && <div className="mb-3">{summary(rows, { total: list.total, facets: fac.data, loading: fac.loading })}</div>}
       {error ? <div role="alert" className="card p-4 text-red-600 text-sm">{error.message}</div> : (
         <>
-          <DataList loading={loading} rows={rows} columns={columns} empty={emptyText || t('noData')} rowClass={rowClass} actions={rowActs} />
+          <DataList
+            loading={loading}
+            rows={rows}
+            columns={
+              selectMode
+                ? [
+                    {
+                      key: '__sel',
+                      label: '',
+                      hideOnCard: false,
+                      render: (r) => (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleRow(String(r._id)); }}
+                          className="p-1 text-char-400 hover:text-terra transition-colors flex items-center"
+                          title={selected.has(String(r._id)) ? 'Deselect' : 'Select'}
+                        >
+                          {selected.has(String(r._id))
+                            ? <CheckSquare size={17} className="text-terra" />
+                            : <Square size={17} />}
+                        </button>
+                      ),
+                    },
+                    ...columns.map((c, i) => (i === 0 && !columns.some((x) => x.primary) ? { ...c, primary: true } : c)),
+                  ]
+                : columns
+            }
+            sortKey={currentSort}
+            onSort={setCurrentSort}
+            onRowClick={selectMode ? (r) => toggleRow(String(r._id)) : undefined}
+            empty={emptyText || t('noData')}
+            rowClass={(r) => cx(rowClass?.(r), selected.has(String(r._id)) && 'bg-terra-50/50 ring-1 ring-terra-300')}
+            actions={rowActs}
+          />
           {!loading && (pagination ? <Pagination page={page} pageSize={pageSize} total={list.total} shown={rows.length} onPage={setPage} onSize={setPageSize} /> : <LoadMore list={list} />)}
         </>
       )}

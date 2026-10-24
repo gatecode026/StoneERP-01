@@ -49,7 +49,7 @@ export type ListQuery = {
 
 const RESERVED = new Set(['limit', 'cursor', 'sort', 'q', 'from', 'to', 'dateField', 'includeVoid', 'count', 'ids', 'fields', '_t', 'page']);
 export const DEFAULT_LIMIT = 25;
-export const MAX_LIMIT = 100;
+export const MAX_LIMIT = 500; // raised from 100 — salary sheets, exports, supervisor dashboards need all records
 
 export const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

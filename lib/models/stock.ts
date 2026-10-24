@@ -7,10 +7,14 @@ export const StockItem = defineModel(
     name: { type: S, required: true, trim: true, maxlength: 160 },
     category: { type: S, enum: ['raw', 'finished', 'consumable'], required: true },
     unit: { type: S, required: true, maxlength: 20 },
-    size: { type: S, maxlength: 60 },
+    // Physical Stocks format fields (as per client)
+    karigar: { type: S, maxlength: 120 }, // the worker / karigar responsible
+    colourFinish: { type: S, maxlength: 80 }, // colour finish description
+    sizeL: { type: N, min: 0 }, // Size Length in mm
+    sizeW: { type: N, min: 0 }, // Size Width in mm
+    size: { type: S, maxlength: 60 }, // legacy size string e.g. "600×600"
     thickness: { type: N, min: 0 },
     finish: { type: S, maxlength: 40 },
-    grade: { type: S, enum: ['A', 'B', 'C'] },
     location: { type: S, maxlength: 80 },
     photo: S,
     balance: { type: N, default: 0 }, // changes ONLY through stock movements (atomic conditional $inc)
@@ -86,6 +90,7 @@ export const Purchase = defineModel(
     qty: { type: N, required: true, min: 0.0001 },
     rate: money({ required: true }), // cost
     gstPercent: { type: N, enum: [0, 5, 12, 18, 28], default: 0 },
+    isInterState: { type: B, default: false }, // true = IGST, false = CGST + SGST
     total: money({ required: true }), // cost
     paidAmount: money({ default: 0 }),
     outstanding: money({ default: 0 }),

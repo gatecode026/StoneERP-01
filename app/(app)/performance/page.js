@@ -10,6 +10,8 @@ import { todayISO, monthOf, fmtMonth, num } from '@/lib/format';
 import T from '@/components/T';
 
 const tone = (s) => (s >= 80 ? 'green' : s >= 60 ? 'amber' : 'red');
+// detect duplicate names in the result set
+const findDupes = (rows) => { const seen = {}; rows.forEach((r) => { seen[r.name] = (seen[r.name] || 0) + 1; }); return Object.keys(seen).filter((n) => seen[n] > 1); };
 
 export default function PerformancePage() {
   const { t, tr, can } = useApp();
@@ -23,6 +25,7 @@ export default function PerformancePage() {
   const [remark, setRemark] = useState('');
   const canRemark = can('perfremarks', 'create');
   const rows = data?.rows || [];
+  const dupes = findDupes(rows);
 
   async function saveRemark() {
     try {
@@ -34,11 +37,16 @@ export default function PerformancePage() {
 
   return (
     <RoleGuard perm="performance">
-      <PageHeader title={t('performance')} subtitle="Monthly scorecard from what was already entered"
+      {dupes.length > 0 && (
+        <div className="mb-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
+          ⚠️ <b>Duplicate employees detected:</b> {dupes.join(', ')} — these appear more than once because the import ran twice. Deactivate the duplicate records from the Employees page.
+        </div>
+      )}
+      <PageHeader title={t('performance')} subtitle="Monthly scorecard — employees need 3+ days data to receive a score"
         actions={<><ImportData resource="perfremarks" perm="perfremarks" noun="performance remarks" /><input type="month" className="input !w-auto" value={month} onChange={(e) => setMonth(e.target.value || month)} />{can('performance', 'export') && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/performance?month=${month}&all=1`); downloadCSV(`performance-${month}`, all.rows, [{ key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'presentDays', label: 'Days present' }, { key: 'absent', label: 'Absent' }, { key: 'onTime', label: 'Reports on time' }, { key: 'qty', label: 'Output' }, { key: 'breakdowns', label: 'Breakdowns' }, { key: 'score', label: 'Score' }, { key: 'remark', label: 'Owner remark' }]); } catch (e) { toast.error(e.message); } }} />}</>} />
       <Section title={<span className="flex items-center gap-2"><Trophy size={16} className="text-terra" /> <T vars={{ m: fmtMonth(month) }}>{'Best workers – {m}'}</T></span>} className="mb-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          {(data?.top || []).map((r, i) => (
+          {(data?.top || []).filter((r) => r.hasData && r.score > 0).slice(0, 5).map((r, i) => (
             <div key={r.empCode} className={`rounded-xl p-3 border ${i === 0 ? 'bg-terra-50 border-terra-100' : 'bg-sand-50 border-sand-200'}`}>
               <div className="text-[11px] font-bold text-char-500">#{i + 1}</div>
               <div className="font-bold text-sm truncate">{r.name}</div>
@@ -46,12 +54,18 @@ export default function PerformancePage() {
               <div className="text-2xl font-extrabold text-terra mt-1">{r.score}</div>
             </div>
           ))}
-          {!(data?.top || []).length && !loading && <div className="text-sm text-char-500 col-span-full"><T>No data for this month</T></div>}
+          {!(data?.top || []).filter((r) => r.hasData).length && !loading && <div className="text-sm text-char-500 col-span-full"><T>No data for this month yet — attendance must be marked for at least 3 days</T></div>}
         </div>
       </Section>
       <DataList loading={loading} rows={rows} rowKey="empCode" onRowClick={(r) => { setSel(r); setRemark(r.remark || ''); }} columns={[
-        { key: 'name', label: 'Employee', primary: true, render: (r) => <span>{r.name}<div className="text-[11px] text-char-500 font-normal">{r.job}</div></span> },
-        { key: 'score', label: 'Score', align: 'right', render: (r) => <Badge tone={tone(r.score)} className="!text-sm">{r.score}</Badge> },
+        { key: 'name', label: 'Employee', primary: true, render: (r) => (
+          <span>
+            {r.name}
+            {dupes.includes(r.name) && <span className="ml-1 text-[10px] text-red-500 font-bold">[DUPLICATE]</span>}
+            <div className="text-[11px] text-char-500 font-normal">{r.job}</div>
+          </span>
+        )},
+        { key: 'score', label: 'Score', align: 'right', render: (r) => r.hasData ? <Badge tone={tone(r.score)} className="!text-sm">{r.score}</Badge> : <span className="text-xs text-char-400 italic">No data</span> },
         { key: 'presentDays', label: 'Present / absent', render: (r) => `${r.presentDays} / ${r.absent}` },
         { key: 'reports', label: 'Reports on time', render: (r) => `${r.onTime} of ${data?.workingDays}` },
         { key: 'qty', label: 'Output', render: (r) => (r.qty ? `${num(r.qty)} sq ft` : r.tasks ? `${r.tasksDone}/${r.tasks} tasks` : '—') },

@@ -2,6 +2,7 @@ import './auth';
 import './settings';
 import { Employee, Attendance, DailyReport, Leave, Advance, SalarySheet, PerfRemark, SafetyRecord, Task } from './people';
 import { Machine, MachineEntry, Block, Royalty, Repair, Vehicle, VehicleTrip } from './production';
+import { Project } from './projects';
 import { StockItem, StockMovement, StockCount, Supplier, Purchase } from './stock';
 import { Customer, Sale, Payment, Dispatch, Complaint } from './sales';
 import { Expense, ExpenseHead, CashEntry, CashClosing, Account } from './money';
@@ -12,6 +13,7 @@ export * from './auth';
 export * from './settings';
 export * from './people';
 export * from './production';
+export * from './projects';
 export * from './stock';
 export * from './sales';
 export * from './money';
@@ -28,6 +30,7 @@ export const MODELS: Record<string, AnyModel> = {
   perfremarks: PerfRemark,
   safetyrecords: SafetyRecord,
   tasks: Task,
+  projects: Project,
   machines: Machine,
   machineentries: MachineEntry,
   blocks: Block,

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getEnv } from './lib/env';
 
 // Proxy = first, cheap gate. It only checks that a session cookie *exists* (real validation happens on the server,
 // in lib/auth/session.ts) and adds the per-request CSP nonce. It never trusts the cookie contents.
@@ -27,6 +28,14 @@ function csp(nonce: string, isDev: boolean) {
 }
 
 export function proxy(request: NextRequest) {
+  // a misconfigured server (a missing or malformed setting) says which one, instead of a bare "Internal Server Error". Names only, never values.
+  try { getEnv(); } catch (e) {
+    return new NextResponse(`The server is not set up correctly.
+
+${(e as Error).message}
+
+Fix the setting in the host's environment variables, then redeploy.`, { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith('/api/');
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p.endsWith('/') ? p : p + '/'));

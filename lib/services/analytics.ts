@@ -63,18 +63,21 @@ async function performanceAll(month: string) {
   const maxSales = Math.max(0, ...base.map((b) => (b.sc ? b.sc.sales + b.sc.collected : 0)));
 
   const rows = base.map((b) => {
-    const attScore = elapsed ? Math.min(100, ((b.presentDays - b.late * 0.25) / elapsed) * 100) : 0;
-    const repScore = elapsed ? Math.min(100, (b.onTime / elapsed) * 100) : 0;
+    // Minimum data guard: need at least 3 days of attendance data to score meaningfully
+    const hasData = b.presentDays + b.absent >= 3;
+    const attScore = elapsed && hasData ? Math.min(100, ((b.presentDays - b.late * 0.25) / elapsed) * 100) : 0;
+    const repScore = elapsed && hasData ? Math.min(100, (b.onTime / elapsed) * 100) : 0;
     let workScore: number;
     if (b.sc && maxSales > 0) workScore = ((b.sc.sales + b.sc.collected) / maxSales) * 100; // salespeople: sales + collections
     else if (maxByJob[b.e.job] > 0) workScore = (b.qty / maxByJob[b.e.job]) * 100;
     else if (b.tasks) workScore = (b.tasksDone / b.tasks) * 100;
-    else workScore = 80;
+    else workScore = hasData ? 80 : 0; // no-output job gets 80 only if they have attendance data
     const disc = Math.max(0, 100 - b.breakdowns * 30 - b.complaints * 30);
-    const score = r0(attScore * 0.35 + repScore * 0.25 + workScore * 0.3 + disc * 0.1);
+    const score = hasData ? r0(attScore * 0.35 + repScore * 0.25 + workScore * 0.3 + disc * 0.1) : 0;
     return {
       empCode: b.e.empCode, name: b.e.name, job: b.e.job, presentDays: b.presentDays, absent: b.absent, late: b.late, reports: b.reports, onTime: b.onTime, qty: r0(b.qty),
       breakdowns: b.breakdowns, tasks: b.tasks, tasksDone: b.tasksDone, complaints: b.complaints, attScore: r0(attScore), repScore: r0(repScore), workScore: r0(workScore), score,
+      hasData, // so the UI can show "Not enough data" instead of a score of 0
       sales: b.sc?.sales, collected: b.sc?.collected,
     };
   });
