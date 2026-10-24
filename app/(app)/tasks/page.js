@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { CheckCircle2, MessageCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, MessageCircle, AlertTriangle, FolderKanban } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, Sheet, Field, PhotoInput, Section, SkeletonList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
@@ -42,12 +42,35 @@ export default function TasksPage() {
   const fields = [
     { name: 'title', label: 'Task', required: true, wide: true },
     { name: 'details', label: 'Details', type: 'textarea', wide: true },
+    {
+      name: 'projectId',
+      label: 'Linked Project',
+      type: 'ref',
+      ref: {
+        model: 'projects',
+        valueKey: '_id',
+        nameField: 'projectName',
+        label: (p) => `${p.name} (${p.projectCode})`,
+      },
+    },
     { name: 'assignedCode', label: 'Assign to', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } },
     { name: 'dueDate', label: 'Due date', type: 'date', required: true },
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];
   const columns = [
     { key: 'title', label: 'Task', primary: true, render: (r) => <span>{r.title}{r.priority === 'High' && <Badge tone="red" className="ml-1.5"><T>High</T></Badge>}<div className="text-[11px] text-char-500 font-normal">{r.details}</div></span> },
+    {
+      key: 'projectName',
+      label: 'Project',
+      render: (r) => (
+        r.projectName ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-terra">
+            <FolderKanban size={13} />
+            <span>{r.projectName}</span>
+          </span>
+        ) : <span className="text-char-400 text-xs">—</span>
+      ),
+    },
     { key: 'assignedName', label: 'Assigned to' },
     { key: 'dueDate', label: 'Due', render: (r) => <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>{fmtDate(r.dueDate)}</span> },
     { key: 'state', label: 'Status', render: (r) => (r.state === 'done' ? <Badge tone="green"><T>Done</T></Badge> : r.dueDate < today ? <Badge tone="red"><T>Overdue</T></Badge> : <Badge tone="amber"><T>Pending</T></Badge>) },

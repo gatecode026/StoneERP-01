@@ -374,26 +374,67 @@ export const safetyrecords: ResourceDef = {
   },
 };
 
-const taskContent = ['title', 'details', 'dueDate', 'priority', 'assignedCode'] as const;
+const taskContent = ['title', 'details', 'dueDate', 'priority', 'assignedCode', 'projectId'] as const;
 export const tasks: ResourceDef = {
   key: 'tasks', model: Task, label: (d) => d.title,
-  listFields: ['title', 'details', 'assignedCode', 'assignedName', 'assignedBy', 'dueDate', 'priority', 'state', 'doneAt', 'doneNote'],
-  sortable: ['dueDate', 'createdAt'], defaultSort: 'dueDate', searchFields: ['title', 'assignedName'],
-  dateFields: ['dueDate'], filters: { state: { enum: ['pending', 'done'] }, assignedCode: 'string', priority: { enum: ['Normal', 'High'] } },
+  listFields: ['title', 'details', 'assignedCode', 'assignedName', 'assignedBy', 'dueDate', 'priority', 'state', 'doneAt', 'doneNote', 'projectId', 'projectCode', 'projectName'],
+  sortable: ['dueDate', 'createdAt'], defaultSort: 'dueDate', searchFields: ['title', 'assignedName', 'projectName', 'projectCode'],
+  dateFields: ['dueDate'], filters: { state: { enum: ['pending', 'done'] }, assignedCode: 'string', priority: { enum: ['Normal', 'High'] }, projectId: 'string' },
   named: { overdue: (v) => (v === '1' ? { state: 'pending', dueDate: { $lt: todayIST() } } : {}) },
-  serverOnly: ['assignedName', 'assignedBy', 'assignedById', 'doneAt'],
-  create: z.object({ title: req(200), details: text(2000).optional(), assignedCode: empCode, dueDate: dateStr, priority: enumOf(['Normal', 'High']).optional() }).strict(),
-  update: z.object({ title: req(200), details: text(2000), assignedCode: empCode, dueDate: dateStr, priority: enumOf(['Normal', 'High']), state: enumOf(['pending', 'done']), doneNote: text(1000), donePhoto: photo }).partial().strict(),
+  serverOnly: ['assignedName', 'assignedBy', 'assignedById', 'doneAt', 'projectCode', 'projectName'],
+  create: z.object({
+    title: req(200), details: text(2000).optional(), assignedCode: empCode, dueDate: dateStr,
+    priority: enumOf(['Normal', 'High']).optional(),
+    projectId: z.string().optional().or(z.literal('')),
+  }).strict(),
+  update: z.object({
+    title: req(200), details: text(2000), assignedCode: empCode, dueDate: dateStr,
+    priority: enumOf(['Normal', 'High']), state: enumOf(['pending', 'done']),
+    doneNote: text(1000), donePhoto: photo,
+    projectId: z.string().optional().or(z.literal('')),
+  }).partial().strict(),
   lifecycle: {
     async prepareCreate(ctx, input) {
       const e = await employeeByCode(ctx, input.assignedCode, { active: true });
-      return { ...input, assignedCode: e.empCode, assignedName: e.name, assignedBy: ctx.actor.name, assignedById: oid(ctx.actor.id), state: 'pending' };
+      const doc: any = { ...input, assignedCode: e.empCode, assignedName: e.name, assignedBy: ctx.actor.name, assignedById: oid(ctx.actor.id), state: 'pending' };
+      if (input.projectId) {
+        const { Project } = await import('../models/projects');
+        const p: any = await Project.findById(input.projectId).lean();
+        if (p) {
+          doc.projectId = String(p._id);
+          doc.projectCode = p.projectCode;
+          doc.projectName = p.name;
+          await Project.updateOne({ _id: p._id }, { $inc: { taskCount: 1 } });
+        }
+      }
+      return doc;
     },
     async prepareUpdate(ctx, prev, patch, auth) {
       if (taskContent.some((k) => k in patch) && !auth.perm.can('tasks', 'create')) throw forbidden('You can only mark your task done');
       if (patch.assignedCode) patch.assignedName = (await employeeByCode(ctx, patch.assignedCode, { active: true })).name;
-      if (patch.state === 'done' && prev.state !== 'done') patch.doneAt = new Date();
-      if (patch.state === 'pending') patch.doneAt = undefined;
+      if (patch.projectId && patch.projectId !== prev.projectId) {
+        const { Project } = await import('../models/projects');
+        const p: any = await Project.findById(patch.projectId).lean();
+        if (p) {
+          patch.projectId = String(p._id);
+          patch.projectCode = p.projectCode;
+          patch.projectName = p.name;
+        }
+      }
+      if (patch.state === 'done' && prev.state !== 'done') {
+        patch.doneAt = new Date();
+        if (prev.projectId) {
+          const { Project } = await import('../models/projects');
+          await Project.updateOne({ _id: prev.projectId }, { $inc: { tasksDone: 1 } });
+        }
+      }
+      if (patch.state === 'pending' && prev.state === 'done') {
+        patch.doneAt = undefined;
+        if (prev.projectId) {
+          const { Project } = await import('../models/projects');
+          await Project.updateOne({ _id: prev.projectId }, { $inc: { tasksDone: -1 } });
+        }
+      }
       return patch;
     },
   },

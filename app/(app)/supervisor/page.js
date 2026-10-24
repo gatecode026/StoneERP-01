@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { CheckCircle2, Clock, FolderOpen, FolderCheck, Users, AlertTriangle, Plus, ClipboardList } from 'lucide-react';
+import { CheckCircle2, Clock, FolderOpen, FolderCheck, Users, AlertTriangle, Plus, ClipboardList, FolderKanban } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, PageHeader, StatCard, Section, Sheet, Field, SkeletonList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
@@ -54,6 +54,17 @@ export default function SupervisorPage() {
   const taskFields = [
     { name: 'title', label: 'Work / Task', required: true, wide: true, placeholder: 'e.g. Cut 200 sq ft Kotah Blue' },
     { name: 'details', label: 'Details / Instructions', type: 'textarea', wide: true },
+    {
+      name: 'projectId',
+      label: 'Linked Project',
+      type: 'ref',
+      ref: {
+        model: 'projects',
+        valueKey: '_id',
+        nameField: 'projectName',
+        label: (p) => `${p.name} (${p.projectCode})`,
+      },
+    },
     { name: 'assignedCode', label: 'Assign to (Worker / Supervisor)', type: 'ref', required: true,
       ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active' } } },
     { name: 'dueDate', label: 'Due date', type: 'date', required: true },
@@ -70,6 +81,18 @@ export default function SupervisorPage() {
         <div className="text-[11px] text-char-500 font-normal">{r.details}</div>
       </span>
     )},
+    {
+      key: 'projectName',
+      label: 'Project',
+      render: (r) => (
+        r.projectName ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-terra">
+            <FolderKanban size={13} />
+            <span>{r.projectName}</span>
+          </span>
+        ) : <span className="text-char-400 text-xs">—</span>
+      ),
+    },
     { key: 'assignedName', label: 'Worker / Team' },
     { key: 'dueDate', label: 'Due', render: (r) => (
       <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>

@@ -317,7 +317,7 @@ export async function saveWithConfirm(path, body, opts) {
 const same = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
 
 export default function CrudPage({
-  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, facets, pagination = 25, mapBody, loadExtra,
+  model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, sortOptions, facets, pagination = 25, mapBody, loadExtra,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
   voidLabel, voidTitle, voidPrompt, voidSuccessMsg,
@@ -327,11 +327,19 @@ export default function CrudPage({
   const sp = useSearchParams();
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
+  const [currentSort, setCurrentSort] = useState(sort || (model === 'employees' ? 'empCode' : ''));
+  const effectiveSortOptions = sortOptions || (model === 'employees' ? [
+    { value: 'empCode', label: 'Sort: Code (EMP-0001…)' },
+    { value: 'name', label: 'Sort: Name (A–Z)' },
+    { value: '-name', label: 'Sort: Name (Z–A)' },
+    { value: 'joiningDate', label: 'Sort: Joining Date' },
+    { value: '-createdAt', label: 'Sort: Recently Added' },
+  ] : null);
   // drill-down links from the home screens arrive as ?<filter>=<value> (e.g. /stock?low=1, /expenses?status=pending)
   const [fv, setFv] = useState(() => Object.fromEntries(filters.map((f) => [f.key, sp.get(f.key) || '']).filter(([, v]) => v)));
   // everything that narrows the list is sent to the server (search, filters, sort); the browser never filters or sorts a big list itself
   const filterParams = Object.assign({}, ...filters.map((f) => (fv[f.key] ? (f.toQuery ? f.toQuery(fv[f.key]) : { [f.key]: fv[f.key] }) : {})));
-  const params = { ...(sort ? { sort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
+  const params = { ...(currentSort ? { sort: currentSort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
   // numbered pages (opt-in with `pagination`): ?page=N, the server counts the total; searching or filtering goes back to page 1
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(typeof pagination === 'number' ? pagination : 25);
@@ -652,6 +660,20 @@ export default function CrudPage({
           </button>
         )}
         <SearchBox value={q} onChange={setQ} />
+        {effectiveSortOptions && (
+          <select
+            aria-label="Sort order"
+            className="input !w-auto min-w-[150px] text-xs font-medium"
+            value={currentSort}
+            onChange={(e) => setCurrentSort(e.target.value)}
+          >
+            {effectiveSortOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {tx(o.label)}
+              </option>
+            ))}
+          </select>
+        )}
         {filters.map((f) => (
           <select key={f.key} aria-label={tx(f.label)} className="input !w-auto min-w-[130px]" value={fv[f.key] || ''} onChange={(e) => setFv({ ...fv, [f.key]: e.target.value })}>
             <option value="">{tx(f.label)}</option>
@@ -689,6 +711,8 @@ export default function CrudPage({
                   ]
                 : columns
             }
+            sortKey={currentSort}
+            onSort={setCurrentSort}
             onRowClick={selectMode ? (r) => toggleRow(String(r._id)) : undefined}
             empty={emptyText || t('noData')}
             rowClass={(r) => cx(rowClass?.(r), selected.has(String(r._id)) && 'bg-terra-50/50 ring-1 ring-terra-300')}

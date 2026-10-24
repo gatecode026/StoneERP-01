@@ -233,6 +233,9 @@ export const Task = defineModel(
   {
     title: { type: S, required: true, maxlength: 200 },
     details: { type: S, maxlength: 2000 },
+    projectId: { type: S },
+    projectCode: { type: S },
+    projectName: { type: S },
     assignedCode: { type: S, required: true, uppercase: true },
     assignedName: S,
     assignedById: { type: OID },
@@ -244,5 +247,5 @@ export const Task = defineModel(
     doneNote: { type: S, maxlength: 1000 },
     donePhoto: S,
   },
-  { indexes: [[{ assignedCode: 1, state: 1, dueDate: 1 }], [{ state: 1, dueDate: 1 }]] }
+  { indexes: [[{ assignedCode: 1, state: 1, dueDate: 1 }], [{ state: 1, dueDate: 1 }], [{ projectId: 1, state: 1 }]] }
 );
