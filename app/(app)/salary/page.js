@@ -3,9 +3,9 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { BadgeCheck, Save, Banknote, FileText, MessageCircle } from 'lucide-react';
+import { BadgeCheck, Save, Banknote, FileText, MessageCircle, Pencil, Sparkles, Check } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination } from '@/components/ui';
+import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination, cx } from '@/components/ui';
 import { api, downloadCSV, openWA } from '@/lib/client';
 import { inr, num, fmtMonth, todayISO, monthOf, addDays } from '@/lib/format';
 import { SALARY } from '@/lib/config';
@@ -40,8 +40,100 @@ export default function SalaryPage() {
   };
   const slipMsg = (r) => `*Salary slip – ${fmtMonth(month)}*\n${r.name} (${r.empCode})\nWages ${inr(r.wages)}${r.otPay ? ` + OT ${inr(r.otPay)}` : ''}\nDeductions: PF/ESI ${inr(r.pf + r.esi)}, advance ${inr(r.advanceRecovery)}\n*Net salary: ${inr(r.net)}*\n— Vipul Stone Suppliers`;
 
+  // Fetch active employees for the update salary picker
+  const allEmpsFetch = useFetch(office ? '/api/employees?status=active&limit=200' : null);
+  const allEmployees = allEmpsFetch.data?.rows || allEmpsFetch.data || rows;
+
+  // Update salary modal state
+  const [salaryModalOpen, setSalaryModalOpen] = useState(false);
+  const [salaryForm, setSalaryForm] = useState({
+    empCode: '',
+    name: '',
+    job: '',
+    payType: 'monthly',
+    rate: '',
+    pieceUnit: 'sqft',
+  });
+  const [savingSalary, setSavingSalary] = useState(false);
+
+  const openSalaryModal = (employee = null) => {
+    if (employee) {
+      setSalaryForm({
+        empCode: employee.empCode,
+        name: employee.name,
+        job: employee.job || '',
+        payType: employee.payType || 'monthly',
+        rate: employee.rate != null ? String(employee.rate) : '',
+        pieceUnit: employee.pieceUnit || 'sqft',
+      });
+    } else {
+      const first = rows[0] || (allEmployees && allEmployees[0]);
+      setSalaryForm({
+        empCode: first?.empCode || '',
+        name: first?.name || '',
+        job: first?.job || '',
+        payType: first?.payType || 'monthly',
+        rate: first?.rate != null ? String(first.rate) : '',
+        pieceUnit: first?.pieceUnit || 'sqft',
+      });
+    }
+    setSalaryModalOpen(true);
+  };
+
+  const onSelectEmployee = (code) => {
+    const emp = (allEmployees || []).find((e) => e.empCode === code) || rows.find((r) => r.empCode === code);
+    if (emp) {
+      setSalaryForm({
+        empCode: emp.empCode,
+        name: emp.name,
+        job: emp.job || '',
+        payType: emp.payType || 'monthly',
+        rate: emp.rate != null ? String(emp.rate) : '',
+        pieceUnit: emp.pieceUnit || 'sqft',
+      });
+    }
+  };
+
+  const handleSaveSalary = async (e) => {
+    e?.preventDefault();
+    if (!salaryForm.empCode) {
+      toast.error('Please select an employee');
+      return;
+    }
+    const rateNum = Number(salaryForm.rate);
+    if (isNaN(rateNum) || rateNum < 0) {
+      toast.error('Please enter a valid salary amount (0 or more)');
+      return;
+    }
+    setSavingSalary(true);
+    try {
+      await api('/api/salary/update', {
+        method: 'POST',
+        body: {
+          empCode: salaryForm.empCode,
+          rate: rateNum,
+          payType: salaryForm.payType,
+          pieceUnit: salaryForm.payType === 'piece' ? salaryForm.pieceUnit : null,
+          month,
+        },
+      });
+      toast.success(`Salary for ${salaryForm.name || salaryForm.empCode} updated to ₹${rateNum.toLocaleString('en-IN')}`);
+      setSalaryModalOpen(false);
+      reload();
+      allEmpsFetch.reload();
+      window.dispatchEvent(new Event('vss-data-changed'));
+      if (sel && sel.empCode === salaryForm.empCode) {
+        setSel(null);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update salary');
+    } finally {
+      setSavingSalary(false);
+    }
+  };
+
   const columns = [
-    { key: 'name', label: 'Employee', primary: true, render: (r) => <span>{r.name}<div className="text-[11px] text-char-500 font-normal">{r.job} · {PT[r.payType]}</div></span> },
+    { key: 'name', label: 'Employee', primary: true, render: (r) => <span>{r.name}<div className="text-[11px] text-char-500 font-normal">{r.job} · {PT[r.payType]} {r.rate != null ? `(₹${num(r.rate)})` : ''}</div></span> },
     { key: 'days', label: 'Days / qty', render: (r) => (r.payType === 'piece' ? `${num(r.qty)} ${r.pieceUnit === 'piece' ? 'pcs' : 'sq ft'}` : `${r.daysPresent} days`) },
     { key: 'wages', label: 'Wages', align: 'right', render: (r) => inr(r.wages) },
     { key: 'otPay', label: 'Overtime', align: 'right', render: (r) => (r.otPay ? `+ ${inr(r.otPay)}` : '—') },
@@ -49,6 +141,25 @@ export default function SalaryPage() {
     { key: 'advanceRecovery', label: 'Advance cut', align: 'right', render: (r) => (r.advanceRecovery ? `− ${inr(r.advanceRecovery)}` : '—') },
     { key: 'net', label: 'Net salary', align: 'right', render: (r) => <b className="text-terra">{inr(r.net)}</b> },
     { key: 'paid', label: 'Paid', render: (r) => (r.paid ? <Badge tone="green">{r.paidMode}</Badge> : <Badge tone="gray">—</Badge>) },
+    ...(office ? [{
+      key: '_update',
+      label: 'Update',
+      align: 'right',
+      render: (r) => (
+        <button
+          type="button"
+          className="btn-outline !py-1 !px-2.5 !text-xs flex items-center gap-1 text-terra border-terra-200 hover:bg-terra-50 hover:border-terra-400 font-semibold shadow-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            openSalaryModal(r);
+          }}
+          title={`Update salary for ${r.name}`}
+        >
+          <Pencil size={12} />
+          <span>Update</span>
+        </button>
+      ),
+    }] : []),
   ];
 
   const sheetStatus = data?.status;
@@ -76,6 +187,16 @@ export default function SalaryPage() {
                 <Badge tone={sheetStatus === 'paid' ? 'green' : sheetStatus === 'approved' ? 'blue' : 'amber'}>{sheetStatus === 'preview' ? 'Preview – not approved' : sheetStatus}</Badge>
                 {data?.approvedBy && <span className="text-xs text-char-500"><T vars={{ n: data.approvedBy }}>{'approved by {n}'}</T></span>}
                 <div className="flex-1" />
+                {office && (
+                  <button
+                    type="button"
+                    className="btn-outline flex items-center gap-1.5 font-semibold text-terra border-terra-300 hover:bg-terra-50 hover:border-terra-400 shadow-xs"
+                    onClick={() => openSalaryModal()}
+                  >
+                    <Banknote size={16} className="text-terra" />
+                    <span>Update salary</span>
+                  </button>
+                )}
                 {office && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-outline" disabled={busy} onClick={() => act('salarySave', {}, 'Draft saved')}><Save size={16} /><T> Save draft</T></button>}
                 {can('salarysheets', 'approve') && ['preview', 'draft'].includes(sheetStatus) && <button className="btn-primary" disabled={busy} onClick={async () => { if (await confirmDialog(`Approve salary sheet for ${fmtMonth(month)}? Net payable ${inr(tot.net)}. Advance recoveries will be applied.`)) act('salaryApprove', {}, 'Salary sheet approved'); }}><BadgeCheck size={16} /> {t('approveSheet')}</button>}
                 {mayPay && ['approved'].includes(sheetStatus) && <button className="btn-green" disabled={busy} onClick={async () => { const mode = await promptDialog('Pay all unpaid salaries by: Bank / Cash / UPI', 'Bank'); if (mode) act('salaryPay', { mode: normMode(mode) }, 'Salaries marked paid'); }}><Banknote size={16} /><T> Pay all</T></button>}
@@ -94,12 +215,35 @@ export default function SalaryPage() {
         </>
       )}
 
+      {/* ── Slide-over Sheet for Employee Details ── */}
       <Sheet open={!!sel} onClose={() => setSel(null)} title={`${sel?.name} · ${fmtMonth(month)}`}
         footer={sel && <><Link href={`/salary/slip/${month}/${sel.empCode}`} className="btn-primary flex-1"><FileText size={16} /> {t('slip')}</Link>{office && <button className="btn-green flex-1" onClick={() => openWA(slipMsg(sel), sel.mobile)}><MessageCircle size={16} /><T> WhatsApp</T></button>}</>}>
         {sel && (
           <div>
             <div className="rounded-xl bg-sand-100 p-3 text-sm mb-3"><div className="text-[11px] uppercase font-bold text-char-500 mb-1"><T>How wages were worked out</T></div><div className="font-mono text-[13px]">{sel.formula}</div></div>
-            <KV label="Pay type">{PT[sel.payType]} · ₹{num(sel.rate)}</KV>
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-sand-200">
+              <KV label="Pay type">{PT[sel.payType]} · ₹{num(sel.rate)}</KV>
+              {office && (
+                <button
+                  type="button"
+                  className="btn-outline !py-1 !px-2.5 !text-xs flex items-center gap-1 text-terra border-terra-200 hover:bg-terra-50 font-semibold"
+                  onClick={() => openSalaryModal(sel)}
+                >
+                  <Pencil size={12} />
+                  <span>Update rate</span>
+                </button>
+              )}
+            </div>
+            {office && (
+              <button
+                type="button"
+                className="btn-outline w-full flex items-center justify-center gap-1.5 py-2 font-semibold text-terra border-terra-300 hover:bg-terra-50 mb-3 shadow-xs"
+                onClick={() => openSalaryModal(sel)}
+              >
+                <Pencil size={14} />
+                <span>Update {sel.name}&apos;s Salary / Rate</span>
+              </button>
+            )}
             {sel.unmarked > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.unmarked }}>{'{n} day(s) have no attendance marked — they are not paid.'}</T></div>}
             {sel.payType !== 'piece' && <><KV label="Present days">{sel.present}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV>{sel.paidOffDays > 0 && <KV label="Weekly off / holidays (paid)">{sel.paidOffDays}</KV>}</>}
             <KV label="Wages">{inr(sel.wages)}</KV>
@@ -113,6 +257,146 @@ export default function SalaryPage() {
           </div>
         )}
       </Sheet>
+
+      {/* ── Update Salary Modal Sheet ── */}
+      <Sheet
+        open={salaryModalOpen}
+        onClose={() => !savingSalary && setSalaryModalOpen(false)}
+        title="Update Employee Salary"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn-outline"
+              disabled={savingSalary}
+              onClick={() => setSalaryModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary flex items-center gap-1.5"
+              disabled={savingSalary || !salaryForm.empCode}
+              onClick={handleSaveSalary}
+            >
+              <Check size={16} />
+              {savingSalary ? 'Saving & Recalculating…' : 'Save & Update Salary'}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveSalary} className="space-y-4">
+          <div>
+            <label className="label">Employee</label>
+            <select
+              className="input w-full"
+              value={salaryForm.empCode}
+              onChange={(e) => onSelectEmployee(e.target.value)}
+              disabled={savingSalary}
+            >
+              <option value="">-- Select employee --</option>
+              {(allEmployees || []).map((e) => (
+                <option key={e.empCode} value={e.empCode}>
+                  {e.name} ({e.empCode}) · {e.job || 'Worker'} · ₹{num(e.rate)} ({PT[e.payType] || e.payType})
+                </option>
+              ))}
+            </select>
+            {salaryForm.empCode && (
+              <div className="mt-2 p-2.5 rounded-xl bg-sand-100 flex items-center justify-between text-xs">
+                <div>
+                  <span className="font-semibold text-char-900">{salaryForm.name}</span>
+                  <span className="text-char-500 ml-1.5 font-mono">({salaryForm.empCode})</span>
+                  <span className="text-char-400 mx-1.5">·</span>
+                  <span className="text-char-600">{salaryForm.job || 'Worker'}</span>
+                </div>
+                <Badge tone="blue">{PT[salaryForm.payType] || salaryForm.payType}</Badge>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="label">Pay Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'monthly', label: 'Monthly', desc: 'Fixed monthly' },
+                { id: 'daily', label: 'Daily', desc: 'Per day wage' },
+                { id: 'piece', label: 'Piece rate', desc: 'Per sqft / pc' },
+              ].map((pt) => (
+                <button
+                  key={pt.id}
+                  type="button"
+                  disabled={savingSalary}
+                  onClick={() => setSalaryForm((f) => ({ ...f, payType: pt.id }))}
+                  className={cx(
+                    'p-2.5 rounded-xl border text-left transition-all',
+                    salaryForm.payType === pt.id
+                      ? 'border-terra bg-terra-50 text-terra font-semibold ring-1 ring-terra shadow-xs'
+                      : 'border-sand-300 bg-white hover:bg-sand-50 text-char-700'
+                  )}
+                >
+                  <div className="text-sm font-semibold">{pt.label}</div>
+                  <div className="text-[11px] opacity-75">{pt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="label">
+              {salaryForm.payType === 'monthly'
+                ? 'Monthly Salary (₹)'
+                : salaryForm.payType === 'daily'
+                ? 'Daily Wage (₹)'
+                : 'Rate per Unit (₹)'}
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-char-500 font-bold text-base">₹</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                required
+                disabled={savingSalary}
+                className="input w-full pl-8 font-mono text-base font-bold"
+                placeholder="e.g. 25000"
+                value={salaryForm.rate}
+                onChange={(e) => setSalaryForm((f) => ({ ...f, rate: e.target.value }))}
+              />
+            </div>
+            <div className="text-[11px] text-char-500 mt-1">
+              {salaryForm.payType === 'monthly' && Number(salaryForm.rate) > 0 && (
+                <span>≈ ₹{Math.round(Number(salaryForm.rate) / 30).toLocaleString('en-IN')} / day (calculated for 30 days)</span>
+              )}
+              {salaryForm.payType === 'daily' && Number(salaryForm.rate) > 0 && (
+                <span>Daily wage multiplied by present days worked</span>
+              )}
+            </div>
+          </div>
+
+          {salaryForm.payType === 'piece' && (
+            <div>
+              <label className="label">Piece Unit</label>
+              <select
+                className="input w-full"
+                value={salaryForm.pieceUnit}
+                onChange={(e) => setSalaryForm((f) => ({ ...f, pieceUnit: e.target.value }))}
+                disabled={savingSalary}
+              >
+                <option value="sqft">Per sq ft (Square feet)</option>
+                <option value="piece">Per piece</option>
+              </select>
+            </div>
+          )}
+
+          <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-3 text-xs text-amber-900 flex items-start gap-2.5">
+            <Sparkles size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <strong>Properly updates everywhere:</strong> Saves directly to {salaryForm.name || 'employee'}&apos;s master profile, updates the employees directory, and immediately recalculates wages, overtime, and net pay in the <strong>{fmtMonth(month)}</strong> salary sheet.
+            </div>
+          </div>
+        </form>
+      </Sheet>
     </RoleGuard>
   );
 }
+

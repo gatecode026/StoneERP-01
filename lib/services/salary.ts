@@ -203,4 +203,100 @@ export async function getSlip(month: string, code: string, settings: AppSettings
   return { month, status: sheet.status, row: safe };
 }
 
+/**
+ * Update an employee's salary rate / pay type master record.
+ * Immediately recalculates and updates the salary sheet (draft or approved unpaid) for the specified month so changes reflect everywhere.
+ */
+export async function updateSalaryRate(
+  ctx: SvcCtx,
+  input: {
+    empCode: string;
+    rate: number;
+    payType?: 'monthly' | 'daily' | 'piece';
+    pieceUnit?: 'sqft' | 'piece' | null;
+    month?: string;
+  }
+) {
+  const code = (input.empCode || '').trim().toUpperCase();
+  if (!code) throw badRequest('Employee code is required');
+  const rate = Number(input.rate);
+  if (isNaN(rate) || rate < 0) throw badRequest('Valid pay rate is required (>= 0)');
+
+  const emp: any = await Employee.findOne({ empCode: code, isVoid: false }).session(ctx.session ?? null);
+  if (!emp) throw notFound(`Employee ${code} not found`);
+
+  const oldRate = emp.rate;
+  const oldPayType = emp.payType;
+
+  const updateFields: Record<string, any> = {
+    rate,
+    updatedById: oid(ctx.actor.id),
+    updatedByName: ctx.actor.name,
+  };
+  if (input.payType) updateFields.payType = input.payType;
+  if (input.pieceUnit !== undefined) updateFields.pieceUnit = input.pieceUnit || undefined;
+
+  await Employee.updateOne({ _id: emp._id }, { $set: updateFields }, { session: ctx.session });
+
+  let sheetUpdated = false;
+  const targetMonth = input.month || todayIST().slice(0, 7);
+  if (targetMonth) {
+    const sheet: any = await SalarySheet.findOne({ month: targetMonth, isVoid: false }).session(ctx.session ?? null);
+    if (sheet) {
+      if (sheet.status === 'draft') {
+        const rows = await computeSalary(targetMonth, ctx.settings, { session: ctx.session });
+        const totals = sheetTotals(rows);
+        await SalarySheet.updateOne(
+          { _id: sheet._id },
+          { $set: { rows, totals, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name } },
+          { session: ctx.session }
+        );
+        sheetUpdated = true;
+      } else if (['approved', 'paid'].includes(sheet.status)) {
+        // Recalculate this employee's row if unpaid
+        const [updatedRow] = await computeSalary(targetMonth, ctx.settings, { empCodes: [code], session: ctx.session });
+        if (updatedRow) {
+          const rows = [...(sheet.rows || [])];
+          const idx = rows.findIndex((r: any) => r.empCode === code);
+          if (idx >= 0 && !rows[idx].paid) {
+            rows[idx] = { ...rows[idx], ...updatedRow };
+            const totals = sheetTotals(rows);
+            await SalarySheet.updateOne(
+              { _id: sheet._id },
+              { $set: { rows, totals, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name } },
+              { session: ctx.session }
+            );
+            sheetUpdated = true;
+          }
+        }
+      }
+    }
+  }
+
+  await writeAudit(
+    {
+      resource: 'employees',
+      refId: emp._id,
+      action: 'edit',
+      label: `${emp.name} (${emp.empCode}) salary updated to ₹${rate}`,
+      changes: {
+        rate: { from: oldRate, to: rate },
+        ...(input.payType && input.payType !== oldPayType ? { payType: { from: oldPayType, to: input.payType } } : {}),
+      },
+    },
+    ctx.actor,
+    ctx.session
+  );
+
+  return {
+    ok: true,
+    empCode: emp.empCode,
+    name: emp.name,
+    rate,
+    payType: input.payType || emp.payType,
+    pieceUnit: input.pieceUnit !== undefined ? input.pieceUnit : emp.pieceUnit,
+    sheetUpdated,
+  };
+}
+
 void forbidden;
