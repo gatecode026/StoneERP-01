@@ -8,6 +8,7 @@ import {
   ExternalLink, FileText, PackageCheck, Briefcase
 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
+import ImportData from '@/components/ImportData';
 import { RoleGuard, Badge, Sheet, StatCard, KV } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { fmtDate, todayISO, inr } from '@/lib/format';
@@ -277,6 +278,14 @@ export default function ProjectsPage() {
           subtitle="Track stone projects, material requirements, deliverables, and assign supervisor tasks"
           label="Project"
           addLabel="New Project"
+          headerExtra={
+            <ImportData
+              resource="projects"
+              perm="projects"
+              noun="projects"
+              hint="order date, order no, party name, colour, finish, sizes, quantities and total amount"
+            />
+          }
           fields={fields}
           columns={columns}
           sort="-createdAt"

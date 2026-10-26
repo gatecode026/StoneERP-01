@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Model } from 'mongoose';
 import {
-  Attendance, Block, Customer, DailyReport, Employee, Machine, PerfRemark, StockItem, Supplier, Vehicle, Sale,
+  Attendance, Block, Customer, DailyReport, Employee, Machine, PerfRemark, StockItem, Supplier, Vehicle, Sale, Project,
 } from '../models';
+import { SITES } from '../models/projects';
 import { MACHINE_TYPES } from '../config';
 import type { Resource } from '../perm/resources';
 import { parseDate, tenDigits, type Col } from './employees';
@@ -381,6 +382,152 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
     footnote: 'One row per task. "Assign to" is the employee code (or exact name).',
     columns: [col('title', 'Task', ['title'], 'Calibrate yesterday\'s slabs'), col('details', 'Details', [], ''), empCol('assignee', 'Assign to'), dateCol('dueDate', 'Due date', '15-10-2026'), enumCol('priority', 'Priority', ['Normal', 'High'], 'Normal')],
     describe: (i) => `${i.title ?? ''}`,
+  },
+  projects: {
+    resource: 'projects',
+    noun: 'projects',
+    required: ['partyName'],
+    refs: [employee('supervisor', 'supervisorCode', true)],
+    footnote: 'Order book format. Maps Ord. Date, Order No, Party Name, Colour, Sizes, Finish, Quantities and Amount into projects and deliverables. Status defaults to In Progress (or Completed if balance qty is 0).',
+    columns: [
+      col('ordDate', 'Ord. Date', ['orderdate', 'orddate', 'date'], '24-10-2026', { parse: parseDate }),
+      col('orderNo', 'Order No', ['orderno', 'ordernumber', 'ordno', 'so'], 'SO-101'),
+      col('partyName', 'Party Name', ['partyname', 'party', 'client', 'clientname', 'customer', 'customername', 'name', 'projectname'], 'Delhi Builders'),
+      col('dispatchFrom', 'Dispatch From', ['dispatchfrom', 'dispatchsite', 'from', 'site'], 'Factory', { note: (SITES as readonly string[]).join(' / ') }),
+      col('ourSaleInvoice', 'Our Sale Invoice', ['oursaleinvoice', 'saleinvoice', 'invoiceno', 'invoice'], 'INV-2026-01'),
+      col('partyPoNo', 'Party P.O. No', ['partypono', 'partypo', 'pono', 'po'], 'PO-882'),
+      col('colour', 'Colour', ['colour', 'color', 'stonetype', 'variety'], 'Teakwood Sandstone'),
+      col('finish', 'Finish', ['finish', 'stonefinish'], 'Honed / Sawn'),
+      col('edges', 'Edges', ['edges', 'edge', 'edgefinish'], 'Hand Cut'),
+      col('sizes', 'Sizes', ['sizes', 'size', 'dimension', 'dimensions'], '600x600 mm'),
+      col('thickness', 'Thickness', ['thickness', 'thick', 'thk'], '25 mm'),
+      numCol('qtyInPcs', 'Qty In Pcs', ['qtyinpcs', 'pcs', 'pieces'], '500'),
+      numCol('qtyInSqFt', 'Qty In Sq Ft', ['qtyinsqft', 'sqft', 'sqfeet', 'area'], '2000'),
+      numCol('qtyInTons', 'Qty In Tons', ['qtyintons', 'tons', 'ton', 'weight'], '15'),
+      col('units', 'Units', ['units', 'unit', 'uom'], 'Sq Ft'),
+      numCol('dispatchQty', 'Dispatch Qty', ['dispatchqty', 'dispatchedqty', 'sentqty'], '0'),
+      numCol('price', 'Price', ['price', 'rate', 'unitprice'], '65'),
+      numCol('totalOrderAmount', 'Total Order Amount', ['totalorderamount', 'totalamount', 'orderamount', 'amount', 'contractvalue'], '130000'),
+      numCol('balanceOrderQty', 'Balance Order Qty', ['balanceorderqty', 'balanceqty', 'pendingqty', 'balqty'], '2000'),
+      numCol('balanceOrderAmount', 'Balance Order Amount', ['balanceorderamount', 'balanceamount', 'pendingamount', 'balamount'], '130000'),
+      col('other', 'Other', ['other', 'remarks', 'note', 'notes', 'comment'], ''),
+      empCol('supervisor', 'Supervisor'),
+      dateCol('targetDate', 'Target Date', '30-11-2026'),
+      enumCol('priority', 'Priority', ['Normal', 'High', 'Urgent'], 'Normal'),
+      enumCol('status', 'Status', ['In Progress', 'Completed', 'Pending', 'Planning', 'On Hold', 'Review'], 'In Progress'),
+      col('name', 'Project Name', ['title', 'project'], ''),
+    ],
+    shape: (input) => {
+      const party = String(input.partyName || input.clientName || input.name || '').trim();
+      const orderNo = String(input.orderNo || '').trim();
+      const colour = String(input.colour || input.stoneType || '').trim();
+
+      // Form project name from party and order/colour/specs if not provided
+      let name = String(input.name || '').trim();
+      if (!name) {
+        const details = [colour, input.sizes, input.thickness, input.finish].filter(Boolean).join(' ');
+        name = `${party || 'Stone Project'}${orderNo ? ` - #${orderNo}` : ''}${details ? ` (${details})` : ''}`.slice(0, 200);
+      } else {
+        name = name.slice(0, 200);
+      }
+
+      // Site
+      const siteCandidate = String(input.dispatchFrom || input.site || '').trim();
+      const matchedSite = (SITES as readonly string[]).find((s) => s.toLowerCase() === siteCandidate.toLowerCase()) || 'Factory';
+
+      // targetQty
+      const qtyParts: string[] = [];
+      if (input.qtyInSqFt) qtyParts.push(`${input.qtyInSqFt} Sq Ft`);
+      if (input.qtyInPcs) qtyParts.push(`${input.qtyInPcs} Pcs`);
+      if (input.qtyInTons) qtyParts.push(`${input.qtyInTons} Tons`);
+      if (!qtyParts.length && input.units) qtyParts.push(String(input.units));
+      const targetQty = (qtyParts.length ? qtyParts.join(', ') : String(input.targetQty || '')).trim().slice(0, 100) || undefined;
+
+      // Deliverables: Finish, Edges, Sizes, Thickness, Price
+      const delivParts: string[] = [];
+      if (input.sizes) delivParts.push(`Sizes: ${input.sizes}`);
+      if (input.thickness) delivParts.push(`Thickness: ${input.thickness}`);
+      if (input.finish) delivParts.push(`Finish: ${input.finish}`);
+      if (input.edges) delivParts.push(`Edges: ${input.edges}`);
+      if (input.price) delivParts.push(`Price: ₹${input.price}`);
+      const deliverables = (delivParts.length ? delivParts.join(' | ') : String(input.deliverables || '')).trim().slice(0, 4000) || undefined;
+
+      // Requirements: Order No, Party PO No, Our Sale Invoice, Dispatch site
+      const reqParts: string[] = [];
+      if (orderNo) reqParts.push(`Order No: ${orderNo}`);
+      if (input.partyPoNo) reqParts.push(`Party PO: ${input.partyPoNo}`);
+      if (input.ourSaleInvoice) reqParts.push(`Sale Invoice: ${input.ourSaleInvoice}`);
+      if (input.dispatchFrom) reqParts.push(`Dispatch From: ${input.dispatchFrom}`);
+      const requirements = (reqParts.length ? reqParts.join(' | ') : String(input.requirements || '')).trim().slice(0, 4000) || undefined;
+
+      // Notes: Dispatch Qty, Balance Order Qty, Balance Order Amount, Other
+      const noteParts: string[] = [];
+      if (input.dispatchQty) noteParts.push(`Dispatched Qty: ${input.dispatchQty}`);
+      if (input.balanceOrderQty) noteParts.push(`Balance Order Qty: ${input.balanceOrderQty}`);
+      if (input.balanceOrderAmount) noteParts.push(`Balance Order Amount: ₹${input.balanceOrderAmount}`);
+      if (input.other) noteParts.push(String(input.other));
+      const notes = (noteParts.length ? noteParts.join(' | ') : String(input.notes || '')).trim().slice(0, 2000) || undefined;
+
+      // Status
+      let status = input.status;
+      if (!status || !['Planning', 'Pending', 'In Progress', 'On Hold', 'Review', 'Completed'].includes(status)) {
+        const balQty = Number(String(input.balanceOrderQty ?? '').replace(/[^0-9.-]/g, ''));
+        const dispQty = Number(String(input.dispatchQty ?? '').replace(/[^0-9.-]/g, ''));
+        if (dispQty > 0 && balQty <= 0 && input.balanceOrderQty !== undefined && input.balanceOrderQty !== '') {
+          status = 'Completed';
+        } else {
+          status = 'In Progress';
+        }
+      }
+
+      // Priority
+      let priority = input.priority;
+      if (!priority || !['Normal', 'High', 'Urgent'].includes(priority)) {
+        priority = 'Normal';
+      }
+
+      // Contract Value
+      const totalAmt = Number(String(input.totalOrderAmount || input.contractValue || '').replace(/[^0-9.]/g, ''));
+      const contractValue = Number.isFinite(totalAmt) && totalAmt > 0 ? totalAmt : undefined;
+
+      // Dates
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const startDate = typeof input.ordDate === 'string' && dateRegex.test(input.ordDate)
+        ? input.ordDate
+        : typeof input.startDate === 'string' && dateRegex.test(input.startDate)
+        ? input.startDate
+        : undefined;
+      const targetDate = typeof input.targetDate === 'string' && dateRegex.test(input.targetDate)
+        ? input.targetDate
+        : undefined;
+
+      const out: Record<string, any> = {
+        name,
+        site: matchedSite,
+        status,
+        priority,
+      };
+      if (party) out.clientName = party.slice(0, 150);
+      if (colour) out.stoneType = colour.slice(0, 100);
+      if (targetQty) out.targetQty = targetQty;
+      if (requirements) out.requirements = requirements;
+      if (deliverables) out.deliverables = deliverables;
+      if (notes) out.notes = notes;
+      if (contractValue !== undefined) out.contractValue = contractValue;
+      if (startDate) out.startDate = startDate;
+      if (targetDate) out.targetDate = targetDate;
+      if (input.supervisorCode) out.supervisorCode = input.supervisorCode;
+      if (input.projectCode) out.projectCode = String(input.projectCode).trim().toUpperCase();
+
+      return out;
+    },
+    describe: (i) => `${i.name ?? i.partyName ?? ''}${i.orderNo ? ' · #' + i.orderNo : ''}`,
+    keyOf: (d) => String(d.name || '').trim().toLowerCase(),
+    existing: async (rows) => {
+      const names = rows.map((r) => String(r.name || '').trim()).filter(Boolean);
+      const found: any[] = await Project.find({ name: { $in: names }, isVoid: false }, 'name').lean();
+      return new Set(found.map((p) => low(p.name)));
+    },
   },
 };
 export const importSpec = (k: string) => (Object.prototype.hasOwnProperty.call(IMPORT_SPECS, k) ? IMPORT_SPECS[k] : undefined);
