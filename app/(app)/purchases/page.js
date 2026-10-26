@@ -45,7 +45,7 @@ export default function PurchasesPage() {
   // Purchase form fields — client's format: Date, Party Name, Product Name, Qty, Rate, CGST%, SGST%, IGST%
   const fields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'supplierId', label: 'Party Name', type: 'ref', required: true, ref: { model: 'suppliers', nameField: 'supplierName' } },
+    { name: 'partyName', label: 'Party Name', required: true, placeholder: 'e.g. Shree Ram Stones' },
     { name: 'itemId', label: 'Product Name', type: 'ref', required: true, wide: true, ref: { model: 'stockitems', nameField: 'itemName', label: (x) => `${x.name} (${x.unit})` },
       onPick: (row) => (row ? { unit: row.unit } : {}) },
     { name: 'qty', label: 'Qun. (Quantity)', type: 'number', required: true },

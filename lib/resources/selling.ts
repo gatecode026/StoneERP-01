@@ -74,7 +74,7 @@ export const customers: ResourceDef = {
 };
 
 // ------------------------------------------------------------------ sales
-const lineSchema = z.object({ stockItemId: oidStr.optional(), name: req(160), hsn: enumOf(['6802', '2516']).optional(), qty: posNum(1e9), unit: text(20).optional(), rate: posNum(1e8), gstRate: z.coerce.number().refine((v) => [0, 5, 12, 18, 28].includes(v)).optional() }).strict();
+const lineSchema = z.object({ stockItemId: oidStr.optional(), name: req(160), hsn: text(20).optional(), qty: posNum(1e9), unit: text(20).optional(), rate: posNum(1e8), gstRate: z.coerce.number().min(0).max(100).optional() }).strict();
 
 async function priceSale(ctx: SvcCtx, customer: any, items: z.infer<typeof lineSchema>[]) {
   const keys = items.map((i) => lineKey(i));

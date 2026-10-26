@@ -5,7 +5,7 @@ export const StockItem = defineModel(
   'StockItem',
   {
     name: { type: S, required: true, trim: true, maxlength: 160 },
-    category: { type: S, enum: ['raw', 'finished', 'consumable'], required: true },
+    category: { type: S, required: true, maxlength: 60, default: 'finished' },
     unit: { type: S, required: true, maxlength: 20 },
     // Physical Stocks format fields (as per client)
     karigar: { type: S, maxlength: 120 }, // the worker / karigar responsible

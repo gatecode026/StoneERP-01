@@ -36,7 +36,7 @@ export default function StockPage() {
     { name: 'pieces', label: 'Pieces', type: 'number', placeholder: '100' },
     { name: 'openingBalance', label: 'Quantity Sqft', type: 'number', default: 0, createOnly: true, hint: 'Opening stock balance' },
     ...(isOwner ? [{ name: 'price', label: 'Price (₹)', type: 'number', placeholder: '65', hint: 'Visible only to Owner' }] : []),
-    { name: 'category', label: 'Stock type', type: 'select', options: CAT, default: 'finished' },
+    { name: 'category', label: 'Stock type', placeholder: 'e.g. Finished goods, Raw stone', default: 'finished' },
     { name: 'unit', label: 'Counted in', type: 'select', options: UNITS, default: 'sq ft' },
     { name: 'minLevel', label: 'Minimum level (alert below this)', type: 'number' },
     { name: 'location', label: 'Location in yard' },

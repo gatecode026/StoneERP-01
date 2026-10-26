@@ -20,8 +20,8 @@ export const Customer = defineModel(
 
 export const saleItem = new Schema(
   {
-    stockItemId: OID, name: { type: S, required: true }, hsn: { type: S, enum: ['6802', '2516'], default: '6802' },
-    qty: { type: N, required: true, min: 0.0001 }, unit: S, rate: money({ required: true }), gstRate: { type: N, enum: [0, 5, 12, 18, 28], default: 18 },
+    stockItemId: OID, name: { type: S, required: true }, hsn: { type: S, default: '6802' },
+    qty: { type: N, required: true, min: 0.0001 }, unit: S, rate: money({ required: true }), gstRate: { type: N, min: 0, max: 100, default: 18 },
     amount: N, tax: N,
   },
   { _id: false }

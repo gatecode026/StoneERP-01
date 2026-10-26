@@ -441,6 +441,8 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       col('sizes', 'Sizes', ['sizes', 'size', 'dimension', 'dimensions'], '600x600 mm'),
       col('thickness', 'Thickness', ['thickness', 'thick', 'thk'], '25 mm'),
       numCol('qtyInPcs', 'Qty In Pcs', ['qtyinpcs', 'pcs', 'pieces'], '500'),
+      numCol('completedPcs', 'Completed Pcs', ['completedpcs', 'donepcs', 'completed', 'cutpcs'], '0'),
+      numCol('balancePcs', 'Balance Pcs', ['balancepcs', 'leftpcs', 'remainingpcs'], '0'),
       numCol('qtyInSqFt', 'Qty In Sq Ft', ['qtyinsqft', 'sqft', 'sqfeet', 'area'], '2000'),
       numCol('qtyInTons', 'Qty In Tons', ['qtyintons', 'tons', 'ton', 'weight'], '15'),
       col('units', 'Units', ['units', 'unit', 'uom'], 'Sq Ft'),
@@ -489,6 +491,8 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       const units = input.units ? String(input.units).trim().slice(0, 50) : undefined;
       const qtyInSqFt = input.qtyInSqFt != null && input.qtyInSqFt !== '' ? Number(String(input.qtyInSqFt).replace(/[^0-9.]/g, '')) : undefined;
       const qtyInPcs = input.qtyInPcs != null && input.qtyInPcs !== '' ? Number(String(input.qtyInPcs).replace(/[^0-9.]/g, '')) : undefined;
+      const completedPcs = input.completedPcs != null && input.completedPcs !== '' ? Number(String(input.completedPcs).replace(/[^0-9.]/g, '')) : 0;
+      const balancePcs = qtyInPcs != null ? (input.balancePcs != null && input.balancePcs !== '' ? Number(String(input.balancePcs).replace(/[^0-9.]/g, '')) : Math.max(0, qtyInPcs - completedPcs)) : undefined;
       const qtyInTons = input.qtyInTons != null && input.qtyInTons !== '' ? Number(String(input.qtyInTons).replace(/[^0-9.]/g, '')) : undefined;
       const dispatchQty = input.dispatchQty != null && input.dispatchQty !== '' ? Number(String(input.dispatchQty).replace(/[^0-9.]/g, '')) : undefined;
       const balanceOrderQty = input.balanceOrderQty != null && input.balanceOrderQty !== '' ? Number(String(input.balanceOrderQty).replace(/[^0-9.]/g, '')) : undefined;
@@ -551,6 +555,8 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       if (price !== undefined && !isNaN(price)) out.price = price;
       if (qtyInSqFt !== undefined && !isNaN(qtyInSqFt)) out.qtyInSqFt = qtyInSqFt;
       if (qtyInPcs !== undefined && !isNaN(qtyInPcs)) out.qtyInPcs = qtyInPcs;
+      if (completedPcs !== undefined && !isNaN(completedPcs)) out.completedPcs = completedPcs;
+      if (balancePcs !== undefined && !isNaN(balancePcs)) out.balancePcs = balancePcs;
       if (qtyInTons !== undefined && !isNaN(qtyInTons)) out.qtyInTons = qtyInTons;
       if (dispatchQty !== undefined && !isNaN(dispatchQty)) out.dispatchQty = dispatchQty;
       if (balanceOrderQty !== undefined && !isNaN(balanceOrderQty)) out.balanceOrderQty = balanceOrderQty;

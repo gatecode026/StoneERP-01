@@ -36,7 +36,7 @@ export default function MachinesPage() {
     { name: 'date', label: 'Date', type: 'date', required: true },
     { name: 'shift', label: 'Shift', type: 'select', options: ['Day', 'Night'], default: 'Day', required: true, onChange: (v) => timesFor(v) },
     { name: 'machineId', label: 'Machine', type: 'ref', required: true, ref: { model: 'machines', nameField: 'machineName', label: (m) => `${m.name} (${m.type})` } },
-    { name: 'operatorCode', label: 'Operator', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'operatorName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Operator' } } },
+    { name: 'operatorCode', label: 'Operator', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'operatorName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Worker / operator,Operator' } } },
     { name: 'startTime', label: 'Start time', type: 'time', default: () => timesFor('Day').startTime },
     { name: 'stopTime', label: 'Stop time', type: 'time', default: () => timesFor('Day').stopTime },
     { name: 'hourMeterStart', label: 'Hour-meter at start', type: 'number', hint: 'Optional. With the end reading the hours run come from the meter' },

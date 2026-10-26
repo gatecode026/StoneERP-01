@@ -12,7 +12,7 @@ import { dateStr, enumOf, monthStr, num, oidStr, photo, posNum, req, ruled, text
 const s = (ctx: { session?: any }) => ctx.session ?? null;
 
 const itemFields = {
-  name: req(160), category: enumOf(['raw', 'finished', 'consumable']).optional(), unit: text(20).optional(),
+  name: req(160), category: text(60).optional(), unit: text(20).optional(),
   size: text(60).optional(), sizeL: num(0, 1e7).optional(), sizeW: num(0, 1e7).optional(),
   thickness: num(0, 1000).optional(), finish: text(40).optional(), pieces: num(0, 1e7).optional(),
   colourFinish: text(80).optional(), karigar: text(120).optional(),
@@ -23,7 +23,7 @@ export const stockitems: ResourceDef = {
   key: 'stockitems', model: StockItem, label: (d) => d.name,
   listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative'],
   sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish'],
-  filters: { category: { enum: ['raw', 'finished', 'consumable'] }, grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
+  filters: { category: 'string', grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
   named: { low: (v) => (v === '1' ? { belowMin: true } : {}) }, // uses the indexed flag kept by incBalance
   computed: { value: { expr: { $multiply: [{ $ifNull: ['$balance', 0] }, { $ifNull: ['$costRate', 0] }] }, needs: ['costRate'] } },
   serverOnly: ['balance', 'belowMin'],
@@ -100,10 +100,37 @@ export const purchases: ResourceDef = {
   named: { payable: (v) => (v === '1' ? { status: 'approved', outstanding: { $gt: 0 } } : {}) },
   statFields: ['total', 'outstanding', 'paidAmount'],
   serverOnly: ['total', 'paidAmount', 'outstanding', 'prevRate', 'status', 'approvedBy', 'approvedAt', 'supplierName', 'itemName', 'stockMovementId', 'hasBill'],
-  create: z.object({ date: dateStr.optional(), supplierId: oidStr, itemId: oidStr, qty: posNum(1e9), rate: posNum(1e8), gstPercent: z.coerce.number().refine((v) => [0, 5, 12, 18, 28].includes(v)).optional(), billNo: text(60).optional(), billPhoto: photo.optional(), paidNow: z.boolean().optional(), payMode: enumOf(['Cash', 'UPI', 'Bank']).optional(), dueDate: dateStr.optional() }).strict(),
+  create: z.object({
+    date: dateStr.optional(),
+    supplierId: oidStr.optional(),
+    supplierName: text(120).optional(),
+    partyName: text(120).optional(),
+    itemId: oidStr,
+    qty: posNum(1e9),
+    rate: posNum(1e8),
+    gstPercent: z.coerce.number().optional(),
+    isInterState: z.boolean().optional(),
+    billNo: text(60).optional(),
+    billPhoto: photo.optional(),
+    paidNow: z.boolean().optional(),
+    payMode: enumOf(['Cash', 'UPI', 'Bank']).optional(),
+    dueDate: dateStr.optional(),
+  }).strict(),
   lifecycle: {
     async prepareCreate(ctx, input, auth) {
-      const sup = await supplierById(ctx, input.supplierId);
+      let sup: any = null;
+      const party = (input.partyName || input.supplierName || '').trim();
+      if (input.supplierId) {
+        sup = await supplierById(ctx, input.supplierId);
+      } else if (party) {
+        sup = await Supplier.findOne({ name: { $regex: new RegExp(`^${party.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i') }, isVoid: false }).session(s(ctx));
+        if (!sup) {
+          const [created] = await Supplier.create([{ name: party, supplies: 'Purchases', outstanding: 0 }], { session: ctx.session });
+          sup = created;
+        }
+      } else {
+        throw badRequest('Party name is required');
+      }
       const it = await stockItemById(ctx, input.itemId);
       if (input.date && input.date > todayIST()) throw badRequest('Purchase date cannot be in the future');
       const gst = input.gstPercent ?? 0;
@@ -111,9 +138,9 @@ export const purchases: ResourceDef = {
       const last: any = await Purchase.findOne({ itemId: it._id, status: { $in: ['approved', 'pending'] }, isVoid: false }).session(s(ctx)).sort({ date: -1, createdAt: -1 }).select('rate').lean();
       const needsApproval = total > ctx.settings.limits.purchaseApproval && !(auth.perm.can('purchases', 'approve') && withinApprovalLimit(auth.perm, total));
       const paidNow = Boolean(input.paidNow);
-      const { paidNow: _p, ...rest } = input;
+      const { paidNow: _p, partyName: _pn, supplierId: _sid, ...rest } = input;
       const doc: any = {
-        ...rest, hasBill: Boolean(input.billPhoto), date: input.date ?? todayIST(), supplierName: sup.name, itemName: it.name, gstPercent: gst, total, prevRate: last?.rate,
+        ...rest, supplierId: sup._id, supplierName: sup.name, hasBill: Boolean(input.billPhoto), date: input.date ?? todayIST(), itemName: it.name, gstPercent: gst, total, prevRate: last?.rate,
         paidAmount: !needsApproval && paidNow ? total : 0, outstanding: 0, payMode: paidNow ? input.payMode ?? 'Cash' : undefined,
         status: needsApproval ? 'pending' : 'approved', payOnApproval: needsApproval && paidNow, _paidNow: paidNow,
       };

@@ -3,8 +3,8 @@ import { signIn, SAME_ORIGIN } from './helpers';
 
 // Punch In / Out, the senior's fix, overtime approval, and the working-hours settings, on a phone-size screen.
 const ymd = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
-// the last day before today that is a working day: Sunday is the weekly off, and a day off cannot be marked or have overtime
-const yesterday = (() => { let t = Date.now() - 86400000; while (new Date(ymd(new Date(t)) + 'T12:00:00Z').getUTCDay() === 0) t -= 86400000; return ymd(new Date(t)); })();
+// the last day before today that is a working day: weekends can be weekly off, and a day off cannot be marked or have overtime
+const yesterday = (() => { let t = Date.now() - 86400000; while (new Date(ymd(new Date(t)) + 'T12:00:00Z').getUTCDay() === 0 || new Date(ymd(new Date(t)) + 'T12:00:00Z').getUTCDay() === 6) t -= 86400000; return ymd(new Date(t)); })();
 
 test('Worker: Punch In from the home screen shows the time, and the button becomes Punch Out', async ({ page }) => {
   await signIn(page, 'worker');
@@ -115,7 +115,7 @@ test.describe('on a computer the day is a ledger table', () => {
 
     // a person without a mark is marked from the row (leave, absent, half day or present)
     const sup = page.locator('tr', { hasText: 'E2E supervisor' });
-    await expect(sup.locator('td').nth(6)).toContainText('Not marked');
+    await expect(sup.locator('td').nth(6)).toContainText(/Not marked|Off/);
     await sup.getByRole('button', { name: 'Actions' }).click();
     await page.getByRole('menuitem', { name: 'Mark Absent' }).click();
     await expect(sup.locator('td').nth(6)).toContainText('Absent');

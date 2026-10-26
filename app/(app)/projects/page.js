@@ -5,16 +5,36 @@ import { useSearchParams } from 'next/navigation';
 import {
   FolderKanban, CheckCircle2, Clock, AlertTriangle, Plus, ListChecks,
   User, Calendar, Layers, Hammer, ShieldAlert, CheckSquare, Sparkles,
-  ExternalLink, FileText, PackageCheck, Briefcase, Boxes
+  ExternalLink, FileText, PackageCheck, Briefcase, Boxes, Pencil
 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import ImportData from '@/components/ImportData';
-import { RoleGuard, Badge, Sheet, StatCard, KV } from '@/components/ui';
+import { RoleGuard, Badge, Sheet, StatCard, KV, cx } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
-import { fmtDate, todayISO, inr } from '@/lib/format';
+import { fmtDate, todayISO, inr, num } from '@/lib/format';
 import { api } from '@/lib/client';
 import toast from '@/lib/toast';
 import T from '@/components/T';
+
+function getProjectTarget(project) {
+  if (!project) return { target: 0, unit: 'Pcs', type: 'pcs' };
+  if (project.qtyInPcs != null && Number(project.qtyInPcs) > 0) {
+    return { target: Number(project.qtyInPcs), unit: project.units || 'Pcs', type: 'pcs' };
+  }
+  if (project.qtyInSqFt != null && Number(project.qtyInSqFt) > 0) {
+    return { target: Number(project.qtyInSqFt), unit: project.units || 'Sq Ft', type: 'sqft' };
+  }
+  if (project.targetQty) {
+    const raw = String(project.targetQty);
+    const numMatch = raw.match(/([0-9,.]+)\s*(pcs|pieces|pc|sq\s*ft|sqft|tons|ton|cft)?/i);
+    if (numMatch) {
+      const val = parseFloat(numMatch[1].replace(/,/g, ''));
+      const u = numMatch[2] ? (numMatch[2].toLowerCase().includes('sq') ? 'Sq Ft' : numMatch[2].toLowerCase().includes('ton') ? 'Tons' : 'Pcs') : (project.units || 'Pcs');
+      return { target: val, unit: u, type: u.toLowerCase().includes('sq') ? 'sqft' : 'pcs' };
+    }
+  }
+  return { target: 0, unit: project.units || 'Pcs', type: 'pcs' };
+}
 
 const STONE_VARIETIES = [
   'Teakwood Sandstone',
@@ -40,6 +60,70 @@ export default function ProjectsPage() {
 
   // Selected project for viewing details and tasks
   const [selectedProject, setSelectedProject] = useState(null);
+
+  // Work progress update modal state
+  const [progressModalProject, setProgressModalProject] = useState(null);
+  const [progressInputType, setProgressInputType] = useState('total'); // 'total' | 'add'
+  const [progressValue, setProgressValue] = useState('');
+  const [progressNotes, setProgressNotes] = useState('');
+  const [markAsCompleted, setMarkAsCompleted] = useState(false);
+  const [progressBusy, setProgressBusy] = useState(false);
+
+  const openProgressModal = (project) => {
+    setProgressModalProject(project);
+    const currentCompleted = Number(project.completedPcs || 0);
+    setProgressValue(String(currentCompleted));
+    setProgressInputType('total');
+    setProgressNotes('');
+    setMarkAsCompleted(project.status === 'Completed');
+  };
+
+  async function handleSaveProgress(e) {
+    e?.preventDefault?.();
+    if (!progressModalProject) return;
+    const { target, unit } = getProjectTarget(progressModalProject);
+    let newCompleted = 0;
+    const inputNum = Number(progressValue || 0);
+    if (progressInputType === 'add') {
+      newCompleted = Number(progressModalProject.completedPcs || 0) + inputNum;
+    } else {
+      newCompleted = inputNum;
+    }
+    if (isNaN(newCompleted) || newCompleted < 0) {
+      toast.error('Please enter a valid positive number');
+      return;
+    }
+    const newLeft = target > 0 ? Math.max(0, target - newCompleted) : 0;
+    const shouldComplete = markAsCompleted || (target > 0 && newLeft === 0);
+
+    setProgressBusy(true);
+    try {
+      await api(`/api/projects/${progressModalProject._id}`, {
+        method: 'PATCH',
+        body: {
+          completedPcs: newCompleted,
+          balancePcs: newLeft,
+          ...(shouldComplete ? { status: 'Completed' } : {}),
+          ...(progressNotes.trim() ? { notes: [progressModalProject.notes, `[${todayISO()}] Progress update: ${num(newCompleted)} ${unit} completed (${progressNotes.trim()})`].filter(Boolean).join('\n') } : {}),
+        },
+      });
+      toast.success(`Progress updated! ${num(newCompleted)} / ${num(target)} ${unit} (${num(newLeft)} left)`);
+      setProgressModalProject(null);
+      if (selectedProject?._id === progressModalProject._id) {
+        setSelectedProject((prev) => ({
+          ...prev,
+          completedPcs: newCompleted,
+          balancePcs: newLeft,
+          ...(shouldComplete ? { status: 'Completed' } : {}),
+        }));
+      }
+      window.dispatchEvent(new CustomEvent('vss-data-changed'));
+      statsFetch.reload();
+    } catch (err) {
+      toast.error(err.message);
+    }
+    setProgressBusy(false);
+  }
 
   // New task assignment modal for selected project
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -185,8 +269,10 @@ export default function ProjectsPage() {
     // ── Quantities & Commercials ──
     { name: 'price', label: 'Price (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 65' },
     { name: 'contractValue', label: 'Total Order Amount (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'Optional budget / value' },
+    { name: 'qtyInPcs', label: 'Qty In Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 2100' },
+    { name: 'completedPcs', label: 'Completed Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 1200' },
+    { name: 'balancePcs', label: 'Balance / Left Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 900', hint: 'Auto-calculated: Target - Completed' },
     { name: 'qtyInSqFt', label: 'Qty In Sq Ft', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 2000' },
-    { name: 'qtyInPcs', label: 'Qty In Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 500' },
     { name: 'qtyInTons', label: 'Qty In Tons', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 15' },
     { name: 'units', label: 'Units', section: 'Quantities & Commercials', placeholder: 'e.g. Sq Ft, Pcs, Tonnes' },
     { name: 'targetQty', label: 'Target Output / Quantity', section: 'Quantities & Commercials', placeholder: 'e.g. 25,000 sq ft / 150 tonnes' },
@@ -264,13 +350,58 @@ export default function ProjectsPage() {
     },
     {
       key: 'stoneType',
-      label: 'Stone & Target',
+      label: 'Stone',
       render: (r) => (
-        <div>
-          <div className="text-xs font-semibold text-char-800">{r.stoneType || 'Stone Supply'}</div>
-          {r.targetQty && <div className="text-[11px] text-char-500">{r.targetQty}</div>}
-        </div>
+        <div className="text-xs font-semibold text-char-800">{r.stoneType || 'Stone Supply'}</div>
       ),
+    },
+    {
+      key: 'workProgress',
+      label: 'Current Status',
+      render: (r) => {
+        const { target, unit } = getProjectTarget(r);
+        const completed = Number(r.completedPcs || 0);
+        const left = target > 0 ? Math.max(0, target - completed) : (r.balancePcs != null ? Number(r.balancePcs) : 0);
+        const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
+
+        return (
+          <div className="text-xs py-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap font-medium">
+              <span>
+                <b className="text-char-900">{num(completed)}</b>
+                <span className="text-char-500"> / {target > 0 ? num(target) : '—'} {unit}</span>
+              </span>
+              {target > 0 && (
+                <span className="text-amber-700 font-semibold text-[11px] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                  {num(left)} left
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openProgressModal(r);
+                }}
+                className="text-terra hover:text-terra-800 hover:underline inline-flex items-center gap-0.5 text-[11px] font-bold ml-1"
+                title="Update Pieces"
+              >
+                <Pencil size={10} /> Update
+              </button>
+            </div>
+            {target > 0 && (
+              <div className="flex items-center gap-2 text-[10px] text-char-500 mt-1">
+                <div className="w-20 bg-sand-200 h-1.5 rounded-full overflow-hidden shrink-0">
+                  <div
+                    className={`h-full transition-all duration-300 ${pct === 100 ? 'bg-emerald-500' : 'bg-terra'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span>{pct}% done</span>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'deliverables',
@@ -415,6 +546,11 @@ export default function ProjectsPage() {
               onClick: () => setSelectedProject(row),
             },
             {
+              label: 'Update Completed Pieces',
+              icon: <CheckSquare size={14} className="text-emerald-600" />,
+              onClick: () => openProgressModal(row),
+            },
+            {
               label: '+ Assign Task',
               icon: <Plus size={14} className="text-emerald-600" />,
               onClick: () => {
@@ -439,10 +575,17 @@ export default function ProjectsPage() {
               <div className="flex gap-2">
                 <button
                   type="button"
+                  className="btn-outline !text-xs !py-1.5 !px-3 flex items-center gap-1.5 text-terra border-terra-300 hover:bg-terra-50 font-semibold"
+                  onClick={() => openProgressModal(selectedProject)}
+                >
+                  <Pencil size={13} /> Update Pieces
+                </button>
+                <button
+                  type="button"
                   className="btn-primary !text-xs !py-1.5 !px-3 flex items-center gap-1.5"
                   onClick={() => setTaskModalOpen(true)}
                 >
-                  <Plus size={14} /> Assign Task to this Project
+                  <Plus size={14} /> Assign Task
                 </button>
                 <button
                   type="button"
@@ -457,6 +600,64 @@ export default function ProjectsPage() {
         >
           {selectedProject && (
             <div className="space-y-4">
+              {/* Current Status / Pieces Progress Card */}
+              {(() => {
+                const { target, unit } = getProjectTarget(selectedProject);
+                const completed = Number(selectedProject.completedPcs || 0);
+                const left = target > 0 ? Math.max(0, target - completed) : (selectedProject.balancePcs != null ? Number(selectedProject.balancePcs) : 0);
+                const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
+
+                return (
+                  <div className="p-3.5 rounded-xl border border-terra-200 bg-gradient-to-br from-terra-50/50 to-sand-50/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Boxes size={16} className="text-terra" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-char-900">
+                          Current Status / Pieces & Work Progress
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openProgressModal(selectedProject)}
+                        className="btn-primary !text-xs !py-1 !px-3 flex items-center gap-1.5 font-bold shadow-xs"
+                      >
+                        <Pencil size={12} /> Update Completed Pieces
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2 rounded-xl bg-white border border-sand-200 shadow-xs">
+                        <span className="text-[10px] font-bold uppercase text-char-500 block">Needs / Target</span>
+                        <span className="text-sm font-black text-char-900">{target > 0 ? `${num(target)} ${unit}` : (selectedProject.targetQty || '—')}</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 shadow-xs">
+                        <span className="text-[10px] font-bold uppercase text-emerald-700 block">Completed</span>
+                        <span className="text-sm font-black text-emerald-800">{num(completed)} {unit}</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 shadow-xs">
+                        <span className="text-[10px] font-bold uppercase text-amber-700 block">Left / Remaining</span>
+                        <span className="text-sm font-black text-amber-800">{target > 0 ? `${num(left)} ${unit}` : '—'}</span>
+                      </div>
+                    </div>
+
+                    {target > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center text-xs font-semibold text-char-700">
+                          <span className={pct === 100 ? 'text-emerald-700 font-bold' : 'text-char-700'}>{pct}% Completed</span>
+                          <span className="text-char-500">{num(completed)} of {num(target)} {unit} ({num(left)} left to finish)</span>
+                        </div>
+                        <div className="w-full bg-sand-200 h-2.5 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${pct === 100 ? 'bg-emerald-500' : 'bg-terra'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Top metadata grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-sand-50/80 border border-sand-200">
                 <KV label="Client">{selectedProject.clientName || 'Direct Order'}</KV>
@@ -754,6 +955,168 @@ export default function ProjectsPage() {
               </select>
             </div>
           </form>
+        </Sheet>
+
+        {/* Work Progress Update Sheet */}
+        <Sheet
+          open={Boolean(progressModalProject)}
+          onClose={() => setProgressModalProject(null)}
+          title="Update Work Progress & Completed Pieces"
+          footer={
+            <div className="flex items-center justify-end gap-2 w-full">
+              <button
+                type="button"
+                className="btn-outline !text-xs !py-1.5 !px-3"
+                onClick={() => setProgressModalProject(null)}
+                disabled={progressBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary !text-xs !py-1.5 !px-4 flex items-center gap-1.5 font-bold"
+                onClick={handleSaveProgress}
+                disabled={progressBusy}
+              >
+                {progressBusy ? 'Saving…' : 'Save Progress'}
+              </button>
+            </div>
+          }
+        >
+          {progressModalProject && (() => {
+            const { target, unit } = getProjectTarget(progressModalProject);
+            const currentDone = Number(progressModalProject.completedPcs || 0);
+            const inputVal = Number(progressValue || 0);
+            const calcCompleted = progressInputType === 'add' ? currentDone + inputVal : inputVal;
+            const calcLeft = target > 0 ? Math.max(0, target - calcCompleted) : 0;
+            const calcPct = target > 0 ? Math.min(100, Math.round((calcCompleted / target) * 100)) : 0;
+
+            return (
+              <form onSubmit={handleSaveProgress} className="space-y-4">
+                <div className="p-3 rounded-xl bg-sand-50 border border-sand-200 text-xs">
+                  <div className="font-bold text-char-900 text-sm">{progressModalProject.name}</div>
+                  <div className="text-char-500 mt-0.5">Code: <b className="text-char-700">{progressModalProject.projectCode}</b> · Stone: <b className="text-char-700">{progressModalProject.stoneType || 'Custom'}</b></div>
+                </div>
+
+                {/* Target & Live Calculation Overview */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2.5 rounded-xl bg-white border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block">Needs / Target</span>
+                    <span className="text-sm font-black text-char-900">{target > 0 ? `${num(target)} ${unit}` : (progressModalProject.targetQty || '—')}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Completed</span>
+                    <span className="text-sm font-black text-emerald-800">{num(calcCompleted)} {unit}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <span className="text-[10px] uppercase font-bold text-amber-700 block">Left / Remaining</span>
+                    <span className="text-sm font-black text-amber-800">{target > 0 ? `${num(calcLeft)} ${unit}` : '—'}</span>
+                  </div>
+                </div>
+
+                {/* Progress bar preview */}
+                {target > 0 && (
+                  <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 space-y-1.5">
+                    <div className="flex justify-between items-center text-xs font-semibold text-char-700">
+                      <span>{calcPct}% Completed</span>
+                      <span className="text-char-500">{num(calcCompleted)} of {num(target)} {unit} ({num(calcLeft)} left)</span>
+                    </div>
+                    <div className="w-full bg-sand-200 h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${calcPct === 100 ? 'bg-emerald-500' : 'bg-terra'}`}
+                        style={{ width: `${calcPct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Entry mode toggle */}
+                <div className="space-y-1">
+                  <label className="label">Update Mode</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProgressInputType('total');
+                        setProgressValue(String(currentDone));
+                      }}
+                      className={cx(
+                        'py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5',
+                        progressInputType === 'total'
+                          ? 'bg-terra text-white border-terra shadow-xs'
+                          : 'bg-white text-char-700 border-sand-200 hover:bg-sand-50'
+                      )}
+                    >
+                      Set Total Completed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProgressInputType('add');
+                        setProgressValue('');
+                      }}
+                      className={cx(
+                        'py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5',
+                        progressInputType === 'add'
+                          ? 'bg-terra text-white border-terra shadow-xs'
+                          : 'bg-white text-char-700 border-sand-200 hover:bg-sand-50'
+                      )}
+                    >
+                      + Add Pieces Done Today
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input for completed pieces */}
+                <div>
+                  <label className="label">
+                    {progressInputType === 'add' ? `Pieces Completed Today (${unit}) *` : `Total Pieces Completed So Far (${unit}) *`}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="input !text-lg !font-bold"
+                    placeholder={progressInputType === 'add' ? 'e.g. 200' : 'e.g. 1200'}
+                    value={progressValue}
+                    onChange={(e) => setProgressValue(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                  <div className="text-[11px] text-char-500 mt-1">
+                    {progressInputType === 'add'
+                      ? `Adding to previous ${num(currentDone)} ${unit} = total ${num(calcCompleted)} ${unit}`
+                      : `Currently recorded: ${num(currentDone)} ${unit}`}
+                  </div>
+                </div>
+
+                {/* Mark as completed checkbox */}
+                <div className="pt-2 border-t border-sand-200">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-char-800">
+                    <input
+                      type="checkbox"
+                      checked={markAsCompleted || (target > 0 && calcLeft === 0)}
+                      onChange={(e) => setMarkAsCompleted(e.target.checked)}
+                      className="rounded border-sand-300 text-terra focus:ring-terra"
+                    />
+                    <span>Mark project status as <b>Completed</b> {target > 0 && calcLeft === 0 ? '(Target 100% achieved!)' : ''}</span>
+                  </label>
+                </div>
+
+                {/* Work note */}
+                <div>
+                  <label className="label">Work Narration / Notes (Optional)</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. Cut 300 pcs on Bridge Cutter 1; edge finish completed"
+                    value={progressNotes}
+                    onChange={(e) => setProgressNotes(e.target.value)}
+                  />
+                </div>
+              </form>
+            );
+          })()}
         </Sheet>
       </div>
     </RoleGuard>

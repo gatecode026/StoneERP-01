@@ -33,6 +33,9 @@ const projectFields = {
   qtyInSqFt: num().optional(),
   qtyInPcs: num().optional(),
   qtyInTons: num().optional(),
+  completedPcs: num().optional(),
+  completedSqFt: num().optional(),
+  balancePcs: num().optional(),
   units: text(50).optional(),
   price: num().optional(),
   targetQty: text(100).optional(),
@@ -60,7 +63,7 @@ export const projects: ResourceDef = {
     'projectCode', 'name', 'clientName', 'site', 'stoneType',
     'orderNo', 'partyPoNo', 'ourSaleInvoice',
     'finish', 'edges', 'sizes', 'thickness',
-    'qtyInSqFt', 'qtyInPcs', 'qtyInTons', 'units', 'price',
+    'qtyInSqFt', 'qtyInPcs', 'qtyInTons', 'completedPcs', 'completedSqFt', 'balancePcs', 'units', 'price',
     'targetQty', 'requirements', 'deliverables', 'supervisorCode', 'supervisorName',
     'startDate', 'targetDate', 'status', 'priority', 'contractValue',
     'dispatchQty', 'balanceOrderQty', 'balanceOrderAmount', 'otherRemark', 'notes',
@@ -94,6 +97,12 @@ export const projects: ResourceDef = {
       doc.priority ??= 'Normal';
       doc.taskCount ??= 0;
       doc.tasksDone ??= 0;
+      doc.completedPcs = Number(doc.completedPcs || 0);
+      doc.completedSqFt = Number(doc.completedSqFt || 0);
+      const targetPcs = doc.qtyInPcs != null ? Number(doc.qtyInPcs) : 0;
+      if (targetPcs > 0) {
+        doc.balancePcs = Math.max(0, targetPcs - doc.completedPcs);
+      }
       return doc;
     },
     async prepareUpdate(ctx, prev, patch) {
@@ -104,6 +113,11 @@ export const projects: ResourceDef = {
         } catch {
           // ignore
         }
+      }
+      const targetPcs = patch.qtyInPcs !== undefined ? Number(patch.qtyInPcs) : (prev.qtyInPcs !== undefined ? Number(prev.qtyInPcs) : 0);
+      const donePcs = patch.completedPcs !== undefined ? Number(patch.completedPcs) : Number(prev.completedPcs || 0);
+      if (targetPcs > 0) {
+        patch.balancePcs = Math.max(0, targetPcs - donePcs);
       }
       return patch;
     },

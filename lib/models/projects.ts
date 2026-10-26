@@ -25,6 +25,9 @@ export const Project = defineModel(
     qtyInSqFt: { type: N },
     qtyInPcs: { type: N },
     qtyInTons: { type: N },
+    completedPcs: { type: N, default: 0 },
+    completedSqFt: { type: N, default: 0 },
+    balancePcs: { type: N, default: 0 },
     units: { type: S, maxlength: 50 },
     price: money({ default: 0 }), // Unit price / rate (₹)
     dispatchQty: { type: N, default: 0 },

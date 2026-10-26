@@ -10,8 +10,9 @@ test('Owner: employee form validates every ID field and numbers the new employee
   const f = (name: string) => page.locator(`#f_${name}`);
   await expect(f('empCode')).toHaveCount(0); // the number is given by the server when saved: there is nothing to type
 
+  const uniqueMobile = '98290' + String(Date.now()).slice(-5);
   await f('name').fill('Ramesh Meena');
-  await f('mobile').fill('+91 98290 77777');
+  await f('mobile').fill(uniqueMobile);
   await f('job').selectOption({ index: 1 });
   await f('rate').fill('16000');
 
@@ -53,6 +54,10 @@ test('Owner: employee form validates every ID field and numbers the new employee
   await f('emergencyMobile').fill('');
 
   await page.getByRole('button', { name: /^(Submit|Save)$/i }).click();
+  const confirmBtn = page.getByRole('button', { name: /^(Save anyway|Confirm|OK)$/i });
+  if (await confirmBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await confirmBtn.click();
+  }
   await expect(page.getByText(/Employee saved/i)).toBeVisible();
   await page.getByPlaceholder(/search/i).first().fill('Ramesh Meena');
   await expect(page.getByText(/EMP-\d{4}/).first()).toBeVisible();
