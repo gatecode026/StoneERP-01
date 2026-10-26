@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   FolderKanban, CheckCircle2, Clock, AlertTriangle, Plus, ListChecks,
   User, Calendar, Layers, Hammer, ShieldAlert, CheckSquare, Sparkles,
-  ExternalLink, FileText, PackageCheck, Briefcase
+  ExternalLink, FileText, PackageCheck, Briefcase, Boxes
 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import ImportData from '@/components/ImportData';
@@ -103,16 +103,105 @@ export default function ProjectsPage() {
     setTaskBusy(false);
   }
 
+  // Unpack merged deliverables or requirements into individual fields when opening an existing record
+  const loadExtra = (full) => {
+    const patch = {};
+    if (full.deliverables) {
+      const parts = full.deliverables.split('|').map((s) => s.trim());
+      const remaining = [];
+      let unpackedAny = false;
+      for (const p of parts) {
+        const [k, ...rest] = p.split(':');
+        const key = k?.trim()?.toLowerCase();
+        const val = rest.join(':').trim();
+        if ((key === 'sizes' || key === 'size') && (!full.sizes || full.sizes === '')) {
+          patch.sizes = val;
+          unpackedAny = true;
+        } else if (key === 'thickness' && (!full.thickness || full.thickness === '')) {
+          patch.thickness = val;
+          unpackedAny = true;
+        } else if (key === 'finish' && (!full.finish || full.finish === '')) {
+          patch.finish = val;
+          unpackedAny = true;
+        } else if ((key === 'edges' || key === 'edge') && (!full.edges || full.edges === '')) {
+          patch.edges = val;
+          unpackedAny = true;
+        } else if (key === 'price' && (full.price == null || full.price === '')) {
+          const num = Number(val.replace(/[^0-9.]/g, ''));
+          if (!isNaN(num) && num > 0) patch.price = num;
+          unpackedAny = true;
+        } else {
+          remaining.push(p);
+        }
+      }
+      if (unpackedAny) {
+        patch.deliverables = remaining.join(' | ');
+      }
+    }
+    if (full.requirements) {
+      const parts = full.requirements.split('|').map((s) => s.trim());
+      const remaining = [];
+      let unpackedAny = false;
+      for (const p of parts) {
+        const [k, ...rest] = p.split(':');
+        const key = k?.trim()?.toLowerCase();
+        const val = rest.join(':').trim();
+        if ((key === 'order no' || key === 'order') && (!full.orderNo || full.orderNo === '')) {
+          patch.orderNo = val;
+          unpackedAny = true;
+        } else if ((key === 'party po' || key === 'party po no' || key === 'po') && (!full.partyPoNo || full.partyPoNo === '')) {
+          patch.partyPoNo = val;
+          unpackedAny = true;
+        } else if ((key === 'sale invoice' || key === 'invoice') && (!full.ourSaleInvoice || full.ourSaleInvoice === '')) {
+          patch.ourSaleInvoice = val;
+          unpackedAny = true;
+        } else {
+          remaining.push(p);
+        }
+      }
+      if (unpackedAny) {
+        patch.requirements = remaining.join(' | ');
+      }
+    }
+    return patch;
+  };
+
   const fields = [
-    { name: 'name', label: 'Project Name', required: true, wide: true, placeholder: 'e.g. Airport Terminal 3 - Sandstone Cladding' },
-    { name: 'clientName', label: 'Client / Customer', placeholder: 'e.g. L&T Infrastructure, Oberoi Hotels' },
-    { name: 'site', label: 'Site Location', type: 'select', options: SITE_OPTIONS, default: 'Factory' },
-    { name: 'stoneType', label: 'Stone Variety', type: 'select', options: STONE_VARIETIES, default: 'Teakwood Sandstone' },
-    { name: 'targetQty', label: 'Target Output / Quantity', placeholder: 'e.g. 25,000 sq ft / 150 tonnes' },
+    // ── General & Order Details ──
+    { name: 'name', label: 'Project Name', required: true, wide: true, section: 'General & Order Details', placeholder: 'e.g. Airport Terminal 3 - Sandstone Cladding' },
+    { name: 'clientName', label: 'Client / Customer', section: 'General & Order Details', placeholder: 'e.g. L&T Infrastructure, Oberoi Hotels' },
+    { name: 'orderNo', label: 'Order No', section: 'General & Order Details', placeholder: 'e.g. SO-101' },
+    { name: 'partyPoNo', label: 'Party P.O. No', section: 'General & Order Details', placeholder: 'e.g. PO-882' },
+    { name: 'ourSaleInvoice', label: 'Our Sale Invoice', section: 'General & Order Details', placeholder: 'e.g. INV-2026-01' },
+    { name: 'site', label: 'Site Location', type: 'select', options: SITE_OPTIONS, default: 'Factory', section: 'General & Order Details' },
+
+    // ── Stone Specifications ──
+    { name: 'stoneType', label: 'Stone Variety', type: 'select', options: STONE_VARIETIES, default: 'Teakwood Sandstone', section: 'Stone Specifications' },
+    { name: 'sizes', label: 'Sizes', section: 'Stone Specifications', placeholder: 'e.g. Random, 600x600 mm, 600x300 mm' },
+    { name: 'thickness', label: 'Thickness', section: 'Stone Specifications', placeholder: 'e.g. 20-25 mm, 30 mm' },
+    { name: 'finish', label: 'Finish', section: 'Stone Specifications', placeholder: 'e.g. Tumble, Honed, Polished, Sawn, Flamed' },
+    { name: 'edges', label: 'Edges', section: 'Stone Specifications', placeholder: 'e.g. Hand Cut, Machine Cut, Bullnose, Chamfered' },
+
+    // ── Quantities & Commercials ──
+    { name: 'price', label: 'Price (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 65' },
+    { name: 'contractValue', label: 'Total Order Amount (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'Optional budget / value' },
+    { name: 'qtyInSqFt', label: 'Qty In Sq Ft', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 2000' },
+    { name: 'qtyInPcs', label: 'Qty In Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 500' },
+    { name: 'qtyInTons', label: 'Qty In Tons', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 15' },
+    { name: 'units', label: 'Units', section: 'Quantities & Commercials', placeholder: 'e.g. Sq Ft, Pcs, Tonnes' },
+    { name: 'targetQty', label: 'Target Output / Quantity', section: 'Quantities & Commercials', placeholder: 'e.g. 25,000 sq ft / 150 tonnes' },
+
+    // ── Dispatch & Balances ──
+    { name: 'dispatchQty', label: 'Dispatch Qty', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 0' },
+    { name: 'balanceOrderQty', label: 'Balance Order Qty', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 2000' },
+    { name: 'balanceOrderAmount', label: 'Balance Order Amount (₹)', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 130000' },
+
+    // ── Project Planning & Team ──
     {
       name: 'supervisorCode',
       label: 'Supervisor in Charge',
       type: 'ref',
+      section: 'Project Planning & Team',
       ref: {
         model: 'employees',
         valueKey: 'empCode',
@@ -121,16 +210,18 @@ export default function ProjectsPage() {
         query: { status: 'active', job: 'Supervisor' },
       },
     },
-    { name: 'startDate', label: 'Start Date', type: 'date', default: () => todayISO() },
-    { name: 'targetDate', label: 'Target Deadline', type: 'date', required: true },
-    { name: 'status', label: 'Project Status', type: 'select', options: STATUS_OPTIONS, default: 'In Progress' },
-    { name: 'priority', label: 'Priority', type: 'select', options: PRIORITY_OPTIONS, default: 'Normal' },
-    { name: 'contractValue', label: 'Contract Value (₹)', type: 'number', placeholder: 'Optional budget / value' },
+    { name: 'startDate', label: 'Start Date', type: 'date', default: () => todayISO(), section: 'Project Planning & Team' },
+    { name: 'targetDate', label: 'Target Deadline', type: 'date', required: true, section: 'Project Planning & Team' },
+    { name: 'status', label: 'Project Status', type: 'select', options: STATUS_OPTIONS, default: 'In Progress', section: 'Project Planning & Team' },
+    { name: 'priority', label: 'Priority', type: 'select', options: PRIORITY_OPTIONS, default: 'Normal', section: 'Project Planning & Team' },
+
+    // ── Notes & Instructions ──
     {
       name: 'requirements',
       label: 'What It Needs (Materials & Machines)',
       type: 'textarea',
       wide: true,
+      section: 'Notes & Instructions',
       placeholder: 'e.g. 30 Raw Quarry Blocks (Teakwood Grade A), Bridge Cutter 1 & 2 for sizing, Calibration 2 for 20mm thickness, wooden pallets',
     },
     {
@@ -138,9 +229,11 @@ export default function ProjectsPage() {
       label: 'Key Deliverables & Specifications',
       type: 'textarea',
       wide: true,
-      placeholder: 'e.g. 1. 20mm Calibrated Honed Slabs (600x600mm) - 15,000 sqft\n2. Bullnose coping steps (1200x300mm) - 400 pcs\n3. Export fumigated crate packing',
+      section: 'Notes & Instructions',
+      placeholder: 'Custom notes or additional deliverables...',
     },
-    { name: 'notes', label: 'Additional Notes', type: 'textarea', wide: true },
+    { name: 'otherRemark', label: 'Other Remark', type: 'textarea', wide: true, section: 'Notes & Instructions', placeholder: 'Extra remarks...' },
+    { name: 'notes', label: 'Additional Notes', type: 'textarea', wide: true, section: 'Notes & Instructions' },
   ];
 
   const columns = [
@@ -183,11 +276,15 @@ export default function ProjectsPage() {
       key: 'deliverables',
       label: 'Deliverables',
       wide: true,
-      render: (r) => (
-        <div className="max-w-[280px] text-xs text-char-700 line-clamp-2" title={r.deliverables}>
-          {r.deliverables || '—'}
-        </div>
-      ),
+      render: (r) => {
+        const parts = [r.sizes, r.thickness, r.finish, r.edges].filter(Boolean);
+        const specSummary = parts.length > 0 ? parts.join(' · ') : r.deliverables;
+        return (
+          <div className="max-w-[280px] text-xs text-char-700 line-clamp-2" title={specSummary || r.deliverables}>
+            {specSummary || '—'}
+          </div>
+        );
+      },
     },
     {
       key: 'supervisorName',
@@ -309,6 +406,7 @@ export default function ProjectsPage() {
             },
           ]}
           wide
+          loadExtra={loadExtra}
           onRowClick={(row) => setSelectedProject(row)}
           rowActions={(row) => [
             {
@@ -362,14 +460,13 @@ export default function ProjectsPage() {
               {/* Top metadata grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-sand-50/80 border border-sand-200">
                 <KV label="Client">{selectedProject.clientName || 'Direct Order'}</KV>
-                <KV label="Stone Variety">{selectedProject.stoneType || 'Custom'}</KV>
-                <KV label="Target Quantity">{selectedProject.targetQty || '—'}</KV>
                 <KV label="Site / Yard">{selectedProject.site || 'Factory'}</KV>
                 <KV label="Supervisor in Charge">
                   <span className="font-semibold text-terra">
                     {selectedProject.supervisorName || selectedProject.supervisorCode || 'Unassigned'}
                   </span>
                 </KV>
+                <KV label="Start Date">{fmtDate(selectedProject.startDate)}</KV>
                 <KV label="Target Deadline">
                   <span className={selectedProject.targetDate < today && selectedProject.status !== 'Completed' ? 'text-red-600 font-bold' : ''}>
                     {fmtDate(selectedProject.targetDate)}
@@ -388,6 +485,72 @@ export default function ProjectsPage() {
                 {selectedProject.contractValue > 0 && (
                   <KV label="Contract Value">{inr(selectedProject.contractValue)}</KV>
                 )}
+                {selectedProject.orderNo && <KV label="Order No">{selectedProject.orderNo}</KV>}
+                {selectedProject.partyPoNo && <KV label="Party P.O. No">{selectedProject.partyPoNo}</KV>}
+                {selectedProject.ourSaleInvoice && <KV label="Our Sale Invoice">{selectedProject.ourSaleInvoice}</KV>}
+              </div>
+
+              {/* Stone Specifications & Attributes Grid */}
+              <div className="p-3.5 rounded-xl border border-terra-200 bg-terra-50/30 space-y-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-terra-900 flex items-center gap-1.5">
+                  <Boxes size={14} className="text-terra" />
+                  Stone Specifications & Dimensions
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block">Stone Variety</span>
+                    <span className="font-semibold text-char-800">{selectedProject.stoneType || 'Custom'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block">Sizes</span>
+                    <span className="font-semibold text-char-800">{selectedProject.sizes || '—'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block">Thickness</span>
+                    <span className="font-semibold text-char-800">{selectedProject.thickness || '—'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block">Finish</span>
+                    <span className="font-semibold text-char-800">{selectedProject.finish || '—'}</span>
+                  </div>
+                  {selectedProject.edges && (
+                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block">Edges</span>
+                      <span className="font-semibold text-char-800">{selectedProject.edges}</span>
+                    </div>
+                  )}
+                  {selectedProject.price > 0 && (
+                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block">Price</span>
+                      <span className="font-semibold text-char-800">₹{selectedProject.price}</span>
+                    </div>
+                  )}
+                  {(selectedProject.qtyInSqFt > 0 || selectedProject.qtyInPcs > 0 || selectedProject.qtyInTons > 0 || selectedProject.targetQty) && (
+                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block">Quantity</span>
+                      <span className="font-semibold text-char-800">
+                        {[
+                          selectedProject.qtyInSqFt ? `${selectedProject.qtyInSqFt} Sq Ft` : '',
+                          selectedProject.qtyInPcs ? `${selectedProject.qtyInPcs} Pcs` : '',
+                          selectedProject.qtyInTons ? `${selectedProject.qtyInTons} Tons` : '',
+                          selectedProject.targetQty && !selectedProject.qtyInSqFt ? selectedProject.targetQty : ''
+                        ].filter(Boolean).join(', ') || '—'}
+                      </span>
+                    </div>
+                  )}
+                  {selectedProject.dispatchQty > 0 && (
+                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block">Dispatched Qty</span>
+                      <span className="font-semibold text-char-800">{selectedProject.dispatchQty}</span>
+                    </div>
+                  )}
+                  {selectedProject.balanceOrderQty > 0 && (
+                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block">Balance Qty</span>
+                      <span className="font-semibold text-char-800">{selectedProject.balanceOrderQty}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* What It Needs & Deliverables Split */}
@@ -414,6 +577,14 @@ export default function ProjectsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Other Remarks if any */}
+              {selectedProject.otherRemark && (
+                <div className="p-3 rounded-xl border border-sand-200 bg-sand-50/50 text-xs">
+                  <span className="font-bold text-char-700 block mb-1">Other Remark:</span>
+                  <span className="text-char-800">{selectedProject.otherRemark}</span>
+                </div>
+              )}
 
               {/* Linked Tasks Section */}
               <div className="pt-2 border-t border-sand-200">

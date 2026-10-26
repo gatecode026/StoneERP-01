@@ -233,9 +233,9 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
       case 'select':
         input = (
           <select id={id} className="input" value={v} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.value, ...(f.onChange ? f.onChange(e.target.value, form) : {}) })}>
-            {!f.required || !v ? <option value="">{tx('Select…')}</option> : null}
+            {!f.required || !v ? <option value="">{tx(f.placeholder || 'Select…')}</option> : null}
             {v && !optList(f.options).some((o) => String(o.value) === String(v)) && <option value={v}>{v}</option>}
-                {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
+            {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
           </select>
         ); break;
       case 'ref':
@@ -272,10 +272,18 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
         ); break;
       default:
         input = (
-          <input id={id} className={cx('input', error && '!border-red-500')} type={f.type || 'text'} inputMode={rule?.inputMode || (f.type === 'number' ? 'decimal' : undefined)} step={f.type === 'number' ? 'any' : undefined}
-            value={v} disabled={disabled} placeholder={tx(f.placeholder)} autoCapitalize={rule?.autoCapitalize} spellCheck={rule ? false : undefined} aria-invalid={error ? true : undefined}
-            onChange={(e) => set({ [f.name]: rule ? rule.live(e.target.value) : e.target.value })}
-            onBlur={() => { if (rule && v !== '') set({ [f.name]: rule.clean(v) }); setTouched((t) => ({ ...t, [f.name]: true })); }} />
+          <>
+            <input id={id} className={cx('input', error && '!border-red-500')} type={f.type || 'text'} inputMode={rule?.inputMode || (f.type === 'number' ? 'decimal' : undefined)} step={f.type === 'number' ? 'any' : undefined}
+              list={f.list || (f.options ? `${id}_list` : undefined)}
+              value={v} disabled={disabled} placeholder={tx(f.placeholder)} autoCapitalize={rule?.autoCapitalize} spellCheck={rule ? false : undefined} aria-invalid={error ? true : undefined}
+              onChange={(e) => set({ [f.name]: rule ? rule.live(e.target.value) : e.target.value })}
+              onBlur={() => { if (rule && v !== '') set({ [f.name]: rule.clean(v) }); setTouched((t) => ({ ...t, [f.name]: true })); }} />
+            {f.options && (
+              <datalist id={`${id}_list`}>
+                {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
+              </datalist>
+            )}
+          </>
         );
     }
     return <Field key={f.name} htmlFor={id} className={span} label={f.type === 'checkbox' ? '' : f.label} required={f.required} hint={f.hint} error={error}>{input}</Field>;

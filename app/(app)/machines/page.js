@@ -2,7 +2,7 @@
 import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertTriangle, Wrench } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader } from '@/components/ui';
@@ -116,15 +116,15 @@ export default function MachinesPage() {
       )}
 
       {tab === 'machines' && (
-        <CrudPage model="machines" title="Machine list" subtitle="Entered once — 30 machines as configured" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" headerExtra={<ImportData resource="machines" noun="machines" hint="name and type are required" />}
+        <CrudPage model="machines" title="Machine list" subtitle="30 factory machines configured · Add any machine easily" label="Machine" canAdd={canManage} canEdit={() => canManage} sort="name" headerExtra={<ImportData resource="machines" noun="machines" hint="name and type are required" />}
           fields={[
-            { name: 'name', label: 'Machine name', required: true, type: 'select', options: MACHINE_NAMES, hint: 'Select from the configured list' },
-            { name: 'type', label: 'Type', type: 'select', options: MACHINE_TYPES, required: true },
-            { name: 'location', label: 'Location', type: 'select', options: ['Factory', 'Yard', 'Quarry'], default: 'Factory' }, { name: 'purchaseDate', label: 'Purchase date', type: 'date' },
-            { name: 'serviceIntervalDays', label: 'Service every (days)', type: 'number', default: 90 }, { name: 'lastServiceDate', label: 'Last service date', type: 'date' },
+            { name: 'name', label: 'Machine name', required: true, placeholder: 'Enter machine name (e.g. Bridge Cutter 6)' },
+            { name: 'type', label: 'Type', required: true, placeholder: 'Enter machine type (e.g. Bridge Cutter)', options: MACHINE_TYPES },
           ]}
-          columns={[{ key: 'name', label: 'Machine', primary: true }, { key: 'type', label: 'Type' }, { key: 'location', label: 'Location' }, { key: 'purchaseDate', label: 'Purchased', render: (r) => fmtDate(r.purchaseDate) },
-            { label: 'Service', render: (r) => { const due = r.lastServiceDate && r.serviceIntervalDays ? addDays(r.lastServiceDate, Number(r.serviceIntervalDays)) : null; return due ? <Badge tone={due < today ? 'red' : due <= addDays(today, 7) ? 'amber' : 'green'}><Wrench size={11} /> {due < today ? 'Overdue' : due <= addDays(today, 7) ? 'Due soon' : 'OK'} · {fmtDate(due)}</Badge> : '—'; } }]}
+          columns={[
+            { key: 'name', label: 'Machine', primary: true },
+            { key: 'type', label: 'Type' },
+          ]}
         />
       )}
 

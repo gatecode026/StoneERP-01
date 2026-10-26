@@ -33,6 +33,16 @@ function OtBadge({ m, compact }) {
   return <Badge tone={tone}><T vars={{ n: fmtDuration(shown) }}>{text}</T></Badge>;
 }
 
+function fmtLate(mins) {
+  const m = Math.round(Number(mins) || 0);
+  if (m <= 0) return '';
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (!h) return `${rem}min`;
+  if (!rem) return `${h}h`;
+  return `${h}h${rem}min`;
+}
+
 // what a person's day looks like: In, Out, hours, lateness, overtime, and anything that needs attention
 function PunchLine({ m }) {
   if (!m.inAt) return null;
@@ -41,7 +51,7 @@ function PunchLine({ m }) {
       <span><T>In</T> <b>{fmtClock(m.inAt)}</b></span>
       <span><T>Out</T> <b>{m.outAt ? fmtClock(m.outAt) : '—'}</b></span>
       {m.workedMinutes > 0 && <span>{fmtDuration(m.workedMinutes)}</span>}
-      {m.late && <Badge tone="red"><T vars={{ n: m.lateMinutes }}>{'Late {n} min'}</T></Badge>}
+      {m.late && <Badge tone="red"><T vars={{ n: fmtLate(m.lateMinutes) }}>{'Late {n}'}</T></Badge>}
       {m.otMinutes > 0 && <OtBadge m={m} />}
       {m.corrected && <Badge tone="blue"><T>corrected</T></Badge>}
       {m.open && <Badge tone="red"><T>Out missing</T></Badge>}
@@ -283,7 +293,7 @@ export default function AttendancePage() {
                       <tr key={r.empCode} className={cx('hover:bg-sand-50', m.open && 'bg-red-50/40')}>
                         <td className="td whitespace-nowrap"><div className="font-semibold">{r.name}</div><div className="text-xs text-char-500">{r.empCode} · {r.job}</div></td>
                         <td className="td">{r.shiftName || '—'}</td>
-                        <td className="td whitespace-nowrap">{m.inAt ? <><b>{fmtClock(m.inAt)}</b>{m.late && <Badge tone="red"><T vars={{ n: m.lateMinutes }}>{'Late {n} min'}</T></Badge>}</> : <span className="text-char-300">—</span>}</td>
+                        <td className="td whitespace-nowrap">{m.inAt ? <><b>{fmtClock(m.inAt)}</b>{m.late && <Badge tone="red"><T vars={{ n: fmtLate(m.lateMinutes) }}>{'Late {n}'}</T></Badge>}</> : <span className="text-char-300">—</span>}</td>
                         <td className="td whitespace-nowrap">{m.outAt ? <b>{fmtClock(m.outAt)}</b> : m.open ? <Badge tone="red"><T>Out missing</T></Badge> : <span className="text-char-300">—</span>}</td>
                         <td className="td whitespace-nowrap text-right">{m.workedMinutes > 0 ? fmtDuration(m.workedMinutes) : <span className="text-char-300">—</span>}</td>
                         <td className="td whitespace-nowrap">

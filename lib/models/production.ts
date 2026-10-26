@@ -1,14 +1,19 @@
 import { defineModel, liveUnique, dateStr, monthStr, money, S, N, B, OID } from './_base';
 
-export const MACHINE_TYPES = ['Gang saw', 'Block cutter', 'Multi-cutter', 'Edge cutter', 'Calibration', 'Polishing', 'Flaming', 'Loader', 'Crane'] as const;
-export const CUTTING_TYPES = ['Gang saw', 'Block cutter', 'Multi-cutter'] as const;
+export const MACHINE_TYPES = [
+  'Calibration', 'Bridge Cutter', 'CNC', 'Pillar Machine', 'Edge Cutting',
+  'Polish Machine', 'Tumble Machine', 'Bull Nose Machine', 'Cobble Machine',
+  'Shot Blast', 'Block Cutter', 'Multi Machine', 'Wireshow',
+  'Gang saw', 'Block cutter', 'Multi-cutter', 'Edge cutter', 'Calibration', 'Polishing', 'Flaming', 'Loader', 'Crane',
+] as const;
+export const CUTTING_TYPES = ['Bridge Cutter', 'Block Cutter', 'Multi Machine', 'CNC', 'Wireshow', 'Gang saw', 'Block cutter', 'Multi-cutter'] as const;
 
 export const Machine = defineModel(
   'Machine',
   {
     name: { type: S, required: true, trim: true, maxlength: 80 },
-    type: { type: S, enum: MACHINE_TYPES, required: true },
-    location: { type: S, enum: ['Factory', 'Yard', 'Quarry'], default: 'Factory' },
+    type: { type: S, required: true, trim: true, maxlength: 80 },
+    location: { type: S, default: 'Factory' },
     purchaseDate: dateStr(),
     serviceIntervalDays: { type: N, min: 1, default: 90 },
     serviceIntervalHours: { type: N, min: 1 }, // service by running hours (PDF Part 13)

@@ -22,13 +22,14 @@ type Kind = {
   sort: Record<string, 1 | -1>;
   label(d: any): string;
   hint?(d: any): string | undefined;
+  limit?: number;
 };
 
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
   employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
-  machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})` },
+  machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})`, limit: 100 },
   items: { resource: 'stockitems', model: StockItem, search: ['name'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name unit balance category', sort: { name: 1 }, label: (d) => `${d.name} (${n(d.balance)} ${d.unit})`, hint: (d) => d.unit },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
   suppliers: { resource: 'suppliers', model: Supplier, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
@@ -94,7 +95,8 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
       if (Number.isFinite(no)) and.push({ blockNo: no });
     }
   }
-  const limit = Math.min(Math.max(Number(sp.get('limit') ?? LOOKUP_MAX) || LOOKUP_MAX, 1), LOOKUP_MAX);
+  const maxLimit = kind.limit ?? LOOKUP_MAX;
+  const limit = Math.min(Math.max(Number(sp.get('limit') ?? maxLimit) || maxLimit, 1), maxLimit);
   const rows: any[] = await kind.model.find({ $and: and }, kind.select + ' ' + idField).sort(kind.sort).limit(limit).lean();
   return { data: rows.map((d) => ({ id: String(d[idField]), label: kind.label(d), ...(kind.hint?.(d) ? { hint: kind.hint(d) } : {}) })) };
 }

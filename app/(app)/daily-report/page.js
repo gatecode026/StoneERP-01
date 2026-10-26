@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
 import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
@@ -21,14 +21,12 @@ export default function DailyReportPage() {
   const sp = useSearchParams();
   const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
   const [date, setDate] = useState(sp.get('date') || todayISO());
-  // workers see their own recent reports; everybody else sees the chosen day, a page at a time, plus who has not filled it (2 requests)
+  // workers see their own recent reports; everybody else sees the chosen day, a page at a time
   const day = useNumberedList(isWorker ? null : '/api/dailyreports', { date, sort: 'empName' }, { size: 25 });
-  const missingQ = useFetch(isWorker ? null : `/api/dailyreports/missing?date=${date}`);
   const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=10' : null);
   const { loading } = day;
-  const reload = () => { day.reload(); missingQ.reload?.(); };
+  const reload = () => { day.reload(); };
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(blank());
   const [saving, setSaving] = useState(false);
@@ -92,8 +90,6 @@ export default function DailyReportPage() {
   }
 
   const rows = day.rows;
-  const missing = missingQ.data?.people || [];
-  const missingCount = missingQ.data?.count || 0;
   const canCheck = can('dailyreports', 'approve');
 
   const isOwn = (r) => !!session?.empCode && r.empCode === session.empCode;
@@ -218,22 +214,6 @@ export default function DailyReportPage() {
         <>
           {!rows.length ? <Empty text={tr('No reports for {d} yet', { d: fmtDate(date) })} /> : renderList(rows)}
           <Pager list={day} />
-          {missingCount > 0 && (
-            <div className="card p-4 mt-4 border-amber-200 bg-amber-50">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-bold text-sm"><T>Not filled yet</T></div>
-                  <div className="text-xs text-char-500"><T vars={{ n: missingCount, d: fmtDate(date) }}>{missingCount === 1 ? '{n} person has not sent a report for {d}' : '{n} people have not sent a report for {d}'}</T></div>
-                </div>
-                {missing.length > 12 && <button className="btn-outline btn-sm shrink-0" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>{showAll ? 'Hide' : 'Show all'}</button>}
-              </div>
-              <div className={cx('flex flex-wrap gap-1.5 mt-3', showAll && 'max-h-64 overflow-y-auto pr-1')}>
-                {(showAll ? missing : missing.slice(0, 12)).map((e) => <span key={e.empCode} className="badge-amber" title={e.job}>{e.name}</span>)}
-                {!showAll && missingCount > 12 && <span className="text-xs text-char-500 self-center">+ <T vars={{ n: missingCount - 12 }}>{'{n} more'}</T></span>}
-                {showAll && missingCount > missing.length && <span className="text-xs text-char-500 self-center">+ <T vars={{ n: missingCount - missing.length }}>{'{n} more not listed'}</T></span>}
-              </div>
-            </div>
-          )}
         </>
       )}
 

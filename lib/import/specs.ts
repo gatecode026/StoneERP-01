@@ -438,30 +438,27 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       if (!qtyParts.length && input.units) qtyParts.push(String(input.units));
       const targetQty = (qtyParts.length ? qtyParts.join(', ') : String(input.targetQty || '')).trim().slice(0, 100) || undefined;
 
-      // Deliverables: Finish, Edges, Sizes, Thickness, Price
-      const delivParts: string[] = [];
-      if (input.sizes) delivParts.push(`Sizes: ${input.sizes}`);
-      if (input.thickness) delivParts.push(`Thickness: ${input.thickness}`);
-      if (input.finish) delivParts.push(`Finish: ${input.finish}`);
-      if (input.edges) delivParts.push(`Edges: ${input.edges}`);
-      if (input.price) delivParts.push(`Price: ₹${input.price}`);
-      const deliverables = (delivParts.length ? delivParts.join(' | ') : String(input.deliverables || '')).trim().slice(0, 4000) || undefined;
+      // Individual attributes
+      const sizes = input.sizes ? String(input.sizes).trim().slice(0, 200) : undefined;
+      const thickness = input.thickness ? String(input.thickness).trim().slice(0, 100) : undefined;
+      const finish = input.finish ? String(input.finish).trim().slice(0, 120) : undefined;
+      const edges = input.edges ? String(input.edges).trim().slice(0, 120) : undefined;
+      const price = input.price != null && input.price !== '' ? Number(String(input.price).replace(/[^0-9.]/g, '')) : undefined;
+      const partyPoNo = input.partyPoNo ? String(input.partyPoNo).trim().slice(0, 100) : undefined;
+      const ourSaleInvoice = input.ourSaleInvoice ? String(input.ourSaleInvoice).trim().slice(0, 100) : undefined;
+      const dispatchFrom = input.dispatchFrom ? String(input.dispatchFrom).trim().slice(0, 100) : undefined;
+      const units = input.units ? String(input.units).trim().slice(0, 50) : undefined;
+      const qtyInSqFt = input.qtyInSqFt != null && input.qtyInSqFt !== '' ? Number(String(input.qtyInSqFt).replace(/[^0-9.]/g, '')) : undefined;
+      const qtyInPcs = input.qtyInPcs != null && input.qtyInPcs !== '' ? Number(String(input.qtyInPcs).replace(/[^0-9.]/g, '')) : undefined;
+      const qtyInTons = input.qtyInTons != null && input.qtyInTons !== '' ? Number(String(input.qtyInTons).replace(/[^0-9.]/g, '')) : undefined;
+      const dispatchQty = input.dispatchQty != null && input.dispatchQty !== '' ? Number(String(input.dispatchQty).replace(/[^0-9.]/g, '')) : undefined;
+      const balanceOrderQty = input.balanceOrderQty != null && input.balanceOrderQty !== '' ? Number(String(input.balanceOrderQty).replace(/[^0-9.]/g, '')) : undefined;
+      const balanceOrderAmount = input.balanceOrderAmount != null && input.balanceOrderAmount !== '' ? Number(String(input.balanceOrderAmount).replace(/[^0-9.]/g, '')) : undefined;
+      const otherRemark = (input.otherRemark || input.other) ? String(input.otherRemark || input.other).trim().slice(0, 2000) : undefined;
 
-      // Requirements: Order No, Party PO No, Our Sale Invoice, Dispatch site
-      const reqParts: string[] = [];
-      if (orderNo) reqParts.push(`Order No: ${orderNo}`);
-      if (input.partyPoNo) reqParts.push(`Party PO: ${input.partyPoNo}`);
-      if (input.ourSaleInvoice) reqParts.push(`Sale Invoice: ${input.ourSaleInvoice}`);
-      if (input.dispatchFrom) reqParts.push(`Dispatch From: ${input.dispatchFrom}`);
-      const requirements = (reqParts.length ? reqParts.join(' | ') : String(input.requirements || '')).trim().slice(0, 4000) || undefined;
-
-      // Notes: Dispatch Qty, Balance Order Qty, Balance Order Amount, Other Remark
-      const noteParts: string[] = [];
-      if (input.dispatchQty) noteParts.push(`Dispatched Qty: ${input.dispatchQty}`);
-      if (input.balanceOrderQty) noteParts.push(`Balance Order Qty: ${input.balanceOrderQty}`);
-      if (input.balanceOrderAmount) noteParts.push(`Balance Order Amount: ₹${input.balanceOrderAmount}`);
-      if (input.otherRemark || input.other) noteParts.push(String(input.otherRemark || input.other));
-      const notes = (noteParts.length ? noteParts.join(' | ') : String(input.notes || '')).trim().slice(0, 2000) || undefined;
+      const deliverables = input.deliverables ? String(input.deliverables).trim().slice(0, 4000) : undefined;
+      const requirements = input.requirements ? String(input.requirements).trim().slice(0, 4000) : undefined;
+      const notes = input.notes ? String(input.notes).trim().slice(0, 2000) : undefined;
 
       // Status
       let status = input.status;
@@ -504,6 +501,22 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       };
       if (party) out.clientName = party.slice(0, 150);
       if (colour) out.stoneType = colour.slice(0, 100);
+      if (orderNo) out.orderNo = orderNo;
+      if (partyPoNo) out.partyPoNo = partyPoNo;
+      if (ourSaleInvoice) out.ourSaleInvoice = ourSaleInvoice;
+      if (sizes) out.sizes = sizes;
+      if (thickness) out.thickness = thickness;
+      if (finish) out.finish = finish;
+      if (edges) out.edges = edges;
+      if (units) out.units = units;
+      if (price !== undefined && !isNaN(price)) out.price = price;
+      if (qtyInSqFt !== undefined && !isNaN(qtyInSqFt)) out.qtyInSqFt = qtyInSqFt;
+      if (qtyInPcs !== undefined && !isNaN(qtyInPcs)) out.qtyInPcs = qtyInPcs;
+      if (qtyInTons !== undefined && !isNaN(qtyInTons)) out.qtyInTons = qtyInTons;
+      if (dispatchQty !== undefined && !isNaN(dispatchQty)) out.dispatchQty = dispatchQty;
+      if (balanceOrderQty !== undefined && !isNaN(balanceOrderQty)) out.balanceOrderQty = balanceOrderQty;
+      if (balanceOrderAmount !== undefined && !isNaN(balanceOrderAmount)) out.balanceOrderAmount = balanceOrderAmount;
+      if (otherRemark) out.otherRemark = otherRemark;
       if (targetQty) out.targetQty = targetQty;
       if (requirements) out.requirements = requirements;
       if (deliverables) out.deliverables = deliverables;

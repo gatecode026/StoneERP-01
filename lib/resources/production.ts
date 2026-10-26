@@ -15,7 +15,7 @@ const s = (ctx: { session?: any }) => ctx.session ?? null;
 
 // ------------------------------------------------------------------ machines
 const machineFields = {
-  name: req(80), type: enumOf(MACHINE_TYPES), location: enumOf(['Factory', 'Yard', 'Quarry']).optional(), purchaseDate: dateStr.optional(),
+  name: req(80), type: enumOf(MACHINE_TYPES), location: text(40).optional(), purchaseDate: dateStr.optional(),
   serviceIntervalDays: num(1, 3650).optional(), serviceIntervalHours: num(1, 100000).optional(), lastServiceDate: dateStr.optional(),
   supervisorCode: empCode.optional().or(z.literal('')), mechanicCodes: z.array(empCode).max(10).optional(),
 };
@@ -23,10 +23,10 @@ export const machines: ResourceDef = {
   key: 'machines', model: Machine, label: (d) => d.name,
   listFields: ['name', 'type', 'location', 'purchaseDate', 'serviceIntervalDays', 'serviceIntervalHours', 'lastServiceDate', 'hourMeter', 'lastServiceHourMeter', 'supervisorCode', 'mechanicCodes'],
   sortable: ['name', 'type', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'type'],
-  filters: { type: { enum: MACHINE_TYPES }, location: { enum: ['Factory', 'Yard', 'Quarry'] } },
+  filters: { type: { enum: MACHINE_TYPES }, location: 'string' },
   serverOnly: ['hourMeter', 'lastServiceHourMeter'],
   create: z.object(machineFields).strict(), update: z.object(machineFields).partial().strict(),
-  lifecycle: { prepareCreate: (_c, i) => ({ serviceIntervalDays: 90, ...i }) },
+  lifecycle: { prepareCreate: (_c, i) => ({ location: 'Factory', serviceIntervalDays: 90, ...i }) },
 };
 
 // ------------------------------------------------------------------ machine entries

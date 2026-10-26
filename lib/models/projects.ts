@@ -12,6 +12,25 @@ export const Project = defineModel(
     clientName: { type: S, maxlength: 150 },
     site: { type: S, enum: SITES as unknown as string[], default: 'Factory' },
     stoneType: { type: S, maxlength: 100 }, // e.g. Teakwood Sandstone, Kandla Grey, Black Granite
+    // Order & invoice references
+    orderNo: { type: S, maxlength: 100 },
+    partyPoNo: { type: S, maxlength: 100 },
+    ourSaleInvoice: { type: S, maxlength: 100 },
+    // Stone specifications & attributes
+    finish: { type: S, maxlength: 120 }, // e.g. Tumble, Honed, Polished, Sawn, Flamed, Shot Blast
+    edges: { type: S, maxlength: 120 }, // e.g. Hand Cut, Machine Cut, Bullnose, Chamfered
+    sizes: { type: S, maxlength: 200 }, // e.g. Random, 600x600 mm, 600x300 mm
+    thickness: { type: S, maxlength: 100 }, // e.g. 20-25 mm, 20mm, 30mm
+    // Quantities & Commercials
+    qtyInSqFt: { type: N },
+    qtyInPcs: { type: N },
+    qtyInTons: { type: N },
+    units: { type: S, maxlength: 50 },
+    price: money({ default: 0 }), // Unit price / rate (₹)
+    dispatchQty: { type: N, default: 0 },
+    balanceOrderQty: { type: N, default: 0 },
+    balanceOrderAmount: money({ default: 0 }),
+    otherRemark: { type: S, maxlength: 2000 },
     targetQty: { type: S, maxlength: 100 }, // e.g. 25,000 sq ft, 150 tonnes
     requirements: { type: S, maxlength: 4000 }, // What it needs (raw blocks, machine line, packaging, tools)
     deliverables: { type: S, maxlength: 4000 }, // Deliverables (sizes, finishes, edge details, packaging)
