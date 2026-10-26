@@ -6,7 +6,7 @@ import type { Resource } from '../perm/resources';
 import type { AnyModel } from '../models/_base';
 import { DESIGNATIONS } from '../config';
 
-export const LOOKUP_MAX = 50;
+export const LOOKUP_MAX = 20;
 
 type Kind = {
   resource: Resource;
@@ -27,7 +27,7 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS, role: ['supervisor', 'worker', 'manager', 'owner', 'admin'], loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})` },
   items: { resource: 'stockitems', model: StockItem, search: ['name'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name unit balance category', sort: { name: 1 }, label: (d) => `${d.name} (${n(d.balance)} ${d.unit})`, hint: (d) => d.unit },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
@@ -87,7 +87,7 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
   } else {
     const q = sp.get('q')?.trim().slice(0, 40);
     if (q && kind.search.length) {
-      const re = new RegExp(escapeRe(q), 'i');
+      const re = new RegExp('^' + escapeRe(q), 'i');
       and.push({ $or: kind.search.map((f) => ({ [f]: re })) });
     } else if (q && kind.model === Block) {
       const no = Number(q);

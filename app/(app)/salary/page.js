@@ -188,7 +188,7 @@ export default function SalaryPage() {
             e.stopPropagation();
             openSalaryModal(r);
           }}
-          title={`Update salary for ${r.name}`}
+          title={tr('Update salary for {name}', { name: r.name })}
         >
           <Pencil size={12} />
           <span>Update</span>

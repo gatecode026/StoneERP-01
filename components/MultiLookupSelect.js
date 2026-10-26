@@ -251,7 +251,7 @@ export default function MultiLookupSelect({
                     removeItem(it.id);
                   }}
                   className="p-0.5 rounded hover:bg-terra-200/60 text-terra-700 transition cursor-pointer"
-                  aria-label={`Remove ${it.label}`}
+                  aria-label="Remove"
                 >
                   <X size={12} />
                 </button>

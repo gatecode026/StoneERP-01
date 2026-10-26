@@ -34,7 +34,7 @@ const STATUS_OPTIONS = ['In Progress', 'Completed', 'Pending', 'Planning', 'On H
 const PRIORITY_OPTIONS = ['Normal', 'High', 'Urgent'];
 
 export default function ProjectsPage() {
-  const { t, can, session } = useApp();
+  const { t, tr, can, session } = useApp();
   const sp = useSearchParams();
   const today = todayISO();
 
@@ -488,7 +488,7 @@ export default function ProjectsPage() {
         <Sheet
           open={taskModalOpen}
           onClose={() => setTaskModalOpen(false)}
-          title={`Assign Task – ${selectedProject?.name || 'Project'}`}
+          title={tr('Assign Task – {project}', { project: selectedProject?.name || 'Project' })}
           footer={
             <>
               <button

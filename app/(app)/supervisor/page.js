@@ -221,7 +221,7 @@ export default function SupervisorPage() {
         <CrudPage
           model="tasks"
           title="Today's Work Assignments"
-          subtitle={`Daily work for ${fmtDate(today)}`}
+          subtitle={tr('Daily work for {d}', { d: fmtDate(today) })}
           label="Daily Task"
           addLabel="Assign daily work"
           baseQuery={{ dueDate: today }}
@@ -345,7 +345,7 @@ export default function SupervisorPage() {
       <Sheet
         open={!!doneRow}
         onClose={() => setDoneRow(null)}
-        title={`Complete Work: ${doneRow?.title || ''}`}
+        title={tr('Complete Work: {title}', { title: doneRow?.title || '' })}
         footer={
           <>
             <button className="btn-outline flex-1" onClick={() => setDoneRow(null)}>

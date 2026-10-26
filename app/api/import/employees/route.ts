@@ -53,30 +53,6 @@ export const POST = withAuth('employees', 'create', async (auth) => {
   const { rows: parsed, unknownColumns } = await readSheet(Buffer.from(await file.arrayBuffer()), file.name);
   const checked = await checkRows(parsed);
 
-  // ---- Duplicate guard: flag rows whose name OR mobile already exists in the DB ----
-  const goodChecked = checked.filter((r) => r.data);
-  const namesToCheck = goodChecked.map((r) => (r.data!.name as string || '').trim().toLowerCase()).filter(Boolean);
-  const mobilesToCheck = goodChecked.map((r) => (r.data!.mobile as string || '').trim()).filter((m) => /^[6-9]\d{9}$/.test(m));
-  const [dupByName, dupByMobile] = await Promise.all([
-    namesToCheck.length ? Employee.find({ name: { $in: namesToCheck.map((n) => new RegExp(`^${n}$`, 'i')), }, isVoid: false }, 'name mobile').lean() : [],
-    mobilesToCheck.length ? Employee.find({ mobile: { $in: mobilesToCheck }, isVoid: false }, 'name mobile').lean() : [],
-  ]);
-  const existingNames = new Set((dupByName as any[]).map((e) => (e.name as string).trim().toLowerCase()));
-  const existingMobiles = new Set((dupByMobile as any[]).map((e) => e.mobile as string));
-  for (const r of goodChecked) {
-    if (!r.data) continue;
-    const n = (r.data.name as string || '').trim().toLowerCase();
-    const m = (r.data.mobile as string || '').trim();
-    if (existingNames.has(n)) {
-      r.errors.push(`Employee "${r.data.name}" already exists — skipped to avoid duplicate`);
-      r.data = undefined;
-    } else if (m && existingMobiles.has(m)) {
-      r.errors.push(`Mobile ${m} already belongs to another employee — skipped to avoid duplicate`);
-      r.data = undefined;
-    }
-  }
-  // ---------------------------------------------------------------------------------
-
   const preview = { ...summarize(checked), unknownColumns };
   if (auth.query.get('commit') !== '1') return { committed: false, ...preview };
 
