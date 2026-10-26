@@ -410,12 +410,7 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       numCol('totalOrderAmount', 'Total Order Amount', ['totalorderamount', 'totalamount', 'orderamount', 'amount', 'contractvalue'], '130000'),
       numCol('balanceOrderQty', 'Balance Order Qty', ['balanceorderqty', 'balanceqty', 'pendingqty', 'balqty'], '2000'),
       numCol('balanceOrderAmount', 'Balance Order Amount', ['balanceorderamount', 'balanceamount', 'pendingamount', 'balamount'], '130000'),
-      col('other', 'Other', ['other', 'remarks', 'note', 'notes', 'comment'], ''),
-      empCol('supervisor', 'Supervisor'),
-      dateCol('targetDate', 'Target Date', '30-11-2026'),
-      enumCol('priority', 'Priority', ['Normal', 'High', 'Urgent'], 'Normal'),
-      enumCol('status', 'Status', ['In Progress', 'Completed', 'Pending', 'Planning', 'On Hold', 'Review'], 'In Progress'),
-      col('name', 'Project Name', ['title', 'project'], ''),
+      col('otherRemark', 'Other Remark', ['otherremark', 'other', 'remarks', 'note', 'notes', 'comment'], ''),
     ],
     shape: (input) => {
       const party = String(input.partyName || input.clientName || input.name || '').trim();
@@ -460,12 +455,12 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       if (input.dispatchFrom) reqParts.push(`Dispatch From: ${input.dispatchFrom}`);
       const requirements = (reqParts.length ? reqParts.join(' | ') : String(input.requirements || '')).trim().slice(0, 4000) || undefined;
 
-      // Notes: Dispatch Qty, Balance Order Qty, Balance Order Amount, Other
+      // Notes: Dispatch Qty, Balance Order Qty, Balance Order Amount, Other Remark
       const noteParts: string[] = [];
       if (input.dispatchQty) noteParts.push(`Dispatched Qty: ${input.dispatchQty}`);
       if (input.balanceOrderQty) noteParts.push(`Balance Order Qty: ${input.balanceOrderQty}`);
       if (input.balanceOrderAmount) noteParts.push(`Balance Order Amount: ₹${input.balanceOrderAmount}`);
-      if (input.other) noteParts.push(String(input.other));
+      if (input.otherRemark || input.other) noteParts.push(String(input.otherRemark || input.other));
       const notes = (noteParts.length ? noteParts.join(' | ') : String(input.notes || '')).trim().slice(0, 2000) || undefined;
 
       // Status

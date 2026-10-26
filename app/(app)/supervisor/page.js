@@ -98,7 +98,10 @@ export default function SupervisorPage() {
       name: 'assignedCode',
       label: 'Assign to (Supervisor)',
       type: 'ref',
+      multiple: true,
       required: true,
+      placeholder: 'Check one or more supervisors…',
+      hint: 'Check one or more supervisors for this work (a task is assigned to each)',
       ref: {
         model: 'employees',
         valueKey: 'empCode',

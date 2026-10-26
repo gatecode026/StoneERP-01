@@ -9,6 +9,7 @@ import { useApp, useFetch, useTx } from './Providers';
 import { trNow } from '@/lib/trNow';
 import { PageHeader, DataList, SearchBox, Sheet, Field, PhotoInput, DocInput, ExportBtn, LoadMore, Pagination, Badge, cx } from './ui';
 import LookupSelect from './LookupSelect';
+import MultiLookupSelect from './MultiLookupSelect';
 import { api, submit, ApiError } from '@/lib/client';
 import { toQuery, useDebounced, usePagedList } from '@/lib/usePaged';
 import { todayISO, fmtDate, fmtDateTime } from '@/lib/format';
@@ -171,6 +172,42 @@ function RefSelect({ field, form, set, id }) {
   return <LookupSelect id={id} kind={kind} by={by} query={query} value={form[field.name] || ''} valueLabel={r.nameField ? form[r.nameField] : undefined} onChange={pick} />;
 }
 
+function MultiRefSelect({ field, form, set, id, disabled }) {
+  const r = field.ref;
+  const kind = LOOKUP_KIND[r.model];
+  const { sort: _sort, ...query } = r.query || {};
+  const by = r.valueKey && r.valueKey !== '_id' ? r.valueKey : undefined;
+
+  function handleChange(selectedItems) {
+    const ids = selectedItems.map((x) => x.id);
+    const labels = selectedItems.map((x) => x.label);
+    const patch = {
+      [field.name]: ids.join(','),
+      [`${field.name}s`]: ids,
+    };
+    if (r.nameField) {
+      patch[r.nameField] = labels.join(', ');
+    }
+    set(patch);
+  }
+
+  if (!kind) return <div className="text-sm text-red-600">No lookup for {r.model}</div>;
+
+  return (
+    <MultiLookupSelect
+      id={id}
+      kind={kind}
+      by={by}
+      query={query}
+      value={form[field.name] || form[`${field.name}s`] || ''}
+      valueLabel={r.nameField ? form[r.nameField] : undefined}
+      onChange={handleChange}
+      placeholder={field.placeholder || 'Select supervisors…'}
+      disabled={disabled}
+    />
+  );
+}
+
 // field-group access: a field tagged group:'money'|'cost'|'pii' is hidden unless the user can read it, read-only unless they can write it
 const level = (perm, f) => (f.group ? perm?.fields?.[f.group] || 'none' : 'write');
 const visible = (perm, f) => ['read', 'write'].includes(level(perm, f));
@@ -201,7 +238,19 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
                 {optList(f.options).map((o) => <option key={o.value} value={o.value}>{tx(o.label)}</option>)}
           </select>
         ); break;
-      case 'ref': input = <RefSelect id={id} field={f} form={form} set={set} />; break;
+      case 'ref':
+        input = f.multiple ? (
+          <MultiRefSelect id={id} field={f} form={form} set={set} disabled={disabled} />
+        ) : (
+          <RefSelect id={id} field={f} form={form} set={set} />
+        );
+        break;
+      case 'multi-ref':
+        input = <MultiRefSelect id={id} field={f} form={form} set={set} disabled={disabled} />;
+        break;
+      case 'custom':
+        input = typeof f.render === 'function' ? f.render({ form, set, id, disabled, error, mode }) : null;
+        break;
       case 'photo': input = <PhotoInput value={v} onChange={(x) => set({ [f.name]: x })} label={f.buttonLabel} />; break;
       case 'doc': input = <DocInput value={v} onChange={(x) => set({ [f.name]: x })} resource={f.resource} kind={f.kind} label={f.buttonLabel} />; break;
       case 'photos': input = <PhotoInput multiple value={v} onChange={(x) => set({ [f.name]: x })} />; break;
@@ -291,13 +340,16 @@ export function cleanForm(fields, form) {
   for (const f of fields) {
     if (f.type === 'number') out[f.name] = out[f.name] === '' || out[f.name] == null ? undefined : Number(out[f.name]);
     if (f.rule && typeof out[f.name] === 'string') out[f.name] = EMPLOYEE_RULES[f.rule].clean(out[f.name]);
+    if (f.multiple && typeof out[f.name] === 'string' && out[f.name].includes(',')) {
+      out[`${f.name}s`] = out[f.name].split(',').map((s) => s.trim()).filter(Boolean);
+    }
   }
   Object.keys(out).forEach((k) => out[k] === undefined && delete out[k]);
   return out;
 }
 
 export function missingRequired(fields, form, editing = false) {
-  const f = fields.find((x) => x.required && (!x.show || x.show(form)) && !(x.createOnly && editing) && (form[x.name] === '' || form[x.name] == null || form[x.name] === false));
+  const f = fields.find((x) => x.required && (!x.show || x.show(form)) && !(x.createOnly && editing) && (form[x.name] === '' || form[x.name] == null || form[x.name] === false || (Array.isArray(form[x.name]) && form[x.name].length === 0)));
   return f ? f.label : null;
 }
 
@@ -458,6 +510,9 @@ export default function CrudPage({
     const bad = firstFieldError(fields, form, editing, (f) => visible(perm, f) && level(perm, f) === 'write');
     if (bad) { setShowErrors(true); toast.error(`${trNow(bad.label)}: ${trNow(bad.message)}`); document.getElementById(`f_${bad.name}`)?.focus(); return; }
     const names = new Set([...fields.filter((f) => visible(perm, f) && level(perm, f) === 'write').map((f) => f.name), ...Object.keys(defaults)]);
+    for (const f of fields) {
+      if (f.multiple) names.add(`${f.name}s`);
+    }
     let body = cleanForm(fields, form);
     if (beforeSave) {
       try { body = (await beforeSave(body, editing ? 'edit' : 'new')) || body; } catch (e) { toast.error(e.message); return; }

@@ -53,7 +53,7 @@ export default function TasksPage() {
         label: (p) => `${p.name} (${p.projectCode})`,
       },
     },
-    { name: 'assignedCode', label: 'Assign to', type: 'ref', required: true, ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor,Operator' } } },
+    { name: 'assignedCode', label: 'Assign to', type: 'ref', multiple: true, required: true, placeholder: 'Check one or more assignees…', hint: 'Check one or more assignees for this task', ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor,Operator' } } },
     { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true },
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];

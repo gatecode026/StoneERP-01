@@ -412,10 +412,17 @@ export const tasks: ResourceDef = {
   },
   serverOnly: ['assignedName', 'assignedBy', 'assignedById', 'doneAt', 'projectCode', 'projectName'],
   create: z.object({
-    title: req(200), details: text(2000).optional(), assignedCode: empCode, dueDate: dateStr.optional(),
+    title: req(200),
+    details: text(2000).optional(),
+    assignedCode: z.string().trim().optional(),
+    assignedCodes: z.array(z.string().trim()).optional(),
+    dueDate: dateStr.optional(),
     priority: enumOf(['Normal', 'High', 'Project']).optional(),
     projectId: z.string().optional().or(z.literal('')),
-  }).strict(),
+  }).strict().refine(
+    (d) => Boolean((d.assignedCode && d.assignedCode.trim()) || (d.assignedCodes && d.assignedCodes.length > 0)),
+    { message: 'Assignee is required', path: ['assignedCode'] }
+  ),
   update: z.object({
     title: req(200), details: text(2000), assignedCode: empCode, dueDate: dateStr,
     priority: enumOf(['Normal', 'High', 'Project']), state: enumOf(['pending', 'done']),
@@ -423,8 +430,69 @@ export const tasks: ResourceDef = {
     projectId: z.string().optional().or(z.literal('')),
   }).partial().strict(),
   lifecycle: {
+    async create(ctx, input, auth) {
+      const rawCodes: string[] = [];
+      if (Array.isArray(input.assignedCodes)) {
+        for (const c of input.assignedCodes) {
+          const s = String(c || '').trim().toUpperCase();
+          if (s && !rawCodes.includes(s)) rawCodes.push(s);
+        }
+      }
+      if (input.assignedCode) {
+        for (const c of String(input.assignedCode).split(',')) {
+          const s = c.trim().toUpperCase();
+          if (s && !rawCodes.includes(s)) rawCodes.push(s);
+        }
+      }
+      if (!rawCodes.length) throw badRequest('Please select at least one supervisor');
+
+      const employees = await Promise.all(
+        rawCodes.map((code) => employeeByCode(ctx, code, { active: true }))
+      );
+
+      let projectData: { id: string; code?: string; name?: string } | null = null;
+      if (input.projectId) {
+        const { Project } = await import('../models/projects');
+        const p: any = await Project.findById(input.projectId).session(ctx.session ?? null).lean();
+        if (p) {
+          projectData = { id: String(p._id), code: p.projectCode, name: p.name };
+          await Project.updateOne(
+            { _id: p._id },
+            { $inc: { taskCount: employees.length } }
+          ).session(ctx.session ?? null);
+        }
+      }
+
+      const dueDate = input.dueDate || todayIST();
+      const docsToInsert = employees.map((e) => ({
+        title: input.title,
+        details: input.details,
+        dueDate,
+        priority: input.priority || 'Normal',
+        state: 'pending',
+        assignedCode: e.empCode,
+        assignedName: e.name,
+        assignedBy: ctx.actor.name,
+        assignedById: oid(ctx.actor.id),
+        ...(projectData
+          ? {
+              projectId: projectData.id,
+              projectCode: projectData.code,
+              projectName: projectData.name,
+            }
+          : {}),
+        createdById: oid(auth.user.id),
+        createdByName: auth.user.name,
+        updatedById: oid(auth.user.id),
+        updatedByName: auth.user.name,
+      }));
+
+      const inserted = await Task.create(docsToInsert, { session: ctx.session });
+      return { doc: inserted[0].toObject() };
+    },
     async prepareCreate(ctx, input) {
-      const e = await employeeByCode(ctx, input.assignedCode, { active: true });
+      const singleCode = String(input.assignedCode || (Array.isArray(input.assignedCodes) ? input.assignedCodes[0] : '')).split(',')[0].trim();
+      const e = await employeeByCode(ctx, singleCode, { active: true });
       const doc: any = {
         ...input,
         dueDate: input.dueDate || todayIST(),
