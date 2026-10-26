@@ -285,9 +285,10 @@ export default function ProjectsPage() {
             {
               key: 'status',
               label: 'All status',
+              default: 'In Progress',
               options: [
-                { value: 'Completed', label: 'Completed' },
                 { value: 'In Progress', label: 'In Progress' },
+                { value: 'Completed', label: 'Completed' },
                 { value: 'Pending', label: 'Pending' },
                 { value: 'Planning', label: 'Planning' },
                 { value: 'On Hold', label: 'On Hold' },

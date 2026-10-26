@@ -336,7 +336,7 @@ export default function CrudPage({
     { value: '-createdAt', label: 'Sort: Recently Added' },
   ] : null);
   // drill-down links from the home screens arrive as ?<filter>=<value> (e.g. /stock?low=1, /expenses?status=pending)
-  const [fv, setFv] = useState(() => Object.fromEntries(filters.map((f) => [f.key, sp.get(f.key) || '']).filter(([, v]) => v)));
+  const [fv, setFv] = useState(() => Object.fromEntries(filters.map((f) => [f.key, sp?.get?.(f.key) ?? f.default ?? f.defaultValue ?? '']).filter(([, v]) => v)));
   // everything that narrows the list is sent to the server (search, filters, sort); the browser never filters or sorts a big list itself
   const filterParams = Object.assign({}, ...filters.map((f) => (fv[f.key] ? (f.toQuery ? f.toQuery(fv[f.key]) : { [f.key]: fv[f.key] }) : {})));
   const params = { ...(currentSort ? { sort: currentSort } : {}), ...baseQuery, ...(dq ? { q: dq } : {}), ...filterParams };
