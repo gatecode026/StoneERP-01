@@ -1,7 +1,7 @@
 import { defineModel, liveUnique, dateStr, money, S, N } from './_base';
 
 export const SITES = ['Factory', 'Yard', 'Quarry', 'Office', 'Gate', 'On-site Installation'] as const;
-export const PROJECT_STATUSES = ['Planning', 'In Progress', 'On Hold', 'Review', 'Completed'] as const;
+export const PROJECT_STATUSES = ['Planning', 'Pending', 'In Progress', 'On Hold', 'Review', 'Completed'] as const;
 export const PROJECT_PRIORITIES = ['Normal', 'High', 'Urgent'] as const;
 
 export const Project = defineModel(
