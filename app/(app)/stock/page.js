@@ -18,49 +18,58 @@ const CAT = [{ value: 'raw', label: 'Raw stone' }, { value: 'finished', label: '
 const UNITS = ['sq ft', 'sq m', 'pieces', 'CFT', 'tonne', 'litres', 'kg', 'numbers'];
 
 export default function StockPage() {
-  const { t, can, perm } = useApp();
+  const { t, can, perm, session } = useApp();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'items');
   const [reloadKey, setReloadKey] = useState(0);
   const manage = can('stockitems', 'create');
+  const isOwner = session?.role === 'owner';
 
-  // Stock item fields matching "Physical Stocks (Naresh Ji)" format:
-  // Date | Karigar | Colour Finish | Thickness | Size (L) | Size (W) | QTY | SQFT | Finish | Amount
+  // Stock item fields matching "Physical Stocks" format:
+  // Colour | Finish | Sizes Length | Sizes Width | Thickness | Pieces | Quantity Sqft | Price (Owner only)
   const itemFields = [
-    { name: 'name', label: 'Colour / Item name', required: true, wide: true, placeholder: 'e.g. Kotah Blue, Dholpur Pink' },
-    { name: 'category', label: 'Stock type', type: 'select', options: CAT, required: true, default: 'finished' },
-    { name: 'karigar', label: 'Karigar (Worker)', placeholder: 'Name of the karigar' },
-    { name: 'colourFinish', label: 'Colour Finish', placeholder: 'e.g. Natural, Light Grey' },
-    { name: 'sizeL', label: 'Size (L) mm', type: 'number', placeholder: '600' },
-    { name: 'sizeW', label: 'Size (W) mm', type: 'number', placeholder: '600' },
-    { name: 'thickness', label: 'Thickness (mm)', type: 'number' },
-    { name: 'finish', label: 'Finish', type: 'select', options: FINISH_OPTIONS },
-    { name: 'unit', label: 'Counted in', type: 'select', options: UNITS, required: true, default: 'sq ft' },
-    { name: 'location', label: 'Location in yard' },
-    { name: 'openingBalance', label: 'Opening balance', type: 'number', default: 0, createOnly: true, hint: 'Later changes happen through stock movements' },
+    { name: 'name', label: 'Colour', required: true, wide: true, placeholder: 'e.g. Kotah Blue, Dholpur Pink' },
+    { name: 'finish', label: 'Finish', type: 'select', options: FINISH_OPTIONS, default: 'Natural' },
+    { name: 'sizeL', label: 'Sizes Length (mm)', type: 'number', placeholder: '600' },
+    { name: 'sizeW', label: 'Sizes Width (mm)', type: 'number', placeholder: '600' },
+    { name: 'thickness', label: 'Thickness (mm)', type: 'number', placeholder: '25' },
+    { name: 'pieces', label: 'Pieces', type: 'number', placeholder: '100' },
+    { name: 'openingBalance', label: 'Quantity Sqft', type: 'number', default: 0, createOnly: true, hint: 'Opening stock balance' },
+    ...(isOwner ? [{ name: 'price', label: 'Price (₹)', type: 'number', placeholder: '65', hint: 'Visible only to Owner' }] : []),
+    { name: 'category', label: 'Stock type', type: 'select', options: CAT, default: 'finished' },
+    { name: 'unit', label: 'Counted in', type: 'select', options: UNITS, default: 'sq ft' },
     { name: 'minLevel', label: 'Minimum level (alert below this)', type: 'number' },
+    { name: 'location', label: 'Location in yard' },
     { name: 'photo', label: 'Photo', type: 'photo' },
   ];
 
   const itemCols = [
-    { key: 'name', label: 'Colour / Item', primary: true, render: (r) => (
-      <span>{r.name}
-        <div className="text-[11px] text-char-500 font-normal">
-          {[r.karigar && `Karigar: ${r.karigar}`, r.colourFinish, r.sizeL && r.sizeW && `${r.sizeL}×${r.sizeW} mm`, r.thickness && `${r.thickness} mm thick`, r.finish].filter(Boolean).join(' · ')}
-        </div>
+    { key: 'name', label: 'Colour', primary: true, render: (r) => (
+      <span>
+        {r.name}
+        {r.category && r.category !== 'finished' && (
+          <span className="ml-2 text-[11px] text-char-400 font-normal">({r.category})</span>
+        )}
       </span>
     )},
-    { key: 'karigar', label: 'Karigar' },
-    { key: 'colourFinish', label: 'Colour Finish', render: (r) => r.colourFinish || '—' },
-    { key: 'thickness', label: 'Thickness', render: (r) => r.thickness ? `${r.thickness} mm` : '—' },
-    { key: 'sizeL', label: 'Size (L)', render: (r) => r.sizeL ? `${r.sizeL} mm` : '—' },
-    { key: 'sizeW', label: 'Size (W)', render: (r) => r.sizeW ? `${r.sizeW} mm` : '—' },
-    { key: 'balance', label: 'QTY / SQFT', align: 'right', render: (r) => {
-      const low = r.minLevel && r.balance < r.minLevel;
-      return <span className={low ? 'text-red-600 font-bold' : 'font-semibold'}>{num(r.balance)} {r.unit} {low && <AlertTriangle size={12} className="inline -mt-0.5" />}</span>;
-    }},
     { key: 'finish', label: 'Finish', render: (r) => r.finish || '—' },
-    { key: 'location', label: 'Location' },
+    { key: 'sizeL', label: 'Sizes Length', render: (r) => r.sizeL ? `${r.sizeL} mm` : '—' },
+    { key: 'sizeW', label: 'Sizes Width', render: (r) => r.sizeW ? `${r.sizeW} mm` : '—' },
+    { key: 'thickness', label: 'Thickness', render: (r) => r.thickness ? `${r.thickness} mm` : '—' },
+    { key: 'pieces', label: 'Pieces', align: 'right', render: (r) => r.pieces != null ? num(r.pieces) : '—' },
+    { key: 'balance', label: 'Quantity Sqft', align: 'right', render: (r) => {
+      const low = r.minLevel && r.balance < r.minLevel;
+      return <span className={low ? 'text-red-600 font-bold' : 'font-semibold'}>{num(r.balance)} {r.unit || 'sq ft'} {low && <AlertTriangle size={12} className="inline -mt-0.5" />}</span>;
+    }},
+    ...(isOwner ? [{
+      key: 'price',
+      label: 'Price',
+      align: 'right',
+      render: (r) => {
+        const val = r.price ?? r.sellRate;
+        return val != null && val !== '' ? <b className="text-emerald-700">₹{num(val)}</b> : <span className="text-char-300">—</span>;
+      },
+    }] : []),
   ];
 
   return (
@@ -69,7 +78,7 @@ export default function StockPage() {
       {tab === 'daily' && <StockDaily />}
       {tab === 'count' && <StockCount />}
       {tab === 'items' && (
-        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Physical Stocks — Karigar, Colour Finish, Size, QTY, SQFT, Finish" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="name, type and unit are required; opening balance becomes the first stock-in" />}
+        <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Physical Stocks — Colour, Finish, Sizes, Pieces, Quantity Sqft" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="Colour, Finish, Sizes, Pieces, Quantity Sqft and Price are supported" />}
           fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
           filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }] }]}
@@ -86,16 +95,14 @@ export default function StockPage() {
           rowClass={(r) => (r.minLevel && r.balance < r.minLevel ? 'bg-red-50/60' : '')}
           exportName="physical-stock-report"
           exportColumns={[
-            { key: 'name', label: 'Colour / Item' },
-            { key: 'karigar', label: 'Karigar' },
-            { key: 'colourFinish', label: 'Colour Finish' },
-            { key: 'thickness', label: 'Thickness (mm)' },
-            { key: 'sizeL', label: 'Size L (mm)' },
-            { key: 'sizeW', label: 'Size W (mm)' },
-            { key: 'balance', label: 'QTY / SQFT' },
-            { key: 'unit', label: 'Unit' },
+            { key: 'name', label: 'Colour' },
             { key: 'finish', label: 'Finish' },
-            { key: 'location', label: 'Location' },
+            { key: 'sizeL', label: 'Sizes Length' },
+            { key: 'sizeW', label: 'Sizes Width' },
+            { key: 'thickness', label: 'Thickness' },
+            { key: 'pieces', label: 'Pieces' },
+            { key: 'balance', label: 'Quantity Sqft' },
+            ...(isOwner ? [{ key: 'price', label: 'Price' }] : []),
           ]}
           rowActions={(row) => manage ? [{ label: 'Move', icon: <ArrowLeftRight size={14} />, onClick: () => { setTab('moves'); toast('Choose "Add" to record a movement for ' + row.name); } }] : []}
         />

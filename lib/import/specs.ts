@@ -133,21 +133,60 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
     async existing() { return new Set(((await Supplier.find({ isVoid: false }, 'name').lean()) as any[]).map((s) => low(s.name))); },
   },
   stockitems: {
-    resource: 'stockitems', noun: 'stock items', required: ['name', 'unit'],
-    footnote: 'Delete the example row before importing. "Item name", "Type" and "Counted in" are required. "Opening balance" becomes the first stock-in entry. An item with the same name, size and finish already in the app is skipped.',
+    resource: 'stockitems', noun: 'stock items', required: ['name'],
+    footnote: 'Delete the example row before importing. "Colour" is required. "Quantity Sqft" becomes the opening stock balance.',
     columns: [
-      col('name', 'Item name', ['name', 'item', 'product', 'itemname'], 'Kota Stone Slab'),
-      col('category', 'Type', ['stocktype', 'category', 'kind'], 'finished', { note: 'raw / finished / consumable', parse: CATEGORY }),
-      col('unit', 'Counted in', ['unit', 'uom'], 'sq ft', { note: 'sq ft, sq m, pieces, CFT, tonne, litres, kg, numbers' }),
-      col('size', 'Size (mm)', ['size'], '600x600'), numCol('thickness', 'Thickness (mm)', ['thickness'], '30'), col('finish', 'Finish', [], 'Natural'),
-      col('grade', 'Grade', [], 'A', { parse: (v) => v.trim().toUpperCase() }), col('location', 'Location in yard', ['yardlocation', 'location'], 'Row 3'),
-      numCol('openingBalance', 'Opening balance', ['openingstock', 'balance', 'stock', 'qty', 'quantity'], '1000'), numCol('minLevel', 'Minimum level', ['minimum', 'minstock', 'reorderlevel'], '200'),
-      numCol('sellRate', 'Selling rate', ['rate', 'price', 'sellingprice'], '65'), col('costRate', 'Cost rate', ['cost', 'purchaserate', 'purchaseprice'], '40', { note: 'Needs cost access', parse: num }),
+      col('name', 'Colour', ['colour', 'color', 'item name', 'item', 'product', 'name'], 'Kotah Blue'),
+      col('finish', 'Finish', ['finish', 'finishtype'], 'Natural'),
+      numCol('sizeL', 'Sizes Length', ['sizes length', 'size length', 'length', 'sizel', 'l'], '600'),
+      numCol('sizeW', 'Sizes Width', ['sizes width', 'size width', 'width', 'sizew', 'w'], '600'),
+      numCol('thickness', 'Thickness', ['thickness', 'thickness (mm)', 'thk'], '25'),
+      numCol('pieces', 'Pieces', ['pieces', 'pcs', 'quantity pieces', 'pieces count'], '100'),
+      numCol('openingBalance', 'Quantity Sqft', ['quantity sqft', 'quantity (sqft)', 'sqft', 'opening balance', 'balance', 'quantity', 'qty'], '400'),
+      numCol('price', 'Price', ['price', 'selling rate', 'rate', 'price (rs)', 'sellingprice', 'sellrate'], '65'),
+      // backward-compatible columns (parsed if present in existing files/tests, but hidden from the new template):
+      { ...col('category', 'Type', ['stocktype', 'category', 'kind'], 'finished', { note: 'raw / finished / consumable', parse: CATEGORY }), hiddenInTemplate: true },
+      { ...col('unit', 'Counted in', ['unit', 'uom'], 'sq ft', { note: 'sq ft, sq m, pieces, CFT, tonne, litres, kg, numbers' }), hiddenInTemplate: true },
+      { ...col('size', 'Size (mm)', ['size'], '600x600'), hiddenInTemplate: true },
+      { ...col('grade', 'Grade', [], 'A', { parse: (v) => v.trim().toUpperCase() }), hiddenInTemplate: true },
+      { ...col('location', 'Location in yard', ['yardlocation', 'location'], 'Row 3'), hiddenInTemplate: true },
+      { ...numCol('minLevel', 'Minimum level', ['minimum', 'minstock', 'reorderlevel'], '200'), hiddenInTemplate: true },
+      { ...col('costRate', 'Cost rate', ['cost', 'purchaserate', 'purchaseprice'], '40', { note: 'Needs cost access', parse: num }), hiddenInTemplate: true },
     ],
-    keyOf: (d) => `${low(d.name)}|${low(d.size)}|${low(d.finish)}`,
+    shape: (i: Record<string, any>) => {
+      const name = i.name || i.colour || 'Kota Stone Slab';
+      const sizeL = i.sizeL ? Number(i.sizeL) : undefined;
+      const sizeW = i.sizeW ? Number(i.sizeW) : undefined;
+      const size = i.size || (sizeL && sizeW ? `${sizeL}x${sizeW}` : (sizeL ? `${sizeL}` : ''));
+      const balance = i.openingBalance != null && i.openingBalance !== '' ? Number(i.openingBalance) : 0;
+      const pieces = i.pieces != null && i.pieces !== '' ? Number(i.pieces) : undefined;
+      const price = i.price != null && i.price !== '' ? Number(i.price) : (i.sellRate != null && i.sellRate !== '' ? Number(i.sellRate) : undefined);
+      return {
+        ...i,
+        name,
+        colourFinish: i.colourFinish || name,
+        category: i.category || 'finished',
+        unit: i.unit || 'sq ft',
+        sizeL,
+        sizeW,
+        size,
+        pieces,
+        openingBalance: balance,
+        price,
+        sellRate: price,
+        ...(i.costRate !== undefined && i.costRate !== '' ? { costRate: Number(i.costRate) } : {}),
+      };
+    },
+    keyOf: (d) => {
+      const sz = d.size || (d.sizeL && d.sizeW ? `${d.sizeL}x${d.sizeW}` : '');
+      return `${low(d.name)}|${low(sz)}|${low(d.finish || '')}`;
+    },
     async existing(rows) {
-      const found: any[] = await StockItem.find({ name: { $in: [...new Set(rows.map((r) => r.name))] }, isVoid: false }, 'name size finish').lean();
-      return new Set(found.map((i) => `${low(i.name)}|${low(i.size)}|${low(i.finish)}`));
+      const found: any[] = await StockItem.find({ name: { $in: [...new Set(rows.map((r) => r.name))] }, isVoid: false }, 'name size sizeL sizeW finish').lean();
+      return new Set(found.map((i) => {
+        const sz = i.size || (i.sizeL && i.sizeW ? `${i.sizeL}x${i.sizeW}` : '');
+        return `${low(i.name)}|${low(sz)}|${low(i.finish || '')}`;
+      }));
     },
   },
   machines: {

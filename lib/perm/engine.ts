@@ -138,6 +138,10 @@ export function projectDoc<T extends Record<string, any>>(perm: Pick<EffectivePe
   const out: Record<string, any> = { ...doc };
   const fields = new Set<string>([...Object.values(groups ?? {}).flat(), ...enc.map((e) => e.field)]);
   for (const f of fields) {
+    if (resource === 'stockitems' && f === 'price' && !(perm as any)?.isOwner) {
+      delete out[f];
+      continue;
+    }
     const level = fieldLevel(perm, resource, f);
     const e = enc.find((x) => x.field === f);
     const raw = out[f];
@@ -162,6 +166,9 @@ export const projectMany = <T extends Record<string, any>>(perm: Pick<EffectiveP
 
 /** Throws 403 if any of `keys` is a field the user may not write (e.g. Manager editing pay rate). */
 export function assertWritable(perm: Pick<EffectivePerm, 'fields'>, resource: Resource, keys: string[]) {
+  if (resource === 'stockitems' && keys.includes('price') && !(perm as any)?.isOwner) {
+    throw forbidden('You cannot change: price');
+  }
   const blocked = keys.filter((k) => fieldLevel(perm, resource, k) !== 'write');
   if (blocked.length) throw forbidden(`You cannot change: ${blocked.join(', ')}`);
 }
@@ -173,6 +180,9 @@ export function hiddenFields(perm: Pick<EffectivePerm, 'fields'>, resource: Reso
   if (!groups) return out;
   for (const f of new Set(Object.values(groups).flat())) {
     if (LEVEL_RANK[fieldLevel(perm, resource, f)] < LEVEL_RANK.read) out.add(f);
+  }
+  if (resource === 'stockitems' && !(perm as any)?.isOwner) {
+    out.add('price');
   }
   return out;
 }

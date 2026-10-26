@@ -15,10 +15,12 @@ export const StockItem = defineModel(
     size: { type: S, maxlength: 60 }, // legacy size string e.g. "600×600"
     thickness: { type: N, min: 0 },
     finish: { type: S, maxlength: 40 },
+    pieces: { type: N, min: 0 }, // Pieces count
     location: { type: S, maxlength: 80 },
     photo: S,
     balance: { type: N, default: 0 }, // changes ONLY through stock movements (atomic conditional $inc)
     minLevel: { type: N, min: 0 },
+    price: money(), // Stock item price
     sellRate: money(),
     costRate: money(), // cost
     allowNegative: { type: B, default: false },

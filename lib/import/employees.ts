@@ -13,7 +13,7 @@ export const DEFAULT_IMPORT_PASSWORD = process.env.IMPORT_DEFAULT_PASSWORD || '1
 export const MAX_ROWS = 2000;
 export const MAX_BYTES = 5 * 1024 * 1024;
 
-export type Col = { key: string; label: string; aliases: string[]; example: string; note?: string; parse?: (v: string) => unknown };
+export type Col = { key: string; label: string; aliases: string[]; example: string; note?: string; parse?: (v: string) => unknown; hiddenInTemplate?: boolean };
 export const norm = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 export const digits = (v: string) => v.replace(/[^0-9]/g, '');
 const yes = (v: string) => ['yes', 'y', 'true', '1', 'haan', 'ha'].includes(v.trim().toLowerCase());
@@ -161,13 +161,14 @@ export async function checkRows(rows: ParsedRow[]): Promise<Checked[]> {
 export async function buildTemplate(COLUMNS: Col[] = COLS, sheetName = 'Employees', footnote = 'Dates are DD-MM-YYYY. Delete the example row before importing. Only "Name" and "Job" are required.'): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(sheetName);
-  ws.addRow(COLUMNS.map((c) => c.label)).font = { bold: true };
-  ws.addRow(COLUMNS.map((c) => c.example));
-  COLUMNS.forEach((c, i) => { ws.getColumn(i + 1).width = Math.max(14, c.label.length + 4); });
+  const visible = COLUMNS.filter((c) => !c.hiddenInTemplate);
+  ws.addRow(visible.map((c) => c.label)).font = { bold: true };
+  ws.addRow(visible.map((c) => c.example));
+  visible.forEach((c, i) => { ws.getColumn(i + 1).width = Math.max(14, c.label.length + 4); });
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   const notes = wb.addWorksheet('Notes');
   notes.addRow(['Column', 'Notes']).font = { bold: true };
-  for (const c of COLUMNS) notes.addRow([c.label, c.note ?? '']);
+  for (const c of visible) notes.addRow([c.label, c.note ?? '']);
   notes.addRow([]);
   notes.addRow([footnote]);
   notes.getColumn(1).width = 22; notes.getColumn(2).width = 60;

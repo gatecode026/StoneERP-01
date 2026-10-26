@@ -91,7 +91,7 @@ export const RESOURCES = {
     own: [{ field: 'driverCode', value: 'empCode' }, { field: 'createdById', value: 'userId' }], team: [{ field: 'driverCode', in: 'codes' }] },
 
   // ---- Stock & buying ----
-  stockitems: { label: { en: 'Stock', hi: 'स्टॉक' }, group: 'stock', part: 4, model: true, actions: CRUD, fieldGroups: { cost: ['costRate'] } },
+  stockitems: { label: { en: 'Stock', hi: 'स्टॉक' }, group: 'stock', part: 4, model: true, actions: CRUD, fieldGroups: { cost: ['costRate', 'price'] } },
   stockmovements: { label: { en: 'Stock movements', hi: 'स्टॉक की आवाजाही' }, group: 'stock', part: 4, model: true, actions: ALL_A },
   stockcounts: { label: { en: 'Physical stock count', hi: 'स्टॉक की गिनती' }, group: 'stock', part: 4, model: true, actions: ['view', 'create', 'edit', 'approve', 'export'] },
   suppliers: { label: { en: 'Suppliers', hi: 'सप्लायर' }, group: 'stock', part: 9, model: true, actions: CRUD, fieldGroups: { cost: ['outstanding'] } },

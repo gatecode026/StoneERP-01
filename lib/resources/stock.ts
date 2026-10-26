@@ -12,12 +12,16 @@ import { dateStr, enumOf, monthStr, num, oidStr, photo, posNum, req, ruled, text
 const s = (ctx: { session?: any }) => ctx.session ?? null;
 
 const itemFields = {
-  name: req(160), category: enumOf(['raw', 'finished', 'consumable']), unit: req(20), size: text(60).optional(), thickness: num(0, 1000).optional(), finish: text(40).optional(),
-  grade: enumOf(['A', 'B', 'C']).optional(), location: text(80).optional(), photo: photo.optional(), minLevel: num().optional(), sellRate: num().optional(), costRate: num().optional(), allowNegative: z.boolean().optional(),
+  name: req(160), category: enumOf(['raw', 'finished', 'consumable']).optional(), unit: text(20).optional(),
+  size: text(60).optional(), sizeL: num(0, 1e7).optional(), sizeW: num(0, 1e7).optional(),
+  thickness: num(0, 1000).optional(), finish: text(40).optional(), pieces: num(0, 1e7).optional(),
+  colourFinish: text(80).optional(), karigar: text(120).optional(),
+  grade: enumOf(['A', 'B', 'C']).optional(), location: text(80).optional(), photo: photo.optional(),
+  minLevel: num().optional(), price: num().optional(), sellRate: num().optional(), costRate: num().optional(), allowNegative: z.boolean().optional(),
 };
 export const stockitems: ResourceDef = {
   key: 'stockitems', model: StockItem, label: (d) => d.name,
-  listFields: ['name', 'category', 'unit', 'size', 'thickness', 'finish', 'grade', 'location', 'balance', 'minLevel', 'sellRate', 'costRate', 'allowNegative'],
+  listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative'],
   sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish'],
   filters: { category: { enum: ['raw', 'finished', 'consumable'] }, grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
   named: { low: (v) => (v === '1' ? { belowMin: true } : {}) }, // uses the indexed flag kept by incBalance
@@ -28,7 +32,12 @@ export const stockitems: ResourceDef = {
   lifecycle: {
     async create(ctx, input) {
       const { openingBalance, ...rest } = input;
-      const [doc] = await StockItem.create([{ ...rest, balance: 0, belowMin: Number(rest.minLevel) > 0, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
+      const unit = rest.unit || 'sq ft';
+      const category = rest.category || 'finished';
+      const size = rest.size || (rest.sizeL && rest.sizeW ? `${rest.sizeL}×${rest.sizeW}` : undefined);
+      const price = rest.price ?? rest.sellRate;
+      const sellRate = rest.sellRate ?? rest.price;
+      const [doc] = await StockItem.create([{ ...rest, unit, category, size, price, sellRate, balance: 0, belowMin: Number(rest.minLevel) > 0, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
       if (openingBalance > 0) await applyStock(ctx, { itemId: doc._id, delta: openingBalance, type: 'in', ref: 'Opening balance', refModel: 'stockitems', refId: doc._id });
       const fresh: any = await StockItem.findById(doc._id).session(s(ctx)).lean();
       return { doc: fresh };
