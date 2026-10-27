@@ -389,7 +389,7 @@ export default function CrudPage({
   const dq = useDebounced(q.trim(), 300);
   const [currentSort, setCurrentSort] = useState(sort || (model === 'employees' ? 'empCode' : ''));
   const effectiveSortOptions = sortOptions || (model === 'employees' ? [
-    { value: 'empCode', label: 'Sort: Code (EMP-0001…)' },
+    { value: 'empCode', label: 'Sort: Employee Code' },
     { value: 'name', label: 'Sort: Name (A–Z)' },
     { value: '-name', label: 'Sort: Name (Z–A)' },
     { value: 'joiningDate', label: 'Sort: Joining Date' },
