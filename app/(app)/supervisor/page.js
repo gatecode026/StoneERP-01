@@ -48,7 +48,7 @@ export default function SupervisorPage() {
   const [doneRow, setDoneRow] = useState(null);
   const [note, setNote] = useState('');
   const today = todayISO();
-  const isSupervisor = session?.role === 'supervisor' || can('supervisor', 'view') || can('tasks', 'view');
+  const isSupervisor = session?.role === 'supervisor' || can('supervisor', 'view');
   const canAssign = can('supervisor', 'create') || can('tasks', 'create');
 
   // Active supervisor code: if logged in as supervisor, lock to their empCode; otherwise default to EMP-0001
@@ -180,7 +180,7 @@ export default function SupervisorPage() {
   };
 
   return (
-    <RoleGuard perm={['supervisor', 'tasks']}>
+    <RoleGuard perm="supervisor">
       <PageHeader
         title="Supervisor Dashboard"
         subtitle="Team Attendance · Stone Projects · Daily Work & Progress"
