@@ -348,7 +348,7 @@ export default function MultiLookupSelect({
           </div>
 
           {/* Checkbox Options List */}
-          <div className="max-h-60 overflow-y-auto divide-y divide-sand-100">
+          <div className="min-h-[170px] max-h-64 overflow-y-auto divide-y divide-sand-100">
             {busy && items.length === 0 ? (
               <div className="p-4 text-xs text-char-400 text-center">Loading…</div>
             ) : filteredItems.length === 0 ? (

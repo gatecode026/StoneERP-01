@@ -151,7 +151,6 @@ export default function ProjectsPage() {
         body: {
           supervisorCodes: assignSelectedCodes,
           supervisorCode: assignSelectedCodes.join(','),
-          supervisorName: assignSelectedNames,
         },
       });
       toast.success(`Supervisors updated for ${assignModalProject.name}`);
@@ -780,6 +779,8 @@ export default function ProjectsPage() {
           open={Boolean(assignModalProject)}
           onClose={() => setAssignModalProject(null)}
           title={`Assign Supervisors – ${assignModalProject?.name || 'Project'}`}
+          className="md:!min-h-[520px] md:!max-w-2xl"
+          bodyClassName="!min-h-[380px] overflow-visible pb-28"
           footer={
             <div className="flex items-center justify-end gap-2 w-full">
               <button
@@ -811,7 +812,7 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="min-h-[260px] pb-6">
                 <label className="label">Select Supervisors (Checkbox Multi-Select)</label>
                 <MultiLookupSelect
                   kind="employees"
