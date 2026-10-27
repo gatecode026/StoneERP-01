@@ -14,6 +14,7 @@ export const StockItem = defineModel(
     sizeW: { type: N, min: 0 }, // Size Width in mm
     size: { type: S, maxlength: 60 }, // legacy size string e.g. "600×600"
     thickness: { type: N, min: 0 },
+    edges: { type: S, maxlength: 120 },
     finish: { type: S, maxlength: 40 },
     pieces: { type: N, min: 0 }, // Pieces count
     location: { type: S, maxlength: 80 },

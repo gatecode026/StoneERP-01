@@ -141,9 +141,10 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       numCol('sizeL', 'Sizes Length', ['sizes length', 'size length', 'length', 'sizel', 'l'], '600'),
       numCol('sizeW', 'Sizes Width', ['sizes width', 'size width', 'width', 'sizew', 'w'], '600'),
       numCol('thickness', 'Thickness', ['thickness', 'thickness (mm)', 'thk'], '25'),
-      numCol('pieces', 'Pieces', ['pieces', 'pcs', 'quantity pieces', 'pieces count'], '100'),
-      numCol('openingBalance', 'Quantity Sqft', ['quantity sqft', 'quantity (sqft)', 'sqft', 'opening balance', 'balance', 'quantity', 'qty'], '400'),
+      col('edges', 'Edges', ['edges', 'edge', 'edgefinish'], 'Hand Cut'),
       numCol('price', 'Price', ['price', 'selling rate', 'rate', 'price (rs)', 'sellingprice', 'sellrate'], '65'),
+      numCol('openingBalance', 'Quantity Sqft', ['quantity sqft', 'quantity (sqft)', 'sqft', 'opening balance', 'balance', 'quantity', 'qty'], '400'),
+      numCol('pieces', 'Pieces', ['pieces', 'pcs', 'quantity pieces', 'pieces count'], '100'),
       // backward-compatible columns (parsed if present in existing files/tests, but hidden from the new template):
       { ...col('category', 'Type', ['stocktype', 'category', 'kind'], 'finished', { note: 'raw / finished / consumable', parse: CATEGORY }), hiddenInTemplate: true },
       { ...col('unit', 'Counted in', ['unit', 'uom'], 'sq ft', { note: 'sq ft, sq m, pieces, CFT, tonne, litres, kg, numbers' }), hiddenInTemplate: true },
@@ -161,6 +162,7 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       const balance = i.openingBalance != null && i.openingBalance !== '' ? Number(i.openingBalance) : 0;
       const pieces = i.pieces != null && i.pieces !== '' ? Number(i.pieces) : undefined;
       const price = i.price != null && i.price !== '' ? Number(i.price) : (i.sellRate != null && i.sellRate !== '' ? Number(i.sellRate) : undefined);
+      const edges = i.edges ? String(i.edges).trim().slice(0, 120) : undefined;
       return {
         ...i,
         name,
@@ -170,6 +172,7 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
         sizeL,
         sizeW,
         size,
+        edges,
         pieces,
         openingBalance: balance,
         price,

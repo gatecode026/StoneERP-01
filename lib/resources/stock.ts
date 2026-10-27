@@ -14,15 +14,15 @@ const s = (ctx: { session?: any }) => ctx.session ?? null;
 const itemFields = {
   name: req(160), category: text(60).optional(), unit: text(20).optional(),
   size: text(60).optional(), sizeL: num(0, 1e7).optional(), sizeW: num(0, 1e7).optional(),
-  thickness: num(0, 1000).optional(), finish: text(40).optional(), pieces: num(0, 1e7).optional(),
+  thickness: num(0, 1000).optional(), edges: text(120).optional(), finish: text(40).optional(), pieces: num(0, 1e7).optional(),
   colourFinish: text(80).optional(), karigar: text(120).optional(),
   grade: enumOf(['A', 'B', 'C']).optional(), location: text(80).optional(), photo: photo.optional(),
   minLevel: num().optional(), price: num().optional(), sellRate: num().optional(), costRate: num().optional(), allowNegative: z.boolean().optional(),
 };
 export const stockitems: ResourceDef = {
   key: 'stockitems', model: StockItem, label: (d) => d.name,
-  listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative'],
-  sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish'],
+  listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'edges', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative'],
+  sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish', 'edges'],
   filters: { category: 'string', grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
   named: { low: (v) => (v === '1' ? { belowMin: true } : {}) }, // uses the indexed flag kept by incBalance
   computed: { value: { expr: { $multiply: [{ $ifNull: ['$balance', 0] }, { $ifNull: ['$costRate', 0] }] }, needs: ['costRate'] } },
