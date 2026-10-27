@@ -47,9 +47,12 @@ export default function StockPage() {
   const itemCols = [
     { key: 'name', label: 'Colour', primary: true, render: (r) => (
       <span>
-        {r.name}
+        <div className="font-semibold text-char-900">{r.name}</div>
+        {r.karigar && (
+          <div className="text-[11px] text-char-500 font-normal">By {r.karigar}</div>
+        )}
         {r.category && r.category !== 'finished' && (
-          <span className="ml-2 text-[11px] text-char-400 font-normal">({r.category})</span>
+          <span className="text-[11px] text-char-400 font-normal">({r.category})</span>
         )}
       </span>
     )},

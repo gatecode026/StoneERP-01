@@ -375,7 +375,7 @@ export default function DailyReportPage() {
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                 <Field label="Thickness (mm)">
                   <input
                     type="number"
@@ -407,6 +407,17 @@ export default function DailyReportPage() {
                     onChange={(e) => set({ pieces: e.target.value })}
                   />
                 </Field>
+                <Field label={`${t('quantity')} (sq ft)`}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="input !bg-white font-semibold text-terra-900"
+                    placeholder="e.g. 410"
+                    value={form.quantity || ''}
+                    onChange={(e) => set({ quantity: e.target.value })}
+                  />
+                </Field>
                 <Field label="Rate (₹)">
                   <input
                     type="number"
@@ -421,9 +432,15 @@ export default function DailyReportPage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t('hours')}><input className="input text-lg" type="number" inputMode="decimal" value={form.hours} onChange={(e) => set({ hours: e.target.value })} placeholder="9" /></Field>
-            <Field label={`${t('quantity')} (sq ft)`}><input className="input text-lg" type="number" inputMode="decimal" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" /></Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label={t('hours')}>
+              <input className="input text-lg" type="number" inputMode="decimal" value={form.hours} onChange={(e) => set({ hours: e.target.value })} placeholder="8" />
+            </Field>
+            {!(form.machineId || (form.machineIds || []).length > 0) && (
+              <Field label={`${t('quantity')} (sq ft)`}>
+                <input className="input text-lg" type="number" inputMode="decimal" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" />
+              </Field>
+            )}
           </div>
           <p className="text-[11px] text-char-500 -mt-2"><T>Quantity also feeds yield and piece-rate pay.</T></p>
           <Field label={t('problem')}><input className="input" value={form.problem} onChange={(e) => set({ problem: e.target.value })} placeholder={tr('Power cut, 1 hour')} /></Field>

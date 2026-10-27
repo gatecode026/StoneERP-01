@@ -54,7 +54,12 @@ export default function MachinesPage() {
   const columns = [
     { key: 'machineName', label: 'Machine', primary: true, render: (r) => <span>{r.machineName}<div className="text-[11px] text-char-500 font-normal">{r.operatorName} · {r.shift}</div></span> },
     { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
-    { key: 'workDone', label: 'Work done', wide: true },
+    { key: 'workDone', label: 'Work done', wide: true, render: (r) => (
+      <div>
+        <div className="text-sm text-char-900 leading-snug">{r.workDone || '—'}</div>
+        {r.remarks && <div className="text-xs text-char-500 italic mt-0.5">{r.remarks}</div>}
+      </div>
+    )},
     { key: 'outputSqft', label: 'Output', align: 'right', render: (r) => <b><T vars={{ n: num(r.outputSqft) }}>{'{n} sq ft'}</T>{r.pieces ? <span className="text-char-500 font-normal"> / <T vars={{ n: r.pieces }}>{'{n} pcs'}</T></span> : null}</b> },
     { key: 'blockNo', label: 'Block', render: (r) => (r.blockNo ? `#${r.blockNo}` : '—') },
     { key: 'hoursRun', label: 'Hours run', render: (r) => r.hoursRun ?? '—' },
