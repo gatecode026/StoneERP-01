@@ -4,7 +4,7 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye } from 'lucide-react';
+import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye, Boxes } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
@@ -15,7 +15,11 @@ import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, fmtDateTime, num } from '@/lib/format';
 import T from '@/components/T';
 
-const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '', machineIds: [], machineNames: '' });
+const blank = () => ({
+  narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '',
+  machineIds: [], machineNames: '',
+  colour: '', output: '', thickness: '', edges: '', pieces: '', rate: '',
+});
 
 export default function DailyReportPage() {
   const { t, tr, can, perm, session } = useApp();
@@ -46,6 +50,12 @@ export default function DailyReportPage() {
           photos: full.photos || [],
           machineIds: full.machineIds || [],
           machineNames: full.machineNames || '',
+          colour: full.colour || '',
+          output: full.output || '',
+          thickness: full.thickness || '',
+          edges: full.edges || '',
+          pieces: full.pieces || '',
+          rate: full.rate || '',
         });
       } catch (e) {
         toast.error(e.message);
@@ -72,6 +82,12 @@ export default function DailyReportPage() {
       photos: form.photos || [],
       machineIds: form.machineIds || [],
       machineNames: form.machineNames || '',
+      colour: form.colour || '',
+      output: form.output || '',
+      thickness: form.thickness === '' ? undefined : Number(form.thickness),
+      edges: form.edges || '',
+      pieces: form.pieces === '' ? undefined : Number(form.pieces),
+      rate: form.rate === '' ? undefined : Number(form.rate),
     };
     try {
       const res = editing
@@ -229,7 +245,14 @@ export default function DailyReportPage() {
     ['Employee', `${detail.empName}${detail.job ? ' · ' + detail.job : ''}`], ['Date', fmtDate(detail.date)],
     ...(detail.filledBy && detail.filledBy !== detail.empName ? [['Filled by', detail.filledBy]] : []),
     ...(detail.machineNames ? [['Machines', detail.machineNames]] : []),
+    ...(detail.colour ? [['Colour / Stone', detail.colour]] : []),
+    ...(detail.output ? [['Output / Finish', detail.output]] : []),
+    ...(detail.thickness ? [['Thickness', `${detail.thickness} mm`]] : []),
+    ...(detail.edges ? [['Edges', detail.edges]] : []),
+    ...(detail.pieces ? [['Pieces', num(detail.pieces)]] : []),
+    ...(detail.rate ? [['Rate', `₹${num(detail.rate)}`]] : []),
     ['Hours', detail.hours > 0 ? `${detail.hours} h` : '—'], ['Quantity', detail.quantity > 0 ? `${num(detail.quantity)} sq ft` : '—'],
+    ...(detail.stockUpdated ? [['Stock Status', '✔ Automatically credited to Stock']] : []),
   ] : [];
 
   return (
@@ -312,6 +335,84 @@ export default function DailyReportPage() {
               }}
             />
           </Field>
+          {(form.machineIds || []).length > 0 && (
+            <div className="p-3.5 rounded-none border border-terra-200 bg-sand-50/70 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-char-900 flex items-center gap-1.5">
+                  <Boxes size={14} className="text-terra" /> Stone Production & Stock Work
+                </span>
+                <span className="text-[11px] text-terra-800 font-semibold bg-terra-100/60 px-2 py-0.5 rounded">
+                  Auto-updates Stock & Machine Work
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Colour / Stone Variety">
+                  <input
+                    type="text"
+                    className="input !bg-white"
+                    placeholder="e.g. Kotah Blue, Dholpur Pink"
+                    value={form.colour || ''}
+                    onChange={(e) => set({ colour: e.target.value })}
+                  />
+                </Field>
+                <Field label="Output / Finish">
+                  <input
+                    type="text"
+                    className="input !bg-white"
+                    placeholder="e.g. Slabs, Tiles, Cobbles, Sawn"
+                    value={form.output || ''}
+                    onChange={(e) => set({ output: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <Field label="Thickness (mm)">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="input !bg-white"
+                    placeholder="e.g. 25"
+                    value={form.thickness || ''}
+                    onChange={(e) => set({ thickness: e.target.value })}
+                  />
+                </Field>
+                <Field label="Edges">
+                  <input
+                    type="text"
+                    className="input !bg-white"
+                    placeholder="e.g. Machine Cut, Hand Cut"
+                    value={form.edges || ''}
+                    onChange={(e) => set({ edges: e.target.value })}
+                  />
+                </Field>
+                <Field label="Pieces">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="input !bg-white"
+                    placeholder="e.g. 100"
+                    value={form.pieces || ''}
+                    onChange={(e) => set({ pieces: e.target.value })}
+                  />
+                </Field>
+                <Field label="Rate (₹)">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="input !bg-white"
+                    placeholder="e.g. 65"
+                    value={form.rate || ''}
+                    onChange={(e) => set({ rate: e.target.value })}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('hours')}><input className="input text-lg" type="number" inputMode="decimal" value={form.hours} onChange={(e) => set({ hours: e.target.value })} placeholder="9" /></Field>
             <Field label={`${t('quantity')} (sq ft)`}><input className="input text-lg" type="number" inputMode="decimal" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" /></Field>
