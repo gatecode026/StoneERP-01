@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from '@/lib/toast';
@@ -22,7 +22,13 @@ import {
   Layers,
   ArrowRight,
   TrendingUp,
-  Boxes
+  Boxes,
+  Lock,
+  Search,
+  Save,
+  RotateCcw,
+  ShieldCheck,
+  CheckSquare
 } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, PageHeader, StatCard, Section, Sheet, Field, SkeletonList, cx } from '@/components/ui';
@@ -208,6 +214,7 @@ export default function SupervisorPage() {
         tabs={[
           { key: 'today', label: "Today's Work" },
           { key: 'attendance', label: 'Team Attendance' },
+          { key: 'assign_team', label: 'Assign Employees' },
           { key: 'my_projects', label: 'My Projects' },
           { key: 'narration', label: 'Daily Narration' },
           { key: 'assign', label: canAssign ? 'Assign Work' : null },
@@ -239,6 +246,16 @@ export default function SupervisorPage() {
       {/* ── 2. TEAM ATTENDANCE (Supervisor marks attendance for their workers) ── */}
       {tab === 'attendance' && (
         <SupervisorTeamAttendance
+          selectedSupCode={selectedSupCode}
+          setSelectedSupCode={setSelectedSupCode}
+          isOwnerOrManager={isOwnerOrManager}
+          setTab={setTab}
+        />
+      )}
+
+      {/* ── 2b. ASSIGN EMPLOYEES TO SUPERVISOR ── */}
+      {tab === 'assign_team' && (
+        <SupervisorAssignEmployees
           selectedSupCode={selectedSupCode}
           setSelectedSupCode={setSelectedSupCode}
           isOwnerOrManager={isOwnerOrManager}
@@ -376,7 +393,7 @@ export default function SupervisorPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT 1: Team Attendance (Supervisor marks Present/Absent for their crew)
 // ─────────────────────────────────────────────────────────────────────────────
-function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwnerOrManager }) {
+function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwnerOrManager, setTab }) {
   const [date, setDate] = useState(todayISO());
   const [saving, setSaving] = useState(false);
   const [attMap, setAttMap] = useState({}); // empCode -> state ('present', 'absent', 'half', 'leave')
@@ -484,6 +501,16 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
         </div>
 
         <div className="flex items-center gap-2">
+          {setTab && (
+            <button
+              type="button"
+              className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5"
+              onClick={() => setTab('assign_team')}
+            >
+              <Users size={14} className="text-[#8A5C38]" />
+              <span><T>Manage Team</T></span>
+            </button>
+          )}
           <button
             type="button"
             className="btn-green text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
@@ -520,12 +547,22 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
       {teamRes.loading ? (
         <SkeletonList n={5} className="h-16" />
       ) : workers.length === 0 ? (
-        <div className="card p-8 text-center text-char-500 bg-white">
+        <div className="card p-8 text-center text-char-500 bg-white border border-sand-200">
           <Users size={32} className="mx-auto text-char-300 mb-2" />
-          <p className="font-semibold">No workers assigned to this supervisor yet.</p>
-          <p className="text-xs text-char-400 mt-1">
-            Workers can be assigned under supervisor in the Employees module.
+          <p className="font-semibold"><T>No workers assigned to this supervisor yet.</T></p>
+          <p className="text-xs text-char-400 mt-1 mb-3">
+            <T>Assign workers to this supervisor team using the Assign Employees tab.</T>
           </p>
+          {setTab && (
+            <button
+              type="button"
+              className="btn-primary text-xs py-1.5 px-4 inline-flex items-center gap-1.5 font-bold shadow-none"
+              onClick={() => setTab('assign_team')}
+            >
+              <Users size={14} />
+              <span><T>Assign Employees Now</T></span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="card overflow-hidden bg-white border border-sand-200 shadow-sm">
@@ -957,6 +994,464 @@ function SupervisorDailyNarration({ selectedSupCode, session }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ── 5. ASSIGN EMPLOYEES TO SUPERVISOR ──────────────────────────────────────
+ * Allows selecting a supervisor, picking multiple employees to work under them,
+ * and strictly enforcing that employees already assigned to another supervisor
+ * cannot be reselected.
+ */
+function SupervisorAssignEmployees({ selectedSupCode, setSelectedSupCode, isOwnerOrManager }) {
+  const { tr, lang } = useApp();
+  const { data, loading, error, reload } = useFetch('/api/supervisor/assign-team');
+  const supervisors = data?.supervisors || [];
+  const allEmployees = data?.employees || [];
+
+  const [activeSupCode, setActiveSupCode] = useState(selectedSupCode || '');
+  const [selectedCodes, setSelectedCodes] = useState([]);
+  const [originalCodes, setOriginalCodes] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'selected' | 'unassigned' | 'other'
+  const [saving, setSaving] = useState(false);
+
+  // Set default supervisor once data is loaded
+  useEffect(() => {
+    if (supervisors.length > 0) {
+      if (!activeSupCode || !supervisors.some((s) => s.empCode === activeSupCode)) {
+        setActiveSupCode(supervisors[0].empCode);
+      }
+    }
+  }, [supervisors, activeSupCode]);
+
+  const currentSup = supervisors.find((s) => s.empCode === activeSupCode) || supervisors[0];
+
+  // Initialize selectedCodes whenever active supervisor changes or data reloads
+  useEffect(() => {
+    if (currentSup && allEmployees.length > 0) {
+      const assigned = allEmployees
+        .filter((e) => e.supervisorCode === currentSup.empCode)
+        .map((e) => e.empCode);
+      setSelectedCodes(assigned);
+      setOriginalCodes(assigned);
+    }
+  }, [currentSup?.empCode, data]);
+
+  // Sync back to parent selectedSupCode if admin switches
+  const handleSupChange = (newCode) => {
+    setActiveSupCode(newCode);
+    setSelectedSupCode?.(newCode);
+  };
+
+  // Check dirty state
+  const isDirty = useMemo(() => {
+    if (selectedCodes.length !== originalCodes.length) return true;
+    const s = new Set(selectedCodes);
+    return originalCodes.some((c) => !s.has(c));
+  }, [selectedCodes, originalCodes]);
+
+  const addedCount = selectedCodes.filter((c) => !originalCodes.includes(c)).length;
+  const removedCount = originalCodes.filter((c) => !selectedCodes.includes(c)).length;
+
+  // Candidates: all employees except current supervisor
+  const candidates = useMemo(() => {
+    return allEmployees.filter((e) => e.empCode !== currentSup?.empCode);
+  }, [allEmployees, currentSup?.empCode]);
+
+  // Counts
+  const counts = useMemo(() => {
+    let selected = 0;
+    let unassigned = 0;
+    let other = 0;
+    candidates.forEach((e) => {
+      const isCur = selectedCodes.includes(e.empCode);
+      if (isCur) {
+        selected++;
+      } else if (!e.supervisorCode) {
+        unassigned++;
+      } else {
+        other++;
+      }
+    });
+    return { all: candidates.length, selected, unassigned, other };
+  }, [candidates, selectedCodes]);
+
+  // Filtered employees based on search query and filter pill
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return candidates.filter((e) => {
+      const isSelected = selectedCodes.includes(e.empCode);
+      const isUnassigned = !e.supervisorCode && !isSelected;
+      const isOther = e.supervisorCode && e.supervisorCode !== currentSup?.empCode && !isSelected;
+
+      if (filter === 'selected' && !isSelected) return false;
+      if (filter === 'unassigned' && !isUnassigned) return false;
+      if (filter === 'other' && !isOther) return false;
+
+      if (q) {
+        const text = `${e.name} ${e.empCode} ${e.job} ${e.designation} ${e.site} ${e.supervisorName}`.toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [candidates, selectedCodes, filter, search, currentSup?.empCode]);
+
+  // Toggle single employee
+  const toggleEmployee = (emp) => {
+    // If assigned to ANOTHER supervisor, forbid selection
+    if (emp.supervisorCode && emp.supervisorCode !== currentSup?.empCode && !selectedCodes.includes(emp.empCode)) {
+      toast.error(`${emp.name} (${emp.empCode}) is already assigned to supervisor ${emp.supervisorName || emp.supervisorCode}. Employees cannot be selected under multiple supervisors.`);
+      return;
+    }
+
+    setSelectedCodes((prev) =>
+      prev.includes(emp.empCode) ? prev.filter((c) => c !== emp.empCode) : [...prev, emp.empCode]
+    );
+  };
+
+  // Bulk actions
+  const selectAllAvailable = () => {
+    const availableCodes = candidates
+      .filter((e) => !e.supervisorCode && !selectedCodes.includes(e.empCode))
+      .map((e) => e.empCode);
+    if (!availableCodes.length) {
+      toast.info('No available unassigned employees to add.');
+      return;
+    }
+    setSelectedCodes((prev) => [...prev, ...availableCodes]);
+    toast.success(`Added ${availableCodes.length} unassigned employees`);
+  };
+
+  const deselectAll = () => {
+    setSelectedCodes([]);
+  };
+
+  const resetChanges = () => {
+    setSelectedCodes([...originalCodes]);
+  };
+
+  // Save to backend
+  const saveAssignments = async () => {
+    if (!currentSup) return;
+    setSaving(true);
+    try {
+      const res = await api('/api/supervisor/assign-team', {
+        method: 'POST',
+        body: {
+          supervisorCode: currentSup.empCode,
+          employeeCodes: selectedCodes,
+        },
+      });
+      toast.success(`Saved! Assigned ${res.assignedCount} employees to supervisor ${currentSup.name} ✔`);
+      reload();
+    } catch (err) {
+      toast.error(err.message || 'Failed to save team assignments');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading && !data) return <SkeletonList n={5} />;
+  if (error) return <div className="card p-4 text-red-600 bg-red-50 text-sm">{error.message}</div>;
+
+  return (
+    <div className="space-y-4">
+      {/* ── Supervisor Selector Card ── */}
+      <div className="card p-4 bg-white border border-sand-200 shadow-none">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Users size={18} className="text-terra" />
+              <h3 className="font-bold text-base text-char-900"><T>Assign Employees to Supervisor</T></h3>
+            </div>
+            <p className="text-xs text-char-500">
+              <T>Select a supervisor and check the employees who work in their team. Employees assigned to one supervisor cannot be selected for another.</T>
+            </p>
+          </div>
+
+          {/* Supervisor Switcher Dropdown */}
+          <div className="flex items-center gap-2 bg-[#FAF7F2] p-2 border border-sand-300">
+            <span className="text-xs font-bold text-char-700 whitespace-nowrap"><T>Supervisor:</T></span>
+            <select
+              className="input !w-auto text-xs font-semibold py-1.5 bg-white border-sand-300"
+              value={activeSupCode}
+              onChange={(e) => handleSupChange(e.target.value)}
+              disabled={saving}
+            >
+              {supervisors.map((s) => (
+                <option key={s.empCode} value={s.empCode}>
+                  {s.name} ({s.empCode}) · {s.teamCount} workers
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Selected Supervisor Details Banner */}
+        {currentSup && (
+          <div className="mt-3 pt-3 border-t border-sand-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <span className="text-char-500 block"><T>Supervisor In Charge</T></span>
+              <span className="font-bold text-char-900">{currentSup.name} ({currentSup.empCode})</span>
+            </div>
+            <div>
+              <span className="text-char-500 block"><T>Job / Site</T></span>
+              <span className="font-medium text-char-800">{currentSup.job} · {currentSup.site}</span>
+            </div>
+            <div>
+              <span className="text-char-500 block"><T>Assigned Workers</T></span>
+              <span className="font-bold text-terra text-sm">{selectedCodes.length} <T>workers</T></span>
+            </div>
+            <div>
+              <span className="text-char-500 block"><T>Changes</T></span>
+              {isDirty ? (
+                <span className="font-semibold text-amber-600">
+                  {addedCount > 0 && `+${addedCount} added `}
+                  {removedCount > 0 && `-${removedCount} removed`}
+                </span>
+              ) : (
+                <span className="text-char-400"><T>No unsaved changes</T></span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Strict Integrity Notice ── */}
+      <div className="rounded-none bg-[#FAF7F2] border border-[#D4C2AB] p-3 text-xs text-[#7D5333] flex items-center gap-2.5">
+        <ShieldCheck size={18} className="text-[#8A5C38] shrink-0" />
+        <span className="leading-relaxed">
+          <b><T>Single Supervisor Rule:</T></b>{' '}
+          <T>Each employee belongs to exactly one supervisor team. Workers marked with a lock icon are already working under another supervisor and cannot be selected.</T>
+        </span>
+      </div>
+
+      {/* ── Controls: Search, Filter Tabs, Bulk Buttons ── */}
+      <div className="card p-3 bg-white border border-sand-200 space-y-3 shadow-none">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-char-400" />
+            <input
+              type="text"
+              className="input !pl-9 text-xs"
+              placeholder={tr('Search employees by name, code, designation, site…')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-char-400 hover:text-char-700"
+                onClick={() => setSearch('')}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              className="btn-outline btn-sm text-xs py-1.5 px-3 flex items-center gap-1.5"
+              onClick={selectAllAvailable}
+              disabled={counts.unassigned === 0}
+            >
+              <CheckSquare size={13} className="text-[#8A5C38]" />
+              <span><T>Select All Available</T> ({counts.unassigned})</span>
+            </button>
+            <button
+              type="button"
+              className="btn-outline btn-sm text-xs py-1.5 px-3"
+              onClick={deselectAll}
+              disabled={selectedCodes.length === 0}
+            >
+              <T>Deselect All</T>
+            </button>
+            {isDirty && (
+              <button
+                type="button"
+                className="btn-outline btn-sm text-xs py-1.5 px-3 flex items-center gap-1 text-amber-700"
+                onClick={resetChanges}
+                disabled={saving}
+              >
+                <RotateCcw size={13} />
+                <span><T>Reset</T></span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-primary btn-sm text-xs py-1.5 px-4 flex items-center gap-1.5 font-bold shadow-none"
+              onClick={saveAssignments}
+              disabled={!isDirty || saving}
+            >
+              <Save size={14} />
+              <span>{saving ? tr('Saving…') : tr('Save Team Assignments')}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          {[
+            { key: 'all', label: 'All Employees', count: counts.all },
+            { key: 'selected', label: 'In This Team', count: counts.selected },
+            { key: 'unassigned', label: 'Available (Unassigned)', count: counts.unassigned },
+            { key: 'other', label: 'Assigned to Others', count: counts.other },
+          ].map((tabItem) => (
+            <button
+              key={tabItem.key}
+              type="button"
+              onClick={() => setFilter(tabItem.key)}
+              className={cx(
+                'px-3 py-1 text-xs font-semibold rounded-none border transition flex items-center gap-1.5 whitespace-nowrap',
+                filter === tabItem.key
+                  ? 'bg-[#8A5C38] text-white border-[#8A5C38]'
+                  : 'bg-white text-char-700 border-sand-300 hover:bg-[#FAF7F2]'
+              )}
+            >
+              <span><T>{tabItem.label}</T></span>
+              <span
+                className={cx(
+                  'px-1.5 py-0.2 text-[10px] font-mono rounded-none',
+                  filter === tabItem.key ? 'bg-white/20 text-white' : 'bg-sand-100 text-char-600'
+                )}
+              >
+                {tabItem.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Employees List Table ── */}
+      <div className="card p-0 bg-white border border-sand-200 overflow-hidden shadow-none">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-[#FAF7F2] border-b border-sand-200 text-char-600 font-bold uppercase tracking-wider text-[11px]">
+                <th className="py-2.5 px-3 w-10 text-center"><T>Select</T></th>
+                <th className="py-2.5 px-3"><T>Employee</T></th>
+                <th className="py-2.5 px-3"><T>Job & Designation</T></th>
+                <th className="py-2.5 px-3"><T>Site</T></th>
+                <th className="py-2.5 px-3"><T>Assignment Status</T></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-sand-200">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-char-400">
+                    <T>No employees match the current search / filter.</T>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((emp) => {
+                  const isAssignedToThis = selectedCodes.includes(emp.empCode);
+                  const isAssignedToOther = emp.supervisorCode && emp.supervisorCode !== currentSup?.empCode && !isAssignedToThis;
+
+                  return (
+                    <tr
+                      key={emp.empCode}
+                      className={cx(
+                        'transition-colors',
+                        isAssignedToThis ? 'bg-[#FAF7F2]/60 hover:bg-[#FAF7F2]' : isAssignedToOther ? 'bg-sand-50/40 opacity-75' : 'hover:bg-sand-50/50'
+                      )}
+                    >
+                      {/* Checkbox */}
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 text-terra rounded-none border-sand-400 focus:ring-terra cursor-pointer disabled:cursor-not-allowed"
+                          checked={isAssignedToThis}
+                          disabled={Boolean(isAssignedToOther) || saving}
+                          onChange={() => toggleEmployee(emp)}
+                          aria-label={tr('Select')}
+                        />
+                      </td>
+
+                      {/* Name & Code */}
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-char-900">{emp.name}</div>
+                        <div className="text-[11px] font-mono text-char-500">{emp.empCode}</div>
+                      </td>
+
+                      {/* Job & Designation */}
+                      <td className="py-2.5 px-3 text-char-700">
+                        <div>{emp.job}</div>
+                        {emp.designation && <div className="text-[11px] text-char-500">{emp.designation}</div>}
+                      </td>
+
+                      {/* Site */}
+                      <td className="py-2.5 px-3">
+                        <span className="badge-gray !text-[11px] !px-1.5 !py-0.5">{emp.site}</span>
+                      </td>
+
+                      {/* Assignment Status Badge */}
+                      <td className="py-2.5 px-3">
+                        {isAssignedToThis ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold text-green-800 bg-green-50 border border-green-200">
+                            <CheckCircle2 size={12} className="text-green-600 shrink-0" />
+                            <span><T>Assigned to this team</T></span>
+                          </span>
+                        ) : isAssignedToOther ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 cursor-not-allowed"
+                            title={tr('Already assigned to another supervisor. Cannot be reselected.')}
+                          >
+                            <Lock size={12} className="text-amber-600 shrink-0" />
+                            <span><T>Under</T> {emp.supervisorName || emp.supervisorCode}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-char-600 bg-sand-100 border border-sand-200">
+                            <span><T>Available (Unassigned)</T></span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer summary & save button */}
+        <div className="p-3 bg-[#FAF7F2] border-t border-sand-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="text-char-600">
+            <b>{selectedCodes.length}</b>{' '}
+            <T vars={{ name: currentSup?.name || '' }}>{'employees selected for {name}'}</T>
+            {isDirty && (
+              <span className="ml-2 font-semibold text-terra">
+                ({addedCount > 0 && `+${addedCount} added `}{removedCount > 0 && `-${removedCount} removed`})
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isDirty && (
+              <button
+                type="button"
+                className="btn-outline btn-sm py-1.5 px-3 text-xs"
+                onClick={resetChanges}
+                disabled={saving}
+              >
+                <T>Discard</T>
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-primary btn-sm py-1.5 px-4 text-xs font-bold flex items-center gap-1.5 shadow-none"
+              onClick={saveAssignments}
+              disabled={!isDirty || saving}
+            >
+              <Save size={14} />
+              <span>{saving ? tr('Saving…') : tr('Save Team Assignments')}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
