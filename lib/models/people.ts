@@ -122,6 +122,8 @@ export const DailyReport = defineModel(
     projectCode: { type: S },
     projectName: { type: S },
     narration: { type: S, required: true, maxlength: 4000 },
+    machineId: { type: OID, ref: 'Machine' },
+    machineName: { type: S },
     machineIds: { type: [OID], default: [] },
     machineNames: { type: S },
     colour: { type: S, maxlength: 120 },

@@ -17,7 +17,7 @@ import T from '@/components/T';
 
 const blank = () => ({
   narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '',
-  machineIds: [], machineNames: '',
+  machineId: '', machineName: '', machineIds: [], machineNames: '',
   colour: '', output: '', thickness: '', edges: '', pieces: '', rate: '',
 });
 
@@ -48,8 +48,10 @@ export default function DailyReportPage() {
           ...blank(),
           ...full,
           photos: full.photos || [],
-          machineIds: full.machineIds || [],
-          machineNames: full.machineNames || '',
+          machineId: full.machineId || (full.machineIds?.[0] || ''),
+          machineName: full.machineName || full.machineNames || '',
+          machineIds: full.machineIds?.length ? full.machineIds : (full.machineId ? [full.machineId] : []),
+          machineNames: full.machineNames || full.machineName || '',
           colour: full.colour || '',
           output: full.output || '',
           thickness: full.thickness || '',
@@ -73,6 +75,8 @@ export default function DailyReportPage() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
     if (!isWorker && !editing && !form.empCode) { toast.error('Choose the employee'); return; }
     setSaving(true);
+    const mIds = form.machineId ? [form.machineId] : (form.machineIds || []);
+    const mName = form.machineName || form.machineNames || '';
     const body = {
       narration: form.narration,
       hours: form.hours === '' ? 0 : Number(form.hours),
@@ -80,8 +84,10 @@ export default function DailyReportPage() {
       problem: form.problem || '',
       plan: form.plan || '',
       photos: form.photos || [],
-      machineIds: form.machineIds || [],
-      machineNames: form.machineNames || '',
+      machineId: form.machineId || mIds[0] || undefined,
+      machineName: mName,
+      machineIds: mIds,
+      machineNames: mName,
       colour: form.colour || '',
       output: form.output || '',
       thickness: form.thickness === '' ? undefined : Number(form.thickness),
@@ -320,22 +326,24 @@ export default function DailyReportPage() {
             <SpeakButton onText={(x) => set({ narration: (form.narration ? form.narration + ' ' : '') + x })} />
             <div className="[&>div]:h-full"><PhotoInput multiple value={form.photos} onChange={(p) => set({ photos: p })} label={t('addPhoto')} /></div>
           </div>
-          <Field label={tr('Machines worked on')} hint={tr('Select the machines you operated / worked on today')}>
-            <MultiLookupSelect
+          <Field label={tr('Machine worked on')} hint={tr('Select the machine you operated / worked on today')}>
+            <LookupSelect
               kind="machines"
-              value={form.machineIds || []}
-              valueLabel={form.machineNames || ''}
-              placeholder={tr('Select machines worked on…')}
+              value={form.machineId || (form.machineIds?.[0] || '')}
+              valueLabel={form.machineName || form.machineNames || ''}
+              placeholder={tr('Select machine worked on…')}
               emptyText={tr('No machines found')}
-              onChange={(selected) => {
+              onChange={(m) => {
                 set({
-                  machineIds: selected.map((m) => m.id),
-                  machineNames: selected.map((m) => m.label).join(', '),
+                  machineId: m ? m.id : '',
+                  machineName: m ? m.label : '',
+                  machineIds: m ? [m.id] : [],
+                  machineNames: m ? m.label : '',
                 });
               }}
             />
           </Field>
-          {(form.machineIds || []).length > 0 && (
+          {(form.machineId || (form.machineIds || []).length > 0) && (
             <div className="p-3.5 rounded-none border border-terra-200 bg-sand-50/70 space-y-3 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-char-900 flex items-center gap-1.5">

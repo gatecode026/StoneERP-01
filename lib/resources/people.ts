@@ -162,13 +162,14 @@ const checkKeys = ['supCheck', 'supRemark'] as const;
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineIds', 'machineNames', 'colour', 'output', 'thickness', 'edges', 'pieces', 'rate', 'stockItemId', 'stockUpdated', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
-  sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName', 'machineNames', 'colour'],
+  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineId', 'machineName', 'machineIds', 'machineNames', 'colour', 'output', 'thickness', 'edges', 'pieces', 'rate', 'stockItemId', 'stockUpdated', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
+  sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName', 'machineName', 'machineNames', 'colour'],
   dateFields: ['date'], filters: { date: 'date', empCode: 'string', projectId: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
   serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job', 'stockItemId', 'stockUpdated'],
   create: z.object({
     date: dateStr.optional(), empCode: empCode.optional(),
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
+    machineId: z.string().trim().optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
     colour: text(120).optional(), output: text(120).optional(), thickness: num(0, 1000).optional(),
     edges: text(120).optional(), pieces: num(0, 1e7).optional(), rate: num().optional(),
@@ -176,6 +177,7 @@ export const dailyreports: ResourceDef = {
   }).strict(),
   update: z.object({
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
+    machineId: z.string().trim().optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
     colour: text(120).optional(), output: text(120).optional(), thickness: num(0, 1000).optional(),
     edges: text(120).optional(), pieces: num(0, 1e7).optional(), rate: num().optional(),
@@ -205,8 +207,12 @@ export const dailyreports: ResourceDef = {
           }
         } catch { /* proceed */ }
       }
-      let machineNames = input.machineNames;
-      const machineIds = (input.machineIds || []).map((id: string) => oid(id));
+      let machineNames = input.machineNames || input.machineName;
+      let machineIds = (input.machineIds || []).map((id: string) => oid(id));
+      if (!machineIds.length && input.machineId) {
+        machineIds = [oid(input.machineId)];
+      }
+      const machineId = input.machineId ? oid(input.machineId) : (machineIds[0] || undefined);
       if (machineIds.length && !machineNames) {
         try {
           const { Machine } = await import('../models');
@@ -218,6 +224,8 @@ export const dailyreports: ResourceDef = {
         ...input, date, empCode: e.empCode, empName: e.name, job: e.job,
         projectId: input.projectId ? oid(input.projectId) : undefined,
         projectCode, projectName,
+        machineId,
+        machineName: machineNames,
         machineIds, machineNames,
         colour: input.colour ? String(input.colour).trim() : undefined,
         output: input.output ? String(input.output).trim() : undefined,
