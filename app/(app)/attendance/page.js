@@ -226,13 +226,13 @@ export default function AttendancePage() {
 
       {showMark && !ownOnly && (
         <>
-          {dayOff && <div className="rounded-xl bg-sky-50 border border-sky-200 text-sky-900 text-sm px-3 py-2 mb-3"><T>{sheet.meta.dayKind === 'holiday' ? 'Holiday' : 'Weekly off'}</T>{sheet.meta.dayName ? `: ${sheet.meta.dayName}` : ''}. <T>Nobody needs to be marked today. Anyone who works gets the hours as overtime.</T></div>}
+          {dayOff && <div className="rounded-none bg-sky-50 border border-sky-200 text-sky-900 text-sm px-3 py-2 mb-3"><T>{sheet.meta.dayKind === 'holiday' ? 'Holiday' : 'Weekly off'}</T>{sheet.meta.dayName ? `: ${sheet.meta.dayName}` : ''}. <T>Nobody needs to be marked today. Anyone who works gets the hours as overtime.</T></div>}
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
             {STATES.map((s) => <StatCard key={s.v} label={s.label} value={counts(s.v)} />)}
             <StatCard label="Not marked" value={unmarked} tone={unmarked ? 'amber' : 'green'} />
             <StatCard label="Needs a fix" value={sheet.meta.openCount || 0} tone={sheet.meta.openCount ? 'red' : 'green'} />
           </div>
-          {canApprove && otCount > 0 && tab === 'mark' && <button className="w-full text-left rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3 min-h-[44px]" onClick={() => setTab('overtime')}><T vars={{ n: otCount }}>{'{n} overtime entries are waiting for your approval. Tap to review.'}</T></button>}
+          {canApprove && otCount > 0 && tab === 'mark' && <button className="w-full text-left rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3 min-h-[44px]" onClick={() => setTab('overtime')}><T vars={{ n: otCount }}>{'{n} overtime entries are waiting for your approval. Tap to review.'}</T></button>}
           <div className="flex gap-2 mb-3 flex-wrap"><SearchBox value={q} onChange={setQ} placeholder="Search name or job…" />{canMark && unmarked > 0 && !dayOff && <button className="btn-green" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}</div>
           {sheet.loading ? <SkeletonList n={6} /> : (<>
             <div className="space-y-2.5 md:hidden">
@@ -264,7 +264,7 @@ export default function AttendancePage() {
                       <div className="grid grid-cols-4 gap-1.5">
                         {STATES.map((s) => (
                           <button key={s.v} aria-label={s.label} onClick={() => mark(e, s.v)}
-                            className={cx('min-h-[46px] rounded-xl border text-sm font-bold transition active:scale-95', m?.state === s.v ? s.on : 'bg-white border-sand-300 text-char-700')}>
+                            className={cx('min-h-[46px] rounded-none border text-sm font-bold transition active:scale-95', m?.state === s.v ? s.on : 'bg-white border-sand-300 text-char-700')}>
                             <span className="md:hidden">{s.short}</span><span className="hidden md:inline">{s.label}</span>
                           </button>
                         ))}

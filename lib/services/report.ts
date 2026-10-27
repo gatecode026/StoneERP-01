@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSettings } from '../settings';
 import { punchState } from './punch';
-import { Account, Attendance, CashClosing, Customer, DailyReport, Dispatch, Employee, Expense, MachineEntry, Payment, Repair, Sale, StockItem, Task } from '../models';
+import { Account, Attendance, CashClosing, Customer, DailyReport, Dispatch, Employee, Expense, MachineEntry, Payment, Project, Repair, Sale, StockItem, Task } from '../models';
 import { scopeFilter, type EffectivePerm } from '../perm/engine';
 import type { SessionUser } from '../auth/session';
 import type { AppSettings } from '../settings';
@@ -31,7 +31,10 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
   if (can('attendance')) tasks.push((async () => {
     const asf = await scopeFilter(user, perm, 'attendance', 'view');
     const empScope = perm.can('employees', 'view') ? await scopeFilter(user, perm, 'employees', 'view').catch(() => asf) : asf;
-    const total = await Employee.countDocuments({ $and: [{ status: 'active', isVoid: false }, empScope] });
+    const [total, otRows] = await Promise.all([
+      Employee.countDocuments({ $and: [{ status: 'active', isVoid: false }, empScope] }),
+      Attendance.aggregate([{ $match: { $and: [{ date, isVoid: false }, asf] } }, { $group: { _id: null, otMins: { $sum: '$otMinutes' }, otCount: { $sum: { $cond: [{ $gt: ['$otMinutes', 0] }, 1, 0] } } } }]),
+    ]);
     let by: Record<string, number>;
     if (all('attendance') && day) by = day.attendance ?? {};
     else {
@@ -39,7 +42,15 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
       by = Object.fromEntries(rows.map((x: any) => [x._id, x.n]));
     }
     const marked = Object.values(by).reduce((t, x) => t + n0(x), 0);
-    out.attendance = { total, present: n0(by.present) + n0(by.overtime) + n0(by.half), absent: n0(by.absent), leave: n0(by.leave), unmarked: Math.max(0, total - marked) };
+    out.attendance = {
+      total,
+      present: n0(by.present) + n0(by.overtime) + n0(by.half),
+      absent: n0(by.absent),
+      leave: n0(by.leave),
+      unmarked: Math.max(0, total - marked),
+      otHours: r1((otRows[0]?.otMins || 0) / 60),
+      otCount: otRows[0]?.otCount || 0,
+    };
   })());
 
   if (can('dailyreports')) tasks.push((async () => {
@@ -77,11 +88,12 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
   })());
 
   if (can('stockitems')) tasks.push((async () => {
-    const [low, main] = await Promise.all([
+    const [low, main, totalCount] = await Promise.all([
       StockItem.find({ belowMin: true, isVoid: false }).select('name balance minLevel unit').limit(30).lean(),
       StockItem.aggregate([{ $match: { isVoid: false, category: 'finished' } }, { $addFields: { value: { $multiply: ['$balance', { $ifNull: ['$sellRate', 0] }] } } }, { $sort: { value: -1 } }, { $limit: 6 }, { $project: { name: 1, balance: 1, unit: 1, minLevel: 1 } }]),
+      StockItem.countDocuments({ isVoid: false }),
     ]);
-    out.stock = { lowStock: low.map((i: any) => ({ _id: String(i._id), name: i.name, balance: i.balance, minLevel: i.minLevel, unit: i.unit })), mainItems: main };
+    out.stock = { lowStock: low.map((i: any) => ({ _id: String(i._id), name: i.name, balance: i.balance, minLevel: i.minLevel, unit: i.unit })), mainItems: main, totalCount };
   })());
 
   if (can('sales')) tasks.push((async () => {
@@ -125,7 +137,24 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
 
   if (can('tasks')) tasks.push((async () => {
     const sf = await scopeFilter(user, perm, 'tasks', 'view');
-    out.tasksOpen = await Task.countDocuments({ $and: [{ state: 'pending', isVoid: false }, sf] });
+    const [openCount, overdueCount] = await Promise.all([
+      Task.countDocuments({ $and: [{ state: 'pending', isVoid: false }, sf] }),
+      Task.countDocuments({ $and: [{ state: 'pending', dueDate: { $lt: date }, isVoid: false }, sf] }),
+    ]);
+    out.tasks = { open: openCount, overdue: overdueCount };
+    out.tasksOpen = openCount;
+  })());
+
+  tasks.push((async () => {
+    try {
+      const [ongoing, total] = await Promise.all([
+        Project.countDocuments({ status: { $ne: 'Completed' }, isVoid: false }),
+        Project.countDocuments({ isVoid: false }),
+      ]);
+      out.projects = { ongoing, total };
+    } catch {
+      out.projects = { ongoing: 0, total: 0 };
+    }
   })());
 
   tasks.push((async () => {

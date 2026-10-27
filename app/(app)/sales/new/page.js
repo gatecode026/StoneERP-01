@@ -145,7 +145,7 @@ export default function NewSale() {
   return (
     <RoleGuard perm="sales">
       <PageHeader title={editId ? 'Change quotation' : t('newQuotation')} back={editId ? `/sales/${editId}` : '/sales'} subtitle="Customer → items → quotation or order" />
-      {editNote && <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3"><T>{editNote}</T></div>}
+      {editNote && <div className="rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3"><T>{editNote}</T></div>}
       <div className="grid lg:grid-cols-3 gap-4 pb-24">
         <div className="lg:col-span-2 space-y-4">
           <Section title="1. Customer">
@@ -164,7 +164,7 @@ export default function NewSale() {
           <Section title="2. Items" right={<button className="btn-outline btn-sm" onClick={() => setItems([...items, newItem()])}><Plus size={14} /><T> Add item</T></button>}>
             <div className="space-y-3">
               {items.map((it, i) => (
-                <div key={i} className={`rounded-xl border p-3 bg-sand-50/50 ${showErrors && problems[i] ? 'border-red-400' : 'border-sand-200'}`}>
+                <div key={i} className={`rounded-none border p-3 bg-sand-50/50 ${showErrors && problems[i] ? 'border-red-400' : 'border-sand-200'}`}>
                   <div className="flex gap-2 items-start">
                     <LookupSelect className="flex-1 min-w-0" kind="items" query={{ category: 'finished' }} value={it.stockItemId} valueLabel={it.name} onChange={(x) => pickProduct(i, x ? x.id : '')} placeholder="Search product…" />
                     {items.length > 1 && <button className="p-2.5 text-red-600" aria-label={tr('Remove this line')} onClick={() => setItems(items.filter((_, k) => k !== i))}><Trash2 size={18} /></button>}

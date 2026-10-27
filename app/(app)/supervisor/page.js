@@ -195,7 +195,7 @@ export default function SupervisorPage() {
       </div>
 
       {overdueCount > 0 && (
-        <div className="mb-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2 flex items-center gap-2">
+        <div className="mb-3 rounded-none bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2 flex items-center gap-2">
           <AlertTriangle size={15} />
           <span><b>{overdueCount} overdue tasks.</b> Review them under "Ongoing" or mark as completed.</span>
         </div>
@@ -575,7 +575,7 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
                       type="button"
                       onClick={() => markWorker(w.empCode, 'present')}
                       className={cx(
-                        'text-xs px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1',
+                        'text-xs px-3 py-1.5 rounded-none font-semibold transition-all flex items-center gap-1',
                         current === 'present'
                           ? 'bg-emerald-600 text-white shadow-xs'
                           : 'bg-white border border-sand-300 text-char-700 hover:border-emerald-500 hover:text-emerald-700'
@@ -588,7 +588,7 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
                       type="button"
                       onClick={() => markWorker(w.empCode, 'absent')}
                       className={cx(
-                        'text-xs px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1',
+                        'text-xs px-3 py-1.5 rounded-none font-semibold transition-all flex items-center gap-1',
                         current === 'absent'
                           ? 'bg-rose-600 text-white shadow-xs'
                           : 'bg-white border border-sand-300 text-char-700 hover:border-rose-500 hover:text-rose-700'
@@ -601,7 +601,7 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
                       type="button"
                       onClick={() => markWorker(w.empCode, 'half')}
                       className={cx(
-                        'text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all',
+                        'text-xs px-2.5 py-1.5 rounded-none font-semibold transition-all',
                         current === 'half'
                           ? 'bg-amber-500 text-white shadow-xs'
                           : 'bg-white border border-sand-300 text-char-700 hover:border-amber-500 hover:text-amber-700'
@@ -614,7 +614,7 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
                       type="button"
                       onClick={() => markWorker(w.empCode, 'leave')}
                       className={cx(
-                        'text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all',
+                        'text-xs px-2.5 py-1.5 rounded-none font-semibold transition-all',
                         current === 'leave'
                           ? 'bg-purple-600 text-white shadow-xs'
                           : 'bg-white border border-sand-300 text-char-700 hover:border-purple-500 hover:text-purple-700'
@@ -682,7 +682,7 @@ function SupervisorProjectsView({ selectedSupCode, setSelectedSupCode, isOwnerOr
                     <Badge tone={p.status === 'Completed' ? 'green' : 'terra'}>{p.status}</Badge>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs bg-sand-50/70 p-2.5 rounded-xl border border-sand-200">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs bg-sand-50/70 p-2.5 rounded-none border border-sand-200">
                     <div>
                       <span className="text-[10px] uppercase text-char-400 font-semibold block">Stone Variety</span>
                       <span className="font-semibold text-char-800">{p.stoneType || 'Mandana/Kota'}</span>
@@ -816,7 +816,7 @@ function SupervisorDailyNarration({ selectedSupCode, session }) {
               Submit daily stone cutting, calibration, and dispatch progress linked to active projects
             </p>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-sand-100 text-char-700">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-none bg-sand-100 text-char-700">
             Supervisor: {selectedSupCode}
           </span>
         </div>
@@ -938,7 +938,7 @@ function SupervisorDailyNarration({ selectedSupCode, session }) {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-xs text-char-900">{fmtDate(r.date)}</span>
                     {r.projectName && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-terra bg-terra-50 px-2 py-0.5 rounded-md border border-terra-200">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-terra bg-terra-50 px-2 py-0.5 rounded-none border border-terra-200">
                         <FolderKanban size={11} /> {r.projectName}
                       </span>
                     )}

@@ -55,7 +55,7 @@ export function DialogHost() {
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={() => close(isPrompt ? null : false)} />
-      <div ref={box} role={isPrompt ? 'dialog' : 'alertdialog'} aria-modal="true" aria-labelledby="dlg_msg" className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-sand-200">
+      <div ref={box} role={isPrompt ? 'dialog' : 'alertdialog'} aria-modal="true" aria-labelledby="dlg_msg" className="relative w-full max-w-sm rounded-none bg-white p-5 shadow-2xl border border-sand-300">
         <p id="dlg_msg" className="text-sm text-char whitespace-pre-line">{tr(cur.message)}</p>
         {isPrompt && (
           <form onSubmit={(e) => { e.preventDefault(); close(val); }}>

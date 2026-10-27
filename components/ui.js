@@ -35,22 +35,22 @@ const ICON_TONES = {
 };
 
 const BORDER_ACCENTS = {
-  default: 'border-stone-200/90',
-  red: 'border-stone-200/90 border-l-[3px] border-l-rose-500',
-  green: 'border-stone-200/90 border-l-[3px] border-l-emerald-500',
-  amber: 'border-stone-200/90 border-l-[3px] border-l-amber-500',
-  terra: 'border-stone-200/90 border-l-[3px] border-l-terra',
+  default: 'border-sand-300',
+  red: 'border-sand-300 border-l-[3px] border-l-rose-500',
+  green: 'border-sand-300 border-l-[3px] border-l-emerald-500',
+  amber: 'border-sand-300 border-l-[3px] border-l-amber-500',
+  terra: 'border-sand-300 border-l-[3px] border-l-terra',
 };
 
 export function StatCard({ label, value, sub, tone = 'default', icon: Icon, href, valueClass }) {
   const tx = useTx();
   const body = (
-    <div className={cx('rounded-2xl border bg-white p-3.5 h-full flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] hover:border-stone-300 hover:shadow-xs transition-all duration-150', BORDER_ACCENTS[tone] || BORDER_ACCENTS.default)}>
+    <div className={cx('rounded-none border bg-white p-3.5 h-full flex flex-col justify-between shadow-none hover:border-terra transition-all duration-150', BORDER_ACCENTS[tone] || BORDER_ACCENTS.default)}>
       <div>
         <div className="flex items-center justify-between gap-2">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-char-500 truncate">{tx(label)}</div>
           {Icon && (
-            <div className={cx('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', ICON_TONES[tone] || ICON_TONES.default)}>
+            <div className={cx('w-7 h-7 rounded-none flex items-center justify-center shrink-0', ICON_TONES[tone] || ICON_TONES.default)}>
               <Icon size={15} />
             </div>
           )}
@@ -128,10 +128,10 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 no-print" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
-      <div ref={panel} className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[92vh] rounded-t-3xl md:rounded-2xl shadow-2xl border border-sand-200 overflow-hidden', wide ? 'md:max-w-3xl lg:max-w-4xl' : 'md:max-w-xl lg:max-w-2xl')}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-sand-200 shrink-0 bg-sand-50/70">
+      <div ref={panel} className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[92vh] rounded-none shadow-2xl border border-sand-300 overflow-hidden', wide ? 'md:max-w-3xl lg:max-w-4xl' : 'md:max-w-xl lg:max-w-2xl')}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-sand-200 shrink-0 bg-sand-50/70">
           <h2 className="font-bold text-base md:text-lg text-char truncate pr-2">{tx(title)}</h2>
-          <button onClick={onClose} className="min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2 rounded-lg text-char-500 hover:text-char hover:bg-sand-200 transition" aria-label={tx('Close')}><X size={20} /></button>
+          <button onClick={onClose} className="min-w-[40px] min-h-[40px] flex items-center justify-center -mr-2 rounded-none text-char-500 hover:text-char hover:bg-sand-200 transition" aria-label={tx('Close')}><X size={20} /></button>
         </div>
         <div className="overflow-y-auto px-5 py-4 flex-1">{children}</div>
         {footer && <div className="shrink-0 border-t border-sand-200 px-5 py-3.5 safe-pb bg-white flex items-center justify-end gap-3">{footer}</div>}
@@ -143,11 +143,11 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
 export function Tabs({ tabs, value, onChange }) {
   const tx = useTx();
   return (
-    <div className="tabs-row flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
+    <div className="tabs-row flex gap-1.5 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
       {tabs.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
-          className={cx('shrink-0 min-h-[40px] px-4 rounded-full text-sm font-semibold border transition-all duration-75 active:scale-95 cursor-pointer select-none',
-            value === t.key ? 'bg-terra text-white border-terra shadow-sm' : 'bg-white text-char-700 border-sand-300 hover:bg-sand-100 active:bg-sand-200')}>
+          className={cx('shrink-0 min-h-[38px] px-3.5 rounded-none text-xs font-semibold border transition-all duration-75 active:scale-98 cursor-pointer select-none',
+            value === t.key ? 'bg-terra text-white border-terra-600 shadow-none' : 'bg-white text-char border-sand-300 hover:bg-sand-50 hover:text-terra hover:border-terra active:bg-sand-100')}>
           {tx(t.label)}{t.count != null && <span className={cx('ml-1.5 text-xs', value === t.key ? 'text-white/80' : 'text-char-500')}>{t.count}</span>}
         </button>
       ))}
@@ -215,7 +215,7 @@ export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
   const from = (page - 1) * pageSize + 1;
   const to = (page - 1) * pageSize + shown;
   const nums = [...new Set([1, 2, page - 1, page, page + 1, pages - 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
-  const btn = 'min-w-[44px] min-h-[44px] rounded-lg border text-sm font-semibold';
+  const btn = 'min-w-[40px] min-h-[40px] rounded-none border text-xs font-semibold';
 
   // Do not show redundant pagination bar when all records fit easily on 1 page
   if (pages <= 1 && total <= 10) return null;
@@ -225,15 +225,15 @@ export function Pagination({ page, pageSize, total, shown, onPage, onSize }) {
       <div className="text-xs text-char-500">{t('pagerShowing', { from, to, total: capped ? '10,000+' : total })}</div>
       {pages > 1 && (
         <div className="flex items-center gap-1.5 flex-wrap justify-center">
-          <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={t('prevPage')}>{t('prev')}</button>
+          <button className={`${btn} px-3 border-sand-300 bg-white hover:bg-sand-50 hover:border-terra disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={t('prevPage')}>{t('prev')}</button>
           {nums.map((n, i) => (
             <span key={n} className="flex items-center gap-1.5">
               {i > 0 && n - nums[i - 1] > 1 && <span className="text-char-300">…</span>}
-              <button className={`${btn} ${n === page ? 'bg-terra text-white border-terra' : 'border-sand-300 bg-white'}`} aria-current={n === page ? 'page' : undefined} onClick={() => onPage(n)}>{n}</button>
+              <button className={`${btn} ${n === page ? 'bg-terra text-white border-terra-600' : 'border-sand-300 bg-white hover:bg-sand-50 hover:border-terra'}`} aria-current={n === page ? 'page' : undefined} onClick={() => onPage(n)}>{n}</button>
             </span>
           ))}
-          <button className={`${btn} px-3 border-sand-300 bg-white disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={t('nextPage')}>{t('next')}</button>
-          <select aria-label={t('rowsPerPage')} className="input !w-auto !min-h-[44px] ml-1" value={pageSize} onChange={(e) => onSize(Number(e.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{t('perPage', { n })}</option>)}</select>
+          <button className={`${btn} px-3 border-sand-300 bg-white hover:bg-sand-50 hover:border-terra disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={t('nextPage')}>{t('next')}</button>
+          <select aria-label={t('rowsPerPage')} className="input !w-auto !min-h-[40px] ml-1" value={pageSize} onChange={(e) => onSize(Number(e.target.value))}>{[10, 25, 50, 100].map((n) => <option key={n} value={n}>{t('perPage', { n })}</option>)}</select>
         </div>
       )}
     </nav>
@@ -274,15 +274,15 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
         {(!items.length || multiple) && (
           <button
             type="button"
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-sm"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-none border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-none"
             onClick={() => ref.current?.click()}
           >
             <Camera size={16} className="text-terra" /> {tx(label) || t('addPhoto')}
           </button>
         )}
         {items.map((src, i) => (
-          <div key={i} className="relative inline-flex items-center gap-2 p-1.5 rounded-xl border border-sand-200 bg-sand-50/60 shadow-sm">
-            <Photo src={src} thumb width={40} height={40} className="h-10 w-10 rounded-lg object-cover border border-sand-200" />
+          <div key={i} className="relative inline-flex items-center gap-2 p-1.5 rounded-none border border-sand-300 bg-sand-50/60 shadow-none">
+            <Photo src={src} thumb width={40} height={40} className="h-10 w-10 rounded-none object-cover border border-sand-300" />
             {!multiple && (
               <button
                 type="button"
@@ -295,7 +295,7 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
             <button
               type="button"
               onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
-              className="text-char-500 hover:text-red-600 p-1 rounded-md transition"
+              className="text-char-500 hover:text-red-600 p-1 rounded-none transition"
               title={tx('Remove')}
             >
               <X size={15} />
@@ -342,15 +342,15 @@ export function DocInput({ value, onChange, resource, kind = 'docs', label }) {
     <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-sm disabled:opacity-50"
+        className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-none border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-none disabled:opacity-50"
         disabled={busy}
         onClick={() => ref.current?.click()}
       >
         <Camera size={16} className="text-terra" /> {busy ? `${tx('Uploading…')} ${pct}%` : tx(label) || tx('Upload photo / PDF')}
       </button>
-      {busy && <div className="basis-full h-1.5 rounded-full bg-sand-200 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-terra transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>}
+      {busy && <div className="basis-full h-1.5 rounded-none bg-sand-200 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-terra transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>}
       {value && (
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-none bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-medium">
           <a href={fileUrl(value)} target="_blank" rel="noreferrer" className="hover:underline font-semibold">{tx('View file')}</a>
           <button type="button" className="text-emerald-700 hover:text-red-600 p-0.5" aria-label={tx('Remove file')} onClick={() => onChange('')}><X size={14} /></button>
         </div>
@@ -588,24 +588,24 @@ export function ActionMenu({ items = [], title = 'Actions', className }) {
           }}
           role="menu"
           aria-orientation="vertical"
-          className="w-48 bg-white/95 backdrop-blur-md rounded-2xl border border-sand-200/90 shadow-2xl p-1.5 focus:outline-none transition-all duration-150 animate-in fade-in zoom-in-95 max-h-[85vh] overflow-y-auto"
+          className="w-48 bg-white rounded-none border border-sand-300 shadow-xl p-1 focus:outline-none transition-all duration-150 animate-in fade-in max-h-[85vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="space-y-0.5">
             {validItems.map((it, idx) => (
               <div key={it.key || idx}>
-                {it.dividerBefore && <div className="my-1 border-t border-sand-100" />}
+                {it.dividerBefore && <div className="my-1 border-t border-sand-200" />}
                 <button
                   type="button"
                   role="menuitem"
                   disabled={it.disabled}
                   className={cx(
-                    'w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left transition-colors',
+                    'w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-none text-left transition-colors',
                     it.danger || it.tone === 'danger' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' :
-                    it.tone === 'primary' ? 'text-terra hover:bg-terra-50' :
+                    it.tone === 'primary' ? 'text-terra hover:bg-sand-50' :
                     it.tone === 'green' ? 'text-emerald-700 hover:bg-emerald-50' :
                     it.tone === 'amber' ? 'text-amber-800 hover:bg-amber-50' :
-                    'text-char-700 hover:text-char-900 hover:bg-sand-100',
+                    'text-char hover:text-terra hover:bg-sand-50',
                     it.disabled && 'opacity-50 cursor-not-allowed'
                   )}
                   onClick={(e) => {

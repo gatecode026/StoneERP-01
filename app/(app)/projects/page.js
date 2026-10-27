@@ -608,7 +608,7 @@ export default function ProjectsPage() {
                 const pct = target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
 
                 return (
-                  <div className="p-3.5 rounded-xl border border-terra-200 bg-gradient-to-br from-terra-50/50 to-sand-50/80 space-y-3">
+                  <div className="p-3.5 rounded-none border border-terra-200 bg-gradient-to-br from-terra-50/50 to-sand-50/80 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Boxes size={16} className="text-terra" />
@@ -626,15 +626,15 @@ export default function ProjectsPage() {
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="p-2 rounded-xl bg-white border border-sand-200 shadow-xs">
+                      <div className="p-2 rounded-none bg-white border border-sand-200 shadow-xs">
                         <span className="text-[10px] font-bold uppercase text-char-500 block">Needs / Target</span>
                         <span className="text-sm font-black text-char-900">{target > 0 ? `${num(target)} ${unit}` : (selectedProject.targetQty || '—')}</span>
                       </div>
-                      <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 shadow-xs">
+                      <div className="p-2 rounded-none bg-emerald-50 border border-emerald-200 shadow-xs">
                         <span className="text-[10px] font-bold uppercase text-emerald-700 block">Completed</span>
                         <span className="text-sm font-black text-emerald-800">{num(completed)} {unit}</span>
                       </div>
-                      <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 shadow-xs">
+                      <div className="p-2 rounded-none bg-amber-50 border border-amber-200 shadow-xs">
                         <span className="text-[10px] font-bold uppercase text-amber-700 block">Left / Remaining</span>
                         <span className="text-sm font-black text-amber-800">{target > 0 ? `${num(left)} ${unit}` : '—'}</span>
                       </div>
@@ -659,7 +659,7 @@ export default function ProjectsPage() {
               })()}
 
               {/* Top metadata grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-sand-50/80 border border-sand-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-none bg-sand-50/80 border border-sand-200">
                 <KV label="Client">{selectedProject.clientName || 'Direct Order'}</KV>
                 <KV label="Site / Yard">{selectedProject.site || 'Factory'}</KV>
                 <KV label="Supervisor in Charge">
@@ -692,42 +692,42 @@ export default function ProjectsPage() {
               </div>
 
               {/* Stone Specifications & Attributes Grid */}
-              <div className="p-3.5 rounded-xl border border-terra-200 bg-terra-50/30 space-y-2.5">
+              <div className="p-3.5 rounded-none border border-terra-200 bg-terra-50/30 space-y-2.5">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-terra-900 flex items-center gap-1.5">
                   <Boxes size={14} className="text-terra" />
                   Stone Specifications & Dimensions
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 text-xs">
-                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
                     <span className="text-[10px] uppercase font-bold text-char-500 block">Stone Variety</span>
                     <span className="font-semibold text-char-800">{selectedProject.stoneType || 'Custom'}</span>
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
                     <span className="text-[10px] uppercase font-bold text-char-500 block">Sizes</span>
                     <span className="font-semibold text-char-800">{selectedProject.sizes || '—'}</span>
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
                     <span className="text-[10px] uppercase font-bold text-char-500 block">Thickness</span>
                     <span className="font-semibold text-char-800">{selectedProject.thickness || '—'}</span>
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
                     <span className="text-[10px] uppercase font-bold text-char-500 block">Finish</span>
                     <span className="font-semibold text-char-800">{selectedProject.finish || '—'}</span>
                   </div>
                   {selectedProject.edges && (
-                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
                       <span className="text-[10px] uppercase font-bold text-char-500 block">Edges</span>
                       <span className="font-semibold text-char-800">{selectedProject.edges}</span>
                     </div>
                   )}
                   {selectedProject.price > 0 && (
-                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
                       <span className="text-[10px] uppercase font-bold text-char-500 block">Price</span>
                       <span className="font-semibold text-char-800">₹{selectedProject.price}</span>
                     </div>
                   )}
                   {(selectedProject.qtyInSqFt > 0 || selectedProject.qtyInPcs > 0 || selectedProject.qtyInTons > 0 || selectedProject.targetQty) && (
-                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
                       <span className="text-[10px] uppercase font-bold text-char-500 block">Quantity</span>
                       <span className="font-semibold text-char-800">
                         {[
@@ -740,13 +740,13 @@ export default function ProjectsPage() {
                     </div>
                   )}
                   {selectedProject.dispatchQty > 0 && (
-                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
                       <span className="text-[10px] uppercase font-bold text-char-500 block">Dispatched Qty</span>
                       <span className="font-semibold text-char-800">{selectedProject.dispatchQty}</span>
                     </div>
                   )}
                   {selectedProject.balanceOrderQty > 0 && (
-                    <div className="bg-white p-2.5 rounded-lg border border-sand-200">
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
                       <span className="text-[10px] uppercase font-bold text-char-500 block">Balance Qty</span>
                       <span className="font-semibold text-char-800">{selectedProject.balanceOrderQty}</span>
                     </div>
@@ -757,7 +757,7 @@ export default function ProjectsPage() {
               {/* What It Needs & Deliverables Split */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {/* Requirements / Needs */}
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40">
+                <div className="p-3.5 rounded-none border border-amber-200 bg-amber-50/40">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5 mb-2">
                     <Layers size={14} className="text-amber-700" />
                     What It Needs (Raw Materials, Blocks & Machines)
@@ -768,7 +768,7 @@ export default function ProjectsPage() {
                 </div>
 
                 {/* Deliverables */}
-                <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40">
+                <div className="p-3.5 rounded-none border border-emerald-200 bg-emerald-50/40">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5 mb-2">
                     <PackageCheck size={14} className="text-emerald-700" />
                     Key Deliverables & Specifications
@@ -781,7 +781,7 @@ export default function ProjectsPage() {
 
               {/* Other Remarks if any */}
               {selectedProject.otherRemark && (
-                <div className="p-3 rounded-xl border border-sand-200 bg-sand-50/50 text-xs">
+                <div className="p-3 rounded-none border border-sand-200 bg-sand-50/50 text-xs">
                   <span className="font-bold text-char-700 block mb-1">Other Remark:</span>
                   <span className="text-char-800">{selectedProject.otherRemark}</span>
                 </div>
@@ -808,7 +808,7 @@ export default function ProjectsPage() {
                 {projectTasksFetch.loading ? (
                   <div className="p-4 text-center text-xs text-char-500">Loading project tasks…</div>
                 ) : projectTasks.length === 0 ? (
-                  <div className="p-4 text-center rounded-xl bg-sand-50 border border-dashed border-sand-300 text-xs text-char-600">
+                  <div className="p-4 text-center rounded-none bg-sand-50 border border-dashed border-sand-300 text-xs text-char-600">
                     No tasks assigned to this project yet. Click &quot;Add Task&quot; above to give work to supervisors.
                   </div>
                 ) : (
@@ -816,7 +816,7 @@ export default function ProjectsPage() {
                     {projectTasks.map((t) => (
                       <div
                         key={t._id}
-                        className="p-3 rounded-xl bg-white border border-sand-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                        className="p-3 rounded-none bg-white border border-sand-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
@@ -993,22 +993,22 @@ export default function ProjectsPage() {
 
             return (
               <form onSubmit={handleSaveProgress} className="space-y-4">
-                <div className="p-3 rounded-xl bg-sand-50 border border-sand-200 text-xs">
+                <div className="p-3 rounded-none bg-sand-50 border border-sand-200 text-xs">
                   <div className="font-bold text-char-900 text-sm">{progressModalProject.name}</div>
                   <div className="text-char-500 mt-0.5">Code: <b className="text-char-700">{progressModalProject.projectCode}</b> · Stone: <b className="text-char-700">{progressModalProject.stoneType || 'Custom'}</b></div>
                 </div>
 
                 {/* Target & Live Calculation Overview */}
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2.5 rounded-xl bg-white border border-sand-200">
+                  <div className="p-2.5 rounded-none bg-white border border-sand-200">
                     <span className="text-[10px] uppercase font-bold text-char-500 block">Needs / Target</span>
                     <span className="text-sm font-black text-char-900">{target > 0 ? `${num(target)} ${unit}` : (progressModalProject.targetQty || '—')}</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div className="p-2.5 rounded-none bg-emerald-50 border border-emerald-200">
                     <span className="text-[10px] uppercase font-bold text-emerald-700 block">Completed</span>
                     <span className="text-sm font-black text-emerald-800">{num(calcCompleted)} {unit}</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <div className="p-2.5 rounded-none bg-amber-50 border border-amber-200">
                     <span className="text-[10px] uppercase font-bold text-amber-700 block">Left / Remaining</span>
                     <span className="text-sm font-black text-amber-800">{target > 0 ? `${num(calcLeft)} ${unit}` : '—'}</span>
                   </div>
@@ -1016,7 +1016,7 @@ export default function ProjectsPage() {
 
                 {/* Progress bar preview */}
                 {target > 0 && (
-                  <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 space-y-1.5">
+                  <div className="p-3 rounded-none bg-sand-50/70 border border-sand-200 space-y-1.5">
                     <div className="flex justify-between items-center text-xs font-semibold text-char-700">
                       <span>{calcPct}% Completed</span>
                       <span className="text-char-500">{num(calcCompleted)} of {num(target)} {unit} ({num(calcLeft)} left)</span>
@@ -1041,7 +1041,7 @@ export default function ProjectsPage() {
                         setProgressValue(String(currentDone));
                       }}
                       className={cx(
-                        'py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5',
+                        'py-2 px-3 rounded-none border text-xs font-bold transition flex items-center justify-center gap-1.5',
                         progressInputType === 'total'
                           ? 'bg-terra text-white border-terra shadow-xs'
                           : 'bg-white text-char-700 border-sand-200 hover:bg-sand-50'
@@ -1056,7 +1056,7 @@ export default function ProjectsPage() {
                         setProgressValue('');
                       }}
                       className={cx(
-                        'py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5',
+                        'py-2 px-3 rounded-none border text-xs font-bold transition flex items-center justify-center gap-1.5',
                         progressInputType === 'add'
                           ? 'bg-terra text-white border-terra shadow-xs'
                           : 'bg-white text-char-700 border-sand-200 hover:bg-sand-50'

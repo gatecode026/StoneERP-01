@@ -255,7 +255,7 @@ export default function SalaryPage() {
         footer={sel && <><Link href={`/salary/slip/${month}/${sel.empCode}`} className="btn-primary flex-1"><FileText size={16} /> {t('slip')}</Link>{office && <button className="btn-green flex-1" onClick={() => openWA(slipMsg(sel), sel.mobile)}><MessageCircle size={16} /><T> WhatsApp</T></button>}</>}>
         {sel && (
           <div>
-            <div className="rounded-xl bg-sand-100 p-3 text-sm mb-3"><div className="text-[11px] uppercase font-bold text-char-500 mb-1"><T>How wages were worked out</T></div><div className="font-mono text-[13px]">{sel.formula}</div></div>
+            <div className="rounded-none bg-sand-100 p-3 text-sm mb-3"><div className="text-[11px] uppercase font-bold text-char-500 mb-1"><T>How wages were worked out</T></div><div className="font-mono text-[13px]">{sel.formula}</div></div>
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-sand-200">
               <KV label="Pay type">{PT[sel.payType]} · ₹{num(sel.rate)}</KV>
               {office && (
@@ -279,11 +279,11 @@ export default function SalaryPage() {
                 <span>Update {sel.name}&apos;s Salary / Rate</span>
               </button>
             )}
-            {sel.unmarked > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.unmarked }}>{'{n} day(s) have no attendance marked — they are not paid.'}</T></div>}
+            {sel.unmarked > 0 && <div className="rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.unmarked }}>{'{n} day(s) have no attendance marked — they are not paid.'}</T></div>}
             {sel.payType !== 'piece' && <><KV label="Present days">{sel.present}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV>{sel.paidOffDays > 0 && <KV label="Weekly off / holidays (paid)">{sel.paidOffDays}</KV>}</>}
             <KV label="Wages">{inr(sel.wages)}</KV>
             <KV label={tr('Overtime approved ({h} h × {m}×)', { h: sel.otHours, m: SALARY.otMultiplier })}>+ {inr(sel.otPay)}</KV>
-            {sel.otPendingHours > 0 && <div className="rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.otPendingHours }}>{'{n} h of overtime is waiting for approval and is not in this salary yet. Approve it on the Attendance screen, then the salary is worked out again.'}</T></div>}
+            {sel.otPendingHours > 0 && <div className="rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.otPendingHours }}>{'{n} h of overtime is waiting for approval and is not in this salary yet. Approve it on the Attendance screen, then the salary is worked out again.'}</T></div>}
             <KV label="Gross">{inr(sel.gross)}</KV>
             <KV label="PF">− {inr(sel.pf)}</KV><KV label="ESI">− {inr(sel.esi)}</KV><KV label="Advance recovery">− {inr(sel.advanceRecovery)}</KV>
             <KV label={<b><T>Net salary</T></b>}><b className="text-lg text-terra">{inr(sel.net)}</b></KV>
@@ -354,7 +354,7 @@ export default function SalaryPage() {
 
             {/* Dropdown Menu with Search Bar */}
             {empDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl border border-sand-300 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-none border border-sand-300 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                 {/* Search Bar Input */}
                 <div className="p-2.5 border-b border-sand-200 bg-sand-50/80">
                   <div className="relative">

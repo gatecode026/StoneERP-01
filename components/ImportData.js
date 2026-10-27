@@ -81,7 +81,7 @@ export default function ImportData({ resource, perm, noun, hint }) {
               </div>
               {res.unknownColumns?.length > 0 && <p className="text-xs text-amber-700 mb-2">{t('impIgnored')}: {res.unknownColumns.join(', ')}</p>}
               {res.invalid > 0 && <p className="text-xs text-char-500 mb-2">{t('impNote')}</p>}
-              <div className="max-h-72 overflow-auto rounded-xl border border-sand-200 divide-y divide-sand-100">
+              <div className="max-h-72 overflow-auto rounded-none border border-sand-300 divide-y divide-sand-100">
                 {res.rows.map((r) => (
                   <div key={r.row} className={`px-3 py-2 text-sm ${r.ok ? '' : 'bg-red-50/60'}`}>
                     <div className="flex items-center justify-between gap-2">

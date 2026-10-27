@@ -94,7 +94,7 @@ function LoadingForm({ sale, slips, onClose, onDone }) {
   if (!lines.length) return <p className="text-sm text-char-500 py-6 text-center"><T>Everything on this order is already sent or on a loading slip.</T></p>;
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-sand-200 p-3">
+      <div className="rounded-none border border-sand-300 p-3">
         <div className="text-xs font-bold uppercase text-char-500 mb-2"><T>Loading slip – quantity loaded</T></div>
         {lines.map((l) => (
           <div key={l.key} className="flex items-center gap-3 py-1.5">
@@ -123,7 +123,7 @@ function LoadingForm({ sale, slips, onClose, onDone }) {
       </div>
       {canOut && <label className="flex items-center gap-3 min-h-[44px]"><input type="checkbox" className="w-5 h-5 accent-[#B5651D]" checked={f.markOut !== false} onChange={(e) => set({ markOut: e.target.checked })} /><span className="text-sm"><T>Guard marks the truck out now (stock is deducted)</T></span></label>}
       {/* pinned to the bottom of the sheet: an error message appearing above must not push the button away from the finger */}
-      <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-white border-t border-sand-200 flex gap-3">
+      <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-white border-t border-sand-300 flex gap-3">
         <button className="btn-outline flex-1" onClick={onClose}><T>Cancel</T></button>
         <button className="btn-primary flex-[2]" disabled={busy} onClick={save}>{f.markOut === false || !canOut ? tr('Save loading slip') : tr('Truck out · deduct stock')}</button>
       </div>

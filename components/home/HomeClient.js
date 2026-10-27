@@ -49,7 +49,7 @@ export default function HomeClient({ initialData = null, initialDate }) {
       actions={WITH_DATE.includes(kind) ? (
         <div className="flex flex-wrap items-center gap-2">
           {data && <LiveBadge key={arrival.n} live={isToday} onRefresh={reload} />}
-          <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />
+          <input type="date" aria-label={tr('Date')} className="input !w-auto !rounded-none !border-slate-300 !h-[38px] text-xs font-mono shadow-none" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />
         </div>
       ) : null} />
   );

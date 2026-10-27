@@ -46,7 +46,7 @@ export default function FixSheet({ row, date, onClose, onSaved }) {
       footer={<button className="btn-primary w-full !min-h-[48px]" onClick={save} disabled={busy}>{busy ? '…' : <T>Save correction</T>}</button>}>
       {row && (
         <div className="space-y-4 text-sm">
-          <div className="rounded-lg bg-sand-100 px-3 py-2 text-xs text-char-700">
+          <div className="rounded-none bg-sand-100 px-3 py-2 text-xs text-char-700">
             <T>Now:</T> <b>{row.inAt ? fmtClock(row.inAt) : '—'}</b> → <b>{row.outAt ? fmtClock(row.outAt) : '—'}</b>
             {row.workedMinutes > 0 && <> · {fmtDuration(row.workedMinutes)}</>}
             {row.corrected && <> · <T>already corrected before</T></>}

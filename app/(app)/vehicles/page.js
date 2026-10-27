@@ -75,8 +75,8 @@ export default function VehiclesPage() {
             const soon = papersOf((d) => d >= today && d <= addDays(today, 30));
             return (
               <div className="space-y-3">
-                {gone.length ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /><T>Expired</T></div>{gone.map((s) => <div key={s}>{s}</div>)}</div> : null}
-                {soon.length ? <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /><T> Expiring within 30 days</T></div>{soon.map((s) => <div key={s}>{s}</div>)}</div> : null}
+                {gone.length ? <div className="rounded-none bg-red-50 border border-red-200 text-red-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /><T>Expired</T></div>{gone.map((s) => <div key={s}>{s}</div>)}</div> : null}
+                {soon.length ? <div className="rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2"><div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /><T> Expiring within 30 days</T></div>{soon.map((s) => <div key={s}>{s}</div>)}</div> : null}
                 {(allV.data || []).length > 0 && <PapersChart data={papers} />}
               </div>
             );

@@ -3,51 +3,63 @@
 @tailwind utilities;
 
 :root { --safe-bottom: env(safe-area-inset-bottom, 0px); }
-html, body { background: #F8F9FA; color: #1E293B; overflow-x: clip; -webkit-tap-highlight-color: transparent; }
+html, body { background: #FAF8F5; color: #2B2B2B; overflow-x: clip; -webkit-tap-highlight-color: transparent; }
 body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(--font-deva), 'Noto Sans Devanagari', Roboto, sans-serif; }
 
 @layer components {
   .grid { grid-template-columns: minmax(0, 1fr); }
   .grid > * { min-width: 0; }
-  .card { @apply bg-white rounded-2xl border border-stone-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] transition-shadow duration-150; }
-  .card:hover { @apply shadow-[0_4px_12px_rgba(0,0,0,0.04)]; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 min-h-[42px] text-sm font-semibold transition-all duration-75 active:scale-[0.97] active:brightness-95 disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer; }
-  .btn-primary { @apply btn bg-terra text-white hover:bg-terra-600 active:bg-terra-700 shadow-sm hover:shadow active:scale-[0.97] active:shadow-inner; }
-  .btn-outline { @apply btn border border-stone-200 bg-white text-char hover:bg-stone-50 hover:border-stone-300 active:bg-stone-100 active:scale-[0.97]; }
-  .btn-ghost { @apply btn text-char-700 hover:bg-sand-100 active:bg-sand-200 active:scale-[0.97]; }
-  .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-sm active:scale-[0.97]; }
-  .btn-green { @apply btn bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-sm active:scale-[0.97]; }
-  .btn-sm { @apply min-h-[38px] px-3 text-xs rounded-xl; }
-  .input { @apply w-full min-h-[42px] rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-sm text-char transition-colors duration-75 focus:outline-none focus:ring-2 focus:ring-terra/20 focus:border-terra disabled:bg-stone-100 disabled:text-char-500 disabled:cursor-not-allowed; }
+  .card { @apply bg-white rounded-none border border-[#D4C2AB] shadow-none transition-colors duration-150; }
+  .card:hover { @apply border-[#B8A58D]; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-none px-4 min-h-[40px] text-sm font-semibold transition-all duration-75 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer; }
+  .btn-primary { @apply btn bg-terra text-white hover:bg-terra-600 active:bg-terra-700 shadow-none border border-terra-600; }
+  .btn-outline { @apply btn border border-[#D4C2AB] bg-white text-char hover:bg-[#FAF7F2] hover:border-terra hover:text-terra active:bg-[#F5ECE3] shadow-none; }
+  .btn-ghost { @apply btn text-char hover:bg-[#FAF7F2] hover:text-terra active:bg-[#F5ECE3]; }
+  .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-none border border-rose-700; }
+  .btn-green { @apply btn bg-emerald-700 text-white hover:bg-emerald-800 active:bg-emerald-900 shadow-none border border-emerald-800; }
+  .btn-sm { @apply min-h-[36px] px-3 text-xs rounded-none; }
+  .input { @apply w-full min-h-[38px] rounded-none border border-[#D4C2AB] bg-white px-3 py-1.5 text-sm text-char transition-colors duration-75 focus:outline-none focus:ring-1 focus:ring-terra focus:border-terra disabled:bg-stone-100 disabled:text-char-500 disabled:cursor-not-allowed shadow-none; }
   select.input {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B6B6B'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238A5C38'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
     background-position: right 0.75rem center;
     background-repeat: no-repeat;
     background-size: 1.1rem;
     padding-right: 2.25rem;
     appearance: none;
   }
-  textarea.input { @apply py-2.5; }
-  .label { @apply block text-xs font-semibold text-char-700 mb-1.5; }
-  .badge { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide; }
-  .badge-red { @apply badge bg-rose-50 text-rose-700 border border-rose-200/70; }
-  .badge-green { @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200/70; }
-  .badge-amber { @apply badge bg-amber-50 text-amber-800 border border-amber-200/70; }
-  .badge-gray { @apply badge bg-stone-100 text-char-700 border border-stone-200/80; }
-  .badge-blue { @apply badge bg-sky-50 text-sky-700 border border-sky-200/70; }
-  .icon-btn { @apply inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-xl hover:bg-stone-100 active:bg-stone-200 active:scale-90 transition-all duration-75 text-char-500 hover:text-char cursor-pointer; }
-  .th { @apply text-left text-[11px] uppercase tracking-wider text-char-500 font-semibold px-3 py-2.5 bg-stone-50 border-b border-stone-200/80 whitespace-nowrap; }
-  .td { @apply px-3 py-2.5 text-sm border-t border-stone-100 align-top; }
+  textarea.input { @apply py-2; }
+  .label { @apply block text-xs font-semibold text-char mb-1.5; }
+  .badge { @apply inline-flex items-center gap-1.5 rounded-none px-2 py-0.5 text-[11px] font-semibold tracking-wide border; }
+  .badge-red { @apply badge bg-rose-50 text-rose-700 border-rose-200/70; }
+  .badge-green { @apply badge bg-emerald-50 text-emerald-700 border-emerald-200/70; }
+  .badge-amber { @apply badge bg-amber-50 text-amber-800 border-amber-200/70; }
+  .badge-gray { @apply badge bg-stone-100 text-char-700 border-stone-200/80; }
+  .badge-blue { @apply badge bg-sky-50 text-sky-700 border-sky-200/70; }
+  .icon-btn { @apply inline-flex items-center justify-center min-w-[36px] min-h-[36px] rounded-none hover:bg-[#FAF7F2] hover:text-terra active:bg-[#F5ECE3] transition-all duration-75 text-char-500 cursor-pointer; }
+  .th { @apply text-left text-[11px] uppercase tracking-wider text-char-500 font-semibold px-3 py-2 bg-stone-50 border-b border-[#D4C2AB] whitespace-nowrap; }
+  .td { @apply px-3 py-2 text-sm border-t border-stone-200 align-top; }
 }
 
-* { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+/* Ensure all checkbox and radio inputs use the logo stone-brown accent color and sharp borders */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #8A5C38 !important;
+  border-radius: 0px !important;
+}
+
+/* Unified focus outline for inputs and fields */
+input:focus, select:focus, textarea:focus {
+  border-color: #8A5C38 !important;
+  outline: none !important;
+}
+
+* { scrollbar-width: thin; scrollbar-color: #D4C2AB transparent; }
 *::-webkit-scrollbar { width: 6px; height: 6px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
-*::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+*::-webkit-scrollbar-thumb { background: #D4C2AB; border-radius: 0px; }
+*::-webkit-scrollbar-thumb:hover { background: #8A5C38; }
 
-.skeleton { background: linear-gradient(90deg, #F1F5F9 25%, #FFFFFF 37%, #F1F5F9 63%); background-size: 400% 100%; animation: sk 1.4s ease infinite; border-radius: 12px; }
-@keyframes sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.skeleton { background: #F5ECE3; animation: sk 1.4s ease infinite; border-radius: 0px; }
+@keyframes sk { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 .safe-pb { padding-bottom: calc(var(--safe-bottom) + 4px); }
 
 /* Jitter-free sheet and modal animation */
@@ -77,9 +89,9 @@ body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(
 /* one tidy action bar under every page title: wraps, equal heights, date / month / select controls share the row instead of one per line */
 .page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; width: 100%; }
 @media (min-width: 640px) { .page-actions { width: auto; justify-content: flex-end; } }
-.page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 44px; }
+.page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 40px; border-radius: 0 !important; }
 .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input {
-  width: auto !important; flex: 1 1 140px; min-width: 0; max-width: 100%; min-height: 44px;
+  width: auto !important; flex: 1 1 140px; min-width: 0; max-width: 100%; min-height: 40px; border-radius: 0 !important;
 }
 @media (min-width: 640px) { .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input { flex: 0 0 auto; } }
 /* the primary action ("Add", "New entry") always sits at the end of the bar and is easy to hit */
@@ -89,7 +101,7 @@ body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(
 /* nothing may push the page wider than the phone */
 html, body { max-width: 100%; overflow-x: clip; }
 img, video, canvas, svg { max-width: 100%; }
-@media (max-width: 480px) { .card { border-radius: 1rem; } }
+@media (max-width: 480px) { .card { border-radius: 0 !important; } }
 .tabs-row { scroll-padding-left: 1rem; scroll-padding-right: 1rem; }
 .page-actions input[type='month'] { min-width: 172px; }
 .page-actions input[type='date'] { min-width: 150px; }
@@ -105,10 +117,10 @@ img, video, canvas, svg { max-width: 100%; }
   .page-actions { flex-wrap: nowrap; gap: .375rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
   .page-actions::-webkit-scrollbar { display: none; }
   .page-actions > .btn-primary { order: -1; flex: 0 0 auto; margin-left: 0; }
-  .page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 40px; padding: 0 .7rem; font-size: .75rem; gap: .3rem; white-space: nowrap; flex: 0 0 auto; border-radius: .6rem; }
+  .page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 38px; padding: 0 .7rem; font-size: .75rem; gap: .3rem; white-space: nowrap; flex: 0 0 auto; border-radius: 0 !important; }
   .page-actions > button svg, .page-actions > a svg { width: 14px; height: 14px; }
   .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input {
-    min-height: 40px; padding: 0 .55rem; font-size: .75rem; border-radius: .6rem; flex: 1 1 auto; min-width: 118px; max-width: 160px;
+    min-height: 38px; padding: 0 .55rem; font-size: .75rem; border-radius: 0 !important; flex: 1 1 auto; min-width: 118px; max-width: 160px;
   }
   .page-actions input[type='month'] { min-width: 118px; }
   .page-actions input[type='date'] { min-width: 118px; }

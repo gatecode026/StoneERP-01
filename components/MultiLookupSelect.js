@@ -229,8 +229,8 @@ export default function MultiLookupSelect({
           }
         }}
         className={cx(
-          'min-h-[42px] px-3 py-1.5 rounded-xl border border-sand-300 bg-white transition cursor-pointer flex flex-wrap items-center gap-1.5 select-none focus:outline-none focus:ring-2 focus:ring-terra/30 focus:border-terra',
-          open && 'ring-2 ring-terra/30 border-terra',
+          'min-h-[38px] px-3 py-1.5 rounded-none border border-sand-300 bg-white transition cursor-pointer flex flex-wrap items-center gap-1.5 select-none focus:outline-none focus:ring-1 focus:ring-terra focus:border-terra',
+          open && 'border-terra',
           disabled && 'opacity-60 cursor-not-allowed bg-sand-50'
         )}
       >
@@ -240,7 +240,7 @@ export default function MultiLookupSelect({
           selectedItems.map((it) => (
             <span
               key={it.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-terra-50 border border-terra-200 text-terra-900 text-xs font-semibold shadow-2xs animate-in fade-in duration-100"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-none bg-sand-100 border border-sand-300 text-char text-xs font-semibold animate-in fade-in duration-100"
             >
               <span className="truncate max-w-[200px]">{it.label}</span>
               {!disabled && (
@@ -250,7 +250,7 @@ export default function MultiLookupSelect({
                     e.stopPropagation();
                     removeItem(it.id);
                   }}
-                  className="p-0.5 rounded hover:bg-terra-200/60 text-terra-700 transition cursor-pointer"
+                  className="p-0.5 rounded-none hover:bg-sand-200 text-char-500 hover:text-terra transition cursor-pointer"
                   aria-label="Remove"
                 >
                   <X size={12} />
@@ -283,7 +283,7 @@ export default function MultiLookupSelect({
 
       {/* Dropdown Menu */}
       {open && (
-        <div className="absolute z-50 left-0 right-0 mt-1 rounded-xl bg-white shadow-xl border border-sand-200 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-100">
+        <div className="absolute z-50 left-0 right-0 mt-1 rounded-none bg-white shadow-xl border border-sand-300 overflow-hidden animate-in fade-in duration-100">
           {/* Search Bar */}
           <div className="p-2 border-b border-sand-200 bg-sand-50/50">
             <div className="relative">
@@ -353,7 +353,7 @@ export default function MultiLookupSelect({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => {}} // handled by parent div click
-                      className="w-4 h-4 rounded text-terra accent-terra cursor-pointer shrink-0"
+                      className="w-4 h-4 rounded-none text-terra accent-terra cursor-pointer shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm truncate">{it.label}</div>

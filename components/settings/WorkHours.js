@@ -65,7 +65,7 @@ function ShiftsCard({ wh, onSaved }) {
       <p className="text-xs text-char-500 -mt-1 mb-3"><T>A shift that ends earlier than it starts (for example 21:00 to 06:00) is a night shift: the day belongs to the evening it starts. Everyone works the default shift unless their profile names another.</T></p>
       <div className="space-y-3">
         {draft.shifts.map((s, i) => (
-          <div key={s.id + i} className="rounded-xl border border-sand-200 p-3">
+          <div key={s.id + i} className="rounded-none border border-sand-300 p-3">
             <div className="grid sm:grid-cols-4 gap-3">
               <Field label="Shift name" htmlFor={`sh_name_${i}`} className="sm:col-span-2"><input id={`sh_name_${i}`} className="input" value={s.name} maxLength={40} onChange={(e) => upd(i, { name: e.target.value })} /></Field>
               <Field label="Starts" htmlFor={`sh_start_${i}`}><input id={`sh_start_${i}`} type="time" className="input" value={s.start} onChange={(e) => upd(i, { start: e.target.value })} /></Field>
@@ -78,7 +78,7 @@ function ShiftsCard({ wh, onSaved }) {
             </div>
             <div className="flex items-center justify-between mt-3 gap-2">
               <label className="flex items-center gap-2 text-sm font-medium min-h-[44px]">
-                <input type="radio" name="defaultShift" className="h-5 w-5 accent-[#B8651D]" checked={draft.defaultShiftId === s.id} onChange={() => setDraft({ ...draft, defaultShiftId: s.id })} /> <T>Default shift</T>
+                <input type="radio" name="defaultShift" className="h-5 w-5 accent-[#8A5C38]" checked={draft.defaultShiftId === s.id} onChange={() => setDraft({ ...draft, defaultShiftId: s.id })} /> <T>Default shift</T>
               </label>
               {draft.shifts.length > 1 && <button type="button" className="btn-outline btn-sm" onClick={() => remove(i)}><Trash2 size={14} /><T> Remove</T></button>}
             </div>
@@ -143,10 +143,10 @@ function RulesCard({ wh, onSaved }) {
     <Section title="Punching and pay rules" right={<SaveBtn dirty={c.dirty} busy={c.busy} onClick={save} />}>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="flex items-center gap-2.5 min-h-[44px] text-sm font-medium sm:col-span-2">
-          <input type="checkbox" className="h-5 w-5 accent-[#B8651D]" checked={!!draft.paidWeekOff} onChange={(e) => setDraft({ ...draft, paidWeekOff: e.target.checked })} /> <T>Monthly-paid staff are paid for weekly offs and holidays</T>
+          <input type="checkbox" className="h-5 w-5 rounded-none accent-[#8A5C38]" checked={!!draft.paidWeekOff} onChange={(e) => setDraft({ ...draft, paidWeekOff: e.target.checked })} /> <T>Monthly-paid staff are paid for weekly offs and holidays</T>
         </label>
         <label className="flex items-center gap-2.5 min-h-[44px] text-sm font-medium sm:col-span-2">
-          <input type="checkbox" className="h-5 w-5 accent-[#B8651D]" checked={!!draft.appPunching} onChange={(e) => setDraft({ ...draft, appPunching: e.target.checked })} /> <T>Allow Punch In / Out buttons in the app (for testing; switch off when the biometric machine is in use)</T>
+          <input type="checkbox" className="h-5 w-5 rounded-none accent-[#8A5C38]" checked={!!draft.appPunching} onChange={(e) => setDraft({ ...draft, appPunching: e.target.checked })} /> <T>Allow Punch In / Out buttons in the app (for testing; switch off when the biometric machine is in use)</T>
         </label>
         <Field label="Ignore a repeat punch within (minutes)" hint="Stops an accidental double tap" htmlFor="pr_gap"><input id="pr_gap" type="number" min="0" max="60" className="input" value={draft.punchGapMinutes} onChange={(e) => setDraft({ ...draft, punchGapMinutes: e.target.value })} /></Field>
         <Field label="Flag a missing Out this many hours after the shift ends" hint="The day then shows in 'Needs a fix'" htmlFor="pr_open"><input id="pr_open" type="number" min="0" max="24" step="0.5" className="input" value={draft.openDayAfterHours} onChange={(e) => setDraft({ ...draft, openDayAfterHours: e.target.value })} /></Field>

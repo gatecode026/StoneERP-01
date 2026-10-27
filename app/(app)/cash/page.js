@@ -52,7 +52,7 @@ export default function CashPage() {
     <RoleGuard perm="cashentries">
       {/* ⚠️ Negative cash warning */}
       {cash < 0 && (
-        <div className="mb-3 rounded-xl bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 font-semibold">
+        <div className="mb-3 rounded-none bg-red-50 border border-red-300 text-red-700 text-sm px-4 py-3 font-semibold">
           ⚠️ Cash balance is negative ({inr(cash)}). This usually means an expense was recorded against a zero opening balance. Please set the correct opening balance or check recent entries.
         </div>
       )}
@@ -62,7 +62,7 @@ export default function CashPage() {
         <StatCard label="Cash in today" value={inr(cashIn)} tone="green" />
         <StatCard label="Cash out today" value={inr(cashOut)} />
       </div>
-      <div className={`rounded-2xl border p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3 ${todayClose ? (todayClose.difference ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200') : 'bg-amber-50 border-amber-200'}`}>
+      <div className={`rounded-none border p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3 ${todayClose ? (todayClose.difference ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200') : 'bg-amber-50 border-amber-200'}`}>
         <div className="flex-1">
           <div className="font-bold text-sm"><T vars={{ d: fmtDate(today) }}>{'Cash closing – {d}'}</T></div>
           {todayClose
@@ -100,7 +100,7 @@ export default function CashPage() {
       <Sheet open={open} onClose={() => setOpen(false)} title="Count cash & confirm"
         footer={<><button className="btn-outline flex-1" onClick={() => setOpen(false)}><T>Cancel</T></button><button className="btn-primary flex-[2]" onClick={confirmClose}><T>Confirm closing cash</T></button></>}>
         <div className="space-y-3">
-          <div className="rounded-xl bg-sand-100 p-3 text-sm"><T>Cash per app:</T> <b>{inr(cash)}</b></div>
+          <div className="rounded-none bg-sand-100 p-3 text-sm"><T>Cash per app:</T> <b>{inr(cash)}</b></div>
           <Field label="Cash counted in drawer (₹)" htmlFor="counted"><input id="counted" className="input" type="number" inputMode="decimal" value={counted} onChange={(e) => setCounted(e.target.value)} /></Field>
           <Field label="Remark" htmlFor="cnote"><input id="cnote" className="input" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
           {counted !== '' && Number(counted) !== cash && <div className="text-sm text-red-600 font-semibold"><T vars={{ d: inr(Number(counted) - cash) }}>{'Difference of {d} will be flagged to the owner.'}</T></div>}

@@ -123,10 +123,10 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-gray-200/90 text-xs font-semibold text-gray-700 shadow-sm hover:bg-white hover:border-gray-300 transition cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-none bg-white border border-[#D4C2AB] text-xs font-semibold text-gray-700 shadow-none hover:bg-stone-50 hover:border-[#8A5C38] transition cursor-pointer"
           title="Toggle Language"
         >
-          <Languages className="w-3.5 h-3.5 text-[#A08368]" />
+          <Languages className="w-3.5 h-3.5 text-[#8A5C38]" />
           <span>{lang === 'en' ? 'हिन्दी' : 'English'}</span>
         </button>
       </div>
@@ -158,7 +158,7 @@ export default function LoginPage() {
           <div className="max-w-xl my-auto py-4">
             <h1 className="text-2xl sm:text-3xl lg:text-[36px] xl:text-[42px] font-extrabold text-[#192231] leading-[1.18] tracking-tight">
               {t.heroTitle1}{' '}
-              <span className="text-[#A08368] block sm:inline">{t.heroTitle2}</span>
+              <span className="text-[#8A5C38] block sm:inline">{t.heroTitle2}</span>
             </h1>
             <p className="mt-3 text-xs sm:text-sm lg:text-base text-gray-700 leading-relaxed font-normal max-w-lg">
               {t.heroDesc}
@@ -237,7 +237,7 @@ export default function LoginPage() {
           style={{ backgroundImage: `url('/login-bg.jpg?v=3')` }}
         />
 
-        <div className="relative z-10 w-full max-w-[390px] lg:max-w-[420px] bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 lg:p-7 xl:p-8 shadow-[0_12px_40px_rgba(0,0,0,0.06)] border border-gray-100 flex flex-col justify-between">
+        <div className="relative z-10 w-full max-w-[390px] lg:max-w-[420px] bg-white rounded-none p-5 sm:p-6 lg:p-7 xl:p-8 shadow-none border border-[#D4C2AB] flex flex-col justify-between">
           {/* Card Header with Centered Logo */}
           <div className="flex flex-col items-center text-center">
             <img
@@ -267,7 +267,7 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-3" noValidate>
             {/* Phone Number Input */}
-            <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 transition focus-within:border-[#A08368] focus-within:ring-2 focus-within:ring-[#A08368]/20">
+            <div className="rounded-none border border-[#D4C2AB] bg-white px-3.5 py-1.5 transition focus-within:border-[#8A5C38] focus-within:ring-1 focus-within:ring-[#8A5C38]">
               <div className="flex items-center gap-2.5">
                 <Smartphone className="w-4 h-4 text-gray-400 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -293,7 +293,7 @@ export default function LoginPage() {
             </div>
 
             {/* Password Input */}
-            <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 transition focus-within:border-[#A08368] focus-within:ring-2 focus-within:ring-[#A08368]/20">
+            <div className="rounded-none border border-[#D4C2AB] bg-white px-3.5 py-1.5 transition focus-within:border-[#8A5C38] focus-within:ring-1 focus-within:ring-[#8A5C38]">
               <div className="flex items-center gap-2.5">
                 <Lock className="w-4 h-4 text-gray-400 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -331,7 +331,7 @@ export default function LoginPage() {
             {error && (
               <div
                 role="alert"
-                className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 flex items-start gap-2"
+                className="rounded-none bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 flex items-start gap-2"
               >
                 <span>{error}</span>
               </div>
@@ -344,7 +344,7 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-[#A08368] accent-[#A08368] focus:ring-[#A08368]"
+                  className="w-4 h-4 rounded-none border-[#D4C2AB] text-[#8A5C38] accent-[#8A5C38] focus:ring-[#8A5C38]"
                 />
                 <span className="font-medium text-gray-700">{t.rememberMe}</span>
               </label>
@@ -352,7 +352,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowForgotModal(true)}
-                className="text-gray-500 hover:text-[#A08368] font-medium transition cursor-pointer"
+                className="text-gray-500 hover:text-[#8A5C38] font-medium transition cursor-pointer"
               >
                 {t.forgotPassword}
               </button>
@@ -363,7 +363,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={busy || !username.trim() || !password}
-                className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 rounded-xl bg-[#A08368] hover:bg-[#8F7257] active:bg-[#7D6248] text-white text-sm font-semibold shadow-sm transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 rounded-none bg-[#8A5C38] hover:bg-[#7A4F2E] active:bg-[#684124] text-white text-sm font-semibold shadow-none transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer border border-[#7A4F2E]"
               >
                 <span>{busy ? t.signingIn : t.loginBtn}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -381,13 +381,13 @@ export default function LoginPage() {
       {/* Forgot Password Modal */}
       {showForgotModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl border border-gray-100 space-y-4">
+          <div className="w-full max-w-sm bg-white rounded-none p-6 shadow-2xl border border-[#D4C2AB] space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">{t.forgotTitle}</h3>
               <button
                 type="button"
                 onClick={() => setShowForgotModal(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                className="p-1 rounded-none text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
@@ -397,7 +397,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowForgotModal(false)}
-              className="w-full py-2.5 rounded-xl bg-[#A08368] hover:bg-[#8F7257] text-white text-xs sm:text-sm font-semibold transition cursor-pointer"
+              className="w-full py-2.5 rounded-none bg-[#8A5C38] hover:bg-[#7A4F2E] text-white text-xs sm:text-sm font-semibold transition cursor-pointer"
             >
               {t.close}
             </button>

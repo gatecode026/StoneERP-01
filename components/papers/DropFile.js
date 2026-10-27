@@ -26,8 +26,8 @@ export default function DropFile({ value, onChange, error }) {
 
   if (value && !busy) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
-        <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-emerald-200 grid place-items-center shrink-0">
+      <div className="flex items-center gap-3 rounded-none border border-emerald-300 bg-emerald-50/60 p-3">
+        <div className="w-14 h-14 rounded-none overflow-hidden bg-white border border-emerald-300 grid place-items-center shrink-0">
           {isPdf(value) ? <FileText size={24} className="text-terra" /> : <Photo src={value} thumb alt="" className="w-14 h-14 object-cover" />}
         </div>
         <div className="min-w-0 flex-1 text-sm">
@@ -44,7 +44,7 @@ export default function DropFile({ value, onChange, error }) {
     <div>
       <div
         role="button" tabIndex={0} aria-label={tx('Choose file')}
-        className={cx('rounded-2xl border-2 border-dashed px-4 py-7 text-center cursor-pointer transition select-none', over ? 'border-terra bg-terra-50' : 'border-sand-300 bg-sand-50/60 hover:border-terra', error && '!border-red-400')}
+        className={cx('rounded-none border border-dashed px-4 py-7 text-center cursor-pointer transition select-none', over ? 'border-terra bg-sand-50' : 'border-sand-300 bg-sand-50/60 hover:border-terra', error && '!border-red-400')}
         onClick={() => !busy && input.current?.click()}
         onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !busy) { e.preventDefault(); input.current?.click(); } }}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -54,7 +54,7 @@ export default function DropFile({ value, onChange, error }) {
         <UploadCloud size={28} className="mx-auto text-terra mb-1.5" />
         <div className="text-sm font-semibold">{busy ? `${tx('Uploading…')} ${pct}%` : tx('Drag and drop a scan here, or tap to choose')}</div>
         <div className="text-[11px] text-char-500 mt-0.5">{tx('Photo or PDF')}</div>
-        {busy && <div className="mt-3 h-1.5 rounded-full bg-sand-200 overflow-hidden mx-auto max-w-xs" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-terra transition-all" style={{ width: `${pct}%` }} /></div>}
+        {busy && <div className="mt-3 h-1.5 rounded-none bg-sand-200 overflow-hidden mx-auto max-w-xs" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="h-full bg-terra transition-all" style={{ width: `${pct}%` }} /></div>}
         <input ref={input} type="file" accept="image/*,application/pdf" className="hidden" data-testid="paper-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; take(f); }} />
       </div>
       {error && <div className="text-[12px] text-red-600 mt-1" role="alert">{tx(error)}</div>}

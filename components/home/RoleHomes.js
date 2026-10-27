@@ -218,9 +218,9 @@ export function SalespersonHome({ data, reload }) {
       <MyAttendance data={data} reload={reload} horizontal={true} />
       {showSales && (
         <>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-gradient-to-r from-amber-500/10 via-terra-500/10 to-transparent p-3.5 rounded-2xl border border-terra-200/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-sand-50 p-3.5 rounded-none border border-sand-300">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-terra-50 border border-terra-100 text-terra flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-9 h-9 rounded-none bg-sand-100 border border-sand-300 text-terra flex items-center justify-center shrink-0">
                 <Receipt size={18} />
               </div>
               <div className="min-w-0">
@@ -240,11 +240,11 @@ export function SalespersonHome({ data, reload }) {
           </div>
           <div className="grid lg:grid-cols-2 gap-4 items-start mt-4">
             <Card title={h('openQuotes')} href="/sales" empty={!data.open?.length} emptyText={h('nothingYet')}>
-              {(data.open || []).map((s) => <Link key={s._id} href={`/sales/${s._id}`} className="flex justify-between gap-2 text-sm py-2 border-b border-stone-100 last:border-0 min-h-[44px] hover:bg-stone-50/50 px-1 rounded-lg transition"><span className="truncate font-medium text-char">{s.saleNo} · {s.customerName}<div className="text-[11px] text-char-500">{fmtDate(s.date)}</div></span><span className="text-right shrink-0"><b>{inr(s.total)}</b><div><Badge tone={s.stage === 'order' ? 'blue' : 'gray'}>{s.stage}</Badge></div></span></Link>)}
+              {(data.open || []).map((s) => <Link key={s._id} href={`/sales/${s._id}`} className="flex justify-between gap-2 text-sm py-2 border-b border-stone-100 last:border-0 min-h-[44px] hover:bg-stone-50/50 px-1 rounded-none transition"><span className="truncate font-medium text-char">{s.saleNo} · {s.customerName}<div className="text-[11px] text-char-500">{fmtDate(s.date)}</div></span><span className="text-right shrink-0"><b>{inr(s.total)}</b><div><Badge tone={s.stage === 'order' ? 'blue' : 'gray'}>{s.stage}</Badge></div></span></Link>)}
             </Card>
             <Card title={h('owing')} href="/sales?tab=pending" empty={!data.customersOwing?.length} emptyText={h('nothingYet')}>
               {(data.customersOwing || []).map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-2 text-sm py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50/50 px-1 rounded-lg transition">
+                <div key={c.id} className="flex items-center justify-between gap-2 text-sm py-2 border-b border-stone-100 last:border-0 hover:bg-stone-50/50 px-1 rounded-none transition">
                   <span className="truncate font-medium text-char">{c.name}<div className="text-[11px] text-char-500">{c.ageDays != null ? `${c.ageDays} ${h('days')}` : ''}</div></span>
                   <span className="flex items-center gap-1 shrink-0"><b className="text-amber-700">{inr(c.amount)}</b>
                     {c.mobile && <button className="icon-btn text-emerald-700 hover:bg-emerald-50" aria-label={h('remind')} onClick={() => openWA(`Dear ${c.name}, gentle reminder from Vipul Stone Suppliers: ${inr(c.amount)} is pending. Kindly arrange the payment. Thank you.`, c.mobile)}><MessageCircle size={16} /></button>}</span>
@@ -297,8 +297,8 @@ export function AttendanceCard({ self, reload, horizontal = false }) {
   }
 
   const inOutBadge = self?.attendance?.inAt ? (
-    <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
-      <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs"><Check size={18} strokeWidth={2.5} /></div>
+    <div className="flex items-center gap-3 p-3.5 rounded-none bg-emerald-50/70 border border-emerald-300">
+      <div className="w-9 h-9 rounded-none bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={18} strokeWidth={2.5} /></div>
       <div className="min-w-0">
         <div className="font-bold text-sm text-emerald-950 flex items-center gap-2 flex-wrap">
           <span><T>In</T> {fmtClock(self.attendance.inAt)}</span>
@@ -312,12 +312,12 @@ export function AttendanceCard({ self, reload, horizontal = false }) {
       </div>
     </div>
   ) : self?.attendance ? (
-    <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
-      <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs"><Check size={18} strokeWidth={2.5} /></div>
+    <div className="flex items-center gap-3 p-3.5 rounded-none bg-emerald-50/70 border border-emerald-300">
+      <div className="w-9 h-9 rounded-none bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><Check size={18} strokeWidth={2.5} /></div>
       <div><div className="font-bold text-sm text-emerald-950 flex items-center gap-2">{h('marked')} ✔ <Badge tone="green">{self.attendance.state}</Badge></div><div className="text-xs text-emerald-700 mt-0.5"><T>Today's attendance recorded</T></div></div>
     </div>
   ) : (
-    <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-sm text-amber-900">
+    <div className="p-3.5 rounded-none bg-amber-50/70 border border-amber-300 text-sm text-amber-900">
       <div className="font-bold text-xs uppercase tracking-wide text-amber-800">{h('attPending')}</div>
       <div className="text-xs text-amber-700 mt-0.5">{self?.punch?.enabled && can('punches', 'create') ? <T>Press Punch In when you start work.</T> : <T>Attendance is recorded by the biometric machine, or your supervisor marks it.</T>}</div>
     </div>
@@ -406,7 +406,7 @@ export function WorkerCards({ self, reload, data }) {
         <Card title={<span className="text-base font-bold flex items-center gap-2"><ClipboardList className="text-terra" size={18} /> {h('writeReport')}</span>}>
           {self?.report ? (
             <div className="space-y-3">
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div className="p-3.5 rounded-none bg-emerald-50 border border-emerald-300">
                 <div className="flex items-center justify-between mb-1">
                   <Badge tone="green">{h('submitted')} ✔</Badge>
                   {self.report.shift && <span className="text-[11px] font-semibold text-emerald-800 uppercase"><T vars={{ s: self.report.shift }}>{'{s} shift'}</T></span>}
@@ -419,10 +419,10 @@ export function WorkerCards({ self, reload, data }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 text-xs text-char-600">
+              <div className="p-3 rounded-none bg-sand-50/70 border border-sand-300 text-xs text-char-600">
                 {h('notFilled')}
               </div>
-              <Link href="/daily-report?new=1" className="btn-primary w-full !min-h-[50px] text-base font-semibold shadow-sm justify-center">
+              <Link href="/daily-report?new=1" className="btn-primary w-full !min-h-[50px] text-base font-semibold shadow-none justify-center">
                 <ClipboardList size={18} /> {h('writeReport')}
               </Link>
             </div>
@@ -432,7 +432,7 @@ export function WorkerCards({ self, reload, data }) {
       {can('salaryslips') && (
         <Card title={<span className="text-base font-bold flex items-center gap-2"><FileText className="text-terra" size={18} /> {h('mySlip')}</span>}>
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-sand-50/70 border border-sand-200 text-xs text-char-600"><T>
+            <div className="p-3 rounded-none bg-sand-50/70 border border-sand-300 text-xs text-char-600"><T>
               View your monthly wages, attendance days, and salary slip</T>
             </div>
             <Link href="/salary" className="btn-outline w-full !min-h-[50px] text-sm font-semibold justify-center">
@@ -476,7 +476,7 @@ export function PresetHome({ data, reload }) {
       first = (
         <Card title={`${h('gate')} (${g?.loading?.length ?? 0})`} empty={!g?.loading?.length} emptyText={h('nothingYet')} href="/dispatch">
           {g?.loading?.map((t) => (
-            <div key={t._id} className="rounded-xl border border-stone-200 p-3 mb-2">
+            <div key={t._id} className="rounded-none border border-sand-300 p-3 mb-2">
               <div className="flex justify-between"><b className="text-lg">{t.truckNo}</b><span className="text-xs text-char-500">{t.gatePassNo}</span></div>
               <div className="text-sm text-char-500">{t.customerName} · {t.driverName || '—'}</div>
               <div className="text-xs mb-2">{(t.items || []).map((i) => `${i.name} × ${num(i.qty)}`).join(', ')}</div>

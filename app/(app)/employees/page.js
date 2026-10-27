@@ -87,7 +87,7 @@ export default function EmployeesPage() {
         facets={{ by: 'status', query: { docs: 'missing', status: 'active' } }}
         summary={(rows, { facets: f }) => {
           const miss = f?.total || 0; // active employees without Aadhaar or passbook on file, counted by the server
-          return miss ? <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> <T vars={{ n: miss }}>{'{n} working employees have a missing document'}</T></div> : null;
+          return miss ? <div className="rounded-none bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> <T vars={{ n: miss }}>{'{n} working employees have a missing document'}</T></div> : null;
         }}
         exportName="employees"
         exportColumns={[{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'site', label: 'Site' }, { key: 'mobile', label: 'Mobile' }, { key: 'payType', label: 'Pay type' }, { key: 'rate', label: 'Rate' }, { key: 'joiningDate', label: 'Joining date' }]}

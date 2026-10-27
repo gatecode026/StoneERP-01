@@ -62,7 +62,7 @@ export default function CompanyCard({ value, onSaved }) {
     <Section title="Company details (printed on bills and quotations)" right={<button className="btn-primary btn-sm" disabled={!dirty || busy} onClick={save}><Save size={14} /> {busy ? '…' : <T>Save</T>}</button>}>
       {hasGst
         ? <p className="text-xs text-emerald-700 flex items-center gap-1.5 -mt-1 mb-3"><CheckCircle2 size={14} /><T>GST number is set. GST bills can be issued.</T></p>
-        : <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3 flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><T>The GST number is not set yet. Enter it below and press Save: until then no GST bill can be issued.</T></span></div>}
+        : <div className="rounded-none bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2 mb-3 flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span><T>The GST number is not set yet. Enter it below and press Save: until then no GST bill can be issued.</T></span></div>}
       <div className="grid sm:grid-cols-2 gap-3">
         <RuledField rule="partyName" label="Company name" required value={d.name} onChange={(v) => set({ name: v })} error={err.name} showError={show} className="sm:col-span-1" />
         <Field label="Brand / tagline" htmlFor="co_brand"><input id="co_brand" className="input" maxLength={120} value={d.brand} onChange={(e) => set({ brand: e.target.value })} /></Field>

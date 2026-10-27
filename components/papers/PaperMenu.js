@@ -58,11 +58,11 @@ export default function PaperMenu({ items = [], title = 'Actions' }) {
         <MoreVertical size={18} />
       </button>
       {open && typeof document !== 'undefined' && createPortal(
-        <div ref={menu} role="menu" style={{ position: 'fixed', top: `${at.top}px`, right: `${at.right}px`, zIndex: 70 }} className="w-48 bg-white rounded-2xl border border-sand-200 shadow-2xl p-1.5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div ref={menu} role="menu" style={{ position: 'fixed', top: `${at.top}px`, right: `${at.right}px`, zIndex: 70 }} className="w-48 bg-white rounded-none border border-sand-300 shadow-xl p-1 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           {list.map((it, i) => (
             <div key={it.key || i}>
-              {it.dividerBefore && <div className="my-1 border-t border-sand-100" />}
-              <button type="button" role="menuitem" className={cx('w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left', it.danger ? 'text-red-600 hover:bg-red-50' : it.tone === 'primary' ? 'text-terra hover:bg-terra-50' : 'text-char-700 hover:bg-sand-100')}
+              {it.dividerBefore && <div className="my-1 border-t border-sand-200" />}
+              <button type="button" role="menuitem" className={cx('w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-none text-left transition-colors', it.danger ? 'text-red-600 hover:bg-red-50' : it.tone === 'primary' ? 'text-terra hover:bg-sand-50' : 'text-char hover:text-terra hover:bg-sand-50')}
                 onClick={(e) => { e.stopPropagation(); setOpen(false); it.onClick?.(); }}>
                 {it.icon && <span className="shrink-0">{it.icon}</span>}<span className="truncate">{tx(it.label)}</span>
               </button>

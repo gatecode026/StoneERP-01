@@ -118,7 +118,7 @@ function RolesEditor() {
         <Section key={g} title={tr(g[0].toUpperCase() + g.slice(1))} className="mb-3">
           <div className="space-y-3">
             {items.map((c) => (
-              <div key={c.key} className="rounded-xl border border-sand-200 p-3">
+              <div key={c.key} className="rounded-none border border-sand-200 p-3">
                 <div className="font-semibold text-sm mb-2">{c.label[lang] || c.label.en}{c.part ? <span className="text-char-500 font-normal text-xs"> · <T vars={{ n: c.part }}>{'Part {n}'}</T></span> : null}</div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {c.actions.map((a) => {

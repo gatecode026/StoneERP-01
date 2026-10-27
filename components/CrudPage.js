@@ -90,7 +90,7 @@ function RowActionMenu({ menuRow, onClose }) {
       }}
       role="menu"
       aria-orientation="vertical"
-      className="w-44 bg-white/95 backdrop-blur-md rounded-2xl border border-sand-200/90 shadow-2xl p-1.5 focus:outline-none transition-all duration-150 animate-in fade-in zoom-in-95"
+      className="w-44 bg-white/95 backdrop-blur-md rounded-none border border-sand-200/90 shadow-2xl p-1.5 focus:outline-none transition-all duration-150 animate-in fade-in zoom-in-95"
       onClick={(e) => e.stopPropagation()}
     >
       {normalItems.length > 0 && (
@@ -102,10 +102,10 @@ function RowActionMenu({ menuRow, onClose }) {
               role="menuitem"
               disabled={it.disabled}
               className={cx(
-                'w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left transition-colors',
-                it.tone === 'primary' ? 'text-terra hover:bg-terra-50' :
+                'w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-none text-left transition-colors',
+                it.tone === 'primary' ? 'text-terra hover:bg-sand-50' :
                 it.tone === 'green' ? 'text-emerald-700 hover:bg-emerald-50' :
-                'text-char-700 hover:text-char-900 hover:bg-sand-100',
+                'text-char hover:text-terra hover:bg-sand-50',
                 it.disabled && 'opacity-50 cursor-not-allowed'
               )}
               onClick={() => {
@@ -120,7 +120,7 @@ function RowActionMenu({ menuRow, onClose }) {
         </div>
       )}
       {dangerItems.length > 0 && (
-        <div className={cx(normalItems.length > 0 && 'pt-1 mt-1 border-t border-sand-100', 'space-y-0.5')}>
+        <div className={cx(normalItems.length > 0 && 'pt-1 mt-1 border-t border-sand-200', 'space-y-0.5')}>
           {dangerItems.map((it) => (
             <button
               key={it.key}
@@ -128,7 +128,7 @@ function RowActionMenu({ menuRow, onClose }) {
               role="menuitem"
               disabled={it.disabled}
               className={cx(
-                'w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-xl text-left transition-colors text-red-600 hover:text-red-700 hover:bg-red-50',
+                'w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-none text-left transition-colors text-red-600 hover:text-red-700 hover:bg-red-50',
                 it.disabled && 'opacity-50 cursor-not-allowed'
               )}
               onClick={() => {
@@ -265,8 +265,8 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
       }
       case 'checkbox':
         input = (
-          <label className="flex items-center gap-3 min-h-[42px] px-3.5 rounded-xl border border-sand-300 bg-sand-50/40 hover:bg-sand-50 cursor-pointer transition">
-            <input id={id} type="checkbox" className="w-4 h-4 rounded text-terra accent-terra" checked={!!form[f.name]} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.checked })} />
+          <label className="flex items-center gap-3 min-h-[40px] px-3.5 rounded-none border border-sand-300 bg-sand-50/40 hover:bg-sand-50 cursor-pointer transition">
+            <input id={id} type="checkbox" className="w-4 h-4 rounded-none text-terra accent-terra" checked={!!form[f.name]} disabled={disabled} onChange={(e) => set({ [f.name]: e.target.checked })} />
             <span className="text-sm font-medium text-char-700">{tx(f.checkLabel || f.label)}</span>
           </label>
         ); break;
@@ -309,7 +309,7 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
   return (
     <div className="space-y-4">
       {sections.map((sec) => (
-        <div key={sec.name} className="p-4 sm:p-5 rounded-2xl bg-sand-50/60 border border-sand-200/90 shadow-sm space-y-3.5">
+        <div key={sec.name} className="p-4 sm:p-5 rounded-none bg-sand-50/60 border border-sand-300 shadow-none space-y-3.5">
           <div className="flex items-center gap-2 pb-2 border-b border-sand-200">
             <span className="text-xs font-bold tracking-wider uppercase text-char-700">{tx(sec.name)}</span>
           </div>
@@ -663,12 +663,12 @@ export default function CrudPage({
       {topContent}
       {/* ── Bulk action bar (appears in selectMode) ── */}
       {selectMode && (
-        <div className="mb-2.5 flex flex-wrap items-center gap-2 rounded-xl bg-terra-50 border border-terra-200 px-3.5 py-2 animate-in fade-in slide-in-from-top-2 duration-150 shadow-sm">
+        <div className="mb-2.5 flex flex-wrap items-center gap-2 rounded-none bg-sand-50 border border-sand-300 px-3.5 py-2 animate-in fade-in duration-150 shadow-none">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={toggleAll}
-              className="btn-outline !text-xs !py-1 !px-2.5 flex items-center gap-1.5 bg-white font-semibold text-terra-800 border-terra-300 hover:bg-terra-100 shadow-xs"
+              className="btn-outline !text-xs !py-1 !px-2.5 flex items-center gap-1.5 bg-white font-semibold text-char border-sand-300 hover:border-terra hover:text-terra shadow-none"
             >
               {allSelected ? <CheckSquare size={15} className="text-terra" /> : <Square size={15} className="text-char-500" />}
               {allSelected ? 'Deselect all' : `Select all (${rows.length})`}
@@ -729,10 +729,10 @@ export default function CrudPage({
               }
             }}
             className={cx(
-              'flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors border shadow-sm font-medium',
+              'flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-none transition-colors border shadow-none font-medium',
               selectMode
-                ? 'bg-terra text-white border-terra hover:bg-terra-600'
-                : 'text-char-700 bg-white border-sand-300 hover:border-terra-400 hover:bg-sand-50'
+                ? 'bg-terra text-white border-terra-600 hover:bg-terra-600'
+                : 'text-char bg-white border-sand-300 hover:border-terra hover:text-terra hover:bg-sand-50'
             )}
           >
             {selectMode ? <X size={14} /> : <CheckSquare size={14} className="text-terra" />}

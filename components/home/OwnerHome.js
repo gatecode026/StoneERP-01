@@ -14,7 +14,7 @@ import T from '@/components/T';
 import { can as canPerm } from '@/lib/clientPerm';
 import { trNow } from '@/lib/trNow';
 
-/** The 8 pm report from the PDF, plus approvals inbox, profit and a day-vs-yesterday comparison. Used by the Owner and (with fewer sections) the Manager. */
+/** Approvals inbox: sharp square layout, zero gradients, zero radius. */
 export function Approvals({ items, reload, canDecide }) {
   const h = useH();
   const [sel, setSel] = useState({});
@@ -37,22 +37,28 @@ export function Approvals({ items, reload, canDecide }) {
     <div className="space-y-2">
       {canDecide && items.length > 1 && (
         <div className="flex flex-wrap items-center gap-2 pb-1">
-          <label className="flex items-center gap-2 min-h-[44px] text-sm"><input type="checkbox" className="w-5 h-5 accent-[#B5651D]" checked={ids.length === items.filter((a) => !a.needsOwner || true).length && ids.length > 0}
-            onChange={(e) => setSel(e.target.checked ? Object.fromEntries(items.map((a) => [key(a), true])) : {})} />{h('selectAll')}</label>
-          {ids.length > 0 && <button className="btn-green btn-sm" disabled={busy} onClick={() => bulk('approve')}><Check size={14} /> {h('approveSel')} ({ids.length})</button>}
+          <label className="flex items-center gap-2 min-h-[38px] text-xs font-semibold uppercase tracking-wider text-slate-700">
+            <input type="checkbox" className="w-4 h-4 rounded-none accent-slate-900" checked={ids.length === items.filter((a) => !a.needsOwner || true).length && ids.length > 0}
+              onChange={(e) => setSel(e.target.checked ? Object.fromEntries(items.map((a) => [key(a), true])) : {})} />{h('selectAll')}
+          </label>
+          {ids.length > 0 && <button className="btn-green !rounded-none !min-h-[34px] px-3 text-xs" disabled={busy} onClick={() => bulk('approve')}><Check size={14} /> {h('approveSel')} ({ids.length})</button>}
         </div>
       )}
       {items.map((a) => (
-        <div key={key(a)} className="border border-sand-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-2">
-          {canDecide && <input type="checkbox" aria-label="Select" className="w-5 h-5 accent-[#B5651D] shrink-0" checked={!!sel[key(a)]} onChange={(e) => setSel({ ...sel, [key(a)]: e.target.checked })} />}
+        <div key={key(a)} className="border border-slate-300 bg-white rounded-none p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+          {canDecide && <input type="checkbox" aria-label="Select" className="w-4 h-4 rounded-none accent-slate-900 shrink-0" checked={!!sel[key(a)]} onChange={(e) => setSel({ ...sel, [key(a)]: e.target.checked })} />}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap"><Badge tone="amber">{a.kind}</Badge><span className="font-semibold text-sm">{a.title}</span>{a.needsOwner && <Badge tone="red">{h('needsOwner')}</Badge>}</div>
-            <div className="text-xs text-char-500 mt-0.5 truncate">{a.sub} · {fmtDate(a.date)}{a.by ? ` · ${a.by}` : ''}{a.hasBill ? ' · 📎 bill' : ''}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-block px-1.5 py-0.5 text-[10px] font-mono uppercase bg-amber-50 text-amber-800 border border-amber-200">{a.kind}</span>
+              <span className="font-semibold text-sm text-slate-900">{a.title}</span>
+              {a.needsOwner && <span className="inline-block px-1.5 py-0.5 text-[10px] font-mono uppercase bg-rose-50 text-rose-700 border border-rose-200">{h('needsOwner')}</span>}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5 truncate">{a.sub} · {fmtDate(a.date)}{a.by ? ` · ${a.by}` : ''}{a.hasBill ? ' · 📎 bill' : ''}</div>
           </div>
           {canDecide && (
             <div className="flex gap-2 shrink-0">
-              <button className="btn-green flex-1 sm:flex-none" disabled={a.needsOwner} title={a.needsOwner ? h('escalate') : undefined} onClick={() => act(a, 'approve')}><Check size={16} /> {h('approve')}</button>
-              <button className="btn-outline flex-1 sm:flex-none !text-red-600 !border-red-200" onClick={() => act(a, 'reject')}><X size={16} /> {h('reject')}</button>
+              <button className="btn-green !rounded-none !min-h-[34px] px-3 text-xs flex-1 sm:flex-none" disabled={a.needsOwner} title={a.needsOwner ? h('escalate') : undefined} onClick={() => act(a, 'approve')}><Check size={15} /> {h('approve')}</button>
+              <button className="btn-outline !rounded-none !min-h-[34px] px-3 text-xs !text-red-600 !border-red-300 flex-1 sm:flex-none" onClick={() => act(a, 'reject')}><X size={15} /> {h('reject')}</button>
             </div>
           )}
         </div>
@@ -63,11 +69,13 @@ export function Approvals({ items, reload, canDecide }) {
 
 export function AlertsCard({ d }) {
   const h = useH();
+  const list = d.alerts || [];
+  if (!list.length) return null;
   return (
-    <Card title={<span className="flex items-center gap-2"><Bell size={16} /> {h('alerts')}</span>} right={<Link href="/tasks?tab=reminders" className="text-xs text-terra font-semibold">{h('all')} {d.reminderCount ?? 0} →</Link>} empty={!(d.alerts || []).length} emptyText={h('noAlerts')}>
-      {(d.alerts || []).slice(0, 6).map((a, i) => (
-        <Link key={i} href={a.link || '/'} className="flex items-start gap-2 py-2.5 border-b border-sand-100 last:border-0 text-sm min-h-[44px]">
-          <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" /><span className="font-medium min-w-0">{String(a.title).replace(/([0-9]{4})-([0-9]{2})-([0-9]{2})/g, '$1‑$2‑$3')}</span>
+    <Card title={<span className="flex items-center gap-2"><Bell size={15} /> {h('alerts')}</span>} right={<Link href="/tasks?tab=reminders" className="text-xs text-slate-900 font-semibold hover:underline">{h('all')} {d.reminderCount ?? 0} →</Link>}>
+      {list.slice(0, 6).map((a, i) => (
+        <Link key={i} href={a.link || '/'} className="flex items-start gap-2 py-2 border-b border-slate-200 last:border-0 text-sm">
+          <AlertTriangle size={15} className="text-red-600 mt-0.5 shrink-0" /><span className="font-medium text-slate-900 min-w-0">{String(a.title).replace(/([0-9]{4})-([0-9]{2})-([0-9]{2})/g, '$1‑$2‑$3')}</span>
         </Link>
       ))}
     </Card>
@@ -76,35 +84,35 @@ export function AlertsCard({ d }) {
 
 export function ProfitCard({ profit, className = 'mt-4' }) {
   const h = useH();
-  if (!profit) return null;
+  if (!profit || (!profit.orders.length && !profit.blocks.length)) return null;
   return (
-    <Card title={`${h('profit')} · ${h('last30')}`} className={className} empty={!profit.orders.length && !profit.blocks.length}>
+    <Card title={`${h('profit')} · ${h('last30')}`} className={className}>
       <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-        <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500"><T>Revenue</T></div><div className="font-bold">{inrShort(profit.orderTotals.revenue)}</div></div>
-        <div className="rounded-xl bg-sand-100 p-2"><div className="text-[10px] uppercase text-char-500"><T>Cost</T></div><div className="font-bold">{inrShort(profit.orderTotals.cost)}</div></div>
-        <div className="rounded-xl bg-emerald-50 p-2"><div className="text-[10px] uppercase text-emerald-800">{h('profit')}</div><div className="font-bold text-emerald-800">{inrShort(profit.orderTotals.profit)}</div></div>
+        <div className="rounded-none border border-slate-200 bg-slate-50 p-2"><div className="text-[10px] uppercase font-mono text-slate-500"><T>Revenue</T></div><div className="font-bold text-slate-900">{inrShort(profit.orderTotals.revenue)}</div></div>
+        <div className="rounded-none border border-slate-200 bg-slate-50 p-2"><div className="text-[10px] uppercase font-mono text-slate-500"><T>Cost</T></div><div className="font-bold text-slate-900">{inrShort(profit.orderTotals.cost)}</div></div>
+        <div className="rounded-none border border-emerald-200 bg-emerald-50 p-2"><div className="text-[10px] uppercase font-mono text-emerald-800">{h('profit')}</div><div className="font-bold text-emerald-800">{inrShort(profit.orderTotals.profit)}</div></div>
       </div>
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div>
-          <div className="text-xs font-bold uppercase text-char-500 mb-1">{h('profitOrders')}</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">{h('profitOrders')}</div>
           {profit.orders.map((o) => (
-            <div key={o.saleNo} className="flex justify-between gap-2 text-sm py-1.5 border-b border-sand-100 last:border-0">
-              <div className="min-w-0"><div className="font-medium truncate">{o.saleNo} · {o.customerName}</div><div className="text-[11px] text-char-500">{fmtDate(o.date)} · {o.margin}% {h('margin')}</div></div>
+            <div key={o.saleNo} className="flex justify-between gap-2 text-sm py-1.5 border-b border-slate-200 last:border-0">
+              <div className="min-w-0"><div className="font-medium truncate text-slate-900">{o.saleNo} · {o.customerName}</div><div className="text-[11px] text-slate-500">{fmtDate(o.date)} · {o.margin}% {h('margin')}</div></div>
               <b className={o.profit < 0 ? 'text-red-600' : 'text-emerald-700'}>{inr(o.profit)}</b>
             </div>
           ))}
         </div>
         <div>
-          <div className="text-xs font-bold uppercase text-char-500 mb-1">{h('profitBlocks')}</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">{h('profitBlocks')}</div>
           {profit.blocks.map((b) => (
-            <div key={b.blockNo} className="flex justify-between gap-2 text-sm py-1.5 border-b border-sand-100 last:border-0">
-              <div className="min-w-0"><div className="font-medium"><T vars={{ n: b.blockNo }}>{'Block #{n}'}</T></div><div className="text-[11px] text-char-500"><T vars={{ a: num(b.saleable), y: b.yieldPct, c: b.costPerSqft }}>{'{a} sq ft · {y}% yield · ₹{c}/sq ft'}</T></div></div>
+            <div key={b.blockNo} className="flex justify-between gap-2 text-sm py-1.5 border-b border-slate-200 last:border-0">
+              <div className="min-w-0"><div className="font-medium text-slate-900"><T vars={{ n: b.blockNo }}>{'Block #{n}'}</T></div><div className="text-[11px] text-slate-500"><T vars={{ a: num(b.saleable), y: b.yieldPct, c: b.costPerSqft }}>{'{a} sq ft · {y}% yield · ₹{c}/sq ft'}</T></div></div>
               <b className={b.profit < 0 ? 'text-red-600' : 'text-emerald-700'}>{inr(b.profit)}</b>
             </div>
           ))}
         </div>
       </div>
-      <p className="text-[11px] text-char-500 mt-2">{profit.note}</p>
+      <p className="text-[11px] text-slate-500 mt-2">{profit.note}</p>
     </Card>
   );
 }
@@ -138,37 +146,49 @@ export function ReportCards({ d, compare, perm }) {
 
 export function StockCard({ d }) {
   const h = useH();
-  if (!d.stock) return null;
+  if (!d.stock || !d.stock.mainItems?.length) return null;
   return (
-    <Card title={h('mainItems')} href="/stock" empty={!d.stock.mainItems.length}>
+    <Card title={h('mainItems')} href="/stock">
       <div className="space-y-1.5">
         {d.stock.mainItems.map((i) => (
-          <div key={i.name} className="flex justify-between gap-2 text-sm">
-            <span className="truncate">{i.name}</span>
-            <b className={cx('shrink-0', i.minLevel && i.balance < i.minLevel && 'text-red-600')}>{num(i.balance)} {i.unit}</b>
+          <div key={i.name} className="flex justify-between gap-2 text-sm py-1 border-b border-slate-100 last:border-0">
+            <span className="truncate text-slate-700">{i.name}</span>
+            <b className={cx('shrink-0 font-mono', i.minLevel && i.balance < i.minLevel ? 'text-red-600' : 'text-slate-900')}>{num(i.balance)} {i.unit}</b>
           </div>
         ))}
       </div>
-      {d.stock.lowStock.length > 0 && <div className="mt-3 pt-2 border-t border-sand-100"><div className="text-xs font-bold uppercase text-red-600 mb-1">{h('lowStock')}</div>
-        {d.stock.lowStock.map((i) => <div key={i._id} className="text-sm text-red-700 flex justify-between"><span>{i.name}</span><b>{num(i.balance)} / {num(i.minLevel)}</b></div>)}</div>}
+      {d.stock.lowStock.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-slate-200">
+          <div className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">{h('lowStock')}</div>
+          {d.stock.lowStock.map((i) => (
+            <div key={i._id} className="text-xs text-red-700 flex justify-between py-0.5">
+              <span>{i.name}</span><b>{num(i.balance)} / {num(i.minLevel)}</b>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }
 
+/** Crisp, sharp, professional WhatsApp preview and share card. Zero bubble radius, zero gradients. */
 export function ReportPreview({ d }) {
   const { lang, t } = useApp();
   const h = useH();
   const lines = reportLines(d, lang);
   return (
-    <Card title="WhatsApp · 8 pm">
-      <div className="rounded-2xl bg-[#E7F0D8] p-3 shadow-inner">
-        <div className="bg-white rounded-xl rounded-tl-sm p-3 text-[13px] leading-6 shadow-sm border border-black/5">
-          <div className="text-[11px] font-bold text-emerald-700 mb-1"><T>VSS ERP</T></div>
-          {lines.map((l, i) => <div key={i} className={cx(l.problem ? 'font-bold text-red-600' : i === 0 ? 'font-bold' : 'text-char')}>{l.text}</div>)}
-        </div>
+    <Card title="Daily Report Summary (WhatsApp 8:00 PM)">
+      <div className="rounded-none border border-slate-300 bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-800 select-all max-h-56 overflow-y-auto">
+        <div className="text-[11px] font-bold text-slate-900 uppercase tracking-wider pb-1 mb-1 border-b border-slate-200">VSS ERP · {fmtDate(d.date)}</div>
+        {lines.map((l, i) => (
+          <div key={i} className={cx(l.problem ? 'font-bold text-red-600' : i === 0 ? 'font-semibold text-slate-900' : 'text-slate-700')}>
+            {l.text}
+          </div>
+        ))}
       </div>
-      <button className="btn-green w-full mt-3" onClick={() => openWA(reportText(d, lang))}><MessageCircle size={18} /> {t('shareWA')}</button>
-      <p className="text-[11px] text-char-500 mt-2">{h('today')}: {fmtDate(d.date)}</p>
+      <button className="btn-green w-full mt-3 !rounded-none !min-h-[38px] text-xs font-semibold flex items-center justify-center gap-2 uppercase tracking-wider" onClick={() => openWA(reportText(d, lang))}>
+        <MessageCircle size={16} /> {t('shareWA')}
+      </button>
     </Card>
   );
 }

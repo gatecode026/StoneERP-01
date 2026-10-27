@@ -40,7 +40,7 @@ function ExpiryBadge({ date }) {
 function FileTile({ paper, size = 'w-11 h-11' }) {
   const Icon = FOLDERS[paper.category]?.icon || FileText;
   return (
-    <div className={cx(size, 'rounded-xl overflow-hidden bg-terra-50 text-terra grid place-items-center shrink-0 border border-sand-200')}>
+    <div className={cx(size, 'rounded-none overflow-hidden bg-terra-50 text-terra grid place-items-center shrink-0 border border-sand-200')}>
       {paper.file && !isPdf(paper.file) ? <Photo src={paper.file} thumb alt="" className={cx(size, 'object-cover')} /> : paper.file ? <FileText size={20} /> : <Icon size={20} />}
     </div>
   );
@@ -144,7 +144,7 @@ export default function PapersVault() {
       {/* header */}
       <div className="card p-4 flex flex-wrap items-center gap-3 justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 rounded-xl bg-terra-50 text-terra grid place-items-center shrink-0"><FolderOpen size={24} /></div>
+          <div className="w-12 h-12 rounded-none bg-terra-50 text-terra grid place-items-center shrink-0"><FolderOpen size={24} /></div>
           <div className="min-w-0">
             <h1 className="text-xl font-extrabold leading-tight"><T>Important papers</T></h1>
             <p className="text-xs text-char-500"><T vars={{ n: total }}>{'{n} papers kept. Reminders 30 and 7 days before they expire'}</T></p>
@@ -165,7 +165,7 @@ export default function PapersVault() {
           <div className="flex items-center gap-2">
             <SearchBox value={q} onChange={setQ} placeholder="Search papers by name, tag or description…" />
             {tab === 'folders' && <button className={cx('btn-outline', filters && '!border-terra')} onClick={() => setFilters(!filters)} aria-expanded={filters}><SlidersHorizontal size={16} /><span className="hidden sm:inline"><T> Filters</T></span></button>}
-            <div className="inline-flex rounded-xl border border-sand-300 overflow-hidden">
+            <div className="inline-flex rounded-none border border-sand-300 overflow-hidden">
               <button className={cx('p-2.5', view === 'grid' ? 'bg-terra text-white' : 'bg-white text-char-600')} aria-label={tr('Grid view')} aria-pressed={view === 'grid'} onClick={() => pickView('grid')}><LayoutGrid size={16} /></button>
               <button className={cx('p-2.5', view === 'list' ? 'bg-terra text-white' : 'bg-white text-char-600')} aria-label={tr('List view')} aria-pressed={view === 'list'} onClick={() => pickView('list')}><List size={16} /></button>
             </div>
@@ -194,7 +194,7 @@ export default function PapersVault() {
               <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><AlertTriangle size={16} className="text-amber-600" /><T>Needs attention</T></h3>
               {(attention.data || []).length ? (
                 <div className="space-y-2">{attention.data.map((p) => (
-                  <button key={p._id} className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-1.5 hover:bg-sand-50" onClick={() => open(p)}>
+                  <button key={p._id} className="w-full flex items-center gap-3 text-left rounded-none px-2 py-1.5 hover:bg-sand-50" onClick={() => open(p)}>
                     <FileTile paper={p} size="w-9 h-9" /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold truncate">{p.name}</span><span className="block text-[11px] text-char-500">{p.category}</span></span><ExpiryBadge date={p.expiryDate} />
                   </button>
                 ))}</div>
@@ -207,9 +207,9 @@ export default function PapersVault() {
                   const n = groups[c]?.n || 0;
                   const Icon = FOLDERS[c].icon;
                   return (
-                    <button key={c} className="w-full flex items-center gap-3 text-sm rounded-xl px-2 py-1 hover:bg-sand-50" onClick={() => { setTab('folders'); setFolder(c); }}>
+                    <button key={c} className="w-full flex items-center gap-3 text-sm rounded-none px-2 py-1 hover:bg-sand-50" onClick={() => { setTab('folders'); setFolder(c); }}>
                       <Icon size={16} className="text-terra shrink-0" /><span className="w-24 text-left shrink-0">{c}</span>
-                      <span className="flex-1 h-2.5 rounded bg-sand-100 overflow-hidden"><span className="block h-full bg-terra" style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span><b className="w-6 text-right">{n}</b>
+                      <span className="flex-1 h-2.5 rounded-none bg-sand-100 overflow-hidden"><span className="block h-full bg-terra" style={{ width: `${total ? (n / total) * 100 : 0}%` }} /></span><b className="w-6 text-right">{n}</b>
                     </button>
                   );
                 })}
@@ -220,7 +220,7 @@ export default function PapersVault() {
             <section className="card p-4">
               <h3 className="font-bold text-sm mb-3"><T>Added recently</T></h3>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">{recent.data.map((p) => (
-                <button key={p._id} className="flex items-center gap-3 text-left rounded-xl border border-sand-200 px-3 py-2 hover:border-terra" onClick={() => open(p)}>
+                <button key={p._id} className="flex items-center gap-3 text-left rounded-none border border-sand-300 px-3 py-2 hover:border-terra" onClick={() => open(p)}>
                   <FileTile paper={p} size="w-9 h-9" /><span className="min-w-0"><span className="block text-sm font-semibold truncate">{p.name}</span><span className="block text-[11px] text-char-500">{p.category} · {fmtDate((p.createdAt || '').slice(0, 10))}</span></span>
                 </button>
               ))}</div>
@@ -236,7 +236,7 @@ export default function PapersVault() {
             const Icon = f.icon;
             return (
               <button key={f.key} className="card p-4 text-center hover:border-terra hover:shadow-md transition flex flex-col items-center gap-1.5" onClick={() => setFolder(f.key)}>
-                <span className="w-12 h-12 rounded-xl bg-terra-50 text-terra grid place-items-center"><Icon size={22} /></span>
+                <span className="w-12 h-12 rounded-none bg-terra-50 text-terra grid place-items-center"><Icon size={22} /></span>
                 <span className="font-bold text-sm">{tr(f.label)}</span>
                 <span className="text-xs text-char-500"><T vars={{ n: f.n }}>{f.n === 1 ? '1 paper' : '{n} papers'}</T></span>
                 {f.hint && <span className="text-[10px] text-char-400 leading-tight"><T>{f.hint}</T></span>}
