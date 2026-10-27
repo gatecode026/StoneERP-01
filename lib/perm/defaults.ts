@@ -34,7 +34,7 @@ const F = (money: FieldAccess['money'], cost: FieldAccess['cost'], pii: FieldAcc
 const ALL_STAR = 'v* c* e* x* a* o*';
 
 const MANAGER = parse({
-  employees: 'v* c* e* x* o*', dailyreports: 'v* c* e* x* a* o*', attendance: 'v* c* e* x* a* o*', punches: 'v* c* e*', leaves: 'v* c* e* x* a* o*',
+  employees: 'v* c* e* x* o*', supervisor: 'v* c* e* x* o*', dailyreports: 'v* c* e* x* a* o*', attendance: 'v* c* e* x* a* o*', punches: 'v* c* e*', leaves: 'v* c* e* x* a* o*',
   advances: 'v* c* e* x* a* o*', salarysheets: 'v* o*', salaryslips: 'v* o*', safetyrecords: 'v* c* e* x* o*', performance: 'v* o*',
   perfremarks: 'v* c* e*', tasks: 'v* c* e* x* o*', projects: 'v* c* e* x* o*', machines: 'v* c* e* x* o*', machineentries: 'v* c* e* x* o*', blocks: 'v* c* e* x* o*',
   royalties: 'v* c* e* x* o*', yield: 'v* o*', repairs: 'v* c* e* x* o*', vehicles: 'v* c* e* x* o*', vehicletrips: 'v* c* e* x* o*',
@@ -54,7 +54,7 @@ const ACCOUNTANT = parse({
 });
 
 const SUPERVISOR = parse(withOwn({
-  employees: 'vt', dailyreports: 'vt ct et ot at', attendance: 'vt ct et ot', punches: 'vt ct', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
+  supervisor: 'vt ct et ot', employees: 'vt', dailyreports: 'vt ct et ot at', attendance: 'vt ct et ot', punches: 'vt ct', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
   tasks: 'vt ct et', projects: 'vt ct et', machines: 'vt', machineentries: 'vt ct et ot', blocks: 'v* c*', repairs: 'vt ct et', vehicles: 'v* c* e*', vehicletrips: 'v* c* e*',
   stockitems: 'v*', stockmovements: 'v* c*', dispatches: 'v* c* e* a*', complaints: 'v*', expenses: 'vm cm', reminders: 'vt', yield: 'v*',
 }));

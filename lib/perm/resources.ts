@@ -50,6 +50,7 @@ export const RESOURCES = {
       money: ['payType', 'rate', 'pieceUnit', 'pfApplicable', 'pfNo', 'esiApplicable', 'esiNo', 'bankAccount', 'ifsc', 'upi'],
       pii: ['bankAccount', 'ifsc', 'upi', 'address', 'fatherName', 'aadhaarNo', 'panNo', 'docAadhaar', 'docPan', 'docPassbook', 'docLicense', 'emergencyName', 'emergencyMobile'],
     } },
+  supervisor: { label: { en: 'Supervisor', hi: 'सुपरवाइज़र' }, group: 'people', part: 1, actions: CRUD, own: empOwn, team: empTeam },
   dailyreports: { label: { en: 'Daily work report', hi: 'दैनिक कार्य रिपोर्ट' }, group: 'people', part: 2, model: true, actions: CRUD, own: empOwn, team: empTeam },
   attendance: { label: { en: 'Attendance', hi: 'हाज़िरी' }, group: 'people', part: 7, model: true, actions: ALL_A, own: empOwn, team: empTeam,
     actionLabels: { create: { en: 'Mark', hi: 'हाज़िरी लगाएँ' }, approve: { en: 'Approve overtime', hi: 'ओवरटाइम मंज़ूर करें' } } },
