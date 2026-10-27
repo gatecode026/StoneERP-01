@@ -73,9 +73,6 @@ function Pulse({ series }) {
   const [range, setRange] = useState(14);
   const rows = (series || []).slice(-range);
   const tot = (k) => sumOf(col(rows, k));
-  const isQuiet = !series?.length || !('sales' in series[0]) || quiet(rows, ['sales', 'received', 'expenses']);
-
-  if (isQuiet) return null;
 
   return (
     <Card title={<T>Business pulse</T>} right={<RangeTabs value={range} onChange={setRange} />}>
@@ -92,10 +89,9 @@ function Pulse({ series }) {
 function MachinesToday({ d }) {
   const h = useH();
   const rows = d.machines?.byMachine || [];
-  if (!rows.length) return null;
   const max = Math.max(1, ...rows.map((m) => m.sqft));
   return (
-    <Card title={<T>Machines today</T>} href="/machines" denied={!d.machines}>
+    <Card title={<T>Machines today</T>} href="/machines" denied={!d.machines} empty={!rows.length} emptyText={h('nothingYet')}>
       <div className="space-y-2.5">
         {rows.slice(0, 8).map((m) => (
           <div key={m.name}>
@@ -113,9 +109,14 @@ function ExpensesToday({ d }) {
   const h = useH();
   const byHead = d.expenses?.byHead || [];
   const total = d.expenses?.total || 0;
-  if (!byHead.length) return null;
   return (
-    <Card title={`${h('byHead')} · ${h('today')}`} href="/expenses" denied={!d.expenses}>
+    <Card
+      title={<span className="inline-flex items-center gap-2"><span>{h('byHead')} · {h('today')}</span>{total > 0 && <span className="font-mono text-xs font-bold text-slate-700">· {inr(total)}</span>}</span>}
+      href="/expenses"
+      denied={!d.expenses}
+      empty={!byHead.length}
+      emptyText={h('nothingYet')}
+    >
       <OwnerExpenseDonut data={byHead} total={total} />
       <div className="mt-2 space-y-1.5">
         {byHead.slice(0, 6).map((e, i) => (
@@ -133,17 +134,18 @@ function ExpensesToday({ d }) {
 
 function Receivables({ ageing }) {
   const h = useH();
-  if (!ageing || !ageing.total) return null;
   return (
-    <Card title={h('ageing')} href="/sales?tab=pending" denied={!ageing}>
-      <div className="text-2xl font-bold text-amber-700 -mt-1">{inrShort(ageing.total)}</div>
-      <OwnerOwedChart data={ageing.buckets} />
-      <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-2 mb-1">{h('topOwing')}</div>
-      {ageing.topCustomers.slice(0, 4).map((c) => (
-        <Link key={c.id} href="/sales?tab=pending" className="flex justify-between gap-2 text-sm py-1.5 border-b border-slate-200 last:border-0 hover:bg-slate-50">
-          <span className="truncate text-slate-800">{c.name}</span><b className="shrink-0 text-slate-900">{inr(c.amount)}</b>
-        </Link>
-      ))}
+    <Card title={h('ageing')} href="/sales?tab=pending" denied={!ageing} empty={!ageing || !ageing.total} emptyText={h('nothingYet')}>
+      {ageing?.total > 0 && <>
+        <div className="text-2xl font-bold text-amber-700 -mt-1">{inrShort(ageing.total)}</div>
+        <OwnerOwedChart data={ageing.buckets} />
+        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-2 mb-1">{h('topOwing')}</div>
+        {ageing.topCustomers.slice(0, 4).map((c) => (
+          <Link key={c.id} href="/sales?tab=pending" className="flex justify-between gap-2 text-sm py-1.5 border-b border-slate-200 last:border-0 hover:bg-slate-50">
+            <span className="truncate text-slate-800">{c.name}</span><b className="shrink-0 text-slate-900">{inr(c.amount)}</b>
+          </Link>
+        ))}
+      </>}
     </Card>
   );
 }
@@ -171,11 +173,10 @@ function Money({ d, series }) {
 
 function StockLevels({ rows }) {
   const h = useH();
-  if (!rows || !rows.length) return null;
   return (
-    <Card title={<T>Stock against minimum</T>} href="/stock" denied={!rows}>
+    <Card title={<T>Stock against minimum</T>} href="/stock" denied={!rows} empty={rows && !rows.length} emptyText={<T>No minimum level is set on any item</T>}>
       <div className="space-y-3">
-        {rows.map((i) => {
+        {(rows || []).map((i) => {
           const r = i.balance / i.minLevel;
           const tone = r < 1 ? 'bg-rose-600' : r < 1.25 ? 'bg-amber-600' : 'bg-emerald-600';
           return (
@@ -194,132 +195,8 @@ function StockLevels({ rows }) {
   );
 }
 
-/** Clean, compact alert box for missing daily reports: replaces 89 individual badges with a single concise panel. */
-function MissingReportsAlert({ reports }) {
-  const h = useH();
-  const [showList, setShowList] = useState(false);
-  if (!reports || (!reports.missing && !reports.problems.length)) return null;
 
-  return (
-    <div className="rounded-none border border-amber-300 bg-amber-50/50 p-4 shadow-none">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-none bg-amber-600 shrink-0" />
-            <h3 className="font-bold text-sm text-slate-900">
-              {h('reports')} · {reports.missing} {h('missing')}
-            </h3>
-          </div>
-          <p className="text-xs text-slate-600 mt-0.5">
-            {reports.missing} staff members have not submitted their daily reports today.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowList(!showList)}
-            className="btn-outline !rounded-none !min-h-[34px] px-3 text-xs !border-amber-300 bg-white text-slate-800 hover:bg-amber-100/50"
-          >
-            {showList ? 'Hide Names' : `View Missing (${reports.missing})`}
-          </button>
-          <Link
-            href="/daily-report"
-            className="btn-primary !rounded-none !min-h-[34px] px-3 text-xs bg-[#8A5C38] text-white hover:bg-[#7D5333]"
-          >
-            Daily Reports →
-          </Link>
-        </div>
-      </div>
-
-      {showList && reports.missingNames?.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-amber-200">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-            Missing Reports List:
-          </div>
-          <div className="max-h-44 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 p-2 bg-white border border-amber-200 rounded-none text-xs font-mono text-slate-800">
-            {reports.missingNames.map((n) => (
-              <div key={n} className="truncate px-2 py-1 bg-slate-50 border border-slate-200 rounded-none">
-                {n}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {reports.problems.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-amber-200">
-          <div className="text-xs font-bold uppercase tracking-wider text-red-600 mb-1">{h('problems')}</div>
-          <div className="space-y-1">
-            {reports.problems.map((p, i) => (
-              <div key={i} className="text-xs py-1 border-b border-amber-200/50 last:border-0 text-slate-800">
-                <b>{p.name}:</b> <span className="text-red-700">{p.problem}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Operational status strip: summarizes zero-state checks into a clean 1-row panel instead of 6 huge empty boxes. */
-function OperationalStatusStrip({ d, data }) {
-  const hasExpenses = d.expenses && d.expenses.total > 0;
-  const hasMachineBreakdowns = d.machines && d.machines.breakdowns?.length > 0;
-  const hasOverdue = (data.ageing?.total ?? 0) > 0;
-  const hasLowStock = d.stock && d.stock.lowStock?.length > 0;
-  const hasAlerts = (d.alerts || []).length > 0;
-
-  return (
-    <div className="rounded-none border border-slate-300 bg-white p-3.5 shadow-none">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 pb-1.5 border-b border-slate-200 flex items-center justify-between">
-        <span>Daily Operations Status</span>
-        <span className="font-mono text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 border border-emerald-300 flex items-center gap-1">
-          <CheckCircle2 size={11} className="text-emerald-700" /> SYSTEM ACTIVE
-        </span>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
-        <div className="p-2 border border-slate-200 bg-slate-50/60 rounded-none">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Expenses Logged</div>
-          <div className="font-bold text-slate-900 mt-0.5">{hasExpenses ? inr(d.expenses.total) : '₹0 recorded'}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{hasExpenses ? `${d.expenses.count} entries` : 'No vouchers today'}</div>
-        </div>
-
-        <div className="p-2 border border-slate-200 bg-slate-50/60 rounded-none">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Machine Status</div>
-          <div className={cx('font-bold mt-0.5', hasMachineBreakdowns ? 'text-red-600' : 'text-slate-900')}>
-            {hasMachineBreakdowns ? `${d.machines.breakdowns.length} breakdowns` : 'Normal · 0 Breakdowns'}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            {d.machines ? `${num(d.machines.totalSqft)} sq ft cut` : '0 entries logged'}
-          </div>
-        </div>
-
-        <div className="p-2 border border-slate-200 bg-slate-50/60 rounded-none">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Receivables Aging</div>
-          <div className={cx('font-bold mt-0.5', hasOverdue ? 'text-amber-700' : 'text-slate-900')}>
-            {hasOverdue ? inrShort(data.ageing.total) : '₹0 (All Settled)'}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            {hasOverdue ? 'Pending collections' : 'No overdue accounts'}
-          </div>
-        </div>
-
-        <div className="p-2 border border-slate-200 bg-slate-50/60 rounded-none">
-          <div className="text-[10px] uppercase font-mono text-slate-500">Stock & Alerts</div>
-          <div className={cx('font-bold mt-0.5', hasLowStock || hasAlerts ? 'text-red-600' : 'text-slate-900')}>
-            {hasLowStock ? `${d.stock.lowStock.length} Low stock` : hasAlerts ? `${d.alerts.length} Alerts` : 'Safe Levels · 0 Alerts'}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            {hasAlerts ? 'Review pending alerts' : 'No urgent issues'}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** The Owner's home: Redesigned with flat colors, zero gradients, zero radius, and removed empty placeholders. */
+/** The Owner's home: Redesigned with flat colors, zero gradients, zero radius, and 10 primary KPI cards. */
 export function OwnerHome({ data }) {
   const h = useH();
   const { t } = useApp();
@@ -332,12 +209,8 @@ export function OwnerHome({ data }) {
   const over30 = (data.ageing?.buckets || []).slice(2).reduce((tot, b) => tot + b.amount, 0);
   const total = d.cash ? d.cash.inHand + d.cash.bank : 0;
 
-  // Active data presence
-  const hasAttendanceHistory = s.length && ('present' in s[0]) && !quiet(week, ['present', 'absent', 'leave']);
-  const hasOutputHistory = s.length && ('sqft' in s[0]) && !quiet(week, ['sqft', 'idleHours']);
-
   return (
-    <div className="space-y-4">
+    <div>
       {/* 10 Primary Dashboard Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {/* 1. Current orders */}
@@ -450,54 +323,45 @@ export function OwnerHome({ data }) {
         />
       </div>
 
-      {/* Missing Work Reports Alert Panel */}
-      {d.reports && <MissingReportsAlert reports={d.reports} />}
+      {/* Business pulse */}
+      <div className="mt-4"><Pulse series={s} /></div>
 
-      {/* Operational Status Summary Strip (replaces 6 giant empty boxes with 1 high-density overview) */}
-      <OperationalStatusStrip d={d} data={data} />
+      {/* Graphs & Detailed Activity */}
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+        <Card title={<T>Machine output and idle time</T>} href="/machines" denied={!d.machines} empty={!s.length || !('sqft' in s[0]) || quiet(s.slice(-14), ['sqft', 'idleHours'])} emptyText={<T>No machine output in the last 14 days</T>}>
+          <OwnerOutputChart series={s.slice(-14)} />
+          <p className="text-[11px] text-slate-500 mt-1 font-mono"><T>Last 14 days. The line is the hours machines stood idle.</T></p>
+        </Card>
+        <Card title={<T>Attendance, day by day</T>} href="/attendance" denied={!att} empty={!s.length || !('present' in s[0]) || quiet(s.slice(-14), ['present', 'absent', 'leave'])} emptyText={<T>No attendance marked in the last 14 days</T>}>
+          <OwnerAttendanceChart series={s.slice(-14)} />
+          <p className="text-[11px] text-slate-500 mt-1 font-mono"><T>Last 14 days.</T></p>
+        </Card>
+        <MachinesToday d={d} />
+      </div>
 
-      {/* Business Pulse (rendered only when there is non-zero pulse activity in the period) */}
-      <Pulse series={s} />
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+        <ExpensesToday d={d} />
+        <Receivables ageing={data.ageing} />
+        <Money d={d} series={s} />
+      </div>
 
-      {/* Active Data & Trends Section: Attendance & Cash/Bank balance */}
-      <div className="grid lg:grid-cols-2 gap-4 items-start">
-        {hasAttendanceHistory && (
-          <Card title={<T>Attendance trend (Last 14 days)</T>} href="/attendance">
-            <OwnerAttendanceChart series={week} />
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+        <StockLevels rows={data.stockLevels} />
+        <AlertsCard d={d} />
+        {d.reports && (
+          <Card title={`${h('reports')} · ${h('missing')} (${d.reports.missing})`} href="/daily-report" empty={!d.reports.missing && !d.reports.problems.length} emptyText={h('nothingYet')}>
+            <div className="flex flex-wrap gap-1.5">{d.reports.missingNames.map((n) => <span key={n} className="badge-amber">{n}</span>)}</div>
+            {d.reports.problems.length > 0 && <>
+              <div className="text-xs font-bold uppercase text-red-600 mt-4 mb-1">{h('problems')}</div>
+              {d.reports.problems.map((p, i) => <div key={i} className="text-sm py-1"><b>{p.name}:</b> <span className="text-red-600">{p.problem}</span></div>)}
+            </>}
           </Card>
-        )}
-        {d.cash && (
-          <Money d={d} series={s} />
         )}
       </div>
 
-      {/* Machine Output Chart (rendered only when historical output or idle hours exist) */}
-      {hasOutputHistory && (
-        <Card title={<T>Machine output and idle time</T>} href="/machines">
-          <OwnerOutputChart series={week} />
-          <p className="text-[11px] font-mono text-slate-500 mt-1"><T>Last 14 days. The red line is machine idle hours.</T></p>
-        </Card>
-      )}
-
-      {/* Active Detailed Breakdown Cards (only render when data is present) */}
-      {(d.machines?.byMachine?.length > 0 || (d.expenses?.byHead?.length > 0) || (data.ageing?.total > 0)) && (
-        <div className="grid lg:grid-cols-3 gap-4 items-start">
-          <MachinesToday d={d} />
-          <ExpensesToday d={d} />
-          <Receivables ageing={data.ageing} />
-        </div>
-      )}
-
-      {/* Stock, Alerts, and Profit (only render when there are active items) */}
-      <StockLevels rows={data.stockLevels} />
-      <AlertsCard d={d} />
-      {data.profit && <ProfitCard profit={data.profit} className="" />}
-
-      {/* WhatsApp Daily Summary Export */}
-      <div className="grid lg:grid-cols-3 gap-4 items-start">
-        <div className="lg:col-span-2">
-          <ReportPreview d={d} />
-        </div>
+      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+        <div className="lg:col-span-2"><ProfitCard profit={data.profit} className="" /></div>
+        <ReportPreview d={d} />
       </div>
 
       <OwnerChat date={data.date} />

@@ -95,7 +95,7 @@ export function LiveBadge({ onRefresh, live }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-none border border-slate-300 bg-white px-2.5 h-[38px] text-xs text-slate-600 shadow-none font-mono" role="status">
       <span className={cx('w-2 h-2 rounded-none shrink-0', live ? 'bg-emerald-600' : 'bg-slate-400')} aria-hidden="true" />
-      <span><b className="text-slate-900 font-semibold">{live ? 'LIVE' : 'RECORD'}</b> · {ago}</span>
+      <span><b className="text-slate-900 font-semibold">{live ? 'Live' : 'Past day'}</b> · {ago}</span>
       <button type="button" aria-label="Refresh" onClick={onRefresh} className="w-6 h-6 rounded-none grid place-items-center hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition"><RefreshCw size={12} /></button>
     </div>
   );
