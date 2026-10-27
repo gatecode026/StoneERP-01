@@ -21,8 +21,8 @@ export default function MultiLookupSelect({
   onChange,
   query = {},
   by,
-  placeholder = 'Select supervisors…',
-  emptyText = 'No supervisors found',
+  placeholder = 'Select…',
+  emptyText = 'No items found',
   disabled = false,
   className = '',
 }) {
@@ -57,6 +57,24 @@ export default function MultiLookupSelect({
     return map;
   });
 
+  // Sync valueLabel into selectedMap when props change
+  useEffect(() => {
+    if (valueLabel && selectedIds.length) {
+      const labels = String(valueLabel).split(',').map((s) => s.trim());
+      setSelectedMap((prev) => {
+        let changed = false;
+        const next = new Map(prev);
+        selectedIds.forEach((sid, idx) => {
+          if (!next.has(sid) || next.get(sid)?.label === sid) {
+            next.set(sid, { id: sid, label: labels[idx] || sid, hint: sid });
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [valueLabel, selectedIds]);
+
   const qkey = JSON.stringify(query);
 
   // Load items from /api/lookup/<kind>
@@ -85,7 +103,7 @@ export default function MultiLookupSelect({
     api(`/api/lookup/${kind}?${toQuery(queryParams)}`)
       .then((r) => {
         const rows = r.data || [];
-        lookupClientCache.set(cacheKey, rows);
+        if (rows.length) lookupClientCache.set(cacheKey, rows);
         if (live) {
           setItems(rows);
           setSelectedMap((prev) => {
@@ -295,7 +313,7 @@ export default function MultiLookupSelect({
                 ref={searchInputRef}
                 type="text"
                 className="input !h-8 !py-1 !pl-8 !pr-2 !text-xs !bg-white"
-                placeholder="Filter supervisors…"
+                placeholder={placeholder.startsWith('Select ') ? `Filter ${placeholder.slice(7).replace(/[….]+$/, '')}…` : 'Filter choices…'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -308,7 +326,7 @@ export default function MultiLookupSelect({
           {/* Quick Actions (Select All / Clear All) */}
           <div className="flex items-center justify-between px-3 py-1.5 bg-sand-100/60 text-xs border-b border-sand-200">
             <span className="font-semibold text-char-600">
-              {selectedIds.length} supervisor{selectedIds.length === 1 ? '' : 's'} selected
+              {selectedIds.length} selected
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -332,7 +350,7 @@ export default function MultiLookupSelect({
           {/* Checkbox Options List */}
           <div className="max-h-60 overflow-y-auto divide-y divide-sand-100">
             {busy && items.length === 0 ? (
-              <div className="p-4 text-xs text-char-400 text-center">Loading supervisors…</div>
+              <div className="p-4 text-xs text-char-400 text-center">Loading…</div>
             ) : filteredItems.length === 0 ? (
               <div className="p-4 text-xs text-char-400 text-center">{emptyText}</div>
             ) : (
@@ -373,8 +391,8 @@ export default function MultiLookupSelect({
           <div className="p-2 border-t border-sand-200 bg-sand-50/50 flex justify-between items-center">
             <span className="text-xs text-char-500">
               {selectedIds.length === 0
-                ? 'Check supervisors to assign'
-                : `${selectedIds.length} supervisor(s) selected`}
+                ? 'Check items to select'
+                : `${selectedIds.length} item(s) selected`}
             </span>
             <button
               type="button"

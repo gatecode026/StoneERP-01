@@ -41,8 +41,9 @@ const projectFields = {
   targetQty: text(100).optional(),
   requirements: text(4000).optional(),
   deliverables: text(4000).optional(),
-  supervisorCode: empCode.optional().or(z.literal('')),
-  supervisorName: text(120).optional(),
+  supervisorCode: z.string().optional().or(z.literal('')),
+  supervisorCodes: z.array(z.string()).optional(),
+  supervisorName: text(300).optional(),
   startDate: dateStr.optional(),
   targetDate: dateStr.optional(),
   status: enumOf(PROJECT_STATUSES).optional(),
@@ -64,7 +65,7 @@ export const projects: ResourceDef = {
     'orderNo', 'partyPoNo', 'ourSaleInvoice',
     'finish', 'edges', 'sizes', 'thickness',
     'qtyInSqFt', 'qtyInPcs', 'qtyInTons', 'completedPcs', 'completedSqFt', 'balancePcs', 'units', 'price',
-    'targetQty', 'requirements', 'deliverables', 'supervisorCode', 'supervisorName',
+    'targetQty', 'requirements', 'deliverables', 'supervisorCode', 'supervisorCodes', 'supervisorName',
     'startDate', 'targetDate', 'status', 'priority', 'contractValue',
     'dispatchQty', 'balanceOrderQty', 'balanceOrderAmount', 'otherRemark', 'notes',
     'taskCount', 'tasksDone'
@@ -85,10 +86,22 @@ export const projects: ResourceDef = {
     async prepareCreate(ctx, input) {
       const doc: any = { ...input };
       if (!doc.projectCode) doc.projectCode = await nextProjectCode(ctx);
-      if (doc.supervisorCode) {
+      let codes: string[] = [];
+      if (Array.isArray(doc.supervisorCodes) && doc.supervisorCodes.length) {
+        codes = doc.supervisorCodes.map((s: string) => String(s).trim()).filter(Boolean);
+      } else if (typeof doc.supervisorCode === 'string' && doc.supervisorCode.trim()) {
+        codes = doc.supervisorCode.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+      doc.supervisorCodes = codes;
+      doc.supervisorCode = codes[0] || '';
+      if (codes.length) {
         try {
-          const sup = await employeeByCode(ctx, doc.supervisorCode);
-          doc.supervisorName = sup.name;
+          const { Employee } = await import('../models');
+          const emps: any[] = await Employee.find({ empCode: { $in: codes }, isVoid: false }).select('empCode name').lean();
+          if (emps.length) {
+            const map = new Map(emps.map((e) => [e.empCode, e.name]));
+            doc.supervisorName = codes.map((c) => map.get(c) || c).join(', ');
+          }
         } catch {
           // ignore if employee not found
         }
@@ -106,12 +119,28 @@ export const projects: ResourceDef = {
       return doc;
     },
     async prepareUpdate(ctx, prev, patch) {
-      if (patch.supervisorCode && patch.supervisorCode !== prev.supervisorCode) {
-        try {
-          const sup = await employeeByCode(ctx, patch.supervisorCode);
-          patch.supervisorName = sup.name;
-        } catch {
-          // ignore
+      if (patch.supervisorCodes !== undefined || patch.supervisorCode !== undefined) {
+        let codes: string[] = [];
+        if (Array.isArray(patch.supervisorCodes)) {
+          codes = patch.supervisorCodes.map((s: string) => String(s).trim()).filter(Boolean);
+        } else if (typeof patch.supervisorCode === 'string') {
+          codes = patch.supervisorCode.split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+        patch.supervisorCodes = codes;
+        patch.supervisorCode = codes[0] || '';
+        if (codes.length) {
+          try {
+            const { Employee } = await import('../models');
+            const emps: any[] = await Employee.find({ empCode: { $in: codes }, isVoid: false }).select('empCode name').lean();
+            if (emps.length) {
+              const map = new Map(emps.map((e) => [e.empCode, e.name]));
+              patch.supervisorName = codes.map((c) => map.get(c) || c).join(', ');
+            }
+          } catch {
+            // ignore
+          }
+        } else {
+          patch.supervisorName = '';
         }
       }
       const targetPcs = patch.qtyInPcs !== undefined ? Number(patch.qtyInPcs) : (prev.qtyInPcs !== undefined ? Number(prev.qtyInPcs) : 0);

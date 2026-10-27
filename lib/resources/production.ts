@@ -31,7 +31,10 @@ export const machines: ResourceDef = {
 
 // ------------------------------------------------------------------ machine entries
 const entryFields = {
-  date: dateStr.optional(), shift: enumOf(['Day', 'Night']), machineId: oidStr, operatorCode: empCode,
+  date: dateStr.optional(), shift: enumOf(['Day', 'Night']),
+  machineId: z.string().optional(),
+  machineIds: z.array(z.string()).optional(),
+  operatorCode: empCode,
   startTime: timeStr.optional(), stopTime: timeStr.optional(), hourMeterStart: num().optional(), hourMeterEnd: num().optional(),
   workDone: text(500).optional(), outputSqft: num(0, 1e6), pieces: num(0, 1e7).optional(), blockNo: num(1, 1e7).optional(),
   wasteSqft: num(0, 1e6).optional(), wasteReason: text(300).optional(), stockItemId: oidStr.optional(),
@@ -49,8 +52,12 @@ export const machineentries: ResourceDef = {
   create: z.object(entryFields).strict(),
   update: z.object({ remarks: text(1000), photo, wasteReason: text(300), workDone: text(500) }).partial().strict(),
   lifecycle: {
-    async prepareCreate(ctx, input) {
-      const m = await machineById(ctx, input.machineId);
+    async create(ctx, input, auth) {
+      const rawIds = (input.machineIds && input.machineIds.length > 0)
+        ? input.machineIds
+        : (input.machineId ? String(input.machineId).split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+      if (!rawIds.length) throw badRequest('Select at least one machine');
+
       const op = await employeeByCode(ctx, input.operatorCode, { active: true });
       const date = input.date ?? todayIST();
       if (date > todayIST()) throw badRequest('You cannot enter a future day');
@@ -60,18 +67,23 @@ export const machineentries: ResourceDef = {
         if (input.hourMeterEnd < input.hourMeterStart) throw badRequest('Hour-meter end is less than start');
         hoursRun = round2(input.hourMeterEnd - input.hourMeterStart);
       } else if (input.startTime && input.stopTime) {
-        hoursRun = Math.max(0, round2((minutesBetween(input.startTime, input.stopTime) - stopped) / 60)); // night shifts cross midnight
+        hoursRun = Math.max(0, round2((minutesBetween(input.startTime, input.stopTime) - stopped) / 60));
       }
-      const dup = await MachineEntry.exists({ date, shift: input.shift, machineId: m._id, isVoid: false }).session(s(ctx));
-      if (dup) throw conflict(`${m.name} already has a ${input.shift.toLowerCase()}-shift entry for ${date}`);
+
+      const machinesList = [];
+      for (const mid of rawIds) {
+        const m = await machineById(ctx, mid);
+        const dup = await MachineEntry.exists({ date, shift: input.shift, machineId: m._id, isVoid: false }).session(s(ctx));
+        if (dup) throw conflict(`${m.name} already has a ${input.shift.toLowerCase()}-shift entry for ${date}`);
+        machinesList.push(m);
+      }
+
       if (input.blockNo) {
         const b: any = await Block.findOne({ blockNo: input.blockNo, isVoid: false }).session(s(ctx)).lean();
         if (!b) throw badRequest(`Block ${input.blockNo} does not exist`);
       }
       if (input.breakdown && !stopped) throw badRequest('Enter the stopped minutes for a breakdown');
-      // broken pieces and waste are recorded with the reason (PDF Part 11)
       if ((input.wasteSqft ?? 0) > 0 && !String(input.wasteReason ?? '').trim()) throw badRequest('Waste reason: say why the stone was broken or wasted');
-      // units used can come from the two meter readings
       let electricityUnits = input.electricityUnits;
       if (input.electricityReadingStart != null && input.electricityReadingEnd != null) {
         if (input.electricityReadingEnd < input.electricityReadingStart) throw badRequest('Electricity meter: the end reading is less than the start reading');
@@ -81,28 +93,49 @@ export const machineentries: ResourceDef = {
         const it: any = await StockItem.findOne({ _id: input.stockItemId, isVoid: false, category: 'finished' }).session(s(ctx)).lean();
         if (!it) throw badRequest('Choose a finished-goods stock item');
       }
-      return { ...input, date, machineId: m._id, machineName: m.name, machineType: m.type, operatorName: op.name, hoursRun, stoppedMins: stopped, ...(electricityUnits != null ? { electricityUnits } : {}) };
-    },
-    async afterCreate(ctx, d) {
-      await roll.machineEntry(d.date, d, 1, ctx.session);
+
+      const { machineIds: _mIds, ...baseDoc } = input;
+      const docsToInsert = machinesList.map((m) => ({
+        ...baseDoc,
+        date,
+        machineId: m._id,
+        machineName: m.name,
+        machineType: m.type,
+        operatorName: op.name,
+        hoursRun,
+        stoppedMins: stopped,
+        ...(electricityUnits != null ? { electricityUnits } : {}),
+        createdById: oid(auth.user.id),
+        createdByName: auth.user.name,
+        updatedById: oid(auth.user.id),
+        updatedByName: auth.user.name,
+      }));
+
+      const inserted = await MachineEntry.create(docsToInsert, { session: s(ctx) });
+
+      for (const entry of inserted) {
+        const d = entry.toObject();
+        await roll.machineEntry(d.date, d, 1, ctx.session);
+        if (d.stockItemId && d.outputSqft > 0) {
+          await applyStock(ctx, { itemId: d.stockItemId, delta: d.outputSqft, type: 'in', date: d.date, ref: `Production – ${d.machineName}`, note: `Block ${d.blockNo ?? '-'}`, refModel: 'machineentries', refId: d._id });
+        }
+        if (d.blockNo) {
+          const b: any = await Block.findOneAndUpdate({ blockNo: d.blockNo, stage: 'received' }, { $set: { stage: 'cutting' } }, { session: ctx.session, returnDocument: 'before', lean: true });
+          if (b?.stockItemId && b.cft > 0) await applyStock(ctx, { itemId: b.stockItemId, delta: -b.cft, type: 'out', date: d.date, ref: `Block ${d.blockNo} to cutting`, refModel: 'blocks', refId: b._id });
+        }
+        if (d.hourMeterEnd != null) await Machine.updateOne({ _id: d.machineId }, { $max: { hourMeter: d.hourMeterEnd } }, { session: ctx.session });
+        if (d.breakdown) {
+          const [rep] = await Repair.create([{
+            kind: 'breakdown', status: 'open', date: d.date, machineId: d.machineId, machineName: d.machineName,
+            problem: d.stopReason || 'Breakdown reported', stoppedHours: round2((d.stoppedMins ?? 0) / 60), reportedByCode: d.operatorCode, photo: d.photo,
+            createdById: oid(ctx.actor.id), createdByName: ctx.actor.name,
+          }], { session: ctx.session });
+          await MachineEntry.updateOne({ _id: d._id }, { $set: { repairId: rep._id } }, { session: ctx.session });
+        }
+      }
       invalidate('yield', 'perf');
-      if (d.stockItemId && d.outputSqft > 0) {
-        await applyStock(ctx, { itemId: d.stockItemId, delta: d.outputSqft, type: 'in', date: d.date, ref: `Production – ${d.machineName}`, note: `Block ${d.blockNo ?? '-'}`, refModel: 'machineentries', refId: d._id });
-      }
-      if (d.blockNo) {
-        const b: any = await Block.findOneAndUpdate({ blockNo: d.blockNo, stage: 'received' }, { $set: { stage: 'cutting' } }, { session: ctx.session, returnDocument: 'before', lean: true });
-        // first cut of this block: the raw block leaves raw stock (CFT)
-        if (b?.stockItemId && b.cft > 0) await applyStock(ctx, { itemId: b.stockItemId, delta: -b.cft, type: 'out', date: d.date, ref: `Block ${d.blockNo} to cutting`, refModel: 'blocks', refId: b._id });
-      }
-      if (d.hourMeterEnd != null) await Machine.updateOne({ _id: d.machineId }, { $max: { hourMeter: d.hourMeterEnd } }, { session: ctx.session });
-      if (d.breakdown) {
-        const [rep] = await Repair.create([{
-          kind: 'breakdown', status: 'open', date: d.date, machineId: d.machineId, machineName: d.machineName,
-          problem: d.stopReason || 'Breakdown reported', stoppedHours: round2((d.stoppedMins ?? 0) / 60), reportedByCode: d.operatorCode, photo: d.photo,
-          createdById: oid(ctx.actor.id), createdByName: ctx.actor.name,
-        }], { session: ctx.session });
-        await MachineEntry.updateOne({ _id: d._id }, { $set: { repairId: rep._id } }, { session: ctx.session });
-      }
+
+      return { doc: inserted[0].toObject() };
     },
     async beforeVoid(ctx, d) {
       await roll.machineEntry(d.date, d, -1, ctx.session);

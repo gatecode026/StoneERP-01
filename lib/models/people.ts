@@ -122,6 +122,8 @@ export const DailyReport = defineModel(
     projectCode: { type: S },
     projectName: { type: S },
     narration: { type: S, required: true, maxlength: 4000 },
+    machineIds: { type: [OID], default: [] },
+    machineNames: { type: S },
     hours: { type: N, min: 0, max: 24, default: 0 },
     quantity: { type: N, min: 0, default: 0 },
     problem: { type: S, maxlength: 1000 },

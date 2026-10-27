@@ -1,7 +1,7 @@
 import './auth';
 import './settings';
 import { Employee, Attendance, DailyReport, Leave, Advance, SalarySheet, PerfRemark, SafetyRecord, Task } from './people';
-import { Machine, MachineEntry, Block, Royalty, Repair, Vehicle, VehicleTrip } from './production';
+import { Machine, MachineEntry, Block, Royalty, Repair, Vehicle, VehicleTrip, TruckTrip } from './production';
 import { Project } from './projects';
 import { StockItem, StockMovement, StockCount, Supplier, Purchase } from './stock';
 import { Customer, Sale, Payment, Dispatch, Complaint } from './sales';
@@ -38,6 +38,7 @@ export const MODELS: Record<string, AnyModel> = {
   repairs: Repair,
   vehicles: Vehicle,
   vehicletrips: VehicleTrip,
+  trucktrips: TruckTrip,
   stockitems: StockItem,
   stockmovements: StockMovement,
   stockcounts: StockCount,

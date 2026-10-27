@@ -11,7 +11,7 @@ import { badRequest } from '../errors';
 type Stored = { grants: Grants; fields: RoleDefault['fields']; approvalLimit: number | null; version: number; known?: string[] };
 
 /** Resources (and single rights) added after the first release. A role the Owner saved earlier does not mention them, so they start from the code defaults. */
-const ADDED_RESOURCES = ['punches', 'supervisor'] as const;
+const ADDED_RESOURCES = ['punches', 'supervisor', 'machines'] as const;
 const ADDED_RIGHTS: [string, string][] = [['attendance', 'approve']];
 type Cache = { version: number; roles: Map<string, Stored>; checkedAt: number };
 

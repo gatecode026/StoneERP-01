@@ -202,7 +202,8 @@ function MultiRefSelect({ field, form, set, id, disabled }) {
       value={form[field.name] || form[`${field.name}s`] || ''}
       valueLabel={r.nameField ? form[r.nameField] : undefined}
       onChange={handleChange}
-      placeholder={field.placeholder || 'Select supervisors…'}
+      placeholder={field.placeholder || `Select ${field.label?.toLowerCase() || 'items'}…`}
+      emptyText={field.emptyText || `No ${field.label?.toLowerCase() || 'items'} found`}
       disabled={disabled}
     />
   );
@@ -348,7 +349,7 @@ export function cleanForm(fields, form) {
   for (const f of fields) {
     if (f.type === 'number') out[f.name] = out[f.name] === '' || out[f.name] == null ? undefined : Number(out[f.name]);
     if (f.rule && typeof out[f.name] === 'string') out[f.name] = EMPLOYEE_RULES[f.rule].clean(out[f.name]);
-    if (f.multiple && typeof out[f.name] === 'string' && out[f.name].includes(',')) {
+    if (f.multiple && typeof out[f.name] === 'string') {
       out[`${f.name}s`] = out[f.name].split(',').map((s) => s.trim()).filter(Boolean);
     }
   }

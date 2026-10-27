@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { Truck } from 'lucide-react';
 import toast from '@/lib/toast';
 import { Sheet, Field, PhotoInput } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
@@ -37,14 +38,49 @@ export default function LoadingSheet({ open, onClose, saleId: fixedSale, onDone 
     onDone?.(slip);
   };
   return (
-    <Sheet open={open} onClose={onClose} title="Loading slip + gate pass" wide>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Loading slip + gate pass"
+      wide={Boolean(fixedSale || saleId)}
+      footer={!saleId ? (
+        <button type="button" className="btn-outline min-w-[100px]" onClick={onClose}>
+          <T>Cancel</T>
+        </button>
+      ) : undefined}
+    >
       {!fixedSale && (
-        <Field label="For order" required className="mb-3">
-          <LookupSelect kind="sales" query={{ stage: 'order,dispatched', toSend: '1' }} value={picked} onChange={(it) => setPicked(it ? it.id : '')} placeholder="Search order or customer…" emptyText="No confirmed order has stone left to send. In Sales & Payments, make a quotation and convert it to an order first." />
-        </Field>
+        <div className={!saleId ? 'min-h-[360px] flex flex-col justify-between' : 'mb-4'}>
+          <div>
+            <Field label="For order" required className="mb-3">
+              <LookupSelect
+                kind="sales"
+                query={{ stage: 'order,dispatched', toSend: '1' }}
+                value={picked}
+                onChange={(it) => setPicked(it ? it.id : '')}
+                placeholder="Search order or customer…"
+                emptyText="No confirmed order has stone left to send. In Sales & Payments, make a quotation and convert it to an order first."
+              />
+            </Field>
+
+            {!saleId && (
+              <div className="mt-6 rounded-none border border-dashed border-sand-300 bg-sand-50/50 p-6 text-center">
+                <div className="mx-auto w-12 h-12 mb-3 flex items-center justify-center bg-sand-200 text-terra rounded-none">
+                  <Truck size={24} />
+                </div>
+                <div className="text-sm font-bold text-char mb-1.5">
+                  <T>Select an order to dispatch</T>
+                </div>
+                <p className="text-xs text-char-500 max-w-sm mx-auto leading-relaxed">
+                  <T>Choose a confirmed order above to enter loaded quantities, truck and driver details, weights, and issue the gate pass.</T>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
       {saleId && full.data?.sale && <LoadingForm key={saleId + (open ? 'o' : 'c')} sale={full.data.sale} slips={full.data.dispatches} onClose={onClose} onDone={saved} />}
-      {saleId && full.loading && <div className="h-24 skeleton" />}
+      {saleId && full.loading && <div className="h-32 skeleton" />}
     </Sheet>
   );
 }
@@ -91,24 +127,45 @@ function LoadingForm({ sale, slips, onClose, onDone }) {
     onClose();
   }
 
-  if (!lines.length) return <p className="text-sm text-char-500 py-6 text-center"><T>Everything on this order is already sent or on a loading slip.</T></p>;
+  if (!lines.length) return (
+    <div className="py-8 text-center space-y-2">
+      <p className="text-sm font-semibold text-char"><T>Order fully dispatched</T></p>
+      <p className="text-xs text-char-500"><T>Everything on this order is already sent or on a loading slip.</T></p>
+    </div>
+  );
   return (
-    <div className="space-y-3">
-      <div className="rounded-none border border-sand-300 p-3">
-        <div className="text-xs font-bold uppercase text-char-500 mb-2"><T>Loading slip – quantity loaded</T></div>
-        {lines.map((l) => (
-          <div key={l.key} className="flex items-center gap-3 py-1.5">
-            <div className="flex-1 text-sm">{l.name}
-              <div className="text-[11px] text-char-500"><T vars={{ n: num(l.left), u: l.unit }}>{'left to send: {n} {u}'}</T>{l.spoken > 0 && <> · <T vars={{ n: num(l.spoken) }}>{'{n} already on a loading slip'}</T></>}</div>
+    <div className="space-y-4">
+      <div className="rounded-none border border-sand-300 p-3.5 bg-sand-50/40">
+        <div className="text-xs font-bold uppercase text-char-600 mb-2.5 tracking-wide"><T>Loading slip – quantity loaded</T></div>
+        <div className="divide-y divide-sand-200">
+          {lines.map((l) => (
+            <div key={l.key} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="flex-1 min-w-0 pr-2">
+                <div className="text-sm font-medium text-char truncate">{l.name}</div>
+                <div className="text-[11px] text-char-500">
+                  <T vars={{ n: num(l.left), u: l.unit }}>{'left to send: {n} {u}'}</T>
+                  {l.spoken > 0 && <> · <T vars={{ n: num(l.spoken) }}>{'{n} already on a loading slip'}</T></>}
+                </div>
+              </div>
+              <div className="shrink-0">
+                <input
+                  className={`input !w-28 text-right font-medium ${f.show && qtyErr(l) ? '!border-red-500' : ''}`}
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max={l.left}
+                  step="any"
+                  value={f.qty[l.key] ?? l.left}
+                  aria-label={`${tr('Quantity loaded')} ${l.name}`}
+                  onChange={(e) => set({ qty: { ...f.qty, [l.key]: e.target.value } })}
+                />
+                {f.show && qtyErr(l) && <div className="text-[11px] text-red-600 mt-0.5 text-right" role="alert">{qtyErr(l)}</div>}
+              </div>
             </div>
-            <div>
-              <input className={`input !w-28 ${f.show && qtyErr(l) ? '!border-red-500' : ''}`} type="number" inputMode="decimal" min="0" max={l.left} step="any" value={f.qty[l.key] ?? l.left} aria-label={`${tr('Quantity loaded')} ${l.name}`} onChange={(e) => set({ qty: { ...f.qty, [l.key]: e.target.value } })} />
-              {f.show && qtyErr(l) && <div className="text-[11px] text-red-600 mt-0.5" role="alert">{qtyErr(l)}</div>}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <RuledField rule="truckNo" label="Truck number" required value={f.truckNo} onChange={(v) => set({ truckNo: v })} placeholder="RJ06 XX 0000" error={err.truck} showError={f.show} />
         <RuledField rule="name" label="Driver name" value={f.driverName} onChange={(v) => set({ driverName: v })} showError={f.show} />
         <RuledField rule="mobile" label="Driver mobile" type="tel" hint="10 digits" value={f.driverMobile} onChange={(v) => set({ driverMobile: v })} showError={f.show} />
@@ -119,13 +176,18 @@ function LoadingForm({ sale, slips, onClose, onDone }) {
         <Field label="Loaded weight (kg)" htmlFor="disp_loaded" error={f.show ? err.loaded : ''}><input id="disp_loaded" className="input" type="number" inputMode="decimal" min="0" step="any" value={f.loadedWeight || ''} onChange={(e) => set({ loadedWeight: e.target.value })} /></Field>
         <Field label="Photo – loaded truck"><PhotoInput value={f.photoLoaded} onChange={(x) => set({ photoLoaded: x })} /></Field>
         <Field label="Photo – covered truck"><PhotoInput value={f.photoCovered} onChange={(x) => set({ photoCovered: x })} /></Field>
-        <Field label="Papers (GST bill, e-way bill, rawanna)" className="col-span-2"><PhotoInput multiple value={f.documents} onChange={(x) => set({ documents: x })} /></Field>
+        <Field label="Papers (GST bill, e-way bill, rawanna)" className="col-span-1 sm:col-span-2"><PhotoInput multiple value={f.documents} onChange={(x) => set({ documents: x })} /></Field>
       </div>
-      {canOut && <label className="flex items-center gap-3 min-h-[44px]"><input type="checkbox" className="w-5 h-5 accent-[#B5651D]" checked={f.markOut !== false} onChange={(e) => set({ markOut: e.target.checked })} /><span className="text-sm"><T>Guard marks the truck out now (stock is deducted)</T></span></label>}
+      {canOut && (
+        <label className="flex items-center gap-3 py-2 cursor-pointer select-none">
+          <input type="checkbox" className="w-5 h-5 accent-terra cursor-pointer" checked={f.markOut !== false} onChange={(e) => set({ markOut: e.target.checked })} />
+          <span className="text-sm font-medium text-char"><T>Guard marks the truck out now (stock is deducted)</T></span>
+        </label>
+      )}
       {/* pinned to the bottom of the sheet: an error message appearing above must not push the button away from the finger */}
-      <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-white border-t border-sand-300 flex gap-3">
-        <button className="btn-outline flex-1" onClick={onClose}><T>Cancel</T></button>
-        <button className="btn-primary flex-[2]" disabled={busy} onClick={save}>{f.markOut === false || !canOut ? tr('Save loading slip') : tr('Truck out · deduct stock')}</button>
+      <div className="sticky bottom-0 -mx-5 px-5 py-3.5 -mb-4 bg-white border-t border-sand-200 flex items-center justify-end gap-3 z-10">
+        <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[120px]" onClick={onClose}><T>Cancel</T></button>
+        <button type="button" className="btn-primary flex-1 sm:flex-initial sm:min-w-[180px]" disabled={busy} onClick={save}>{f.markOut === false || !canOut ? tr('Save loading slip') : tr('Truck out · deduct stock')}</button>
       </div>
     </div>
   );

@@ -162,17 +162,19 @@ const checkKeys = ['supCheck', 'supRemark'] as const;
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
-  sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName'],
+  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineIds', 'machineNames', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
+  sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName', 'machineNames'],
   dateFields: ['date'], filters: { date: 'date', empCode: 'string', projectId: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
   serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job'],
   create: z.object({
     date: dateStr.optional(), empCode: empCode.optional(),
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
+    machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
     narration: req(4000), hours: num(0, 24).optional(), quantity: num(0, 1e6).optional(), problem: text(1000).optional(), plan: text(1000).optional(), photos: photos().optional()
   }).strict(),
   update: z.object({
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
+    machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
     narration: req(4000), hours: num(0, 24), quantity: num(0, 1e6), problem: text(1000), plan: text(1000), photos: photos(), supCheck: enumOf(['', 'ok', 'not_ok']), supRemark: text(500), undoReason: text(300)
   }).partial().strict(),
   lifecycle: {
@@ -199,10 +201,20 @@ export const dailyreports: ResourceDef = {
           }
         } catch { /* proceed */ }
       }
+      let machineNames = input.machineNames;
+      const machineIds = (input.machineIds || []).map((id: string) => oid(id));
+      if (machineIds.length && !machineNames) {
+        try {
+          const { Machine } = await import('../models');
+          const ms: any[] = await Machine.find({ _id: { $in: machineIds } }).lean();
+          if (ms.length) machineNames = ms.map((m) => `${m.name} (${m.type})`).join(', ');
+        } catch { /* proceed */ }
+      }
       const doc: any = {
         ...input, date, empCode: e.empCode, empName: e.name, job: e.job,
         projectId: input.projectId ? oid(input.projectId) : undefined,
         projectCode, projectName,
+        machineIds, machineNames,
         quantity: input.quantity ?? 0, hours: input.hours ?? 0,
         submittedAt: new Date(), onTime: date === today, filledBy: ctx.actor.name, photoCount: input.photos?.length ?? 0
       };
@@ -248,6 +260,16 @@ export const dailyreports: ResourceDef = {
         if (prev.supCheck === 'ok') throw forbidden('This report was marked OK and is locked. The Owner or a Manager can undo the decision to open it again.');
         if (prev.supCheck === 'not_ok') { patch.supCheck = ''; patch.reopenedFrom = 'not_ok'; } // corrected: waits for a new check, the old remark stays visible
         if (patch.photos) patch.photoCount = patch.photos.length;
+        if (patch.machineIds) {
+          patch.machineIds = patch.machineIds.map((id: string) => oid(id));
+          if (!patch.machineNames && patch.machineIds.length) {
+            try {
+              const { Machine } = await import('../models');
+              const ms: any[] = await Machine.find({ _id: { $in: patch.machineIds } }).lean();
+              if (ms.length) patch.machineNames = ms.map((m) => `${m.name} (${m.type})`).join(', ');
+            } catch { /* proceed */ }
+          }
+        }
       }
       return patch;
     },

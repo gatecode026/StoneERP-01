@@ -149,6 +149,12 @@ export const Vehicle = defineModel(
     pucExpiry: dateStr(),
     rcPhoto: S,
     notes: { type: S, maxlength: 500 },
+    status: { type: S, enum: ['in', 'out'], default: 'in' },
+    currentTripId: OID,
+    lastKm: { type: N, min: 0 },
+    lastFuel: { type: N, min: 0 },
+    lastDriverName: S,
+    lastOutTime: S,
   },
   { indexes: [[{ regNo: 1 }, liveUnique({ regNo: { $gt: '' } })], [{ driverCode: 1 }]] }
 );
@@ -171,4 +177,37 @@ export const VehicleTrip = defineModel(
     dieselPerUnit: { type: N, min: 0 },
   },
   { indexes: [[{ vehicleId: 1, date: -1 }], [{ driverCode: 1, date: -1 }], [{ date: -1 }]] }
+);
+
+export const TruckTrip = defineModel(
+  'TruckTrip',
+  {
+    vehicleId: { type: OID, required: true },
+    truckNo: { type: S, required: true, uppercase: true },
+    vehicleName: S,
+    driverCode: { type: S, uppercase: true },
+    driverName: { type: S, required: true },
+    driverMobile: S,
+    purpose: { type: S, default: 'Raw Material' },
+    outDate: dateStr({ required: true }),
+    outTime: { type: S, required: true },
+    outKm: { type: N, min: 0, required: true },
+    outFuel: { type: N, min: 0, required: true }, // fuel in L
+    inDate: dateStr(),
+    inTime: S,
+    inKm: { type: N, min: 0 },
+    inFuel: { type: N, min: 0 }, // fuel in L
+    fuelAdded: { type: N, min: 0, default: 0 },
+    kmTraveled: { type: N, min: 0 },
+    fuelConsumed: { type: N, min: 0 }, // fuel in L
+    status: { type: S, enum: ['out', 'in'], default: 'out' },
+    notes: { type: S, maxlength: 500 },
+  },
+  {
+    indexes: [
+      [{ vehicleId: 1, status: 1 }],
+      [{ status: 1, outDate: -1 }],
+      [{ outDate: -1 }],
+    ],
+  }
 );

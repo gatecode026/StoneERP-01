@@ -94,7 +94,7 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
         <input id={id} className="input pr-16 transition-all duration-75 cursor-pointer focus:cursor-text" role="combobox" aria-expanded={open} aria-autocomplete="list" autoComplete="off" disabled={disabled}
           placeholder={label || tx(placeholder)} value={open ? text : label}
           onFocus={() => { if (!disabled) { setOpen(true); setText(''); } }} onChange={(e) => { setText(e.target.value); setOpen(true); }} onKeyDown={onKey} />
-        <div className="absolute right-0 top-0 h-11 flex items-center pr-2 gap-1 text-char-500">
+        <div className="absolute right-0 inset-y-0 flex items-center pr-2.5 gap-1 text-char-500">
           {value && !disabled && <button type="button" className="p-1 rounded-none hover:bg-sand-200 active:scale-95 transition-all duration-75" aria-label={tx('Clear')} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(null)}><X size={16} /></button>}
           <ChevronDown size={16} aria-hidden className="cursor-pointer" onClick={() => !disabled && setOpen((o) => !o)} />
         </div>
@@ -102,7 +102,7 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
       {open && (
         <ul role="listbox" className="absolute z-30 mt-1 w-full max-h-64 overflow-auto rounded-none border border-sand-300 bg-white shadow-lg py-1 divide-y divide-sand-100">
           {busy && !displayItems.length && <li className="px-3 py-2 text-sm text-char-500 flex items-center gap-2"><div className="w-3.5 h-3.5 border-2 border-terra border-t-transparent rounded-none animate-spin" /><T>Searching…</T></li>}
-          {!busy && !displayItems.length && <li className="px-3 py-2.5 text-sm text-char-500">{dq ? <T>No match found</T> : <T>{emptyText || 'Nothing to choose'}</T>}</li>}
+          {!busy && !displayItems.length && <li className="px-3.5 py-3 text-sm text-char-600 leading-relaxed bg-sand-50/50">{dq ? <T>No match found</T> : <T>{emptyText || 'Nothing to choose'}</T>}</li>}
           {displayItems.map((it, i) => (
             <li key={it.id} role="option" aria-selected={String(it.id) === String(value)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(it)}
               className={cx('px-3.5 py-2.5 text-sm cursor-pointer flex items-baseline justify-between gap-2 transition-colors duration-75 select-none active:bg-sand-200', i === active ? 'bg-sand-100 font-semibold' : 'hover:bg-sand-50', String(it.id) === String(value) && 'font-bold bg-sand-100 text-terra')}>

@@ -8,13 +8,14 @@ import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
+import MultiLookupSelect from '@/components/MultiLookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, fmtDateTime, num } from '@/lib/format';
 import T from '@/components/T';
 
-const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '' });
+const blank = () => ({ narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '', machineIds: [], machineNames: '' });
 
 export default function DailyReportPage() {
   const { t, tr, can, perm, session } = useApp();
@@ -36,8 +37,24 @@ export default function DailyReportPage() {
 
   async function openNew(row) {
     if (row) {
-      try { const full = await api(`/api/dailyreports/${row._id}`); setEditing(full); setForm({ ...blank(), ...full, photos: full.photos || [] }); } catch (e) { toast.error(e.message); return; }
-    } else { setEditing(null); setForm({ ...blank(), date }); }
+      try {
+        const full = await api(`/api/dailyreports/${row._id}`);
+        setEditing(full);
+        setForm({
+          ...blank(),
+          ...full,
+          photos: full.photos || [],
+          machineIds: full.machineIds || [],
+          machineNames: full.machineNames || '',
+        });
+      } catch (e) {
+        toast.error(e.message);
+        return;
+      }
+    } else {
+      setEditing(null);
+      setForm({ ...blank(), date });
+    }
     setOpen(true);
   }
   useEffect(() => { if (sp.get('new') === '1' && can('dailyreports', 'create')) openNew();   }, []);
@@ -46,7 +63,16 @@ export default function DailyReportPage() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
     if (!isWorker && !editing && !form.empCode) { toast.error('Choose the employee'); return; }
     setSaving(true);
-    const body = { narration: form.narration, hours: form.hours === '' ? 0 : Number(form.hours), quantity: form.quantity === '' ? 0 : Number(form.quantity), problem: form.problem || '', plan: form.plan || '', photos: form.photos || [] };
+    const body = {
+      narration: form.narration,
+      hours: form.hours === '' ? 0 : Number(form.hours),
+      quantity: form.quantity === '' ? 0 : Number(form.quantity),
+      problem: form.problem || '',
+      plan: form.plan || '',
+      photos: form.photos || [],
+      machineIds: form.machineIds || [],
+      machineNames: form.machineNames || '',
+    };
     try {
       const res = editing
         ? await submit(`/api/dailyreports/${editing._id}`, body, { method: 'PATCH', label: 'Daily report' })
@@ -158,6 +184,11 @@ export default function DailyReportPage() {
                 <div className="flex items-center gap-1.5 shrink-0">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="text-char-300" aria-label="Locked" />}</div>
               </div>
               <p className="text-sm text-char-700 mt-1 line-clamp-2 break-words">{r.narration}</p>
+              {r.machineNames && (
+                <div className="mt-1 text-xs text-char-600 flex items-center gap-1 truncate">
+                  <span className="text-amber-800 font-medium">⚙️ {r.machineNames}</span>
+                </div>
+              )}
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-char-500">
                 {r.hours > 0 && <span><T vars={{ n: r.hours }}>{'{n} h'}</T></span>}{r.quantity > 0 && <span><T vars={{ n: num(r.quantity) }}>{'{n} sq ft'}</T></span>}{r.problem && <span className="text-red-600 break-words"><T>Problem:</T> {r.problem}</span>}
               </div>
@@ -169,7 +200,7 @@ export default function DailyReportPage() {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="th"><T>Employee</T></th>{isWorker && <th className="th"><T>Date</T></th>}<th className="th"><T>Work done</T></th><th className="th text-right"><T>Hours</T></th><th className="th text-right"><T>Sq ft</T></th><th className="th"><T>Problem</T></th><th className="th"><T>Status</T></th><th className="th text-right w-px"><T>Actions</T></th>
+              <th className="th"><T>Employee</T></th>{isWorker && <th className="th"><T>Date</T></th>}<th className="th"><T>Work done</T></th><th className="th"><T>Machines</T></th><th className="th text-right"><T>Hours</T></th><th className="th text-right"><T>Sq ft</T></th><th className="th"><T>Problem</T></th><th className="th"><T>Status</T></th><th className="th text-right w-px"><T>Actions</T></th>
             </tr>
           </thead>
           <tbody>
@@ -177,7 +208,8 @@ export default function DailyReportPage() {
               <tr key={r._id} className="hover:bg-sand-50 cursor-pointer" onClick={() => setDetail(r)}>
                 <td className="td whitespace-nowrap"><div className="font-semibold">{r.empName}</div><div className="text-xs text-char-500">{r.job}</div></td>
                 {isWorker && <td className="td whitespace-nowrap">{fmtDate(r.date)}</td>}
-                <td className="td max-w-[26rem]"><p className="line-clamp-2 break-words">{r.narration}</p></td>
+                <td className="td max-w-[22rem]"><p className="line-clamp-2 break-words">{r.narration}</p></td>
+                <td className="td max-w-[14rem]"><span className="text-xs text-char-700 line-clamp-2 break-words">{r.machineNames || '—'}</span></td>
                 <td className="td text-right whitespace-nowrap">{r.hours > 0 ? r.hours : '—'}</td>
                 <td className="td text-right whitespace-nowrap">{r.quantity > 0 ? num(r.quantity) : '—'}</td>
                 <td className="td max-w-[12rem]">{r.problem ? <span className="text-red-600 line-clamp-2 break-words">{r.problem}</span> : <span className="text-char-300">—</span>}</td>
@@ -196,6 +228,7 @@ export default function DailyReportPage() {
   const detailRows = detail ? [
     ['Employee', `${detail.empName}${detail.job ? ' · ' + detail.job : ''}`], ['Date', fmtDate(detail.date)],
     ...(detail.filledBy && detail.filledBy !== detail.empName ? [['Filled by', detail.filledBy]] : []),
+    ...(detail.machineNames ? [['Machines', detail.machineNames]] : []),
     ['Hours', detail.hours > 0 ? `${detail.hours} h` : '—'], ['Quantity', detail.quantity > 0 ? `${num(detail.quantity)} sq ft` : '—'],
   ] : [];
 
@@ -264,6 +297,21 @@ export default function DailyReportPage() {
             <SpeakButton onText={(x) => set({ narration: (form.narration ? form.narration + ' ' : '') + x })} />
             <div className="[&>div]:h-full"><PhotoInput multiple value={form.photos} onChange={(p) => set({ photos: p })} label={t('addPhoto')} /></div>
           </div>
+          <Field label={tr('Machines worked on')} hint={tr('Select the machines you operated / worked on today')}>
+            <MultiLookupSelect
+              kind="machines"
+              value={form.machineIds || []}
+              valueLabel={form.machineNames || ''}
+              placeholder={tr('Select machines worked on…')}
+              emptyText={tr('No machines found')}
+              onChange={(selected) => {
+                set({
+                  machineIds: selected.map((m) => m.id),
+                  machineNames: selected.map((m) => m.label).join(', '),
+                });
+              }}
+            />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('hours')}><input className="input text-lg" type="number" inputMode="decimal" value={form.hours} onChange={(e) => set({ hours: e.target.value })} placeholder="9" /></Field>
             <Field label={`${t('quantity')} (sq ft)`}><input className="input text-lg" type="number" inputMode="decimal" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" /></Field>

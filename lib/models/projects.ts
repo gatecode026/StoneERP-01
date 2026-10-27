@@ -38,7 +38,8 @@ export const Project = defineModel(
     requirements: { type: S, maxlength: 4000 }, // What it needs (raw blocks, machine line, packaging, tools)
     deliverables: { type: S, maxlength: 4000 }, // Deliverables (sizes, finishes, edge details, packaging)
     supervisorCode: { type: S, uppercase: true },
-    supervisorName: { type: S, maxlength: 120 },
+    supervisorCodes: { type: [S], default: [] },
+    supervisorName: { type: S, maxlength: 300 },
     startDate: dateStr(),
     targetDate: dateStr(),
     status: { type: S, enum: PROJECT_STATUSES as unknown as string[], default: 'In Progress' },
@@ -53,6 +54,7 @@ export const Project = defineModel(
       [{ projectCode: 1 }, liveUnique()],
       [{ status: 1, targetDate: 1 }],
       [{ supervisorCode: 1 }],
+      [{ supervisorCodes: 1 }],
       [{ name: 1 }],
     ],
   }

@@ -94,7 +94,7 @@ export function Field({ label, hint, children, className, required, htmlFor, err
 }
 
 // Bottom sheet on mobile, centered dialog on desktop. Footer is sticky.
-export function Sheet({ open, onClose, title, children, footer, wide }) {
+export function Sheet({ open, onClose, title, children, footer, wide, className, bodyClassName }) {
   const tx = useTx();
   useEffect(() => {
     if (!open) return;
@@ -128,12 +128,12 @@ export function Sheet({ open, onClose, title, children, footer, wide }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 no-print" role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity" onClick={onClose} />
-      <div ref={panel} className={cx('relative sheet-enter w-full bg-white flex flex-col max-h-[92vh] rounded-none shadow-2xl border border-sand-300 overflow-hidden', wide ? 'md:max-w-3xl lg:max-w-4xl' : 'md:max-w-xl lg:max-w-2xl')}>
+      <div ref={panel} className={cx('relative sheet-enter w-full bg-white flex flex-col min-h-0 md:min-h-[200px] max-h-[92vh] rounded-none shadow-2xl border border-sand-300 overflow-hidden', wide ? 'md:max-w-3xl lg:max-w-4xl' : 'md:max-w-xl lg:max-w-2xl', className)}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-sand-200 shrink-0 bg-sand-50/70">
           <h2 className="font-bold text-base md:text-lg text-char truncate pr-2">{tx(title)}</h2>
           <button onClick={onClose} className="min-w-[40px] min-h-[40px] flex items-center justify-center -mr-2 rounded-none text-char-500 hover:text-char hover:bg-sand-200 transition" aria-label={tx('Close')}><X size={20} /></button>
         </div>
-        <div className="overflow-y-auto px-5 py-4 flex-1">{children}</div>
+        <div className={cx('overflow-y-auto px-5 py-4 flex-1', bodyClassName)}>{children}</div>
         {footer && <div className="shrink-0 border-t border-sand-200 px-5 py-3.5 safe-pb bg-white flex items-center justify-end gap-3">{footer}</div>}
       </div>
     </div>
