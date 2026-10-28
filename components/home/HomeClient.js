@@ -6,14 +6,18 @@ import { todayISO, fmtDate } from '@/lib/format';
 import { HomeBody, HomeError, HomeSkeleton, LiveBadge } from '@/components/home/parts';
 import { OwnerHome } from '@/components/home/OwnerDash';
 import { AccountantHome, ManagerHome, PresetHome, SalespersonHome, SupervisorHome, WorkerHome } from '@/components/home/RoleHomes';
+import DailyTaskModal from '@/components/tasks/DailyTaskModal';
+import { Plus } from 'lucide-react';
+import T from '@/components/T';
 
 const WITH_DATE = ['owner', 'manager', 'accountant', 'supervisor'];
 const TITLES = { manager: 'Operations board', accountant: 'Money board', supervisor: 'Team board', salesperson: 'Sales board' };
 
 // One role-specific home per person. The server renders today's (app/(app)/page.tsx); changing the date asks /api/home in one request.
 export default function HomeClient({ initialData = null, initialDate }) {
-  const { t, tr, session } = useApp();
+  const { t, tr, can, session } = useApp();
   const [date, setDate] = useState(initialDate || todayISO());
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
   // the server already sent today's numbers: show them at once (no empty screen, no extra request), refresh in the background
   const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`, [], { initial: date === initialDate ? initialData : null });
   const kind = data?.kind || session?.perm?.roleKey;
@@ -48,6 +52,15 @@ export default function HomeClient({ initialData = null, initialDate }) {
     <PageHeader title={title} subtitle={subtitle}
       actions={WITH_DATE.includes(kind) ? (
         <div className="flex flex-wrap items-center gap-2">
+          {(kind === 'owner' || can('tasks', 'create')) && (
+            <button
+              type="button"
+              onClick={() => setTaskModalOpen(true)}
+              className="btn-primary !h-[38px] !text-xs !py-1.5 !px-3.5 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
+            >
+              <Plus size={15} /> <T>Daily Task</T>
+            </button>
+          )}
           {data && <LiveBadge key={arrival.n} live={isToday} onRefresh={reload} />}
           <input type="date" aria-label={tr('Date')} className="input !w-auto !rounded-none !border-slate-300 !h-[38px] text-xs font-mono shadow-none" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />
         </div>
@@ -68,5 +81,16 @@ export default function HomeClient({ initialData = null, initialDate }) {
       default: return <PresetHome data={data} reload={reload} />;
     }
   })();
-  return <div>{header}<HomeBody>{body}</HomeBody></div>;
+  return (
+    <div>
+      {header}
+      <HomeBody>{body}</HomeBody>
+      <DailyTaskModal
+        open={taskModalOpen}
+        onClose={() => setTaskModalOpen(false)}
+        onDone={reload}
+        defaultDate={date}
+      />
+    </div>
+  );
 }

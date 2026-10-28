@@ -57,40 +57,27 @@ export default function TasksPage() {
   }
 
   const fields = [
-    { name: 'title', label: 'Task', required: true, wide: true },
-    { name: 'details', label: 'Details', type: 'textarea', wide: true },
-    {
-      name: 'projectId',
-      label: 'Linked Project',
-      type: 'ref',
-      ref: {
-        model: 'projects',
-        valueKey: '_id',
-        nameField: 'projectName',
-        label: (p) => `${p.name} (${p.projectCode})`,
-      },
-    },
+    { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true },
+    { name: 'title', label: 'Task', required: true, wide: true, placeholder: 'Write task description…' },
     {
       name: 'assignedCode',
       label: 'Assign to',
       type: 'ref',
       multiple: true,
       required: true,
-      placeholder: isSupervisor ? 'Select one or more team members…' : 'Select one or more supervisors…',
-      emptyText: isSupervisor ? 'No team members assigned to you' : 'No supervisors found',
-      hint: isSupervisor ? 'Select one or more employees working under you' : 'Select one or more supervisors for this task',
+      placeholder: isSupervisor ? 'Select one or more team members…' : 'Select supervisors or operators…',
+      emptyText: isSupervisor ? 'No team members assigned to you' : 'No supervisors or operators found',
+      hint: isSupervisor ? 'Select one or more employees working under you' : 'Select one or more supervisors or operators for this task',
       ref: {
         model: 'employees',
         valueKey: 'empCode',
         nameField: 'assignedName',
-        label: (e) => (isSupervisor ? `${e.name} (${e.job || 'Team'})` : e.name),
+        label: (e) => `${e.name} (${e.job || 'Staff'})`,
         query: isSupervisor && supervisorEmpCode
           ? { status: 'active', supervisorCode: supervisorEmpCode }
-          : { status: 'active', job: 'Supervisor' },
+          : { status: 'active', job: 'Supervisor,Worker / operator,Operator,Worker,Helper' },
       },
     },
-    { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true },
-    { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];
 
   const columns = [

@@ -264,11 +264,9 @@ export default function AttendancePage() {
               aria-label="Filter by role"
             >
               <option value="">All roles</option>
-              <option value="manager">Manager</option>
-              <option value="accountant">Accountant</option>
               <option value="supervisor">Supervisor</option>
-              <option value="salesperson">Salesperson</option>
-              <option value="worker">Worker / Operator</option>
+              <option value="operator">Operator</option>
+              <option value="worker">Worker / Labour</option>
             </select>
             {statusFilter && (
               <button

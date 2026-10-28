@@ -38,11 +38,29 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
     roleCond.$or = [{ job: new RegExp('^supervisor$', 'i') }, { designation: new RegExp('^supervisor$', 'i') }, { loginRole: 'supervisor' }];
   } else if (role === 'salesperson') {
     roleCond.$or = [{ job: new RegExp('^salesperson$', 'i') }, { designation: new RegExp('^salesperson$', 'i') }, { loginRole: 'salesperson' }];
-  } else if (role === 'worker' || role === 'worker / operator') {
+  } else if (role === 'operator') {
+    roleCond.$or = [
+      { job: new RegExp('operator', 'i') },
+      { designation: new RegExp('operator', 'i') },
+    ];
+  } else if (role === 'worker' || role === 'labour' || role === 'worker / labour' || role === 'worker/labour') {
+    roleCond.$or = [
+      { loginRole: 'worker' },
+      { job: new RegExp('^(worker|labour|labor|helper|polisher|loader)', 'i') },
+      {
+        $and: [
+          { job: { $not: new RegExp('(manager|accountant|supervisor|salesperson|operator)', 'i') } },
+          { designation: { $not: new RegExp('(manager|accountant|supervisor|salesperson|operator)', 'i') } },
+          { loginRole: { $nin: ['manager', 'accountant', 'supervisor', 'salesperson'] } },
+        ],
+      },
+    ];
+  } else if (role === 'worker / operator') {
     roleCond.$or = [
       { loginRole: 'worker' },
       { job: new RegExp('^worker', 'i') },
-      { job: new RegExp('^operator$', 'i') },
+      { job: new RegExp('operator', 'i') },
+      { designation: new RegExp('operator', 'i') },
       {
         $and: [
           { job: { $not: new RegExp('^(manager|accountant|supervisor|salesperson)$', 'i') } },
@@ -51,8 +69,6 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
         ],
       },
     ];
-  } else if (role === 'operator') {
-    roleCond.job = new RegExp('^operator$', 'i');
   } else if (role === 'other') {
     roleCond.$and = [
       { job: { $not: new RegExp('^(operator|supervisor)$', 'i') } },
