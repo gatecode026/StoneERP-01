@@ -202,8 +202,8 @@ function MultiRefSelect({ field, form, set, id, disabled }) {
       value={form[field.name] || form[`${field.name}s`] || ''}
       valueLabel={r.nameField ? form[r.nameField] : undefined}
       onChange={handleChange}
-      placeholder={field.placeholder || `Select ${field.label?.toLowerCase() || 'items'}…`}
-      emptyText={field.emptyText || `No ${field.label?.toLowerCase() || 'items'} found`}
+      placeholder={field.placeholder || 'Select items…'}
+      emptyText={field.emptyText || 'No items found'}
       disabled={disabled}
     />
   );

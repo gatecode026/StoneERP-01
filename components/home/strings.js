@@ -26,6 +26,7 @@ export const H = {
   // supervisor
   team: { en: 'My team – attendance', hi: 'मेरी टीम – हाज़िरी' }, markAll: { en: 'Mark all present', hi: 'सबको उपस्थित करें' }, P: { en: 'P', hi: 'उ' }, A: { en: 'A', hi: 'अ' }, half: { en: '½', hi: '½' }, OT: { en: 'OT', hi: 'ओटी' }, L: { en: 'L', hi: 'छु' },
   teamOutput: { en: "Team's output today", hi: 'टीम का आज का उत्पादन' }, safetyDue: { en: 'Safety items due', hi: 'सुरक्षा के बाकी काम' }, tasks: { en: 'Tasks', hi: 'काम' }, dailyTasks: { en: 'Daily Tasks', hi: 'दैनिक कार्य' }, openRepairs: { en: 'Open repairs', hi: 'खुली मरम्मत' },
+  taskOverdue: { en: 'overdue', hi: 'देर' }, taskPending: { en: 'pending', hi: 'बाकी' },
   ok: { en: 'OK', hi: 'ठीक' }, notOk: { en: 'Not OK', hi: 'ठीक नहीं' },
   // salesperson
   myToday: { en: 'My sales today', hi: 'आज की मेरी बिक्री' }, myMonth: { en: 'My sales this month', hi: 'इस महीने की मेरी बिक्री' }, openQuotes: { en: 'My open quotations & orders', hi: 'मेरे खुले कोटेशन और ऑर्डर' }, owing: { en: 'My customers who owe money', hi: 'मेरे ग्राहक जिनका बकाया है' }, newQuote: { en: 'New quotation', hi: 'नया कोटेशन' }, searchStock: { en: 'Search stock (size, finish)…', hi: 'स्टॉक खोजें (साइज़, फ़िनिश)…' }, myComplaints: { en: 'My open complaints', hi: 'मेरी खुली शिकायतें' }, days: { en: 'days', hi: 'दिन' }, remind: { en: 'Remind', hi: 'याद दिलाएँ' },

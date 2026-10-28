@@ -5,6 +5,7 @@ import { Sheet, Field } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
 import { api } from '@/lib/client';
 import { todayISO, num } from '@/lib/format';
+import { trNow } from '@/lib/trNow';
 import T from '@/components/T';
 import { LogOut, LogIn, Plus, Truck, Clock } from 'lucide-react';
 
@@ -90,7 +91,7 @@ export function TruckOutModal({ open, onClose, truck, onDone }) {
     <Sheet
       open={open}
       onClose={onClose}
-      title={`Truck OUT · ${truck.name}${truck.regNo ? ` (${truck.regNo})` : ''}`}
+      title={trNow('Truck OUT · {name}', { name: `${truck.name}${truck.regNo ? ` (${truck.regNo})` : ''}` })}
       footer={
         <>
           <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[100px]" onClick={onClose}>
@@ -329,7 +330,7 @@ export function TruckInModal({ open, onClose, truck, onDone }) {
     <Sheet
       open={open}
       onClose={onClose}
-      title={`Truck IN · ${truck.name}${truck.regNo ? ` (${truck.regNo})` : ''}`}
+      title={trNow('Truck IN · {name}', { name: `${truck.name}${truck.regNo ? ` (${truck.regNo})` : ''}` })}
       footer={
         <>
           <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[100px]" onClick={onClose}>
@@ -381,7 +382,7 @@ export function TruckInModal({ open, onClose, truck, onDone }) {
           <Field
             label="Return Odometer (KM)"
             required
-            hint={`Must be ≥ start reading (${num(trip.outKm)} km)`}
+            hint={trNow('Must be ≥ start reading ({n} km)', { n: num(trip.outKm) })}
             error={f.inKm !== '' && inKmNum < outKmNum ? `Cannot be less than ${num(trip.outKm)} km` : ''}
           >
             <div className="relative">

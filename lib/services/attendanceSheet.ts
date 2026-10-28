@@ -80,15 +80,19 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
 
   for (const e of teamEmps) {
     const m = teamMarkMap.get(e.empCode);
+    if (!m) {
+      statusMap.set(e.empCode, 'unmarked');
+      continue;
+    }
     const shift = shiftFor(settings, empShift.get(e.empCode));
-    let st = 'absent';
-    if (m?.inAt) {
+    let st: string;
+    if (m.inAt) {
       const calc = calcDay({ date, shift, inAt: new Date(m.inAt), outAt: m.outAt ? new Date(m.outAt) : null, kind: day.kind, now, openAfterHours: wh.openDayAfterHours });
       st = calc.state;
       if (calc.open) { openCount++; openSet.add(e.empCode); }
       if (m.otStatus === 'pending') otPending++;
     } else {
-      st = m?.state === 'leave' ? 'leave' : m?.state === 'half' ? 'half' : 'absent';
+      st = m.state === 'overtime' ? 'present' : (m.state || 'absent');
     }
     counts[st] = (counts[st] ?? 0) + 1;
     statusMap.set(e.empCode, st);
@@ -140,26 +144,31 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
     data: people.map((p) => {
       const m = teamMarkMap.get(p.empCode);
       const shift = shiftFor(settings, p);
-      let st = 'absent';
+      let st: string | undefined = undefined;
       let workedMinutes = 0;
       let late = false;
       let lateMinutes = 0;
       let open = false;
-      if (m?.inAt) {
-        const calc = calcDay({ date, shift, inAt: new Date(m.inAt), outAt: m.outAt ? new Date(m.outAt) : null, kind: day.kind, now, openAfterHours: wh.openDayAfterHours });
-        st = calc.state;
-        workedMinutes = calc.workedMinutes;
-        late = calc.late;
-        lateMinutes = calc.lateMinutes;
-        open = calc.open;
-      } else {
-        st = m?.state === 'leave' ? 'leave' : m?.state === 'half' ? 'half' : 'absent';
+      if (m) {
+        if (m.inAt) {
+          const calc = calcDay({ date, shift, inAt: new Date(m.inAt), outAt: m.outAt ? new Date(m.outAt) : null, kind: day.kind, now, openAfterHours: wh.openDayAfterHours });
+          st = calc.state;
+          workedMinutes = calc.workedMinutes;
+          late = calc.late;
+          lateMinutes = calc.lateMinutes;
+          open = calc.open;
+        } else {
+          st = m.state === 'overtime' ? 'present' : (m.state || 'absent');
+          workedMinutes = m.workedMinutes ?? 0;
+        }
       }
       return {
         empCode: p.empCode, name: p.name, job: p.job, shiftName: m?.shiftName ?? shift.name, markable: markable.has(p.empCode) && !m?.inAt, fixable: fixable.has(p.empCode) && p.empCode !== auth.user.empCode,
         punchable: punchable.has(p.empCode), canDecideOt: otDecider.has(p.empCode) && p.empCode !== auth.user.empCode,
-        state: st, otHours: m?.otHours ?? null, late, lateMinutes, method: m?.method ?? '', inAt: m?.inAt ?? null, outAt: m?.outAt ?? null,
-        workedMinutes, otMinutes: m?.otMinutes ?? 0, otStatus: m?.otStatus ?? '', otApprovedMinutes: m?.otApprovedMinutes ?? 0, corrected: Boolean(m?.corrected), open, recId: m ? String(m._id) : undefined,
+        ...(m ? {
+          state: st, otHours: m.otHours ?? null, late, lateMinutes, method: m.method ?? '', inAt: m.inAt ?? null, outAt: m.outAt ?? null,
+          workedMinutes, otMinutes: m.otMinutes ?? 0, otStatus: m.otStatus ?? '', otApprovedMinutes: m.otApprovedMinutes ?? 0, corrected: Boolean(m.corrected), open, recId: String(m._id),
+        } : {}),
       };
     }),
     nextCursor: hasMore ? people[people.length - 1].empCode : null,

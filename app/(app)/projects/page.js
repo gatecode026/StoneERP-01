@@ -778,7 +778,7 @@ export default function ProjectsPage() {
         <Sheet
           open={Boolean(assignModalProject)}
           onClose={() => setAssignModalProject(null)}
-          title={`Assign Supervisors – ${assignModalProject?.name || 'Project'}`}
+          title={tr('Assign Supervisors – {name}', { name: assignModalProject?.name || 'Project' })}
           className="md:!min-h-[520px] md:!max-w-2xl"
           bodyClassName="!min-h-[380px] overflow-visible pb-28"
           footer={

@@ -176,7 +176,7 @@ export function SupervisorHome({ data, reload }) {
               icon={ListChecks}
               label={h('dailyTasks')}
               value={data.taskCount ?? data.tasks?.length ?? 0}
-              sub={data.overdueTaskCount > 0 ? `${data.overdueTaskCount} overdue · ${data.taskCount ?? data.tasks?.length ?? 0} pending` : `${data.taskCount ?? data.tasks?.length ?? 0} pending`}
+              sub={data.overdueTaskCount > 0 ? `${data.overdueTaskCount} ${h('taskOverdue')} · ${data.taskCount ?? data.tasks?.length ?? 0} ${h('taskPending')}` : `${data.taskCount ?? data.tasks?.length ?? 0} ${h('taskPending')}`}
               tone={data.overdueTaskCount > 0 ? 'red' : (data.taskCount || data.tasks?.length) ? 'amber' : 'green'}
               href="/tasks"
             />

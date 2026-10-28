@@ -313,7 +313,7 @@ export default function MultiLookupSelect({
                 ref={searchInputRef}
                 type="text"
                 className="input !h-8 !py-1 !pl-8 !pr-2 !text-xs !bg-white"
-                placeholder={placeholder.startsWith('Select ') ? `Filter ${placeholder.slice(7).replace(/[….]+$/, '')}…` : 'Filter choices…'}
+                placeholder="Filter choices…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
