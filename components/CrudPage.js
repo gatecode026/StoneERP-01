@@ -381,7 +381,7 @@ export default function CrudPage({
   model, title, subtitle, fields, columns, filters = [], defaults = {}, baseQuery = {}, sort, sortOptions, facets, pagination = 25, mapBody, loadExtra,
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
-  voidLabel, voidTitle, voidPrompt, voidSuccessMsg,
+  voidLabel, voidTitle, voidPrompt, voidSuccessMsg, onRowClick,
 }) {
   const { t, can, perm } = useApp();
   const tx = useTx();
@@ -803,7 +803,7 @@ export default function CrudPage({
             }
             sortKey={currentSort}
             onSort={setCurrentSort}
-            onRowClick={selectMode ? (r) => toggleRow(String(r._id)) : undefined}
+            onRowClick={selectMode ? (r) => toggleRow(String(r._id)) : onRowClick}
             empty={emptyText || t('noData')}
             rowClass={(r) => cx(rowClass?.(r), selected.has(String(r._id)) && 'bg-terra-50/50 ring-1 ring-terra-300')}
             actions={rowActs}

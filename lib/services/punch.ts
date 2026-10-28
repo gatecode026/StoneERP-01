@@ -221,10 +221,9 @@ export async function decideOvertime(ctx: SvcCtx, auth: AuthCtx, decisions: OtDe
 /** The fields a manual mark (no punches) carries, so every day has the same shape whether it came from a punch or from a supervisor. */
 export function manualFields(settings: AppSettings, emp: any, date: string, state: string) {
   const shift = shiftFor(settings, emp);
-  const paid = Math.round(shiftPaidHours(shift) * 60);
   return {
     shiftId: shift.id, shiftName: shift.name, dayKind: dayKind(date, settings.workHours).kind,
-    workedMinutes: state === 'present' ? paid : state === 'half' ? Math.round(paid / 2) : 0,
+    workedMinutes: 0,
     lateMinutes: 0, otMinutes: 0, otStatus: '', otApprovedMinutes: 0, inAt: null, outAt: null,
   };
 }

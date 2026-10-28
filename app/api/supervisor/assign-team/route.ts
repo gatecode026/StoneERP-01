@@ -41,8 +41,14 @@ export const GET = withAuth('supervisor', 'view', async (auth) => {
     }
   });
 
+  const isSupervisorRole = (e: any) => Boolean(
+    (e.job && (/supervisor/i.test(e.job) || e.job === 'Supervisor')) ||
+    (e.designation && /supervisor/i.test(e.designation)) ||
+    e.loginRole === 'supervisor'
+  );
+
   const supervisors = allEmployees
-    .filter((e) => e.job && (/supervisor/i.test(e.job) || e.job === 'Supervisor'))
+    .filter(isSupervisorRole)
     .map((s) => ({
       empCode: s.empCode,
       name: s.name,
@@ -53,16 +59,18 @@ export const GET = withAuth('supervisor', 'view', async (auth) => {
       teamCount: teamCountMap.get(s.empCode) ?? 0,
     }));
 
-  const employees = allEmployees.map((e) => ({
-    empCode: e.empCode,
-    name: e.name,
-    job: e.job,
-    designation: e.designation || '',
-    site: e.site || 'Factory',
-    supervisorCode: e.supervisorCode || '',
-    supervisorName: e.supervisorCode ? (supMap.get(e.supervisorCode) || e.supervisorCode) : '',
-    isSupervisor: e.job ? (/supervisor/i.test(e.job) || e.job === 'Supervisor') : false,
-  }));
+  const employees = allEmployees
+    .filter((e) => !isSupervisorRole(e))
+    .map((e) => ({
+      empCode: e.empCode,
+      name: e.name,
+      job: e.job,
+      designation: e.designation || '',
+      site: e.site || 'Factory',
+      supervisorCode: e.supervisorCode || '',
+      supervisorName: e.supervisorCode ? (supMap.get(e.supervisorCode) || e.supervisorCode) : '',
+      isSupervisor: false,
+    }));
 
   return { supervisors, employees };
 });
@@ -92,13 +100,23 @@ export const POST = withAuth('supervisor', 'edit', async (auth) => {
 
   // Find all requested employees in database
   const targetEmployees = await Employee.find({ empCode: { $in: employeeCodes }, isVoid: false, status: 'active' })
-    .select('empCode name supervisorCode')
+    .select('empCode name job designation loginRole supervisorCode')
     .lean();
 
   if (targetEmployees.length !== employeeCodes.length) {
     const foundCodes = new Set(targetEmployees.map((e) => e.empCode));
     const missing = employeeCodes.filter((c) => !foundCodes.has(c));
     throw badRequest(`The following employee codes are invalid or inactive: ${missing.join(', ')}`);
+  }
+
+  // Prevent assigning any supervisor as an employee under another supervisor
+  const supervisorMembers = targetEmployees.filter((e) =>
+    (e.job && (/supervisor/i.test(e.job) || e.job === 'Supervisor')) ||
+    (e.designation && /supervisor/i.test(e.designation)) ||
+    e.loginRole === 'supervisor'
+  );
+  if (supervisorMembers.length > 0) {
+    throw badRequest(`Supervisors cannot be assigned as workers under another supervisor: ${supervisorMembers.map((s) => s.name).join(', ')}`);
   }
 
   // CRITICAL REQUIREMENT:

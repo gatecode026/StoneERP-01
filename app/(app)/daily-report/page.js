@@ -44,20 +44,32 @@ export default function DailyReportPage() {
       try {
         const full = await api(`/api/dailyreports/${row._id}`);
         setEditing(full);
+        const mId = full.machineId ? String(full.machineId) : (full.machineIds?.[0] ? String(full.machineIds[0]) : '');
+        let mName = full.machineName || full.machineNames || '';
+        if (mId && !mName) {
+          try {
+            const res = await api(`/api/lookup/machines?ids=${mId}`);
+            if (res.data?.[0]?.label) mName = res.data[0].label;
+          } catch { /* proceed */ }
+        }
         setForm({
           ...blank(),
           ...full,
           photos: full.photos || [],
-          machineId: full.machineId || (full.machineIds?.[0] || ''),
-          machineName: full.machineName || full.machineNames || '',
-          machineIds: full.machineIds?.length ? full.machineIds : (full.machineId ? [full.machineId] : []),
-          machineNames: full.machineNames || full.machineName || '',
+          machineId: mId,
+          machineName: mName,
+          machineIds: mId ? [mId] : (full.machineIds?.length ? full.machineIds.map(String) : []),
+          machineNames: mName,
           colour: full.colour || '',
           output: full.output || '',
-          thickness: full.thickness || '',
+          thickness: full.thickness != null && full.thickness !== '' ? String(full.thickness) : '',
           edges: full.edges || '',
-          pieces: full.pieces || '',
-          rate: full.rate || '',
+          pieces: full.pieces != null && full.pieces !== '' ? String(full.pieces) : '',
+          rate: full.rate != null && full.rate !== '' ? String(full.rate) : '',
+          hours: full.hours != null && full.hours !== '' ? String(full.hours) : '',
+          quantity: full.quantity != null && full.quantity !== '' ? String(full.quantity) : '',
+          problem: full.problem || '',
+          plan: full.plan || '',
         });
       } catch (e) {
         toast.error(e.message);
@@ -75,7 +87,7 @@ export default function DailyReportPage() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
     if (!isWorker && !editing && !form.empCode) { toast.error('Choose the employee'); return; }
     setSaving(true);
-    const mIds = form.machineId ? [form.machineId] : (form.machineIds || []);
+    const mIds = form.machineId ? [form.machineId] : (form.machineIds?.length ? form.machineIds : []);
     const mName = form.machineName || form.machineNames || '';
     const body = {
       narration: form.narration,
@@ -84,7 +96,7 @@ export default function DailyReportPage() {
       problem: form.problem || '',
       plan: form.plan || '',
       photos: form.photos || [],
-      machineId: form.machineId || mIds[0] || undefined,
+      machineId: form.machineId || mIds[0] || (editing ? null : undefined),
       machineName: mName,
       machineIds: mIds,
       machineNames: mName,
@@ -206,13 +218,13 @@ export default function DailyReportPage() {
                 <div className="flex items-center gap-1.5 shrink-0">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="text-char-300" aria-label="Locked" />}</div>
               </div>
               <p className="text-sm text-char-700 mt-1 line-clamp-2 break-words">{r.narration}</p>
-              {r.machineNames && (
+              {(r.machineNames || r.machineName) && (
                 <div className="mt-1 text-xs text-char-600 flex items-center gap-1 truncate">
-                  <span className="text-amber-800 font-medium">⚙️ {r.machineNames}</span>
+                  <span className="text-amber-800 font-medium">⚙️ {r.machineNames || r.machineName}</span>
                 </div>
               )}
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-char-500">
-                {r.hours > 0 && <span><T vars={{ n: r.hours }}>{'{n} h'}</T></span>}{r.quantity > 0 && <span><T vars={{ n: num(r.quantity) }}>{'{n} sq ft'}</T></span>}{r.problem && <span className="text-red-600 break-words"><T>Problem:</T> {r.problem}</span>}
+                {r.hours != null && r.hours > 0 && <span><T vars={{ n: r.hours }}>{'{n} h'}</T></span>}{r.quantity != null && r.quantity > 0 && <span><T vars={{ n: num(r.quantity) }}>{'{n} sq ft'}</T></span>}{r.problem && <span className="text-red-600 break-words"><T>Problem:</T> {r.problem}</span>}
               </div>
             </button>
           </li>
@@ -231,9 +243,9 @@ export default function DailyReportPage() {
                 <td className="td whitespace-nowrap"><div className="font-semibold">{r.empName}</div><div className="text-xs text-char-500">{r.job}</div></td>
                 {isWorker && <td className="td whitespace-nowrap">{fmtDate(r.date)}</td>}
                 <td className="td max-w-[22rem]"><p className="line-clamp-2 break-words">{r.narration}</p></td>
-                <td className="td max-w-[14rem]"><span className="text-xs text-char-700 line-clamp-2 break-words">{r.machineNames || '—'}</span></td>
-                <td className="td text-right whitespace-nowrap">{r.hours > 0 ? r.hours : '—'}</td>
-                <td className="td text-right whitespace-nowrap">{r.quantity > 0 ? num(r.quantity) : '—'}</td>
+                <td className="td max-w-[14rem]"><span className="text-xs text-char-700 line-clamp-2 break-words">{r.machineNames || r.machineName || '—'}</span></td>
+                <td className="td text-right whitespace-nowrap">{r.hours != null && r.hours > 0 ? r.hours : '—'}</td>
+                <td className="td text-right whitespace-nowrap">{r.quantity != null && r.quantity > 0 ? num(r.quantity) : '—'}</td>
                 <td className="td max-w-[12rem]">{r.problem ? <span className="text-red-600 line-clamp-2 break-words">{r.problem}</span> : <span className="text-char-300">—</span>}</td>
                 <td className="td whitespace-nowrap">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="inline ml-1.5 text-char-300" aria-label="Locked" />}</td>
                 <td className="td text-right whitespace-nowrap w-px" onClick={(e) => e.stopPropagation()}>
@@ -250,14 +262,14 @@ export default function DailyReportPage() {
   const detailRows = detail ? [
     ['Employee', `${detail.empName}${detail.job ? ' · ' + detail.job : ''}`], ['Date', fmtDate(detail.date)],
     ...(detail.filledBy && detail.filledBy !== detail.empName ? [['Filled by', detail.filledBy]] : []),
-    ...(detail.machineNames ? [['Machines', detail.machineNames]] : []),
-    ...(detail.colour ? [['Colour / Stone', detail.colour]] : []),
+    ...((detail.machineNames || detail.machineName) ? [['Machines', detail.machineNames || detail.machineName]] : []),
+    ...(detail.colour ? [['Colour Name', detail.colour]] : []),
     ...(detail.output ? [['Output / Finish', detail.output]] : []),
     ...(detail.thickness ? [['Thickness', `${detail.thickness} mm`]] : []),
     ...(detail.edges ? [['Edges', detail.edges]] : []),
     ...(detail.pieces ? [['Pieces', num(detail.pieces)]] : []),
     ...(detail.rate ? [['Rate', `₹${num(detail.rate)}`]] : []),
-    ['Hours', detail.hours > 0 ? `${detail.hours} h` : '—'], ['Quantity', detail.quantity > 0 ? `${num(detail.quantity)} sq ft` : '—'],
+    ['Hours', detail.hours != null && detail.hours > 0 ? `${detail.hours} h` : '—'], ['Quantity', detail.quantity != null && detail.quantity > 0 ? `${num(detail.quantity)} sq ft` : '—'],
     ...(detail.stockUpdated ? [['Stock Status', '✔ Automatically credited to Stock']] : []),
   ] : [];
 
@@ -343,7 +355,7 @@ export default function DailyReportPage() {
               }}
             />
           </Field>
-          {(form.machineId || (form.machineIds || []).length > 0) && (
+          {Boolean(form.machineId || (form.machineIds || []).length > 0 || form.colour || form.output || form.thickness || form.edges || form.pieces || form.rate || form.quantity) && (
             <div className="p-3.5 rounded-none border border-terra-200 bg-sand-50/70 space-y-3 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-char-900 flex items-center gap-1.5">
@@ -355,7 +367,7 @@ export default function DailyReportPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Colour / Stone Variety">
+                <Field label="Colour Name">
                   <input
                     type="text"
                     className="input !bg-white"
@@ -383,7 +395,7 @@ export default function DailyReportPage() {
                     step="1"
                     className="input !bg-white"
                     placeholder="e.g. 25"
-                    value={form.thickness || ''}
+                    value={form.thickness ?? ''}
                     onChange={(e) => set({ thickness: e.target.value })}
                   />
                 </Field>
@@ -403,7 +415,7 @@ export default function DailyReportPage() {
                     step="1"
                     className="input !bg-white"
                     placeholder="e.g. 100"
-                    value={form.pieces || ''}
+                    value={form.pieces ?? ''}
                     onChange={(e) => set({ pieces: e.target.value })}
                   />
                 </Field>
@@ -414,7 +426,7 @@ export default function DailyReportPage() {
                     step="0.01"
                     className="input !bg-white font-semibold text-terra-900"
                     placeholder="e.g. 410"
-                    value={form.quantity || ''}
+                    value={form.quantity ?? ''}
                     onChange={(e) => set({ quantity: e.target.value })}
                   />
                 </Field>
@@ -425,7 +437,7 @@ export default function DailyReportPage() {
                     step="0.01"
                     className="input !bg-white"
                     placeholder="e.g. 65"
-                    value={form.rate || ''}
+                    value={form.rate ?? ''}
                     onChange={(e) => set({ rate: e.target.value })}
                   />
                 </Field>
@@ -434,11 +446,11 @@ export default function DailyReportPage() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label={t('hours')}>
-              <input className="input text-lg" type="number" inputMode="decimal" value={form.hours} onChange={(e) => set({ hours: e.target.value })} placeholder="8" />
+              <input className="input text-lg" type="number" inputMode="decimal" value={form.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} placeholder="8" />
             </Field>
-            {!(form.machineId || (form.machineIds || []).length > 0) && (
+            {!Boolean(form.machineId || (form.machineIds || []).length > 0 || form.colour || form.output || form.thickness || form.edges || form.pieces || form.rate || form.quantity) && (
               <Field label={`${t('quantity')} (sq ft)`}>
-                <input className="input text-lg" type="number" inputMode="decimal" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" />
+                <input className="input text-lg" type="number" inputMode="decimal" value={form.quantity ?? ''} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" />
               </Field>
             )}
           </div>

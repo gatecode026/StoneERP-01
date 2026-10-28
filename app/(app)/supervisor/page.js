@@ -28,7 +28,8 @@ import {
   Save,
   RotateCcw,
   ShieldCheck,
-  CheckSquare
+  CheckSquare,
+  Eye,
 } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, PageHeader, StatCard, Section, Sheet, Field, SkeletonList, cx } from '@/components/ui';
@@ -52,9 +53,11 @@ export default function SupervisorPage() {
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'today');
   const [doneRow, setDoneRow] = useState(null);
+  const [viewTask, setViewTask] = useState(null);
   const [note, setNote] = useState('');
   const today = todayISO();
-  const isSupervisor = session?.role === 'supervisor' || can('supervisor', 'view');
+  const isSupervisorUser = session?.role === 'supervisor' || session?.preset === 'supervisor';
+  const isSupervisor = isSupervisorUser || can('supervisor', 'view');
   const canAssign = can('supervisor', 'create') || can('tasks', 'create');
 
   // Active supervisor code: if logged in as supervisor, lock to their empCode; otherwise default to EMP-0001
@@ -77,7 +80,7 @@ export default function SupervisorPage() {
   async function markDone(row, reload) {
     try {
       await api(`/api/tasks/${row._id}`, { method: 'PATCH', body: { state: 'done', doneNote: note } });
-      toast.success('Marked done ✔');
+      toast.success(isSupervisorUser ? 'Task submitted ✔' : 'Marked done ✔');
       setDoneRow(null);
       setNote('');
       reload?.();
@@ -102,18 +105,20 @@ export default function SupervisorPage() {
     },
     {
       name: 'assignedCode',
-      label: 'Assign to (Supervisor)',
+      label: isSupervisorUser ? 'Assign to (Team Member)' : 'Assign to (Supervisor)',
       type: 'ref',
       multiple: true,
       required: true,
-      placeholder: 'Check one or more supervisors…',
-      hint: 'Check one or more supervisors for this work (a task is assigned to each)',
+      placeholder: isSupervisorUser ? 'Select one or more team members…' : 'Check one or more supervisors…',
+      hint: isSupervisorUser ? 'Select one or more employees working in your team' : 'Check one or more supervisors for this work (a task is assigned to each)',
       ref: {
         model: 'employees',
         valueKey: 'empCode',
         nameField: 'assignedName',
         label: (e) => `${e.name} (${e.job} · ${e.empCode})`,
-        query: { status: 'active', job: 'Supervisor' },
+        query: isSupervisorUser && mySupervisorCode
+          ? { status: 'active', supervisorCode: mySupervisorCode }
+          : { status: 'active', job: 'Supervisor' },
       },
     },
     { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true, hint: 'Work date for this task' },
@@ -176,12 +181,17 @@ export default function SupervisorPage() {
     const actions = [];
     if (row.state !== 'done') {
       actions.push({
-        label: 'Mark done',
+        label: isSupervisorUser ? 'Submit' : 'Mark done',
         tone: 'green',
-        icon: <CheckCircle2 size={14} />,
+        icon: <CheckCircle2 size={14} className="text-emerald-600" />,
         onClick: () => setDoneRow({ ...row, reload }),
       });
     }
+    actions.push({
+      label: 'View',
+      icon: <Eye size={14} className="text-char-600" />,
+      onClick: () => setViewTask(row),
+    });
     return actions;
   };
 
@@ -236,7 +246,9 @@ export default function SupervisorPage() {
           fields={taskFields}
           columns={taskCols(false)}
           canAdd={canAssign}
-          canEdit={(r) => canAssign && r.state !== 'done'}
+          canEdit={(r) => (!isSupervisorUser && canAssign && r.state !== 'done')}
+          allowVoid={!isSupervisorUser}
+          onRowClick={isSupervisorUser ? (r) => setViewTask(r) : undefined}
           rowClass={(r) => (r.state === 'done' ? 'opacity-60' : r.dueDate < today ? 'bg-red-50/50' : '')}
           rowActions={rowActionsForTask}
           emptyText="No work assigned for today — use 'Assign Work' tab to add tasks"
@@ -322,7 +334,9 @@ export default function SupervisorPage() {
           fields={taskFields}
           columns={taskCols(false)}
           canAdd={canAssign}
-          canEdit={(r) => canAssign && r.state !== 'done'}
+          canEdit={(r) => (!isSupervisorUser && canAssign && r.state !== 'done')}
+          allowVoid={!isSupervisorUser}
+          onRowClick={isSupervisorUser ? (r) => setViewTask(r) : undefined}
           filters={[
             {
               key: 'priority',
@@ -354,28 +368,30 @@ export default function SupervisorPage() {
           canAdd={false}
           canEdit={() => false}
           allowVoid={false}
+          rowActions={rowActionsForTask}
+          onRowClick={isSupervisorUser ? (r) => setViewTask(r) : undefined}
           emptyText="No completed tasks yet"
         />
       )}
 
-      {/* Mark-done confirmation sheet */}
+      {/* Mark-done / Submit confirmation sheet */}
       <Sheet
         open={!!doneRow}
         onClose={() => setDoneRow(null)}
-        title={tr('Complete Work: {title}', { title: doneRow?.title || '' })}
+        title={isSupervisorUser ? tr('Submit Work: {title}', { title: doneRow?.title || '' }) : tr('Complete Work: {title}', { title: doneRow?.title || '' })}
         footer={
           <>
             <button className="btn-outline flex-1" onClick={() => setDoneRow(null)}>
               <T>Cancel</T>
             </button>
             <button className="btn-green flex-[2]" onClick={() => markDone(doneRow, doneRow?.reload)}>
-              <T>Mark Done ✔</T>
+              <T>{isSupervisorUser ? 'Submit ✔' : 'Mark Done ✔'}</T>
             </button>
           </>
         }
       >
         <div className="space-y-3">
-          <Field label="What was completed? (narration / note)">
+          <Field label={isSupervisorUser ? tr('Completion remarks / note') : tr('What was completed? (narration / note)')}>
             <textarea
               className="input"
               rows={3}
@@ -385,6 +401,117 @@ export default function SupervisorPage() {
             />
           </Field>
         </div>
+      </Sheet>
+
+      {/* View task details sheet */}
+      <Sheet
+        open={!!viewTask}
+        onClose={() => setViewTask(null)}
+        title={tr('Task Details')}
+        footer={
+          <>
+            <button className="btn-outline flex-1" onClick={() => setViewTask(null)}>
+              <T>Close</T>
+            </button>
+            {isSupervisorUser && viewTask?.state !== 'done' && (
+              <button
+                className="btn-green flex-[2] flex items-center justify-center gap-1.5"
+                onClick={() => {
+                  const target = viewTask;
+                  setViewTask(null);
+                  setDoneRow(target);
+                }}
+              >
+                <CheckCircle2 size={16} />
+                <T>Submit work</T>
+              </button>
+            )}
+          </>
+        }
+      >
+        {viewTask && (
+          <div className="space-y-4">
+            <div className="p-3.5 bg-sand-50 border border-sand-200 rounded-sm">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-base font-bold text-char">{viewTask.title}</h3>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {viewTask.priority === 'High' && <Badge tone="red"><T>High</T></Badge>}
+                  {viewTask.priority === 'Project' && <Badge tone="blue"><T>Project</T></Badge>}
+                  {viewTask.state === 'done' ? (
+                    <Badge tone="green"><T>Done</T></Badge>
+                  ) : viewTask.dueDate < today ? (
+                    <Badge tone="red"><T>Overdue</T></Badge>
+                  ) : (
+                    <Badge tone="amber"><T>Pending</T></Badge>
+                  )}
+                </div>
+              </div>
+              {viewTask.details ? (
+                <div className="mt-2 text-sm text-char-700 bg-white p-3 border border-sand-200 rounded-sm whitespace-pre-wrap">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-char-400 mb-1">
+                    <T>Instructions / Details</T>
+                  </div>
+                  {viewTask.details}
+                </div>
+              ) : (
+                <div className="text-xs text-char-400 italic"><T>No additional description provided.</T></div>
+              )}
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Linked Project</T></span>
+                <span className="font-medium text-char">
+                  {viewTask.projectName ? (
+                    <span className="inline-flex items-center gap-1 text-terra font-semibold">
+                      <FolderKanban size={14} />
+                      {viewTask.projectName}
+                    </span>
+                  ) : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Assigned to</T></span>
+                <span className="font-semibold text-char">{viewTask.assignedName || viewTask.assignedCode || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Assigned by</T></span>
+                <span className="font-medium text-char">{viewTask.assignedBy || 'Admin'}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Due Date</T></span>
+                <span className={viewTask.state !== 'done' && viewTask.dueDate < today ? 'font-bold text-red-600' : 'font-medium text-char'}>
+                  {fmtDate(viewTask.dueDate)}
+                </span>
+              </div>
+            </div>
+
+            {viewTask.state === 'done' && (
+              <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-sm space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <T>Submission Details</T>
+                </div>
+                {viewTask.doneNote && (
+                  <div className="text-sm text-char-800">
+                    <span className="font-semibold text-char-600"><T>Done note</T>: </span>
+                    {viewTask.doneNote}
+                  </div>
+                )}
+                {viewTask.donePhoto && (
+                  <div className="mt-2">
+                    <div className="text-xs font-semibold text-char-500 mb-1"><T>Attached Photo</T>:</div>
+                    <img
+                      src={viewTask.donePhoto}
+                      alt="Task submission proof"
+                      className="max-h-56 rounded border border-emerald-200 object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Sheet>
     </RoleGuard>
   );
@@ -721,7 +848,7 @@ function SupervisorProjectsView({ selectedSupCode, setSelectedSupCode, isOwnerOr
 
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs bg-sand-50/70 p-2.5 rounded-none border border-sand-200">
                     <div>
-                      <span className="text-[10px] uppercase text-char-400 font-semibold block">Stone Variety</span>
+                      <span className="text-[10px] uppercase text-char-400 font-semibold block">Colour Name</span>
                       <span className="font-semibold text-char-800">{p.stoneType || 'Mandana/Kota'}</span>
                     </div>
                     <div>
@@ -1056,9 +1183,11 @@ function SupervisorAssignEmployees({ selectedSupCode, setSelectedSupCode, isOwne
   const addedCount = selectedCodes.filter((c) => !originalCodes.includes(c)).length;
   const removedCount = originalCodes.filter((c) => !selectedCodes.includes(c)).length;
 
-  // Candidates: all employees except current supervisor
+  // Candidates: all workers (strictly exclude supervisors from assignable employees list)
   const candidates = useMemo(() => {
-    return allEmployees.filter((e) => e.empCode !== currentSup?.empCode);
+    return allEmployees.filter(
+      (e) => !e.isSupervisor && (!e.job || (!/supervisor/i.test(e.job) && e.job !== 'Supervisor')) && e.empCode !== currentSup?.empCode
+    );
   }, [allEmployees, currentSup?.empCode]);
 
   // Counts

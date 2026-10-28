@@ -74,9 +74,11 @@ export default function AttendancePage() {
   const sp = useSearchParams();
   const [date, setDate] = useState(sp.get('date') || todayISO());
   const [q, setQ] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const dq = useDebounced(q.trim(), 300);
   // one request builds the whole sheet: a page of people with today's marks merged in, plus exact counts for the whole team
-  const sheet = useNumberedList(ownOnly ? null : '/api/attendance/sheet', { date, q: dq }, { size: 25 });
+  const sheet = useNumberedList(ownOnly ? null : '/api/attendance/sheet', { date, q: dq, role: roleFilter, status: statusFilter }, { size: 25 });
   const ot = useFetch(canApprove ? '/api/attendance/overtime' : null);
   const att = useFetch(ownOnly ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
   const [over, setOver] = useState({}); // marks tapped on this screen, shown at once (optimistic)
@@ -228,12 +230,58 @@ export default function AttendancePage() {
         <>
           {dayOff && <div className="rounded-none bg-sky-50 border border-sky-200 text-sky-900 text-sm px-3 py-2 mb-3"><T>{sheet.meta.dayKind === 'holiday' ? 'Holiday' : 'Weekly off'}</T>{sheet.meta.dayName ? `: ${sheet.meta.dayName}` : ''}. <T>Nobody needs to be marked today. Anyone who works gets the hours as overtime.</T></div>}
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
-            {STATES.map((s) => <StatCard key={s.v} label={s.label} value={counts(s.v)} />)}
-            <StatCard label="Not marked" value={unmarked} tone={unmarked ? 'amber' : 'green'} />
-            <StatCard label="Needs a fix" value={sheet.meta.openCount || 0} tone={sheet.meta.openCount ? 'red' : 'green'} />
+            {STATES.map((s) => (
+              <StatCard
+                key={s.v}
+                label={s.label}
+                value={counts(s.v)}
+                active={statusFilter === s.v}
+                onClick={() => setStatusFilter((curr) => curr === s.v ? '' : s.v)}
+              />
+            ))}
+            <StatCard
+              label="Not marked"
+              value={unmarked}
+              tone={unmarked ? 'amber' : 'green'}
+              active={statusFilter === 'unmarked'}
+              onClick={() => setStatusFilter((curr) => curr === 'unmarked' ? '' : 'unmarked')}
+            />
+            <StatCard
+              label="Needs a fix"
+              value={sheet.meta.openCount || 0}
+              tone={sheet.meta.openCount ? 'red' : 'green'}
+              active={statusFilter === 'open'}
+              onClick={() => setStatusFilter((curr) => curr === 'open' ? '' : 'open')}
+            />
           </div>
           {canApprove && otCount > 0 && tab === 'mark' && <button className="w-full text-left rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-sm px-3 py-2 mb-3 min-h-[44px]" onClick={() => setTab('overtime')}><T vars={{ n: otCount }}>{'{n} overtime entries are waiting for your approval. Tap to review.'}</T></button>}
-          <div className="flex gap-2 mb-3 flex-wrap"><SearchBox value={q} onChange={setQ} placeholder="Search name or job…" />{canMark && unmarked > 0 && !dayOff && <button className="btn-green" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}</div>
+          <div className="flex gap-2 mb-3 flex-wrap items-center">
+            <SearchBox value={q} onChange={setQ} placeholder="Search name or job…" className="flex-1 min-w-[200px]" />
+            <select
+              className="input !w-auto min-w-[170px] bg-white cursor-pointer font-medium text-xs sm:text-sm text-char-800"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter by role"
+            >
+              <option value="">All roles</option>
+              <option value="manager">Manager</option>
+              <option value="accountant">Accountant</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="salesperson">Salesperson</option>
+              <option value="worker">Worker / Operator</option>
+            </select>
+            {statusFilter && (
+              <button
+                type="button"
+                onClick={() => setStatusFilter('')}
+                className="btn-ghost text-xs px-2.5 py-1.5 h-auto text-char-600 hover:text-char-900 border border-sand-300 bg-white"
+                title="Clear status filter"
+              >
+                Filtered: <span className="font-semibold capitalize ml-1">{STATES.find((x) => x.v === statusFilter)?.label || (statusFilter === 'open' ? 'Needs a fix' : statusFilter === 'unmarked' ? 'Not marked' : statusFilter)}</span> <X size={14} className="ml-1 inline" />
+              </button>
+            )}
+            {canMark && unmarked > 0 && !dayOff && <button className="btn-green shrink-0" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}
+          </div>
           {sheet.loading ? <SkeletonList n={6} /> : (<>
             <div className="space-y-2.5 md:hidden">
               {sheet.rows.map((r) => {

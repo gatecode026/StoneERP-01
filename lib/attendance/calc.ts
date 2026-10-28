@@ -53,8 +53,9 @@ export function calcDay(o: { date: string; shift: Shift; inAt: Date | null; outA
 
   if (!outAt) {
     const overdue = now.getTime() > sched.end.getTime() + (o.openAfterHours ?? 2) * 3600_000;
-    // counted as present for the day until a senior fixes it, so nobody loses a day's pay because a punch was missed
-    return { state: 'present', lateMinutes, late, workedMinutes: 0, otMinutes: 0, inProgress: !overdue, open: overdue };
+    const gross = Math.max(0, mins(inAt, now));
+    const workedMinutes = gross >= BREAK_APPLIES_FROM_MINUTES ? Math.max(0, gross - (shift.breakMinutes || 0)) : gross;
+    return { state: 'present', lateMinutes, late, workedMinutes, otMinutes: 0, inProgress: !overdue, open: overdue };
   }
 
   const gross = Math.max(0, mins(inAt, outAt));

@@ -48,9 +48,10 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
     const queryParams = { ...JSON.parse(qkey), by, q: dq };
     const cacheKey = `list:${kind}:${JSON.stringify(queryParams)}`;
 
-    // Instant cache hit
-    if (lookupClientCache.has(cacheKey)) {
-      setItems(lookupClientCache.get(cacheKey));
+    // Instant cache hit with 30s TTL, only if we have results
+    const cached = lookupClientCache.get(cacheKey);
+    if (cached && typeof cached === 'object' && Array.isArray(cached.rows) && cached.rows.length > 0 && (Date.now() - cached.time < 30000)) {
+      setItems(cached.rows);
       setBusy(false);
       return;
     }
@@ -60,7 +61,11 @@ export default function LookupSelect({ id, kind, value, valueLabel, onChange, qu
     api(`/api/lookup/${kind}?${toQuery(queryParams)}`)
       .then((r) => {
         const rows = r.data || [];
-        lookupClientCache.set(cacheKey, rows);
+        if (rows.length > 0) {
+          lookupClientCache.set(cacheKey, { rows, time: Date.now() });
+        } else {
+          lookupClientCache.delete(cacheKey);
+        }
         if (live) { setItems(rows); setActive(-1); }
       })
       .catch(() => live && setItems([]))

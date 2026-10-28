@@ -257,7 +257,7 @@ export default function ProjectsPage() {
     { name: 'site', label: 'Site Location', type: 'select', options: SITE_OPTIONS, default: 'Factory', section: 'General & Order Details' },
 
     // ── Stone Specifications ──
-    { name: 'stoneType', label: 'Stone Variety', type: 'select', options: STONE_VARIETIES, default: 'Teakwood Sandstone', section: 'Stone Specifications' },
+    { name: 'stoneType', label: 'Colour Name', section: 'Stone Specifications', placeholder: 'e.g. Teakwood Sandstone, Kotah Blue, Dholpur Pink' },
     { name: 'sizes', label: 'Sizes', section: 'Stone Specifications', placeholder: 'e.g. Random, 600x600 mm, 600x300 mm' },
     { name: 'thickness', label: 'Thickness', section: 'Stone Specifications', placeholder: 'e.g. 20-25 mm, 30 mm' },
     { name: 'finish', label: 'Finish', section: 'Stone Specifications', placeholder: 'e.g. Tumble, Honed, Polished, Sawn, Flamed' },
@@ -682,7 +682,7 @@ export default function ProjectsPage() {
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 text-xs">
                   <div className="bg-white p-2.5 rounded-none border border-sand-200">
-                    <span className="text-[10px] uppercase font-bold text-char-500 block">Stone Variety</span>
+                    <span className="text-[10px] uppercase font-bold text-char-500 block">Colour Name</span>
                     <span className="font-semibold text-char-800">{selectedProject.stoneType || 'Custom'}</span>
                   </div>
                   <div className="bg-white p-2.5 rounded-none border border-sand-200">
@@ -873,7 +873,7 @@ export default function ProjectsPage() {
               <form onSubmit={handleSaveProgress} className="space-y-4">
                 <div className="p-3 rounded-none bg-sand-50 border border-sand-200 text-xs">
                   <div className="font-bold text-char-900 text-sm">{progressModalProject.name}</div>
-                  <div className="text-char-500 mt-0.5">Code: <b className="text-char-700">{progressModalProject.projectCode}</b> · Stone: <b className="text-char-700">{progressModalProject.stoneType || 'Custom'}</b></div>
+                  <div className="text-char-500 mt-0.5">Code: <b className="text-char-700">{progressModalProject.projectCode}</b> · Colour: <b className="text-char-700">{progressModalProject.stoneType || 'Custom'}</b></div>
                 </div>
 
                 {/* Target & Live Calculation Overview */}

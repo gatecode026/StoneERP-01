@@ -7,7 +7,7 @@ import { encryptField } from '../crypto';
 import { addDays, daysBetween, todayIST } from '../time';
 import { employeeByCode } from '../services/lookup';
 import { assertNoPunches, manualFields } from '../services/punch';
-import { nextSeq, oid, postCash, accountFor, round2 } from '../services/core';
+import { nextSeq, oid, postCash, accountFor, round2, type SvcCtx } from '../services/core';
 import { invalidate } from '../cache';
 import { withinApprovalLimit } from '../perm/engine';
 import * as roll from '../rollup/dailySummary';
@@ -160,6 +160,231 @@ export const employees: ResourceDef = {
 
 // ------------------------------------------------------------------ daily report
 const checkKeys = ['supCheck', 'supRemark'] as const;
+
+async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
+  const hasMachine = Boolean(d.machineId || (d.machineIds && d.machineIds.length));
+  const hasStone = Boolean(d.colour || (d.quantity != null && Number(d.quantity) > 0) || (d.pieces != null && Number(d.pieces) > 0));
+
+  if (!hasMachine && !hasStone && !prev) return;
+
+  try {
+    const { StockItem, Machine, MachineEntry, DailyReport } = await import('../models');
+    const { applyStock, reverseStockFor } = await import('../services/core');
+
+    // If updating from a previous state, reverse previously applied stock and void previous machine entries
+    if (prev) {
+      try {
+        await reverseStockFor(ctx, 'dailyreports', d._id, 'Daily report updated');
+      } catch (err) {
+        console.error('Failed to reverse stock on daily report update:', err);
+      }
+      try {
+        await MachineEntry.updateMany(
+          { date: prev.date, operatorCode: prev.empCode, isVoid: false },
+          { $set: { isVoid: true, voidReason: 'Daily report updated' } },
+          { session: ctx.session }
+        );
+      } catch (err) {
+        console.error('Failed to void old machine entries on daily report update:', err);
+      }
+    }
+
+    if (hasMachine || hasStone) {
+      const colour = (d.colour || 'Finished Stone').trim();
+      const output = (d.output || '').trim();
+      const thickness = d.thickness != null && Number(d.thickness) > 0 ? Number(d.thickness) : undefined;
+      const edges = d.edges ? String(d.edges).trim() : undefined;
+      const pieces = d.pieces != null && Number(d.pieces) > 0 ? Number(d.pieces) : undefined;
+      const rate = d.rate != null && Number(d.rate) > 0 ? Number(d.rate) : undefined;
+      const quantity = d.quantity != null && Number(d.quantity) > 0 ? Number(d.quantity) : 0;
+
+      let item: any = null;
+
+      // 1. Process Stock Item and Stock Movement if stone details or quantity are present
+      if (hasStone || colour !== 'Finished Stone') {
+        const nameRegex = new RegExp('^' + colour.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+
+        if (output) {
+          const finishRegex = new RegExp('^' + output.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+          item = await StockItem.findOne({ name: nameRegex, finish: finishRegex, isVoid: false }).session(s(ctx));
+        }
+        if (!item) {
+          item = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
+        }
+
+        if (item) {
+          const $set: any = {};
+          if (output && !item.finish) $set.finish = output;
+          if (thickness && (!item.thickness || item.thickness !== thickness)) $set.thickness = thickness;
+          if (edges && (!item.edges || item.edges !== edges)) $set.edges = edges;
+          if (rate) { $set.price = rate; $set.sellRate = rate; }
+          if (d.empName && !item.karigar) $set.karigar = d.empName;
+          if (d.photos?.[0] && !item.photo) $set.photo = d.photos[0];
+
+          const updateDoc: any = {};
+          if (Object.keys($set).length) updateDoc.$set = $set;
+          if (pieces) updateDoc.$inc = { pieces };
+
+          if (Object.keys(updateDoc).length) {
+            await StockItem.updateOne({ _id: item._id }, updateDoc, { session: ctx.session });
+          }
+        } else {
+          try {
+            const [newItem] = await StockItem.create([{
+              name: colour,
+              finish: output || undefined,
+              thickness,
+              edges,
+              price: rate,
+              sellRate: rate,
+              pieces: pieces || 0,
+              unit: 'sq ft',
+              category: 'finished',
+              karigar: d.empName,
+              photo: d.photos?.[0],
+              balance: 0,
+              createdById: oid(ctx.actor.id),
+              createdByName: ctx.actor.name,
+              updatedById: oid(ctx.actor.id),
+              updatedByName: ctx.actor.name,
+            }], { session: ctx.session });
+            item = newItem;
+          } catch {
+            item = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
+          }
+        }
+
+        // Credit quantity to Stock balance atomically
+        if (item && quantity > 0) {
+          await applyStock(ctx, {
+            itemId: item._id,
+            delta: quantity,
+            type: 'in',
+            date: d.date,
+            ref: `Daily report: ${d.empName} (${d.machineNames || d.machineName || 'Plant'})`,
+            note: [
+              colour,
+              output ? `Finish: ${output}` : '',
+              thickness ? `${thickness}mm` : '',
+              edges ? `Edges: ${edges}` : '',
+              pieces ? `${pieces} pcs` : '',
+              rate ? `₹${rate}/sqft` : '',
+            ].filter(Boolean).join(' · '),
+            refModel: 'dailyreports',
+            refId: d._id,
+          });
+
+          await DailyReport.updateOne(
+            { _id: d._id },
+            { $set: { stockItemId: item._id, stockUpdated: true } },
+            { session: ctx.session }
+          );
+        } else if (item && pieces) {
+          await DailyReport.updateOne(
+            { _id: d._id },
+            { $set: { stockItemId: item._id, stockUpdated: true } },
+            { session: ctx.session }
+          );
+        }
+      }
+
+      // 2. Record machine work entries and advance machine hour meter
+      const machineIds: any[] = (d.machineIds && d.machineIds.length)
+        ? d.machineIds
+        : (d.machineId ? [d.machineId] : []);
+
+      if (machineIds.length) {
+        const splitQty = quantity > 0 ? Math.round((quantity / machineIds.length) * 100) / 100 : 0;
+        const splitPieces = pieces ? Math.max(1, Math.round(pieces / machineIds.length)) : undefined;
+        const splitHours = d.hours ? Math.round((Number(d.hours) / machineIds.length) * 10) / 10 : 0;
+
+        const workDetails = [
+          d.colour ? `Colour: ${d.colour}` : '',
+          output ? `Output: ${output}` : '',
+          thickness ? `Thick: ${thickness}mm` : '',
+          edges ? `Edges: ${edges}` : '',
+          rate ? `₹${rate}/sqft` : '',
+          splitPieces ? `${splitPieces} pcs` : '',
+          splitQty ? `${splitQty} sq ft` : '',
+          d.narration ? `(${d.narration})` : '',
+        ].filter(Boolean).join(' · ');
+
+        for (const mid of machineIds) {
+          const m: any = await Machine.findById(mid).session(s(ctx)).lean();
+          if (m) {
+            if (splitHours > 0) {
+              await Machine.updateOne(
+                { _id: m._id },
+                { $inc: { hourMeter: splitHours } },
+                { session: ctx.session }
+              );
+            }
+
+            // Check for existing entry on this machine/date/shift to prevent unique constraint collisions
+            const existingEntry: any = await MachineEntry.findOne({
+              date: d.date,
+              shift: 'Day',
+              machineId: m._id,
+              isVoid: false,
+            }).session(s(ctx));
+
+            if (existingEntry) {
+              await MachineEntry.updateOne(
+                { _id: existingEntry._id },
+                {
+                  $inc: {
+                    outputSqft: splitQty,
+                    ...(splitPieces ? { pieces: splitPieces } : {}),
+                    ...(splitHours ? { hoursRun: splitHours } : {}),
+                  },
+                  $set: {
+                    workDone: existingEntry.workDone
+                      ? `${existingEntry.workDone} | ${workDetails}`
+                      : workDetails,
+                    ...(d.photos?.[0] && !existingEntry.photo ? { photo: d.photos[0] } : {}),
+                    ...(item?._id && !existingEntry.stockItemId ? { stockItemId: item._id } : {}),
+                  },
+                },
+                { session: ctx.session }
+              );
+            } else {
+              await MachineEntry.create([{
+                date: d.date,
+                shift: 'Day',
+                machineId: m._id,
+                machineName: m.name,
+                machineType: m.type,
+                operatorCode: d.empCode,
+                operatorName: d.empName,
+                hoursRun: splitHours,
+                outputSqft: splitQty,
+                pieces: splitPieces,
+                workDone: workDetails,
+                stockItemId: item?._id,
+                photo: d.photos?.[0],
+                remarks: [
+                  d.problem ? `Problem: ${d.problem}` : '',
+                  d.plan ? `Plan: ${d.plan}` : '',
+                ].filter(Boolean).join(' · ') || undefined,
+                createdById: oid(ctx.actor.id),
+                createdByName: ctx.actor.name,
+                updatedById: oid(ctx.actor.id),
+                updatedByName: ctx.actor.name,
+              }], { session: ctx.session });
+            }
+
+            await roll.machineEntry(d.date, { outputSqft: splitQty }, 1, ctx.session);
+          }
+        }
+      }
+
+      invalidate('stockitems', 'stockmovements', 'machineentries', 'machines', 'yield', 'perf', 'home');
+    }
+  } catch (err) {
+    console.error('Failed to sync stock/machine work from daily report:', err);
+  }
+}
+
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
@@ -170,7 +395,7 @@ export const dailyreports: ResourceDef = {
   create: z.object({
     date: dateStr.optional(), empCode: empCode.optional(),
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
-    machineId: z.string().trim().optional(), machineName: z.string().optional(),
+    machineId: z.union([z.string().trim(), z.null()]).optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
     colour: text(120).optional(), output: text(120).optional(), thickness: num(0, 1000).optional(),
     edges: text(120).optional(), pieces: num(0, 1e7).optional(), rate: num().optional(),
@@ -178,7 +403,7 @@ export const dailyreports: ResourceDef = {
   }).strict(),
   update: z.object({
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
-    machineId: z.string().trim().optional(), machineName: z.string().optional(),
+    machineId: z.union([z.string().trim(), z.null()]).optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
     colour: text(120).optional(), output: text(120).optional(), thickness: num(0, 1000).optional(),
     edges: text(120).optional(), pieces: num(0, 1e7).optional(), rate: num().optional(),
@@ -241,206 +466,7 @@ export const dailyreports: ResourceDef = {
     },
     async afterCreate(ctx, d) {
       await roll.reportFiled(d.date, 1, ctx.session);
-      const hasMachine = Boolean(d.machineId || (d.machineIds && d.machineIds.length));
-      const hasStone = Boolean(d.colour || (d.quantity != null && Number(d.quantity) > 0) || (d.pieces != null && Number(d.pieces) > 0));
-
-      if (hasMachine || hasStone) {
-        try {
-          const { StockItem, Machine, MachineEntry, DailyReport } = await import('../models');
-          const { applyStock } = await import('../services/core');
-          const colour = (d.colour || 'Finished Stone').trim();
-          const output = (d.output || '').trim();
-          const thickness = d.thickness != null && Number(d.thickness) > 0 ? Number(d.thickness) : undefined;
-          const edges = d.edges ? String(d.edges).trim() : undefined;
-          const pieces = d.pieces != null && Number(d.pieces) > 0 ? Number(d.pieces) : undefined;
-          const rate = d.rate != null && Number(d.rate) > 0 ? Number(d.rate) : undefined;
-          const quantity = d.quantity != null && Number(d.quantity) > 0 ? Number(d.quantity) : 0;
-
-          let item: any = null;
-
-          // 1. Process Stock Item and Stock Movement if stone details or quantity are present
-          if (hasStone || colour !== 'Finished Stone') {
-            const nameRegex = new RegExp('^' + colour.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
-
-            if (output) {
-              const finishRegex = new RegExp('^' + output.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
-              item = await StockItem.findOne({ name: nameRegex, finish: finishRegex, isVoid: false }).session(s(ctx));
-            }
-            if (!item) {
-              item = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
-            }
-
-            if (item) {
-              const $set: any = {};
-              if (output && !item.finish) $set.finish = output;
-              if (thickness && (!item.thickness || item.thickness !== thickness)) $set.thickness = thickness;
-              if (edges && (!item.edges || item.edges !== edges)) $set.edges = edges;
-              if (rate) { $set.price = rate; $set.sellRate = rate; }
-              if (d.empName && !item.karigar) $set.karigar = d.empName;
-              if (d.photos?.[0] && !item.photo) $set.photo = d.photos[0];
-
-              const updateDoc: any = {};
-              if (Object.keys($set).length) updateDoc.$set = $set;
-              if (pieces) updateDoc.$inc = { pieces };
-
-              if (Object.keys(updateDoc).length) {
-                await StockItem.updateOne({ _id: item._id }, updateDoc, { session: ctx.session });
-              }
-            } else {
-              try {
-                const [newItem] = await StockItem.create([{
-                  name: colour,
-                  finish: output || undefined,
-                  thickness,
-                  edges,
-                  price: rate,
-                  sellRate: rate,
-                  pieces: pieces || 0,
-                  unit: 'sq ft',
-                  category: 'finished',
-                  karigar: d.empName,
-                  photo: d.photos?.[0],
-                  balance: 0,
-                  createdById: oid(ctx.actor.id),
-                  createdByName: ctx.actor.name,
-                  updatedById: oid(ctx.actor.id),
-                  updatedByName: ctx.actor.name,
-                }], { session: ctx.session });
-                item = newItem;
-              } catch {
-                item = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
-              }
-            }
-
-            // Credit quantity to Stock balance atomically
-            if (item && quantity > 0) {
-              await applyStock(ctx, {
-                itemId: item._id,
-                delta: quantity,
-                type: 'in',
-                date: d.date,
-                ref: `Daily report: ${d.empName} (${d.machineNames || d.machineName || 'Plant'})`,
-                note: [
-                  colour,
-                  output ? `Finish: ${output}` : '',
-                  thickness ? `${thickness}mm` : '',
-                  edges ? `Edges: ${edges}` : '',
-                  pieces ? `${pieces} pcs` : '',
-                  rate ? `₹${rate}/sqft` : '',
-                ].filter(Boolean).join(' · '),
-                refModel: 'dailyreports',
-                refId: d._id,
-              });
-
-              await DailyReport.updateOne(
-                { _id: d._id },
-                { $set: { stockItemId: item._id, stockUpdated: true } },
-                { session: ctx.session }
-              );
-            } else if (item && pieces) {
-              await DailyReport.updateOne(
-                { _id: d._id },
-                { $set: { stockItemId: item._id, stockUpdated: true } },
-                { session: ctx.session }
-              );
-            }
-          }
-
-          // 2. Record machine work entries and advance machine hour meter
-          const machineIds: any[] = (d.machineIds && d.machineIds.length)
-            ? d.machineIds
-            : (d.machineId ? [d.machineId] : []);
-
-          if (machineIds.length) {
-            const splitQty = quantity > 0 ? Math.round((quantity / machineIds.length) * 100) / 100 : 0;
-            const splitPieces = pieces ? Math.max(1, Math.round(pieces / machineIds.length)) : undefined;
-            const splitHours = d.hours ? Math.round((Number(d.hours) / machineIds.length) * 10) / 10 : 0;
-
-            const workDetails = [
-              d.colour ? `Colour: ${d.colour}` : '',
-              output ? `Output: ${output}` : '',
-              thickness ? `Thick: ${thickness}mm` : '',
-              edges ? `Edges: ${edges}` : '',
-              rate ? `₹${rate}/sqft` : '',
-              splitPieces ? `${splitPieces} pcs` : '',
-              splitQty ? `${splitQty} sq ft` : '',
-              d.narration ? `(${d.narration})` : '',
-            ].filter(Boolean).join(' · ');
-
-            for (const mid of machineIds) {
-              const m: any = await Machine.findById(mid).session(s(ctx)).lean();
-              if (m) {
-                if (splitHours > 0) {
-                  await Machine.updateOne(
-                    { _id: m._id },
-                    { $inc: { hourMeter: splitHours } },
-                    { session: ctx.session }
-                  );
-                }
-
-                // Check for existing entry on this machine/date/shift to prevent unique constraint collisions
-                const existingEntry: any = await MachineEntry.findOne({
-                  date: d.date,
-                  shift: 'Day',
-                  machineId: m._id,
-                  isVoid: false,
-                }).session(s(ctx));
-
-                if (existingEntry) {
-                  await MachineEntry.updateOne(
-                    { _id: existingEntry._id },
-                    {
-                      $inc: {
-                        outputSqft: splitQty,
-                        ...(splitPieces ? { pieces: splitPieces } : {}),
-                        ...(splitHours ? { hoursRun: splitHours } : {}),
-                      },
-                      $set: {
-                        workDone: existingEntry.workDone
-                          ? `${existingEntry.workDone} | ${workDetails}`
-                          : workDetails,
-                        ...(d.photos?.[0] && !existingEntry.photo ? { photo: d.photos[0] } : {}),
-                        ...(item?._id && !existingEntry.stockItemId ? { stockItemId: item._id } : {}),
-                      },
-                    },
-                    { session: ctx.session }
-                  );
-                } else {
-                  await MachineEntry.create([{
-                    date: d.date,
-                    shift: 'Day',
-                    machineId: m._id,
-                    machineName: m.name,
-                    machineType: m.type,
-                    operatorCode: d.empCode,
-                    operatorName: d.empName,
-                    hoursRun: splitHours,
-                    outputSqft: splitQty,
-                    pieces: splitPieces,
-                    workDone: workDetails,
-                    stockItemId: item?._id,
-                    photo: d.photos?.[0],
-                    remarks: [
-                      d.problem ? `Problem: ${d.problem}` : '',
-                      d.plan ? `Plan: ${d.plan}` : '',
-                    ].filter(Boolean).join(' · ') || undefined,
-                    createdById: oid(ctx.actor.id),
-                    createdByName: ctx.actor.name,
-                    updatedById: oid(ctx.actor.id),
-                    updatedByName: ctx.actor.name,
-                  }], { session: ctx.session });
-                }
-
-                await roll.machineEntry(d.date, { outputSqft: splitQty }, 1, ctx.session);
-              }
-            }
-          }
-
-          invalidate('stockitems', 'stockmovements', 'machineentries', 'machines', 'yield', 'perf', 'home');
-        } catch (err) {
-          console.error('Failed to auto-update stock/machine work from daily report:', err);
-        }
-      }
+      await syncDailyReportStockAndMachine(ctx, d);
     },
     async beforeVoid(ctx, d) {
       await roll.reportFiled(d.date, -1, ctx.session);
@@ -495,18 +521,51 @@ export const dailyreports: ResourceDef = {
         if (prev.supCheck === 'ok') throw forbidden('This report was marked OK and is locked. The Owner or a Manager can undo the decision to open it again.');
         if (prev.supCheck === 'not_ok') { patch.supCheck = ''; patch.reopenedFrom = 'not_ok'; } // corrected: waits for a new check, the old remark stays visible
         if (patch.photos) patch.photoCount = patch.photos.length;
-        if (patch.machineIds) {
-          patch.machineIds = patch.machineIds.map((id: string) => oid(id));
-          if (!patch.machineNames && patch.machineIds.length) {
-            try {
-              const { Machine } = await import('../models');
-              const ms: any[] = await Machine.find({ _id: { $in: patch.machineIds } }).lean();
-              if (ms.length) patch.machineNames = ms.map((m) => `${m.name} (${m.type})`).join(', ');
-            } catch { /* proceed */ }
-          }
+        // Machine synchronization
+        let machineIds: any = patch.machineIds ? patch.machineIds.map((id: string) => oid(id)) : undefined;
+        let machineId: any = patch.machineId !== undefined ? (patch.machineId ? oid(patch.machineId) : undefined) : undefined;
+
+        if (patch.machineId !== undefined && !machineIds) {
+          machineIds = patch.machineId ? [oid(patch.machineId)] : [];
+        } else if (machineIds && patch.machineId === undefined) {
+          machineId = machineIds[0] || undefined;
         }
+
+        if (machineId !== undefined) patch.machineId = machineId;
+        if (machineIds !== undefined) patch.machineIds = machineIds;
+
+        const effectiveMachineIds = machineIds ?? (patch.machineId ? [patch.machineId] : (prev.machineIds?.length ? prev.machineIds : (prev.machineId ? [prev.machineId] : [])));
+        let machineNames = patch.machineNames || patch.machineName;
+
+        if (effectiveMachineIds && effectiveMachineIds.length && !machineNames) {
+          try {
+            const { Machine } = await import('../models');
+            const ms: any[] = await Machine.find({ _id: { $in: effectiveMachineIds } }).lean();
+            if (ms.length) machineNames = ms.map((m) => `${m.name} (${m.type})`).join(', ');
+          } catch { /* proceed */ }
+        }
+
+        if (machineNames !== undefined) {
+          patch.machineName = machineNames;
+          patch.machineNames = machineNames;
+        } else if (patch.machineId === null || (patch.machineIds && patch.machineIds.length === 0)) {
+          patch.machineName = '';
+          patch.machineNames = '';
+        }
+
+        if (patch.colour !== undefined) patch.colour = patch.colour ? String(patch.colour).trim() : '';
+        if (patch.output !== undefined) patch.output = patch.output ? String(patch.output).trim() : '';
+        if (patch.thickness !== undefined) patch.thickness = patch.thickness != null && patch.thickness !== '' ? Number(patch.thickness) : undefined;
+        if (patch.edges !== undefined) patch.edges = patch.edges ? String(patch.edges).trim() : '';
+        if (patch.pieces !== undefined) patch.pieces = patch.pieces != null && patch.pieces !== '' ? Number(patch.pieces) : undefined;
+        if (patch.rate !== undefined) patch.rate = patch.rate != null && patch.rate !== '' ? Number(patch.rate) : undefined;
+        if (patch.hours !== undefined) patch.hours = patch.hours != null && patch.hours !== '' ? Number(patch.hours) : 0;
+        if (patch.quantity !== undefined) patch.quantity = patch.quantity != null && patch.quantity !== '' ? Number(patch.quantity) : 0;
       }
       return patch;
+    },
+    async afterUpdate(ctx, doc, prev) {
+      await syncDailyReportStockAndMachine(ctx, doc, prev);
     },
   },
 };
@@ -701,7 +760,7 @@ export const tasks: ResourceDef = {
           if (s && !rawCodes.includes(s)) rawCodes.push(s);
         }
       }
-      if (!rawCodes.length) throw badRequest('Please select at least one supervisor');
+      if (!rawCodes.length) throw badRequest('Please select at least one assignee');
 
       const employees = await Promise.all(
         rawCodes.map((code) => employeeByCode(ctx, code, { active: true }))

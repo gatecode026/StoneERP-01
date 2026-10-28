@@ -28,7 +28,7 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', supervisorCode: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})`, limit: 100 },
   items: { resource: 'stockitems', model: StockItem, search: ['name'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name unit balance category', sort: { name: 1 }, label: (d) => `${d.name} (${n(d.balance)} ${d.unit})`, hint: (d) => d.unit },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },

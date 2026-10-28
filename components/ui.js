@@ -42,10 +42,16 @@ const BORDER_ACCENTS = {
   terra: 'border-sand-300 border-l-[3px] border-l-terra',
 };
 
-export function StatCard({ label, value, sub, tone = 'default', icon: Icon, href, valueClass }) {
+export function StatCard({ label, value, sub, tone = 'default', icon: Icon, href, valueClass, onClick, active, className }) {
   const tx = useTx();
   const body = (
-    <div className={cx('rounded-none border bg-white p-3.5 h-full flex flex-col justify-between shadow-none hover:border-terra transition-all duration-150', BORDER_ACCENTS[tone] || BORDER_ACCENTS.default)}>
+    <div className={cx(
+      'rounded-none border bg-white p-3.5 h-full flex flex-col justify-between shadow-none hover:border-terra transition-all duration-150',
+      BORDER_ACCENTS[tone] || BORDER_ACCENTS.default,
+      onClick && 'cursor-pointer select-none active:scale-[0.98]',
+      active && '!border-terra !border-b-[3px] ring-2 ring-terra/40 bg-sand-50/70',
+      className
+    )}>
       <div>
         <div className="flex items-center justify-between gap-2">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-char-500 truncate">{tx(label)}</div>
@@ -60,7 +66,9 @@ export function StatCard({ label, value, sub, tone = 'default', icon: Icon, href
       {sub && <div className="text-xs text-char-500 mt-2 font-normal">{tx(sub)}</div>}
     </div>
   );
-  return href ? <Link href={href} className="block group h-full">{body}</Link> : body;
+  if (href) return <Link href={href} className="block group h-full">{body}</Link>;
+  if (onClick) return <button type="button" onClick={onClick} className="block w-full h-full text-left group p-0 bg-transparent border-0">{body}</button>;
+  return body;
 }
 
 export function Skeleton({ className = 'h-20' }) { return <div className={cx('skeleton', className)} />; }

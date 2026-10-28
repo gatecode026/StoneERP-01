@@ -167,11 +167,20 @@ export function SupervisorHome({ data, reload }) {
   return (
     <div>
       <MyAttendance data={data} reload={reload} />
-      {(showAttendance || showReports || showMachines || showRepairs) && (
+      {(showAttendance || showReports || showTasks || showMachines || showRepairs) && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {showAttendance && <StatCard icon={CalendarCheck} label={h('attendance')} value={`${markedCount}/${members.length}`} sub={`${c.absent ?? 0} ${h('absent')} · ${unmarkedCount} ${h('notMarked')}`} tone={unmarkedCount > 0 ? 'amber' : 'green'} href="/attendance" />}
           {showReports && <StatCard icon={ClipboardList} label={h('reports')} value={`${data.reports?.filled ?? 0}/${members.length}`} sub={`${data.reports?.missing?.length ?? 0} ${h('missing')}`} tone={data.reports?.missing?.length ? 'amber' : 'green'} href="/daily-report" />}
-          {showMachines && <StatCard label={h('teamOutput')} value={`${num(data.machines?.outputSqft ?? 0)} sq ft`} href="/machines" />}
+          {showTasks ? (
+            <StatCard
+              icon={ListChecks}
+              label={h('dailyTasks')}
+              value={data.taskCount ?? data.tasks?.length ?? 0}
+              sub={data.overdueTaskCount > 0 ? `${data.overdueTaskCount} overdue · ${data.taskCount ?? data.tasks?.length ?? 0} pending` : `${data.taskCount ?? data.tasks?.length ?? 0} pending`}
+              tone={data.overdueTaskCount > 0 ? 'red' : (data.taskCount || data.tasks?.length) ? 'amber' : 'green'}
+              href="/tasks"
+            />
+          ) : (showMachines && <StatCard label={h('teamOutput')} value={`${num(data.machines?.outputSqft ?? 0)} sq ft`} href="/machines" />)}
           {showRepairs && <StatCard label={h('breakdowns')} value={data.machines?.breakdowns?.length ?? 0} sub={data.machines?.breakdowns?.map((b) => b.name).join(', ') || h('allRunning')} tone={data.machines?.breakdowns?.length ? 'red' : 'green'} href="/repairs?status=open" />}
         </div>
       )}

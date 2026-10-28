@@ -172,12 +172,15 @@ async function supervisorHome(date: string, user: U, perm: EffectivePerm, settin
   const reported = new Set((reps as any[]).filter((r) => r.date === date).map((r) => r.empCode));
   const msf = perm.can('machines', 'view') ? await scopeFilter(user, perm, 'machines', 'view') : null;
   const esf = perm.can('machineentries', 'view') ? await scopeFilter(user, perm, 'machineentries', 'view') : null;
-  const [machines, entries, repairs, safety, tasks] = await Promise.all([
+  const tsf = perm.can('tasks', 'view') ? await scopeFilter(user, perm, 'tasks', 'view') : null;
+  const [machines, entries, repairs, safety, tasks, taskPendingCount, taskOverdueCount] = await Promise.all([
     msf ? Machine.find({ $and: [{ isVoid: false }, msf] }).select('name type').lean() : [],
     esf ? MachineEntry.find({ $and: [{ date, isVoid: false }, esf] }).select('machineId machineName outputSqft stoppedMins breakdown').lean() : [],
     perm.can('repairs', 'view') ? Repair.countDocuments({ status: 'open', isVoid: false }) : 0,
     perm.can('safetyrecords', 'view') ? SafetyRecord.find({ kind: 'checkup', isVoid: false, dueDate: { $gt: '', $lte: addDays(date, 15) } }).limit(6).select('empName dueDate').lean() : [],
-    perm.can('tasks', 'view') ? Task.find({ $and: [{ state: 'pending', isVoid: false }, await scopeFilter(user, perm, 'tasks', 'view')] }).sort({ dueDate: 1 }).limit(6).select('title assignedName dueDate').lean() : [],
+    tsf ? Task.find({ $and: [{ state: 'pending', isVoid: false }, tsf] }).sort({ dueDate: 1 }).limit(6).select('title details assignedName assignedBy dueDate priority').lean() : [],
+    tsf ? Task.countDocuments({ $and: [{ state: 'pending', isVoid: false }, tsf] }) : 0,
+    tsf ? Task.countDocuments({ $and: [{ state: 'pending', dueDate: { $lt: date }, isVoid: false }, tsf] }) : 0,
   ]);
   const ran = new Set((entries as any[]).map((e) => String(e.machineId)));
   const counts = { present: team.filter((t) => ['present', 'overtime', 'half'].includes(t.state ?? '')).length, absent: team.filter((t) => t.state === 'absent').length, leave: team.filter((t) => t.state === 'leave').length, unmarked: team.filter((t) => !t.state).length };
@@ -186,7 +189,7 @@ async function supervisorHome(date: string, user: U, perm: EffectivePerm, settin
     team: { members: team, counts },
     reports: { toCheck: (reps as any[]).filter((r) => !r.supCheck).slice(0, 12), filled: reported.size, missing: team.filter((t) => !reported.has(t.empCode)).map((t) => t.name).slice(0, 12) },
     machines: { dueEntries: (machines as any[]).filter((m) => !ran.has(String(m._id))).map((m) => ({ id: String(m._id), name: m.name })), outputSqft: sum(entries as any[], (e) => e.outputSqft), breakdowns: (entries as any[]).filter((e) => e.breakdown || e.stoppedMins >= 60).map((e) => ({ name: e.machineName, mins: e.stoppedMins })), openRepairs: repairs },
-    safetyDue: safety, tasks,
+    safetyDue: safety, tasks, taskCount: taskPendingCount, overdueTaskCount: taskOverdueCount,
   }, { team: 'attendance', reports: 'dailyreports', machines: 'machineentries', tasks: 'tasks', safetyDue: 'safetyrecords' });
 }
 

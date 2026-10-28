@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { CheckCircle2, MessageCircle, AlertTriangle, FolderKanban } from 'lucide-react';
+import { CheckCircle2, MessageCircle, AlertTriangle, FolderKanban, Eye } from 'lucide-react';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, Sheet, Field, PhotoInput, Section, SkeletonList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
@@ -25,18 +25,35 @@ const REMINDER_TABLE = [
 ];
 
 export default function TasksPage() {
-  const { t, tr, can } = useApp();
+  const { t, tr, can, session, role } = useApp();
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') === 'reminders' ? 'reminders' : 'tasks');
   const [doneRow, setDoneRow] = useState(null);
+  const [viewRow, setViewRow] = useState(null);
   const [note, setNote] = useState('');
   const [photo, setPhoto] = useState('');
+
+  const isSupervisor = role === 'supervisor' || session?.role === 'supervisor' || session?.preset === 'supervisor';
+  const supervisorEmpCode = session?.empCode;
   const canAssign = can('tasks', 'create');
   const rem = useFetch(tab === 'reminders' ? '/api/reminders' : null);
   const today = todayISO();
 
   async function markDone(reload) {
-    try { await api(`/api/tasks/${doneRow._id}`, { method: 'PATCH', body: { state: 'done', doneNote: note, donePhoto: photo } }); toast.success('Task done ✔'); setDoneRow(null); setNote(''); setPhoto(''); reload(); } catch (e) { toast.error(e.message); }
+    if (!doneRow?._id) return;
+    try {
+      await api(`/api/tasks/${doneRow._id}`, {
+        method: 'PATCH',
+        body: { state: 'done', doneNote: note, donePhoto: photo },
+      });
+      toast.success(isSupervisor ? 'Task submitted ✔' : 'Task done ✔');
+      setDoneRow(null);
+      setNote('');
+      setPhoto('');
+      reload?.();
+    } catch (e) {
+      toast.error(e.message);
+    }
   }
 
   const fields = [
@@ -53,12 +70,52 @@ export default function TasksPage() {
         label: (p) => `${p.name} (${p.projectCode})`,
       },
     },
-    { name: 'assignedCode', label: 'Assign to', type: 'ref', multiple: true, required: true, placeholder: 'Check one or more assignees…', hint: 'Check one or more assignees for this task', ref: { model: 'employees', valueKey: 'empCode', nameField: 'assignedName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor,Operator' } } },
+    {
+      name: 'assignedCode',
+      label: 'Assign to',
+      type: 'ref',
+      multiple: true,
+      required: true,
+      placeholder: isSupervisor ? 'Select one or more team members…' : 'Select one or more supervisors…',
+      emptyText: isSupervisor ? 'No team members assigned to you' : 'No supervisors found',
+      hint: isSupervisor ? 'Select one or more employees working under you' : 'Select one or more supervisors for this task',
+      ref: {
+        model: 'employees',
+        valueKey: 'empCode',
+        nameField: 'assignedName',
+        label: (e) => (isSupervisor ? `${e.name} (${e.job || 'Team'})` : e.name),
+        query: isSupervisor && supervisorEmpCode
+          ? { status: 'active', supervisorCode: supervisorEmpCode }
+          : { status: 'active', job: 'Supervisor' },
+      },
+    },
     { name: 'dueDate', label: 'Date', type: 'date', default: () => todayISO(), required: true },
     { name: 'priority', label: 'Priority', type: 'select', options: ['Normal', 'High'], default: 'Normal' },
   ];
+
   const columns = [
-    { key: 'title', label: 'Task', primary: true, render: (r) => <span>{r.title}{r.priority === 'High' && <Badge tone="red" className="ml-1.5"><T>High</T></Badge>}<div className="text-[11px] text-char-500 font-normal">{r.details}</div></span> },
+    {
+      key: 'title',
+      label: 'Task',
+      primary: true,
+      render: (r) => (
+        <div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-char">{r.title}</span>
+            {r.priority === 'High' && (
+              <Badge tone="red" className="ml-1">
+                <T>High</T>
+              </Badge>
+            )}
+          </div>
+          {r.details && (
+            <div className="text-[11px] text-char-500 font-normal line-clamp-2 mt-0.5 max-w-md">
+              {r.details}
+            </div>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'projectName',
       label: 'Project',
@@ -72,8 +129,31 @@ export default function TasksPage() {
       ),
     },
     { key: 'assignedName', label: 'Assigned to' },
-    { key: 'dueDate', label: 'Date', render: (r) => <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>{fmtDate(r.dueDate)}</span> },
-    { key: 'state', label: 'Status', render: (r) => (r.state === 'done' ? <Badge tone="green"><T>Done</T></Badge> : r.dueDate < today ? <Badge tone="red"><T>Overdue</T></Badge> : <Badge tone="amber"><T>Pending</T></Badge>) },
+    {
+      key: 'assignedBy',
+      label: 'Assigned by',
+      render: (r) => <span className="text-xs text-char-600 font-medium">{r.assignedBy || 'Admin'}</span>,
+    },
+    {
+      key: 'dueDate',
+      label: 'Date',
+      render: (r) => (
+        <span className={r.state !== 'done' && r.dueDate < today ? 'text-red-600 font-bold' : ''}>
+          {fmtDate(r.dueDate)}
+        </span>
+      ),
+    },
+    {
+      key: 'state',
+      label: 'Status',
+      render: (r) => (
+        r.state === 'done'
+          ? <Badge tone="green"><T>Done</T></Badge>
+          : r.dueDate < today
+          ? <Badge tone="red"><T>Overdue</T></Badge>
+          : <Badge tone="amber"><T>Pending</T></Badge>
+      ),
+    },
     { key: 'doneNote', label: 'Done note', render: (r) => r.doneNote || '—' },
   ];
 
@@ -84,12 +164,46 @@ export default function TasksPage() {
     <RoleGuard perm="tasks">
       {can('reminders') && canAssign && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'tasks', label: 'Tasks' }, { key: 'reminders', label: 'Reminder centre' }]} />}
       {tab === 'tasks' && (
-        <CrudPage model="tasks" headerExtra={<ImportData resource="tasks" perm="tasks" noun="tasks" />} title={t('tasks')} subtitle="Give work to anyone, see what is pending and overdue" label="Task" addLabel="Assign task" fields={fields} columns={columns}
-          sort="dueDate" canAdd={canAssign} canEdit={(r) => canAssign && r.state !== 'done'}
+        <CrudPage
+          model="tasks"
+          headerExtra={<ImportData resource="tasks" perm="tasks" noun="tasks" />}
+          title={t('tasks')}
+          subtitle="Give work to anyone, see what is pending and overdue"
+          label="Task"
+          addLabel="Assign task"
+          fields={fields}
+          columns={columns}
+          sort="dueDate"
+          canAdd={canAssign}
+          canEdit={(r) => (!isSupervisor && canAssign && r.state !== 'done')}
+          allowVoid={!isSupervisor}
+          onRowClick={isSupervisor ? (r) => setViewRow(r) : undefined}
           filters={[{ key: 'state', label: 'All tasks', options: [{ value: 'pending', label: 'Pending' }, { value: 'done', label: 'Done' }, { value: 'overdue', label: 'Overdue' }], toQuery: (v) => (v === 'overdue' ? { overdue: '1' } : { state: v }) }]}
           rowClass={(r) => (r.state !== 'done' && r.dueDate < today ? 'bg-red-50/50' : '')}
-          rowActions={(row, { reload }) => (row.state !== 'done' ? [{ label: 'Mark done', tone: 'green', icon: <CheckCircle2 size={14} />, onClick: () => { setDoneRow({ ...row, reload }); } }] : [])}
-          onSaved={() => {}} />
+          rowActions={(row, { reload }) => {
+            if (isSupervisor) {
+              const acts = [];
+              if (row.state !== 'done') {
+                acts.push({
+                  label: 'Submit',
+                  tone: 'green',
+                  icon: <CheckCircle2 size={15} className="text-emerald-600" />,
+                  onClick: () => setDoneRow({ ...row, reload }),
+                });
+              }
+              acts.push({
+                label: 'View',
+                icon: <Eye size={15} className="text-char-600" />,
+                onClick: () => setViewRow(row),
+              });
+              return acts;
+            }
+            return row.state !== 'done'
+              ? [{ label: 'Mark done', tone: 'green', icon: <CheckCircle2 size={14} />, onClick: () => setDoneRow({ ...row, reload }) }]
+              : [];
+          }}
+          onSaved={() => {}}
+        />
       )}
       {tab === 'reminders' && (
         <div>
@@ -115,11 +229,152 @@ export default function TasksPage() {
           )}
         </div>
       )}
-      <Sheet open={!!doneRow} onClose={() => setDoneRow(null)} title={tr('Done: {t}', { t: doneRow?.title || '' })}
-        footer={<><button className="btn-outline flex-1" onClick={() => setDoneRow(null)}><T>Cancel</T></button><button className="btn-green flex-[2]" onClick={() => markDone(doneRow.reload)}><T>Mark done</T></button></>}>
+
+      {/* ── View Task Details Sheet ── */}
+      <Sheet
+        open={!!viewRow}
+        onClose={() => setViewRow(null)}
+        title={tr('Task Details')}
+        footer={
+          <>
+            <button className="btn-outline flex-1" onClick={() => setViewRow(null)}>
+              <T>Close</T>
+            </button>
+            {isSupervisor && viewRow?.state !== 'done' && (
+              <button
+                className="btn-green flex-[2] flex items-center justify-center gap-1.5"
+                onClick={() => {
+                  const target = viewRow;
+                  setViewRow(null);
+                  setDoneRow(target);
+                }}
+              >
+                <CheckCircle2 size={16} />
+                <T>Submit task</T>
+              </button>
+            )}
+          </>
+        }
+      >
+        {viewRow && (
+          <div className="space-y-4">
+            <div className="p-3.5 bg-sand-50 border border-sand-200 rounded-sm">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-base font-bold text-char">{viewRow.title}</h3>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {viewRow.priority === 'High' && <Badge tone="red"><T>High</T></Badge>}
+                  {viewRow.state === 'done' ? (
+                    <Badge tone="green"><T>Done</T></Badge>
+                  ) : viewRow.dueDate < today ? (
+                    <Badge tone="red"><T>Overdue</T></Badge>
+                  ) : (
+                    <Badge tone="amber"><T>Pending</T></Badge>
+                  )}
+                </div>
+              </div>
+              {viewRow.details ? (
+                <div className="mt-2 text-sm text-char-700 bg-white p-3 border border-sand-200 rounded-sm whitespace-pre-wrap">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-char-400 mb-1">
+                    <T>Instructions / Details</T>
+                  </div>
+                  {viewRow.details}
+                </div>
+              ) : (
+                <div className="text-xs text-char-400 italic"><T>No additional description provided.</T></div>
+              )}
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Linked Project</T></span>
+                <span className="font-medium text-char">
+                  {viewRow.projectName ? (
+                    <span className="inline-flex items-center gap-1 text-terra font-semibold">
+                      <FolderKanban size={14} />
+                      {viewRow.projectName}
+                    </span>
+                  ) : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Assigned to</T></span>
+                <span className="font-semibold text-char">{viewRow.assignedName || viewRow.assignedCode || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Assigned by</T></span>
+                <span className="font-medium text-char">{viewRow.assignedBy || 'Admin'}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-sand-200">
+                <span className="text-char-500"><T>Due Date</T></span>
+                <span className={viewRow.state !== 'done' && viewRow.dueDate < today ? 'font-bold text-red-600' : 'font-medium text-char'}>
+                  {fmtDate(viewRow.dueDate)}
+                </span>
+              </div>
+            </div>
+
+            {viewRow.state === 'done' && (
+              <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-sm space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <T>Submission Details</T>
+                </div>
+                {viewRow.doneNote && (
+                  <div className="text-sm text-char-800">
+                    <span className="font-semibold text-char-600"><T>Done note</T>: </span>
+                    {viewRow.doneNote}
+                  </div>
+                )}
+                {viewRow.donePhoto && (
+                  <div className="mt-2">
+                    <div className="text-xs font-semibold text-char-500 mb-1"><T>Attached Photo</T>:</div>
+                    <img
+                      src={viewRow.donePhoto}
+                      alt="Task submission proof"
+                      className="max-h-56 rounded border border-emerald-200 object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      {/* ── Submit / Done Task Modal ── */}
+      <Sheet
+        open={!!doneRow}
+        onClose={() => setDoneRow(null)}
+        title={isSupervisor ? tr('Submit Task: {t}', { t: doneRow?.title || '' }) : tr('Done: {t}', { t: doneRow?.title || '' })}
+        footer={
+          <>
+            <button className="btn-outline flex-1" onClick={() => setDoneRow(null)}>
+              <T>Cancel</T>
+            </button>
+            <button className="btn-green flex-[2] flex items-center justify-center gap-1.5" onClick={() => markDone(doneRow.reload)}>
+              <CheckCircle2 size={16} />
+              <T>{isSupervisor ? 'Submit' : 'Mark done'}</T>
+            </button>
+          </>
+        }
+      >
         <div className="space-y-3">
-          <Field label="Note"><textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder={tr('What was done?')} /></Field>
-          <Field label="Photo"><PhotoInput value={photo} onChange={setPhoto} /></Field>
+          <div className="text-xs text-char-500">
+            {isSupervisor
+              ? tr('Enter completion remarks or notes and attach proof photo before submitting.')
+              : tr('Record what was done and optionally attach photo proof.')}
+          </div>
+          <Field label={tr('Note / Remarks')}>
+            <textarea
+              className="input"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={isSupervisor ? tr('Work completion remarks (optional)…') : tr('What was done?')}
+            />
+          </Field>
+          <Field label={tr('Photo Proof')}>
+            <PhotoInput value={photo} onChange={setPhoto} />
+          </Field>
         </div>
       </Sheet>
     </RoleGuard>

@@ -90,8 +90,9 @@ export default function Shell({ children }) {
   const NavLink = ({ it, small }) => {
     const Icon = it.icon;
     const active = isActive(pathname, it.href);
+    const navLabel = it.label && !hi ? it.label : t(it.key);
     return (
-      <Link href={it.href} title={t(it.key)}
+      <Link href={it.href} title={navLabel}
         className={cx(
           'flex items-center gap-3 rounded-none px-3 min-h-[40px] md:min-h-[36px] md:py-1.5 text-sm md:text-[13px] font-medium transition',
           active
@@ -100,7 +101,7 @@ export default function Shell({ children }) {
           small && 'min-h-[44px]'
         )}>
         <Icon size={17} className={cx('shrink-0', active ? 'text-white' : 'text-[#A07856]')} />
-        {!(collapsed && !small) && <span className="truncate">{t(it.key)}</span>}
+        {!(collapsed && !small) && <span className="truncate">{navLabel}</span>}
       </Link>
     );
   };
@@ -230,9 +231,9 @@ export default function Shell({ children }) {
       <Sheet open={finder} onClose={() => setFinder(false)} title={t('search')}>
         <input className="input mb-3" autoFocus aria-label={t('search')} placeholder={t('search')} value={fq} onChange={(e) => setFq(e.target.value)} />
         <div className="space-y-1">
-          {ALL_ITEMS.filter((it) => canOpen(can, it) && (!fq || t(it.key).toLowerCase().includes(fq.toLowerCase()) || it.key.toLowerCase().includes(fq.toLowerCase()))).map((it) => {
+          {ALL_ITEMS.filter((it) => canOpen(can, it) && (!fq || (it.label || t(it.key)).toLowerCase().includes(fq.toLowerCase()) || it.key.toLowerCase().includes(fq.toLowerCase()))).map((it) => {
             const Icon = it.icon;
-            return <Link key={it.key} href={it.href} onClick={() => setFinder(false)} className="flex items-center gap-3 rounded-none px-3 min-h-[40px] hover:bg-sand-100 hover:text-terra text-sm font-medium"><Icon size={18} className="text-terra" /> {t(it.key)}</Link>;
+            return <Link key={it.key} href={it.href} onClick={() => setFinder(false)} className="flex items-center gap-3 rounded-none px-3 min-h-[40px] hover:bg-sand-100 hover:text-terra text-sm font-medium"><Icon size={18} className="text-terra" /> {it.label && !hi ? it.label : t(it.key)}</Link>;
           })}
         </div>
       </Sheet>
