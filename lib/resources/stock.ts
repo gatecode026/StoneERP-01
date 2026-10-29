@@ -112,9 +112,12 @@ export const purchases: ResourceDef = {
     supplierId: oidStr.optional(),
     supplierName: text(120).optional(),
     partyName: text(120).optional(),
-    itemId: oidStr,
+    itemId: oidStr.optional(),
+    itemName: text(160).optional(),
+    productName: text(160).optional(),
     qty: posNum(1e9),
     rate: posNum(1e8),
+    total: z.coerce.number().optional(),
     gstPercent: z.coerce.number().optional(),
     isInterState: z.boolean().optional(),
     billNo: text(60).optional(),
@@ -130,7 +133,7 @@ export const purchases: ResourceDef = {
       if (input.supplierId) {
         sup = await supplierById(ctx, input.supplierId);
       } else if (party) {
-        sup = await Supplier.findOne({ name: { $regex: new RegExp(`^${party.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`, 'i') }, isVoid: false }).session(s(ctx));
+        sup = await Supplier.findOne({ name: { $regex: new RegExp(`^${party.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, isVoid: false }).session(s(ctx));
         if (!sup) {
           const [created] = await Supplier.create([{ name: party, supplies: 'Purchases', outstanding: 0 }], { session: ctx.session });
           sup = created;
@@ -138,16 +141,28 @@ export const purchases: ResourceDef = {
       } else {
         throw badRequest('Party name is required');
       }
-      const it = await stockItemById(ctx, input.itemId);
+      let it: any = null;
+      const prod = (input.productName || input.itemName || '').trim();
+      if (input.itemId) {
+        it = await stockItemById(ctx, input.itemId);
+      } else if (prod) {
+        it = await StockItem.findOne({ name: { $regex: new RegExp(`^${prod.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, isVoid: false }).session(s(ctx));
+        if (!it) {
+          const [created] = await StockItem.create([{ name: prod, category: 'finished', unit: 'sq ft', balance: 0, stockStatus: 'in_stock' }], { session: ctx.session });
+          it = created;
+        }
+      } else {
+        throw badRequest('Product name is required');
+      }
       if (input.date && input.date > todayIST()) throw badRequest('Purchase date cannot be in the future');
       const gst = input.gstPercent ?? 0;
-      const total = Math.round(input.qty * input.rate * (1 + gst / 100));
+      const total = input.total ? Math.round(input.total) : Math.round(input.qty * input.rate * (1 + gst / 100));
       const last: any = await Purchase.findOne({ itemId: it._id, status: { $in: ['approved', 'pending'] }, isVoid: false }).session(s(ctx)).sort({ date: -1, createdAt: -1 }).select('rate').lean();
       const needsApproval = total > ctx.settings.limits.purchaseApproval && !(auth.perm.can('purchases', 'approve') && withinApprovalLimit(auth.perm, total));
       const paidNow = Boolean(input.paidNow);
-      const { paidNow: _p, partyName: _pn, supplierId: _sid, ...rest } = input;
+      const { paidNow: _p, partyName: _pn, supplierId: _sid, productName: _prn, itemName: _itn, itemId: _iid, ...rest } = input;
       const doc: any = {
-        ...rest, supplierId: sup._id, supplierName: sup.name, hasBill: Boolean(input.billPhoto), date: input.date ?? todayIST(), itemName: it.name, gstPercent: gst, total, prevRate: last?.rate,
+        ...rest, supplierId: sup._id, supplierName: sup.name, itemId: it._id, itemName: it.name, hasBill: Boolean(input.billPhoto), date: input.date ?? todayIST(), gstPercent: gst, total, prevRate: last?.rate,
         paidAmount: !needsApproval && paidNow ? total : 0, outstanding: 0, payMode: paidNow ? input.payMode ?? 'Cash' : undefined,
         status: needsApproval ? 'pending' : 'approved', payOnApproval: needsApproval && paidNow, _paidNow: paidNow,
       };

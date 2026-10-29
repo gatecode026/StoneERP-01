@@ -96,6 +96,16 @@ describe('Excel import for every list that has entries', () => {
     expect((await Purchase.findOne().lean() as any)).toMatchObject({ qty: 2, rate: 4500, total: 10620, supplierName: 'Kota Quarry Co.' });
     expect(((await StockItem.findOne({ name: 'Blade' }).lean()) as any).balance).toBe(10);
     expect(((await Supplier.findOne().lean()) as any).outstanding).toBe(10620);
+
+    // client's exact 11-column format:
+    // Sr No. | Date | Party Name | Product Name | Qun. | Rate | Amount | Cgst | Sgst | Igst | Total Amount
+    const p2 = await imp('purchases', [
+      ['Sr No.', 'Date', 'Party Name', 'Product Name', 'Qun.', 'Rate', 'Amount', 'Cgst', 'Sgst', 'Igst', 'Total Amount'],
+      [1, D, 'Shree Ram Stones', 'Kota Stone Slab', 10, 50, 500, 45, 45, 0, 590],
+    ]);
+    expect(p2.json.imported).toBe(1);
+    const createdP: any = await Purchase.findOne({ supplierName: 'Shree Ram Stones' }).lean();
+    expect(createdP).toMatchObject({ qty: 10, rate: 50, total: 590, supplierName: 'Shree Ram Stones', itemName: 'Kota Stone Slab', isInterState: false, gstPercent: 18 });
   });
 
   it('selling: several lines make one order; loading slips and incoming trucks; complaints', async () => {

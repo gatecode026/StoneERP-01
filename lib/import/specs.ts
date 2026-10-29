@@ -96,7 +96,7 @@ const saleRef: Ref = { col: 'order', to: 'saleId', label: 'Order', load: byNames
 const empCol = (key = 'employee', label = 'Employee') => col(key, label, ['employeecode', 'empcode', 'employeename', 'name', 'worker', 'code'], 'E001', { note: 'Employee code or exact name' });
 const dateCol = (key = 'date', label = 'Date', ex = '08-10-2026') => col(key, label, [], ex, { parse: parseDate });
 const textCol = (key: string, label: string, aliases: string[] = [], example = '') => col(key, label, aliases, example);
-const numCol = (key: string, label: string, aliases: string[] = [], example = '') => col(key, label, aliases, example, { parse: num });
+const numCol = (key: string, label: string, aliases: string[] = [], example = '', extra: Partial<Col> = {}) => col(key, label, aliases, example, { parse: num, ...extra });
 const enumCol = (key: string, label: string, list: readonly string[], example: string, aliases: string[] = []) => col(key, label, aliases, example, { note: list.join(' / '), parse: pick(list) });
 const CATEGORY = (v: string) => {
   const s = low(v);
@@ -356,12 +356,84 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
     describe: (i) => `${i.item ?? ''} ${i.type ?? ''} ${i.qty ?? ''}`,
   },
   purchases: {
-    resource: 'purchases', noun: 'purchases', required: ['supplier', 'item', 'qty', 'rate'], refs: [supplierRef(), itemRef()],
-    footnote: 'One row per purchase. Stock goes up and the supplier\'s balance is updated exactly as when entered by hand. "Paid now": Yes / No. Purchases above the approval limit wait for approval.',
-    columns: [dateCol(), col('supplier', 'Supplier', ['suppliername'], 'Kota Quarry Co.'), col('item', 'Item', ['itemname', 'product'], 'Diamond blade 600 mm'), numCol('qty', 'Quantity', ['quantity'], '2'), numCol('rate', 'Rate', ['price'], '4500'),
-      col('gstPercent', 'GST %', ['gst', 'gstrate'], '18', { parse: num }), col('billNo', 'Bill number', ['bill', 'invoice'], ''), col('paidNow', 'Paid now', ['paid'], 'No', { note: 'Yes / No', parse: yes }),
-      enumCol('payMode', 'Paid by', ['Cash', 'UPI', 'Bank'], 'Bank', ['mode']), dateCol('dueDate', 'Due date', '30-10-2026')],
-    describe: (i) => `${i.supplier ?? ''} · ${i.item ?? ''}`,
+    resource: 'purchases', noun: 'purchases', required: ['partyName', 'productName', 'qty', 'rate'],
+    footnote: 'Delete the example row before importing. Enter Date, Party Name, Product Name, Qun., Rate, Amount, Cgst, Sgst, Igst, and Total Amount. Stock goes up and the party\'s balance is updated automatically.',
+    columns: [
+      col('srNo', 'Sr No.', ['srno', 'sr', 'serial', 'sno', 'sn', 'sno.', 'sr.no.', 'sr. no.', 'sr.no'], '1', { note: 'Optional serial number' }),
+      dateCol('date', 'Date', '08-10-2026'),
+      col('partyName', 'Party Name', ['partyname', 'party', 'supplier', 'suppliername', 'vendor'], 'Kota Quarry Co.', { note: 'Supplier / Party name' }),
+      col('productName', 'Product Name', ['productname', 'product', 'item', 'itemname', 'material', 'stone', 'colour', 'color'], 'Kota Stone Slab', { note: 'Stock item name or colour' }),
+      numCol('qty', 'Qun.', ['qun', 'quantity', 'qty', 'pcs', 'sqft'], '100', { note: 'Quantity purchased' }),
+      numCol('rate', 'Rate', ['rate', 'price', 'unitrate', 'cost'], '50', { note: 'Rate per unit (₹)' }),
+      numCol('amount', 'Amount', ['amount', 'taxableamount', 'baseamount', 'taxable', 'basicamount', 'base'], '5000', { note: 'Taxable base amount (Qun. × Rate)' }),
+      numCol('cgst', 'Cgst', ['cgst', 'cgstamt', 'cgstamount', 'cgst%'], '450', { note: 'CGST amount (Intra-state)' }),
+      numCol('sgst', 'Sgst', ['sgst', 'sgstamt', 'sgstamount', 'sgst%'], '450', { note: 'SGST amount (Intra-state)' }),
+      numCol('igst', 'Igst', ['igst', 'igstamt', 'igstamount', 'igst%'], '0', { note: 'IGST amount (Inter-state)' }),
+      numCol('total', 'Total Amount', ['totalamount', 'total', 'grandtotal', 'billamount', 'netamount', 'grossamount'], '5900', { note: 'Total bill amount including taxes' }),
+      // backward-compatible columns (hidden from new template):
+      { ...col('gstPercent', 'GST %', ['gst', 'gstpercent', 'gstrate', 'gst%'], '18', { parse: num }), hiddenInTemplate: true },
+      { ...col('billNo', 'Bill number', ['bill', 'invoice', 'billno', 'invoiceno'], ''), hiddenInTemplate: true },
+      { ...col('paidNow', 'Paid now', ['paid', 'paidnow'], 'No', { note: 'Yes / No', parse: yes }), hiddenInTemplate: true },
+      { ...enumCol('payMode', 'Paid by', ['Cash', 'UPI', 'Bank'], 'Bank', ['mode', 'paymode']), hiddenInTemplate: true },
+      { ...dateCol('dueDate', 'Due date', '30-10-2026'), hiddenInTemplate: true },
+    ],
+    shape: (i: Record<string, any>) => {
+      const partyName = String(i.partyName || i.supplier || '').trim();
+      const productName = String(i.productName || i.item || '').trim();
+      const qty = Number(i.qty || 0);
+      const rate = (i.rate !== undefined && i.rate !== '') ? Number(i.rate) : (i.amount && qty ? Number(i.amount) / qty : 0);
+      const amount = (i.amount !== undefined && i.amount !== '') ? Number(i.amount) : (qty * rate);
+      const cgst = (i.cgst !== undefined && i.cgst !== '') ? Number(i.cgst) : 0;
+      const sgst = (i.sgst !== undefined && i.sgst !== '') ? Number(i.sgst) : 0;
+      const igst = (i.igst !== undefined && i.igst !== '') ? Number(i.igst) : 0;
+      const isInterState = igst > 0 || Boolean(i.isInterState);
+      let gstAmount = igst > 0 ? igst : (cgst + sgst);
+      let gstPercent = 0;
+      if (i.gstPercent !== undefined && i.gstPercent !== '') {
+        gstPercent = Number(i.gstPercent);
+        if (gstAmount === 0 && gstPercent > 0) {
+          gstAmount = Math.round(amount * (gstPercent / 100));
+        }
+      } else if (gstAmount > 0 && amount > 0) {
+        const raw = (gstAmount / amount) * 100;
+        const STANDARD_GST = [0, 5, 12, 18, 28];
+        gstPercent = STANDARD_GST.reduce((prev, curr) => Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev);
+      }
+      let total = 0;
+      if (i.total !== undefined && i.total !== '') {
+        total = Math.round(Number(i.total));
+        if (gstPercent === 0 && total > amount && amount > 0) {
+          const raw = ((total - amount) / amount) * 100;
+          const STANDARD_GST = [0, 5, 12, 18, 28];
+          gstPercent = STANDARD_GST.reduce((prev, curr) => Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev);
+        }
+      } else if (gstAmount > 0) {
+        total = Math.round(amount + gstAmount);
+      } else if (gstPercent > 0) {
+        total = Math.round(amount * (1 + gstPercent / 100));
+      } else {
+        total = Math.round(amount);
+      }
+      const out: Record<string, any> = {
+        ...i,
+        partyName,
+        productName,
+        qty,
+        rate,
+        gstPercent,
+        isInterState,
+        total,
+      };
+      delete out.supplier;
+      delete out.item;
+      delete out.srNo;
+      delete out.amount;
+      delete out.cgst;
+      delete out.sgst;
+      delete out.igst;
+      return out;
+    },
+    describe: (i) => `${i.partyName ?? i.supplier ?? ''} · ${i.productName ?? i.item ?? ''}`,
   },
   // ------------------------------------------------------------ selling
   sales: {

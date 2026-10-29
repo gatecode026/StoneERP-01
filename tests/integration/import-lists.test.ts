@@ -90,7 +90,7 @@ describe('Excel import for master lists', () => {
     const s = await sheet([['Supplier name', 'City'], ['Kota Quarry Co.', 'Kota'], ['kota quarry co.', 'Kota']]);
     expect((await send(owner, 'suppliers', s, true)).json).toMatchObject({ imported: 1, skipped: 1 });
     expect(await Supplier.countDocuments()).toBe(1);
-    for (const k of ['customers', 'suppliers', 'stockitems', 'machines', 'vehicles']) {
+    for (const k of ['customers', 'suppliers', 'stockitems', 'machines', 'vehicles', 'purchases']) {
       const t = await send(owner, k, null, false, 'GET');
       expect(t.status).toBe(200);
       expect(t.res.headers.get('content-disposition')).toMatch(/template\.xlsx/);
