@@ -75,6 +75,28 @@ describe('Excel import for master lists', () => {
     expect(((await StockItem.findOne({ name: 'Blades' }).lean()) as any)).toMatchObject({ balance: 12, belowMin: false });
   });
 
+  it('stock items: supports new layout (Name, Finish, Egdes, Thikness, Size (L), Size (W), Quntity, SQFT, Price)', async () => {
+    const f = await sheet([
+      ['Name', 'Finish', 'Egdes', 'Thikness', 'Size (L)', 'Size (W)', 'Quntity', 'SQFT', 'Price'],
+      ['Mandana Red', 'Natural', 'Hand Cut', '20-25', 600, 450, 50, 150, 75],
+    ]);
+    const r = await send(owner, 'stockitems', f, true);
+    expect(r.json).toMatchObject({ imported: 1 });
+    const item: any = await StockItem.findOne({ name: 'Mandana Red' }).lean();
+    expect(item).toMatchObject({
+      name: 'Mandana Red',
+      finish: 'Natural',
+      edges: 'Hand Cut',
+      thickness: '20-25',
+      sizeL: 600,
+      sizeW: 450,
+      pieces: 50,
+      balance: 150,
+      sellRate: 75,
+      price: 75,
+    });
+  });
+
   it('machines and vehicles map types and dates, and skip existing records', async () => {
     const m = await sheet([['Machine name', 'Type', 'Location', 'Purchase date', 'Service every (days)'], ['Gang saw 1', 'gang saw', 'factory', '01-04-2022', 60], ['Crane X', 'Rocket', '', '', '']]);
     const r = await send(owner, 'machines', m, true);
