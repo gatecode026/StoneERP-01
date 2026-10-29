@@ -134,17 +134,17 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
   },
   stockitems: {
     resource: 'stockitems', noun: 'stock items', required: ['name'],
-    footnote: 'Delete the example row before importing. "Colour" is required. "Quantity Sqft" becomes the opening stock balance.',
+    footnote: 'Delete the example row before importing. "Name" is required. "SQFT" becomes the opening stock balance.',
     columns: [
-      col('name', 'Colour', ['colour', 'color', 'item name', 'item', 'product', 'name'], 'Kotah Blue'),
+      col('name', 'Name', ['name', 'colour', 'color', 'item name', 'item', 'product'], 'Kotah Blue'),
       col('finish', 'Finish', ['finish', 'finishtype'], 'Natural'),
-      numCol('sizeL', 'Sizes Length', ['sizes length', 'size length', 'length', 'sizel', 'l'], '600'),
-      numCol('sizeW', 'Sizes Width', ['sizes width', 'size width', 'width', 'sizew', 'w'], '600'),
-      numCol('thickness', 'Thickness', ['thickness', 'thickness (mm)', 'thk'], '25'),
-      col('edges', 'Edges', ['edges', 'edge', 'edgefinish'], 'Hand Cut'),
+      col('edges', 'Egdes', ['egdes', 'edges', 'edge', 'edgefinish'], 'Hand Cut'),
+      col('thickness', 'Thikness', ['thikness', 'thickness', 'thickness (mm)', 'thk'], '25'),
+      numCol('sizeL', 'Size (L)', ['size (l)', 'size(l)', 'sizes length', 'size length', 'length', 'sizel', 'l'], '600'),
+      numCol('sizeW', 'Size (W)', ['size (w)', 'size(w)', 'sizes width', 'size width', 'width', 'sizew', 'w'], '600'),
+      numCol('pieces', 'Quntity', ['quntity', 'quantity', 'pieces', 'pcs', 'quantity pieces', 'pieces count', 'quantity (pieces)', 'quantity (pcs)', 'qty'], '100'),
+      numCol('openingBalance', 'SQFT', ['sqft', 'quantity sqft', 'quantity (sqft)', 'opening balance', 'balance', 'area', 'total sqft'], '400'),
       numCol('price', 'Price', ['price', 'selling rate', 'rate', 'price (rs)', 'sellingprice', 'sellrate'], '65'),
-      numCol('openingBalance', 'Quantity Sqft', ['quantity sqft', 'quantity (sqft)', 'sqft', 'opening balance', 'balance', 'quantity', 'qty'], '400'),
-      numCol('pieces', 'Pieces', ['pieces', 'pcs', 'quantity pieces', 'pieces count'], '100'),
       // backward-compatible columns (parsed if present in existing files/tests, but hidden from the new template):
       { ...col('category', 'Type', ['stocktype', 'category', 'kind'], 'finished', { note: 'raw / finished / consumable', parse: CATEGORY }), hiddenInTemplate: true },
       { ...col('unit', 'Counted in', ['unit', 'uom'], 'sq ft', { note: 'sq ft, sq m, pieces, CFT, tonne, litres, kg, numbers' }), hiddenInTemplate: true },
@@ -159,10 +159,14 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       const sizeL = i.sizeL ? Number(i.sizeL) : undefined;
       const sizeW = i.sizeW ? Number(i.sizeW) : undefined;
       const size = i.size || (sizeL && sizeW ? `${sizeL}x${sizeW}` : (sizeL ? `${sizeL}` : ''));
-      const balance = i.openingBalance != null && i.openingBalance !== '' ? Number(i.openingBalance) : 0;
-      const pieces = i.pieces != null && i.pieces !== '' ? Number(i.pieces) : undefined;
+      const pieces = i.pieces != null && i.pieces !== '' ? Number(i.pieces) : (i.quntity != null && i.quntity !== '' ? Number(i.quntity) : undefined);
+      let balance = i.openingBalance != null && i.openingBalance !== '' ? Number(i.openingBalance) : (i.sqft != null && i.sqft !== '' ? Number(i.sqft) : 0);
+      if (!balance && pieces && sizeL && sizeW) {
+        balance = Math.round(((sizeL * sizeW * pieces) / 92903.04) * 100) / 100;
+      }
       const price = i.price != null && i.price !== '' ? Number(i.price) : (i.sellRate != null && i.sellRate !== '' ? Number(i.sellRate) : undefined);
       const edges = i.edges ? String(i.edges).trim().slice(0, 120) : undefined;
+      const thickness = i.thickness != null && i.thickness !== '' ? String(i.thickness).trim() : undefined;
       return {
         ...i,
         name,
@@ -172,6 +176,7 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
         sizeL,
         sizeW,
         size,
+        thickness,
         edges,
         pieces,
         openingBalance: balance,

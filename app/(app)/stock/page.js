@@ -37,7 +37,7 @@ export default function StockPage() {
     { name: 'finish', label: 'Finish', placeholder: 'e.g. Natural, Honed, Polished, Flamed' },
     { name: 'sizeL', label: 'Sizes Length (mm)', type: 'number', placeholder: '600' },
     { name: 'sizeW', label: 'Sizes Width (mm)', type: 'number', placeholder: '600' },
-    { name: 'thickness', label: 'Thickness (mm)', type: 'number', placeholder: '25' },
+    { name: 'thickness', label: 'Thickness (mm)', placeholder: 'e.g. 25, 20-25' },
     { name: 'edges', label: 'Edges', placeholder: 'e.g. Hand Cut, Machine Cut, Bullnose, Chamfered' },
     { name: 'price', label: 'Price (₹)', type: 'number', placeholder: '65', hint: isOwner ? 'Selling rate per sq ft' : undefined },
     { name: 'openingBalance', label: 'Quantity Sqft', type: 'number', default: 0, createOnly: true, hint: 'Opening stock balance' },
@@ -65,7 +65,7 @@ export default function StockPage() {
     { key: 'finish', label: 'Finish', render: (r) => r.finish || '—' },
     { key: 'sizeL', label: 'Sizes Length', render: (r) => r.sizeL ? `${r.sizeL} mm` : '—' },
     { key: 'sizeW', label: 'Sizes Width', render: (r) => r.sizeW ? `${r.sizeW} mm` : '—' },
-    { key: 'thickness', label: 'Thickness', render: (r) => r.thickness ? `${r.thickness} mm` : '—' },
+    { key: 'thickness', label: 'Thickness', render: (r) => r.thickness ? (String(r.thickness).toLowerCase().includes('mm') ? r.thickness : `${r.thickness} mm`) : '—' },
     { key: 'edges', label: 'Edges', render: (r) => r.edges || '—' },
     {
       key: 'price',

@@ -13,7 +13,7 @@ export const StockItem = defineModel(
     sizeL: { type: N, min: 0 }, // Size Length in mm
     sizeW: { type: N, min: 0 }, // Size Width in mm
     size: { type: S, maxlength: 60 }, // legacy size string e.g. "600×600"
-    thickness: { type: N, min: 0 },
+    thickness: { type: Schema.Types.Mixed },
     edges: { type: S, maxlength: 120 },
     finish: { type: S, maxlength: 40 },
     pieces: { type: N, min: 0 }, // Pieces count

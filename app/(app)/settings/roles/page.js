@@ -9,8 +9,8 @@ import { api } from '@/lib/client';
 import { NAV_GROUPS } from '@/lib/nav';
 import T from '@/components/T';
 
-// Only the five roles people are given through their Job are shown. The Owner always has every right (fixed, nothing to edit), and the older job presets are no longer assigned.
-const EDITABLE_ROLES = ['manager', 'accountant', 'supervisor', 'salesperson', 'worker'];
+// Only the roles people are given through their Job are shown (Supervisor, Operator, Worker / Labour).
+const EDITABLE_ROLES = ['supervisor', 'operator', 'worker'];
 const SCOPE_LABEL = { '': '—', own: 'Own', team: 'Team', all: 'All' };
 const ACT_LABEL = { view: 'See', create: 'Add', edit: 'Edit', void: 'Cancel', approve: 'Approve', export: 'Export' };
 const LEVELS = [['none', 'Hidden'], ['masked', 'Masked'], ['read', 'See'], ['write', 'See + change']];
@@ -19,7 +19,7 @@ const GROUP_LABEL = { money: 'Money (pay rates, PF/ESI)', cost: 'Cost (purchase 
 function RolesEditor() {
   const { lang, tr } = useApp();
   const { data, loading, error, reload } = useFetch('/api/roles');
-  const [sel, setSel] = useState('manager');
+  const [sel, setSel] = useState('supervisor');
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);

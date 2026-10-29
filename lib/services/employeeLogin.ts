@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod';
 import { Employee, User } from '../models';
-import { BASE_ROLES, PRESETS } from '../roles';
+import { BASE_ROLES, PRESETS, roleOfJob } from '../roles';
 export { roleOfJob } from '../roles';
 import { badRequest, conflict, forbidden } from '../errors';
 import { hashPassword, initialPasswordSchema, mobileSchema } from '../auth/password';
@@ -75,19 +75,31 @@ export async function applyLogin(ctx: SvcCtx, auth: AuthCtx, emp: any, login: Lo
   clearTeamCache();
 }
 
-/** Keep the sign-in in step when the profile's name or mobile changes. */
+/** Keep the sign-in in step when the profile's name, job, or mobile changes. */
 export async function syncLoginIdentity(ctx: SvcCtx, doc: any, prev: any) {
-  if (doc.mobile === prev.mobile && doc.name === prev.name) return;
   const session = ctx.session ?? null;
   const u: any = await User.findOne({ $or: [{ employeeId: doc._id }, { empCode: doc.empCode }] }).session(session).lean();
   if (!u) return;
-  const set: any = { name: doc.name };
-  if (doc.mobile && doc.mobile !== prev.mobile) {
+  const set: any = {};
+  if (doc.name && doc.name !== prev?.name) set.name = doc.name;
+  if (doc.job) {
+    const expectedRole = roleOfJob(doc.job);
+    if (expectedRole && expectedRole !== u.role) {
+      set.role = expectedRole;
+      await Employee.updateOne({ _id: doc._id }, { $set: { loginRole: expectedRole } }, { session: ctx.session });
+    }
+  }
+  if (doc.mobile && doc.mobile !== prev?.mobile) {
     const m = mobileSchema.safeParse(doc.mobile ?? '');
     if (m.success) {
       if (await User.exists({ username: m.data, _id: { $ne: u._id } }).session(session)) throw conflict('Another sign-in already uses this mobile number');
       set.username = m.data;
     }
   }
-  await User.updateOne({ _id: u._id }, { $set: set }, { session: ctx.session });
+  if (Object.keys(set).length > 0) {
+    await User.updateOne({ _id: u._id }, { $set: set }, { session: ctx.session });
+    if (set.role && set.role !== u.role) {
+      await destroyUserSessions(u._id);
+    }
+  }
 }

@@ -14,7 +14,7 @@ const s = (ctx: { session?: any }) => ctx.session ?? null;
 const itemFields = {
   name: req(160), category: text(60).optional(), unit: text(20).optional(),
   size: text(60).optional(), sizeL: num(0, 1e7).optional(), sizeW: num(0, 1e7).optional(),
-  thickness: num(0, 1000).optional(), edges: text(120).optional(), finish: text(40).optional(), pieces: num(0, 1e7).optional(),
+  thickness: z.union([num(0, 1000), text(100)]).optional(), edges: text(120).optional(), finish: text(40).optional(), pieces: num(0, 1e7).optional(),
   colourFinish: text(80).optional(), karigar: text(120).optional(),
   grade: enumOf(['A', 'B', 'C']).optional(), location: text(80).optional(), photo: photo.optional(),
   minLevel: num().optional(), price: num().optional(), sellRate: num().optional(), costRate: num().optional(), allowNegative: z.boolean().optional(),

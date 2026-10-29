@@ -17,8 +17,8 @@ const sum = (a: any[], f: (x: any) => number) => a.reduce((t, x) => t + (Number(
 const r0 = (n: number) => Math.round(Number(n) || 0);
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
-export type HomeKind = 'owner' | 'manager' | 'accountant' | 'supervisor' | 'salesperson' | 'worker' | 'guard' | 'store_keeper' | 'mechanic' | 'cashier' | 'driver' | 'yard_incharge';
-const KINDS: HomeKind[] = ['owner', 'manager', 'accountant', 'supervisor', 'salesperson', 'worker', 'guard', 'store_keeper', 'mechanic', 'cashier', 'driver', 'yard_incharge'];
+export type HomeKind = 'owner' | 'manager' | 'accountant' | 'supervisor' | 'salesperson' | 'worker' | 'guard' | 'store_keeper' | 'mechanic' | 'cashier' | 'driver' | 'yard_incharge' | 'operator';
+const KINDS: HomeKind[] = ['owner', 'manager', 'accountant', 'supervisor', 'salesperson', 'worker', 'guard', 'store_keeper', 'mechanic', 'cashier', 'driver', 'yard_incharge', 'operator'];
 export const homeKind = (perm: Pick<EffectivePerm, 'roleKey'>): HomeKind => ((KINDS as string[]).includes(perm.roleKey) ? (perm.roleKey as HomeKind) : 'worker');
 
 /** `denied` lists sections this role's home normally shows but the person has no right to see (the card renders "No permission"). */
@@ -279,6 +279,15 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
         Dispatch.find({ $and: [{ date, direction: 'in', isVoid: false }, dsf] }).select('truckNo kind driverName').lean(),
       ]);
       return withDenied(perm, { ...base, yard: { inYard, trucksInToday: inToday } }, { yard: 'blocks' });
+    }
+    case 'operator': {
+      const msf = await scopeFilter(user, perm, 'machines', 'view');
+      const mesf = await scopeFilter(user, perm, 'machineentries', 'view');
+      const [machines, entriesToday] = await Promise.all([
+        Machine.find({ $and: [{ isVoid: false }, msf] }).select('name type location hourMeter status').lean(),
+        MachineEntry.find({ $and: [{ date, isVoid: false }, mesf] }).select('machineName shift hoursProduced outputSqft').lean(),
+      ]);
+      return withDenied(perm, { ...base, operator: { machines, entriesToday } }, { operator: 'machines' });
     }
     default:
       return { ...base, denied: [] as string[] };

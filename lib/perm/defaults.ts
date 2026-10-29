@@ -65,6 +65,10 @@ const SALESPERSON = parse(withOwn({
 
 const WORKER = parse(OWN);
 
+const OPERATOR = parse(withOwn({
+  machines: 'vt', machineentries: 'vm cm em',
+}));
+
 const STORE_KEEPER = parse(withOwn({
   stockitems: 'v* c* e* o*', stockmovements: 'v* c* o*', stockcounts: 'v* c* e*', suppliers: 'v* c*', purchases: 'v* c* o*', expenses: 'vm cm', reminders: 'vm',
 }));
@@ -92,7 +96,8 @@ export const ROLE_DEFAULTS: Record<(typeof BASE_ROLES)[number] | (typeof PRESETS
   accountant: { label: 'Accountant', grants: ACCOUNTANT, fields: F('write', 'write', 'write'), approvalLimit: 0 },
   supervisor: { label: 'Supervisor', grants: SUPERVISOR, fields: F('none', 'none', 'masked'), approvalLimit: 0 },
   salesperson: { label: 'Salesperson', grants: SALESPERSON, fields: F('none', 'none', 'none'), approvalLimit: 0 },
-  worker: { label: 'Worker / Operator', grants: WORKER, fields: F('none', 'none', 'none'), approvalLimit: 0 },
+  operator: { label: 'Operator', grants: OPERATOR, fields: F('none', 'none', 'none'), approvalLimit: 0 },
+  worker: { label: 'Worker / Labour', grants: WORKER, fields: F('none', 'none', 'none'), approvalLimit: 0 },
   store_keeper: { label: 'Store keeper', grants: STORE_KEEPER, fields: F('none', 'write', 'none'), approvalLimit: 0 },
   yard_incharge: { label: 'Yard / Gate in-charge', grants: YARD_INCHARGE, fields: F('none', 'none', 'none'), approvalLimit: 0 },
   guard: { label: 'Guard', grants: GUARD, fields: F('none', 'none', 'none'), approvalLimit: 0 },

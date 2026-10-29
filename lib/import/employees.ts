@@ -39,7 +39,7 @@ export function tenDigits(v: string): string {
 export const COLUMNS: Col[] = [  
   { key: 'empCode', label: 'Employee code', aliases: ['code', 'empcode', 'employeeid', 'empid', 'id'], example: 'E101', note: 'Leave empty: the app numbers new people automatically (EMP-0001, EMP-0002 …)' },
   { key: 'name', label: 'Name', aliases: ['employeename', 'fullname'], example: 'Ramesh Meena', note: 'Required' },
-  { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / operator', note: 'Manager / Accountant / Supervisor / Salesperson / Worker / operator' },
+  { key: 'job', label: 'Job', aliases: ['designation', 'work', 'role', 'post'], example: 'Worker / Labour', note: 'Supervisor / Operator / Worker / Labour' },
   { key: 'mobile', label: 'Mobile', aliases: ['phone', 'mobileno', 'mobilenumber', 'phonenumber', 'contact'], example: '9829012345', parse: tenDigits },
   { key: 'shiftId', label: 'Shift code', aliases: ['shift', 'shiftcode'], example: 'day', note: 'The code of a shift in Settings; empty = the default shift', parse: (v) => v.trim().toLowerCase() },
   { key: 'biometricId', label: 'Biometric ID', aliases: ['biometric', 'machineid', 'punchid'], example: '', note: 'The number the biometric machine knows this person by', parse: (v) => v.replace(/\s/g, '') },

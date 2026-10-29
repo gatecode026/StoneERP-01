@@ -76,6 +76,24 @@ export async function loginWithPassword(input: { username: string; password: str
       });
       await Employee.updateOne({ _id: emp._id }, { $set: { hasLogin: true, loginRole: role } });
     }
+  } else if (user && !byEmail) {
+    const emp: any = await Employee.findOne({
+      $or: [
+        ...(user.employeeId ? [{ _id: user.employeeId }] : []),
+        ...(user.empCode ? [{ empCode: user.empCode }] : []),
+        ...(user.username ? [{ mobile: user.username }] : []),
+      ],
+      isVoid: false,
+    }).lean();
+
+    if (emp && emp.job) {
+      const correctRole = roleOfJob(emp.job);
+      if (correctRole && (user.role !== correctRole || emp.loginRole !== correctRole)) {
+        user.role = correctRole;
+        await User.updateOne({ _id: user._id }, { $set: { role: correctRole } });
+        await Employee.updateOne({ _id: emp._id }, { $set: { loginRole: correctRole } });
+      }
+    }
   }
 
   if (!user || !user.active) {
