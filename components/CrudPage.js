@@ -562,10 +562,11 @@ export default function CrudPage({
     setVoidBusy(true);
     const row = voiding;
     try {
-      await api(`/api/${model}/${row._id}`, { method: 'DELETE', body: { reason } });
-      toast.success(voidSuccessMsg ? tx(voidSuccessMsg) : (voidLabel ? trNow('{label} deactivated', { label: trNow(label) }) : 'Entry cancelled'));
+      await api(`/api/${model}/${row._id}`, { method: 'DELETE', body: {} });
+      toast.success(voidSuccessMsg ? tx(voidSuccessMsg) : (voidLabel ? trNow('{label} deactivated', { label: trNow(label) }) : tx('Deleted successfully')));
       setVoiding(null);
       setReason('');
+      window.dispatchEvent(new Event('vss-data-changed'));
       reload();
     } catch (e) {
       toast.error(e.message);
@@ -614,11 +615,32 @@ export default function CrudPage({
     if (allowVoid && can(model, 'void') && !isVoid) {
       items.push({
         key: 'void',
-        label: voidLabel ? tx(voidLabel) : t('cancelEntry'),
+        label: voidLabel ? tx(voidLabel) : tx('Delete'),
         icon: <Ban size={15} className="shrink-0 text-red-500" />,
         danger: true,
         disabled: voidBusy,
-        onClick: () => { setReason(''); setVoiding(row); },
+        onClick: async () => {
+          const name = row?.name || row?.title || tx(label);
+          const ok = await confirmDialog(
+            voidPrompt ? tx(voidPrompt) : tx('Delete {name}?', { name }),
+            { danger: true, okLabel: voidLabel ? tx(voidLabel) : tx('Delete') }
+          );
+          if (!ok) return;
+          if (voidBusyRef.current) return;
+          voidBusyRef.current = true;
+          setVoidBusy(true);
+          try {
+            await api(`/api/${model}/${row._id}`, { method: 'DELETE', body: {} });
+            toast.success(voidSuccessMsg ? tx(voidSuccessMsg) : (voidLabel ? trNow('{label} deactivated', { label: trNow(label) }) : tx('Deleted successfully')));
+            window.dispatchEvent(new Event('vss-data-changed'));
+            reload();
+          } catch (e) {
+            toast.error(e.message);
+          } finally {
+            voidBusyRef.current = false;
+            setVoidBusy(false);
+          }
+        },
       });
     }
 
@@ -824,7 +846,7 @@ export default function CrudPage({
         <FormFields fields={fields} form={form} set={set} mode={editing ? 'edit' : 'new'} showErrors={showErrors} />
       </Sheet>
 
-      <Sheet open={!!voiding} onClose={() => { if (!voidBusy) setVoiding(null); }} title={voidTitle ? tx(voidTitle) : voidLabel ? `${tx(voidLabel)} – ${voiding?.name || voiding?.title || tx(label)}` : t('cancelEntry')}
+      <Sheet open={!!voiding} onClose={() => { if (!voidBusy) setVoiding(null); }} title={voidTitle ? tx(voidTitle) : voidLabel ? `${tx(voidLabel)} – ${voiding?.name || voiding?.title || tx(label)}` : tx('Delete entry')}
         footer={<>
           <button type="button" className="btn-outline flex-1 sm:flex-initial sm:min-w-[110px]" disabled={voidBusy} onClick={() => setVoiding(null)}>{t('cancel')}</button>
           <button
@@ -833,13 +855,10 @@ export default function CrudPage({
             disabled={voidBusy}
             onClick={confirmVoid}
           >
-            {voidBusy ? (voidLabel ? tx('Deactivating…') : tx('Cancelling…')) : (voidLabel ? tx(voidLabel) : t('cancelEntry'))}
+            {voidBusy ? (voidLabel ? tx('Deactivating…') : tx('Deleting…')) : (voidLabel ? tx(voidLabel) : tx('Delete'))}
           </button>
         </>}>
-        <p className="text-sm text-char-700 mb-3">{voidPrompt ? tx(voidPrompt) : tx('Nothing is deleted — the entry stays in the audit trail, and any stock or money it moved is reversed.')}</p>
-        <Field label={voidLabel ? tx('Reason for deactivation') : tx('Reason')} htmlFor="void_reason">
-          <input id="void_reason" className="input" value={reason} disabled={voidBusy} onChange={(e) => setReason(e.target.value)} autoFocus />
-        </Field>
+        <p className="text-sm text-char-700">{voidPrompt ? tx(voidPrompt) : tx('Are you sure you want to delete this entry?')}</p>
       </Sheet>
 
       <Sheet open={!!hist} onClose={() => setHist(null)} title={`${t('history')} – ${hist?.row?.name || hist?.row?.title || tx(label)}`}>

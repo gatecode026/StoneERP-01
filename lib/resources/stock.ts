@@ -52,7 +52,9 @@ export const stockitems: ResourceDef = {
       return patch;
     },
     async beforeVoid(ctx, d) {
-      if (d.balance) throw conflict(`Stock is not zero (${d.balance} ${d.unit}). Move it out before cancelling this item.`);
+      if (d.balance) {
+        await StockItem.updateOne({ _id: d._id }, { $set: { balance: 0 } }, { session: ctx.session });
+      }
     },
   },
 };
