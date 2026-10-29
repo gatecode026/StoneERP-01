@@ -37,7 +37,18 @@ export type ModelOpts = {
 
 /** Create (or reuse) a strict model. Unknown fields are dropped; `strict:'throw'` would reject, so we validate in Zod first. */
 export function defineModel(name: string, fields: SchemaDefinition, opts: ModelOpts = {}): AnyModel {
-  if (mongoose.models[name]) return mongoose.models[name] as AnyModel;
+  if (mongoose.models[name]) {
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        mongoose.deleteModel(name);
+      } catch {
+        delete (mongoose as any).models[name];
+        delete (mongoose as any).modelSchemas?.[name];
+      }
+    } else {
+      return mongoose.models[name] as AnyModel;
+    }
+  }
   const schema = new Schema({ ...(opts.noBase ? {} : baseFields), ...fields }, { timestamps: true, strict: true, versionKey: false, minimize: false });
   for (const [def, o] of opts.indexes ?? []) schema.index(def, o);
   schema.plugin(trackQueries);

@@ -28,7 +28,7 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', supervisorCode: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', supervisorCode: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'operator', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode, limit: 300 },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})`, limit: 100 },
   items: { resource: 'stockitems', model: StockItem, search: ['name', 'finish', 'colourFinish'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name finish colourFinish unit balance category', sort: { name: 1 }, label: (d) => `${d.name}${d.finish ? ' ' + d.finish : ''} (${n(d.balance)} ${d.unit})`, hint: (d) => [d.finish, d.unit].filter(Boolean).join(' · ') },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
@@ -63,6 +63,15 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
     if (allowed === 'string') { // any one or comma-separated values (e.g. "Operator" or "Supervisor,Operator")
       const parts = v.split(',').map((s) => s.trim()).filter(Boolean);
       if (!parts.length) throw badRequest(`Filter "${k}" is empty`);
+      if (kind.model === Employee && (k === 'job' || k === 'role')) {
+        const patterns = parts.map((p) => new RegExp(escapeRe(p), 'i'));
+        filters.$or = [
+          { job: { $in: patterns } },
+          { designation: { $in: patterns } },
+          { loginRole: { $in: parts.map((p) => p.toLowerCase()) } },
+        ];
+        continue;
+      }
       filters[k] = parts.length > 1
         ? { $in: parts.map((p) => new RegExp(`^${escapeRe(p)}$`, 'i')) }
         : new RegExp(`^${escapeRe(parts[0])}$`, 'i');

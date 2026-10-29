@@ -28,8 +28,24 @@ export const StockItem = defineModel(
     belowMin: { type: B, default: false }, // maintained with every balance / minimum change => the low-stock alert is an index lookup, not a scan
     stockStatus: { type: S, enum: ['in_stock', 'out_of_stock'], default: 'in_stock' },
   },
-  { indexes: [[{ belowMin: 1 }, { partialFilterExpression: { belowMin: true } }], [{ category: 1, name: 1 }], [{ name: 1 }], [{ stockStatus: 1 }], [{ name: 1, size: 1, finish: 1 }, { unique: true, partialFilterExpression: { isVoid: false } }]] }
+  { indexes: [
+    [{ belowMin: 1 }, { partialFilterExpression: { belowMin: true } }],
+    [{ category: 1, name: 1 }],
+    [{ name: 1 }],
+    [{ stockStatus: 1 }],
+    [{ name: 1, size: 1, finish: 1, thickness: 1, edges: 1 }, { partialFilterExpression: { isVoid: false } }],
+  ] }
 );
+
+if (typeof window === 'undefined') {
+  StockItem.init().then(async () => {
+    try {
+      await StockItem.collection.dropIndex('name_1_size_1_finish_1');
+    } catch {
+      // ignore if already dropped or absent
+    }
+  }).catch(() => {});
+}
 
 export const StockMovement = defineModel(
   'StockMovement',

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Activity, AlertTriangle, CalendarCheck, CheckCircle2, CheckSquare, ClipboardList, Cog, FolderKanban, HandCoins, Hourglass, IndianRupee, Landmark, Package, Receipt, ShoppingCart, Truck, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CheckSquare, ClipboardList, Cog, FolderKanban, HandCoins, Hourglass, IndianRupee, Landmark, Package, Receipt, Users } from 'lucide-react';
 import { cx } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { inr, inrShort, num } from '@/lib/format';
@@ -211,20 +211,9 @@ export function OwnerHome({ data }) {
 
   return (
     <div>
-      {/* 10 Primary Dashboard Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        {/* 1. Current orders */}
-        <Kpi
-          icon={ShoppingCart}
-          label="Current orders"
-          value={d.sales ? `${d.sales.orders} Orders` : '0 Orders'}
-          sub={d.sales ? <>{inrShort(d.sales.today)} today · {inrShort(d.sales.pending)} pending</> : 'Active orders'}
-          href="/sales"
-          spark={col(week, 'orders')}
-          tone="stone"
-        />
-
-        {/* 2. Stocks */}
+      {/* 6 Primary Dashboard Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* 1. Stocks */}
         <Kpi
           icon={Package}
           label="Stocks"
@@ -234,19 +223,7 @@ export function OwnerHome({ data }) {
           tone={d.stock?.lowStock?.length ? 'amber' : 'green'}
         />
 
-        {/* 3. Daily updates */}
-        <Kpi
-          icon={Activity}
-          label="Daily updates"
-          value={d.sales ? inrShort(d.sales.received) : '₹0'}
-          sub={d.sales ? <>Received today · {d.alerts?.length || 0} alerts</> : 'Collections & live feed'}
-          href="/sales?tab=pending"
-          spark={col(week, 'received')}
-          sparkClass="text-emerald-700"
-          tone="green"
-        />
-
-        {/* 4. Attendence */}
+        {/* 2. Attendence */}
         <Kpi
           icon={Users}
           label="Attendence"
@@ -258,7 +235,7 @@ export function OwnerHome({ data }) {
           tone={att?.unmarked ? 'amber' : 'stone'}
         />
 
-        {/* 5. Machine output */}
+        {/* 3. Machine output */}
         <Kpi
           icon={Cog}
           label="Machine output"
@@ -269,30 +246,7 @@ export function OwnerHome({ data }) {
           tone={d.machines?.breakdowns?.length ? 'red' : 'stone'}
         />
 
-        {/* 6. Dispatches */}
-        <Kpi
-          icon={Truck}
-          label="Dispatches"
-          value={d.sales ? `${d.sales.dispatches} Trucks` : '0 Trucks'}
-          sub="Dispatched today · Gate passes"
-          href="/dispatch?status=out"
-          spark={col(week, 'dispatches')}
-          sparkClass="text-slate-700"
-          tone="stone"
-        />
-
-        {/* 7. Attendence */}
-        <Kpi
-          icon={CalendarCheck}
-          label="Attendence"
-          value={att?.otHours > 0 ? `${att.otHours}h OT` : att?.unmarked > 0 ? `${att.unmarked} Pending` : 'All Punched'}
-          sub={att ? <>{att.otCount || 0} overtime staff · {att.present || 0} on duty</> : 'Punches & shift hours'}
-          href="/attendance"
-          spark={col(week, 'present')}
-          tone={att?.unmarked ? 'amber' : 'stone'}
-        />
-
-        {/* 8. Daily task */}
+        {/* 4. Daily task */}
         <Kpi
           icon={CheckSquare}
           label="Daily task"
@@ -302,7 +256,7 @@ export function OwnerHome({ data }) {
           tone={(d.tasks?.overdue ?? 0) > 0 ? 'red' : 'stone'}
         />
 
-        {/* 9. Daily report */}
+        {/* 5. Daily report */}
         <Kpi
           icon={ClipboardList}
           label="Daily report"
@@ -312,7 +266,7 @@ export function OwnerHome({ data }) {
           tone={d.reports?.missing ? 'amber' : 'green'}
         />
 
-        {/* 10. Ongoing Project */}
+        {/* 6. Ongoing Project */}
         <Kpi
           icon={FolderKanban}
           label="Ongoing Project"

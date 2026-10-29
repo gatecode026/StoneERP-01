@@ -64,4 +64,40 @@ describe('Stock Item Import Spec', () => {
       sellRate: 72,
     });
   });
+
+  it('generates distinct keys for same colour and finish when thickness or edges differ', () => {
+    // Row 3: Slate Grey, Natural, 60x90, 25-35mm, M/c
+    const row3Key = spec.keyOf!({
+      name: 'Slate Grey',
+      finish: 'Natural',
+      sizeL: 60,
+      sizeW: 90,
+      thickness: '25-35mm',
+      edges: 'M/c',
+    });
+
+    // Row 13: Slate Grey, Natural, 60x90, 22mm, empty
+    const row13Key = spec.keyOf!({
+      name: 'Slate Grey',
+      finish: 'Natural',
+      sizeL: 60,
+      sizeW: 90,
+      thickness: '22mm',
+      edges: '',
+    });
+
+    expect(row3Key).not.toBe(row13Key);
+    expect(row3Key).toBe('slategrey|natural|60x90|25-35mm|m/c');
+    expect(row13Key).toBe('slategrey|natural|60x90|22mm|');
+
+    // Also normalizes whitespace and multiplication symbol
+    const rowWithCross = spec.keyOf!({
+      name: 'Slate Grey ',
+      finish: ' Natural',
+      size: '60 × 90',
+      thickness: '22 mm',
+    });
+    expect(rowWithCross).toBe('slategrey|natural|60x90|22mm|');
+  });
 });
+

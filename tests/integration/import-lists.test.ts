@@ -97,6 +97,26 @@ describe('Excel import for master lists', () => {
     });
   });
 
+  it('stock items: allows rows with same colour and finish when thickness or edges differ without duplicate errors', async () => {
+    const f = await sheet([
+      ['Colour', 'Finish', 'Sizes Length', 'Sizes Width', 'Thickness', 'Edges', 'Price', 'Quantity Sqft', 'Pieces'],
+      ['Slate Grey', 'Natural', 60, 90, '25-35mm', 'M/c', '', 1080, 180],
+      ['Slate Grey', 'Natural', 60, 90, '22mm', '', '', 168, 28],
+      ['Slate Grey', 'Natural', 60, 60, '25-35mm', 'M/c', '', 3120, 780],
+      ['Slate Grey', 'Natural', 60, 60, '22mm', '', '', 580, 145],
+    ]);
+    const preview = await send(owner, 'stockitems', f, false);
+    expect(preview.json.valid).toBe(4);
+    expect(preview.json.invalid).toBe(0);
+    expect(preview.json.rows.every((r: any) => r.ok)).toBe(true);
+
+    const r = await send(owner, 'stockitems', f, true);
+    expect(r.json).toMatchObject({ imported: 4, skipped: 0 });
+    const items = await StockItem.find({ name: 'Slate Grey' }).lean();
+    expect(items.length).toBe(4);
+  });
+
+
   it('machines and vehicles map types and dates, and skip existing records', async () => {
     const m = await sheet([['Machine name', 'Type', 'Location', 'Purchase date', 'Service every (days)'], ['Gang saw 1', 'gang saw', 'factory', '01-04-2022', 60], ['Crane X', 'Rocket', '', '', '']]);
     const r = await send(owner, 'machines', m, true);

@@ -9,15 +9,23 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth(
   async (c) => {
     const k = c.params.kind;
-    if (k === 'machines' && c.user) {
+    if (['machines', 'employees'].includes(k) && c.user) {
       const perm = await getEffectivePerm(c.user);
       if (
+        perm.can('projects', 'view') ||
+        perm.can('projects', 'create') ||
+        perm.can('projects', 'edit') ||
         perm.can('dailyreports', 'create') ||
         perm.can('dailyreports', 'view') ||
         perm.can('machineentries', 'create') ||
-        perm.can('machineentries', 'view')
+        perm.can('machineentries', 'view') ||
+        perm.can('tasks', 'view') ||
+        perm.can('tasks', 'create') ||
+        perm.can('attendance', 'view') ||
+        perm.can('attendance', 'create') ||
+        perm.can('dashboard', 'view')
       ) {
-        return 'dailyreports';
+        return 'dashboard';
       }
     }
     return lookupKind(k).resource;
@@ -25,8 +33,11 @@ export const GET = withAuth(
   'view',
   async (auth) => {
     const kind = lookupKind(auth.params.kind);
-    // For machines dropdown, show all active factory machines so operators/workers can pick them
-    const filter = auth.params.kind === 'machines' ? {} : await auth.filter('view');
+    // For dropdown pickers (machines, employees, items, vehicles, etc.), show all active master records across the plant
+    // so any authorized user can assign/pick supervisors, operators, drivers, machines, etc.
+    const filter = ['machines', 'employees', 'items', 'vehicles', 'suppliers', 'customers'].includes(auth.params.kind)
+      ? {}
+      : await auth.filter('view');
     const out = await runLookup(kind, auth.query, filter);
     return jsonWithEtag(auth.req, out, { maxAge: 15 });
   }

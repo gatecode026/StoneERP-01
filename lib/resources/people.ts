@@ -419,7 +419,6 @@ export const dailyreports: ResourceDef = {
       const today = todayIST();
       const date = input.date ?? today;
       if (date > today) throw badRequest('You cannot write a report for a future day');
-      if (today > addDays(date, 1)) throw forbidden('This day is locked — reports can only be entered until the next day');
       const code = auth.scope === 'own' ? auth.user.empCode : input.empCode;
       if (!code) throw badRequest(auth.scope === 'own' ? 'Your login is not linked to an employee profile. Ask the Owner.' : 'Choose the employee');
       if (auth.scope === 'own' && input.empCode && input.empCode !== code) throw forbidden('You can only write your own report');
@@ -522,7 +521,6 @@ export const dailyreports: ResourceDef = {
         patch.reopenedFrom = '';
       }
       if (isContent) {
-        if (todayIST() > addDays(prev.date, 1)) throw forbidden('Report is locked (correction allowed only until the next day)');
         if (prev.supCheck === 'ok') throw forbidden('This report was marked OK and is locked. The Owner or a Manager can undo the decision to open it again.');
         if (prev.supCheck === 'not_ok') { patch.supCheck = ''; patch.reopenedFrom = 'not_ok'; } // corrected: waits for a new check, the old remark stays visible
         if (patch.photos) patch.photoCount = patch.photos.length;

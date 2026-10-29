@@ -1,10 +1,10 @@
 'use client';
 import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye, Boxes } from 'lucide-react';
+import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye, Boxes, Calendar, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
@@ -12,7 +12,7 @@ import MultiLookupSelect from '@/components/MultiLookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
-import { todayISO, addDays, fmtDate, fmtDateTime, num } from '@/lib/format';
+import { todayISO, addDays, fmtDate, fmtDateTime, fmtMonth, num } from '@/lib/format';
 import T from '@/components/T';
 
 const blank = () => ({
@@ -28,7 +28,7 @@ export default function DailyReportPage() {
   const [date, setDate] = useState(sp.get('date') || todayISO());
   // workers see their own recent reports; everybody else sees the chosen day, a page at a time
   const day = useNumberedList(isWorker ? null : '/api/dailyreports', { date, sort: 'empName' }, { size: 25 });
-  const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=10' : null);
+  const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=35' : null);
   const { loading } = day;
   const reload = () => { day.reload(); };
   const [open, setOpen] = useState(false);
@@ -37,9 +37,51 @@ export default function DailyReportPage() {
   const [saving, setSaving] = useState(false);
   const set = (p) => setForm((f) => ({ ...f, ...p }));
   const today = todayISO();
-  const locked = (d) => today > addDays(d, 1);
+  const locked = (d) => false;
 
-  async function openNew(row) {
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+  const [selectedMonthlyDate, setSelectedMonthlyDate] = useState(todayISO());
+  const [isMonthlySubmission, setIsMonthlySubmission] = useState(false);
+  const [calYear, setCalYear] = useState(() => Number(todayISO().slice(0, 4)));
+  const [calMonth, setCalMonth] = useState(() => Number(todayISO().slice(5, 7)) - 1);
+
+  const handleOpenMonthlyCalendar = () => {
+    const [y, m] = today.split('-').map(Number);
+    setCalYear(y);
+    setCalMonth(m - 1);
+    setSelectedMonthlyDate(today);
+    setCalendarModalOpen(true);
+  };
+
+  const [currY, currM] = today.split('-').map(Number);
+  const isCurrentMonthOrLater = calYear > currY || (calYear === currY && calMonth >= currM - 1);
+
+  const prevMonth = () => {
+    setCalMonth((m) => {
+      if (m === 0) {
+        setCalYear((y) => y - 1);
+        return 11;
+      }
+      return m - 1;
+    });
+  };
+
+  const nextMonth = () => {
+    if (isCurrentMonthOrLater) return;
+    setCalMonth((m) => {
+      if (m === 11) {
+        setCalYear((y) => y + 1);
+        return 0;
+      }
+      return m + 1;
+    });
+  };
+
+  const daysInCurMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstDayOfWeek = new Date(calYear, calMonth, 1).getDay();
+
+  async function openNew(row, customDate, isMonthly = false) {
+    setIsMonthlySubmission(Boolean(isMonthly));
     if (row) {
       try {
         const full = await api(`/api/dailyreports/${row._id}`);
@@ -77,11 +119,15 @@ export default function DailyReportPage() {
       }
     } else {
       setEditing(null);
-      setForm({ ...blank(), date });
+      const chosen = customDate || date || today;
+      setForm({ ...blank(), date: chosen });
+      if (!isWorker) {
+        setDate(chosen);
+      }
     }
     setOpen(true);
   }
-  useEffect(() => { if (sp.get('new') === '1' && can('dailyreports', 'create')) openNew();   }, []);
+  useEffect(() => { if (sp.get('new') === '1' && can('dailyreports', 'create')) openNew(); }, []);
 
   async function save() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
@@ -159,6 +205,28 @@ export default function DailyReportPage() {
   const canUndoRow = (r) => canCheck && !isOwn(r) && !!r.supCheck && ['owner', 'manager'].includes(session?.role);
   const statusBadge = (r) => (r.supCheck === 'ok' ? <Badge tone="green"><T>OK</T></Badge> : r.supCheck === 'not_ok' ? <Badge tone="red"><T>Not OK</T></Badge> : r.reopenedFrom === 'not_ok' ? <Badge tone="amber"><T>Corrected: check again</T></Badge> : canCheck ? <Badge tone="gray"><T>Not checked</T></Badge> : null);
 
+  const canDeleteRow = (r) => {
+    if (!r) return false;
+    if (r.supCheck === 'ok') {
+      return ['owner', 'manager'].includes(session?.role);
+    }
+    return canEditRow(r) || can('dailyreports', 'void');
+  };
+
+  async function removeReport(r) {
+    if (!r) return;
+    const ok = await confirmDialog(tr('Delete daily report of {n} for {d}?', { n: r.empName, d: fmtDate(r.date) }));
+    if (!ok) return;
+    try {
+      await api(`/api/dailyreports/${r._id}`, { method: 'DELETE' });
+      toast.success(tr('Daily report deleted'));
+      if (detail?._id === r._id) setDetail(null);
+      reload();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  }
+
   const getReportActions = (r) => {
     const items = [];
     if (canCheckRow(r)) {
@@ -203,6 +271,16 @@ export default function DailyReportPage() {
       dividerBefore: items.length > 0,
       onClick: () => setDetail(r),
     });
+    if (canDeleteRow(r)) {
+      items.push({
+        key: 'delete',
+        label: tr('Delete'),
+        icon: <Trash2 size={15} className="text-red-500" />,
+        danger: true,
+        dividerBefore: true,
+        onClick: () => removeReport(r),
+      });
+    }
     return items;
   };
 
@@ -279,8 +357,182 @@ export default function DailyReportPage() {
         actions={<><ImportData resource="dailyreports" perm="dailyreports" noun="daily work reports" hint="employee and work done are required" />
           {!isWorker && <input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} />}
           {!isWorker && can('dailyreports', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/dailyreports?format=xlsx&${toQuery({ date, sort: 'empName' })}`)} />}
+          {can('dailyreports', 'create') && (
+            <button
+              type="button"
+              className="btn-outline flex items-center gap-1.5 font-bold text-terra border-terra-300 hover:bg-terra-50 px-3 py-2 text-sm shadow-xs transition-colors cursor-pointer"
+              onClick={handleOpenMonthlyCalendar}
+              title="Choose date to submit report of the month"
+            >
+              <Calendar size={16} className="text-terra shrink-0" />
+              <span><T>Monthly Report Submission</T></span>
+            </button>
+          )}
           {can('dailyreports', 'create') && <button className="btn-primary" onClick={() => openNew()}><Plus size={18} /> {isWorker ? 'Fill today\'s report' : t('add')}</button>}
         </>} />
+
+      {/* Monthly Report Calendar Dialog */}
+      {calendarModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-char-950/40 backdrop-blur-xs p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setCalendarModalOpen(false);
+          }}
+        >
+          <div className="bg-white rounded-none border border-sand-300 shadow-2xl max-w-xs w-full p-4 space-y-3 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-sand-200">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-terra shrink-0" />
+                <h3 className="font-bold text-sm text-char-900"><T>Monthly Report Submission</T></h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCalendarModalOpen(false)}
+                className="text-char-400 hover:text-char-700 p-1 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-char-600">
+              <T>Choose a date from the calendar to submit the work report. Future dates cannot be selected.</T>
+            </p>
+
+            {/* Month & Year Navigation */}
+            <div className="flex items-center justify-between bg-sand-50 px-2 py-1.5 border border-sand-200">
+              <button
+                type="button"
+                onClick={prevMonth}
+                className="p-1 text-char-600 hover:text-char-900 hover:bg-sand-200 rounded cursor-pointer"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <div className="font-bold text-sm text-char-800">
+                {fmtMonth(`${calYear}-${String(calMonth + 1).padStart(2, '0')}`)}
+              </div>
+              <button
+                type="button"
+                onClick={nextMonth}
+                disabled={isCurrentMonthOrLater}
+                className={`p-1 rounded ${
+                  isCurrentMonthOrLater
+                    ? 'text-char-300 cursor-not-allowed'
+                    : 'text-char-600 hover:text-char-900 hover:bg-sand-200 cursor-pointer'
+                }`}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+                <div key={d} className="text-[11px] font-bold text-char-400 py-0.5">
+                  {d}
+                </div>
+              ))}
+              {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                <div key={`empty-${i}`} className="h-8 w-8" />
+              ))}
+              {Array.from({ length: daysInCurMonth }, (_, i) => {
+                const dayNum = i + 1;
+                const mStr = String(calMonth + 1).padStart(2, '0');
+                const dStr = String(dayNum).padStart(2, '0');
+                const dateStr = `${calYear}-${mStr}-${dStr}`;
+                const isFuture = dateStr > today;
+                const isToday = dateStr === today;
+                const isSelected = dateStr === selectedMonthlyDate;
+
+                if (isFuture) {
+                  return <div key={dateStr} className="h-8 w-8" />;
+                }
+
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    onClick={() => {
+                      setCalendarModalOpen(false);
+                      openNew(null, dateStr, true);
+                    }}
+                    className={`h-8 w-8 mx-auto rounded-none text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-terra text-white shadow-xs font-bold'
+                        : isToday
+                        ? 'border border-terra text-terra font-bold bg-terra-50 hover:bg-terra-100'
+                        : 'text-char-800 bg-sand-50 hover:bg-terra-100 hover:text-terra-900 border border-sand-200'
+                    }`}
+                  >
+                    {dayNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Select & Fallback Input */}
+            <div className="pt-2 border-t border-sand-200 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-char-600"><T>Quick Select</T>:</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="btn-outline !text-[11px] !py-0.5 !px-2 font-medium"
+                    onClick={() => {
+                      setCalendarModalOpen(false);
+                      openNew(null, today, true);
+                    }}
+                  >
+                    <T>Today</T>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline !text-[11px] !py-0.5 !px-2 font-medium"
+                    onClick={() => {
+                      setCalendarModalOpen(false);
+                      openNew(null, addDays(today, -1), true);
+                    }}
+                  >
+                    <T>Yesterday</T>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="label text-[11px] mb-1"><T>Select Report Date</T></label>
+                <input
+                  type="date"
+                  className="input !text-xs !py-1 !font-medium"
+                  value={selectedMonthlyDate}
+                  max={today}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val && val <= today) {
+                      setSelectedMonthlyDate(val);
+                      setCalendarModalOpen(false);
+                      openNew(null, val, true);
+                    } else if (val > today) {
+                      toast.error('Future dates cannot be selected');
+                    }
+                  }}
+                />
+                <span className="text-[10px] text-char-500 mt-0.5 block">
+                  <T>Future dates are disabled</T>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                className="btn-outline !text-xs !py-1 !px-3"
+                onClick={() => setCalendarModalOpen(false)}
+              >
+                <T>Cancel</T>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isWorker ? (
         mine.loading ? <SkeletonList /> : (mine.data || []).length ? renderList(mine.data) : <Empty text="No reports yet — fill today's report" />
@@ -301,7 +553,8 @@ export default function DailyReportPage() {
               <button className="flex-1 btn-outline" onClick={() => check(detail, 'not_ok')} disabled={checking}><X size={16} /><T> Not OK</T></button>
             </>}
             {canUndoRow(detail) && <button className="flex-1 btn-outline" onClick={() => undo(detail)} disabled={checking}><RotateCcw size={15} /><T> Undo decision</T></button>}
-            {!canEditRow(detail) && !canCheckRow(detail) && !canUndoRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}><T>Close</T></button>}
+            {canDeleteRow(detail) && <button className="btn-outline text-red-600 hover:bg-red-50 border-red-200" onClick={() => removeReport(detail)}><Trash2 size={14} /><T>Delete</T></button>}
+            {!canEditRow(detail) && !canCheckRow(detail) && !canUndoRow(detail) && !canDeleteRow(detail) && <button className="btn-outline" onClick={() => setDetail(null)}><T>Close</T></button>}
           </>
         )}>
         {detail && (
@@ -326,11 +579,36 @@ export default function DailyReportPage() {
       <Sheet open={open} onClose={() => setOpen(false)} title={tr('Daily work report · {d}', { d: fmtDate(form.date || date) }) + (isWorker ? ` · ${session?.name}` : '')}
         footer={<button className="btn-primary w-full !min-h-[52px] text-base" onClick={save} disabled={saving}>{saving ? '…' : t('submit')}</button>}>
         <div className="space-y-4">
-          {!isWorker && !editing && (
-            <Field label="Employee (you are filling for)" required>
-              <LookupSelect kind="employees" by="empCode" value={form.empCode} onChange={(it) => set({ empCode: it ? it.id : '' })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label={t('date')} required hint={!isMonthlySubmission ? "Today's report" : "Report for chosen date"}>
+              <input
+                type="date"
+                className={`input !font-bold ${
+                  !isMonthlySubmission
+                    ? '!bg-sand-100 !text-char-700 !cursor-not-allowed border-sand-300 select-none'
+                    : ''
+                }`}
+                value={form.date || date || today}
+                max={today}
+                disabled={!isMonthlySubmission}
+                readOnly={!isMonthlySubmission}
+                onChange={(e) => {
+                  if (!isMonthlySubmission) return;
+                  const val = e.target.value;
+                  if (val && val <= today) {
+                    set({ date: val });
+                  } else if (val > today) {
+                    toast.error('Future dates cannot be selected');
+                  }
+                }}
+              />
             </Field>
-          )}
+            {!isWorker && !editing && (
+              <Field label="Employee (you are filling for)" required>
+                <LookupSelect kind="employees" by="empCode" value={form.empCode} onChange={(it) => set({ empCode: it ? it.id : '' })} />
+              </Field>
+            )}
+          </div>
           <Field label={t('workDone')} required>
             <textarea className="input" rows={4} value={form.narration} onChange={(e) => set({ narration: e.target.value })} placeholder={tr('Cut 2 blocks on gang saw 1, got 410 sq ft of 30 mm slabs…')} />
           </Field>

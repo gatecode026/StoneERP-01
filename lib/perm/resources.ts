@@ -68,8 +68,20 @@ export const RESOURCES = {
     own: [{ field: 'assignedCode', value: 'empCode' }, { field: 'assignedById', value: 'userId' }],
     team: [{ field: 'assignedCode', in: 'codes' }, { field: 'assignedById', in: 'userIds' }] },
   projects: { label: { en: 'Projects', hi: 'प्रोजेक्ट' }, group: 'people', part: 15, model: true, actions: CRUD,
-    own: [{ field: 'supervisorCode', value: 'empCode' }, { field: 'supervisorCodes', value: 'empCode' }, { field: 'createdById', value: 'userId' }],
-    team: [{ field: 'supervisorCode', in: 'codes' }, { field: 'supervisorCodes', in: 'codes' }, { field: 'createdById', in: 'userIds' }],
+    own: [
+      { field: 'supervisorCode', value: 'empCode' },
+      { field: 'supervisorCodes', value: 'empCode' },
+      { field: 'operatorCode', value: 'empCode' },
+      { field: 'operatorCodes', value: 'empCode' },
+      { field: 'createdById', value: 'userId' },
+    ],
+    team: [
+      { field: 'supervisorCode', in: 'codes' },
+      { field: 'supervisorCodes', in: 'codes' },
+      { field: 'operatorCode', in: 'codes' },
+      { field: 'operatorCodes', in: 'codes' },
+      { field: 'createdById', in: 'userIds' },
+    ],
     fieldGroups: {
       money: ['price', 'contractValue', 'balanceOrderAmount'],
       pii: ['clientName'],

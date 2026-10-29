@@ -26,7 +26,7 @@ export function parse(spec: Partial<Record<Resource, string>>): Grants {
 
 // Everybody who signs in and is linked to an employee can do these about themselves.
 const OWN: Partial<Record<Resource, string>> = {
-  dailyreports: 'vm cm em', attendance: 'vm', punches: 'vm cm', tasks: 'vm em', leaves: 'vm cm', advances: 'vm cm', salaryslips: 'vm', dashboard: 'v*', machines: 'v*',
+  dailyreports: 'vm cm em xm', attendance: 'vm', punches: 'vm cm', tasks: 'vm em', leaves: 'vm cm', advances: 'vm cm', salaryslips: 'vm', dashboard: 'v*', machines: 'v*',
 };
 const withOwn = (spec: Partial<Record<Resource, string>>) => ({ ...OWN, ...spec });
 const F = (money: FieldAccess['money'], cost: FieldAccess['cost'], pii: FieldAccess['pii']): FieldAccess => ({ money, cost, pii });
@@ -54,7 +54,7 @@ const ACCOUNTANT = parse({
 });
 
 const SUPERVISOR = parse(withOwn({
-  supervisor: 'vt ct et ot', employees: 'vt', dailyreports: 'vt ct et ot at', attendance: 'vt ct et ot', punches: 'vt ct', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
+  supervisor: 'vt ct et ot', employees: 'vt', dailyreports: 'vt ct et xt ot at', attendance: 'vt ct et ot', punches: 'vt ct', leaves: 'vt', safetyrecords: 'vt ct et ot', performance: 'vt',
   tasks: 'vt ct et', projects: 'vt ct et', machines: 'vt', machineentries: 'vt ct et ot', blocks: 'v* c*', repairs: 'vt ct et', vehicles: 'v* c* e*', vehicletrips: 'v* c* e*',
   stockitems: 'v*', stockmovements: 'v* c*', dispatches: 'v* c* e* a*', complaints: 'v*', expenses: 'vm cm', reminders: 'vt', yield: 'v*',
 }));

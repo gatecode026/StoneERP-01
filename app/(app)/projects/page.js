@@ -1,11 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
   FolderKanban, CheckCircle2, Clock, AlertTriangle, Plus, ListChecks,
-  User, Calendar, Layers, Hammer, ShieldAlert, CheckSquare, Sparkles,
-  ExternalLink, FileText, PackageCheck, Briefcase, Boxes, Pencil
+  User, Users, Calendar, Layers, Hammer, ShieldAlert, CheckSquare, Sparkles,
+  ExternalLink, FileText, PackageCheck, Briefcase, Boxes, Pencil, Cog
 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import ImportData from '@/components/ImportData';
@@ -62,6 +62,38 @@ export default function ProjectsPage() {
 
   // Selected project for viewing details and tasks
   const [selectedProject, setSelectedProject] = useState(null);
+
+  // Authoritative loader for project details: immediately displays cached row and fetches fresh document from server
+  const openProjectDetails = async (proj) => {
+    if (!proj) return;
+    setSelectedProject(proj);
+    if (!proj._id) return;
+    try {
+      const full = await api(`/api/projects/${proj._id}?_t=${Date.now()}`);
+      if (full && full._id) {
+        setSelectedProject((prev) => (prev?._id === full._id ? { ...prev, ...full } : prev));
+      }
+    } catch {
+      // keep initial row if detail fetch fails
+    }
+  };
+
+  // Keep selectedProject in sync whenever data changes
+  useEffect(() => {
+    if (!selectedProject?._id) return;
+    const handleDataChanged = async () => {
+      try {
+        const fresh = await api(`/api/projects/${selectedProject._id}?_t=${Date.now()}`);
+        if (fresh && fresh._id) {
+          setSelectedProject((prev) => (prev?._id === fresh._id ? { ...prev, ...fresh } : prev));
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('vss-data-changed', handleDataChanged);
+    return () => window.removeEventListener('vss-data-changed', handleDataChanged);
+  }, [selectedProject?._id]);
 
   // Work progress update modal state
   const [progressModalProject, setProgressModalProject] = useState(null);
@@ -127,22 +159,30 @@ export default function ProjectsPage() {
     setProgressBusy(false);
   }
 
-  // Modal state for assigning multiple supervisors to a project
+  // Modal state for assigning multiple supervisors & operators to a project
   const [assignModalProject, setAssignModalProject] = useState(null);
-  const [assignSelectedCodes, setAssignSelectedCodes] = useState([]);
-  const [assignSelectedNames, setAssignSelectedNames] = useState('');
+  const [assignSelectedSupervisorCodes, setAssignSelectedSupervisorCodes] = useState([]);
+  const [assignSelectedSupervisorNames, setAssignSelectedSupervisorNames] = useState('');
+  const [assignSelectedOperatorCodes, setAssignSelectedOperatorCodes] = useState([]);
+  const [assignSelectedOperatorNames, setAssignSelectedOperatorNames] = useState('');
   const [assignBusy, setAssignBusy] = useState(false);
 
   const openAssignModal = (project) => {
     setAssignModalProject(project);
-    const codes = project.supervisorCodes?.length
+    const sCodes = project.supervisorCodes?.length
       ? project.supervisorCodes
       : (project.supervisorCode ? String(project.supervisorCode).split(',').map((s) => s.trim()).filter(Boolean) : []);
-    setAssignSelectedCodes(codes);
-    setAssignSelectedNames(project.supervisorName || '');
+    setAssignSelectedSupervisorCodes(sCodes);
+    setAssignSelectedSupervisorNames(project.supervisorName || '');
+
+    const opCodes = project.operatorCodes?.length
+      ? project.operatorCodes
+      : (project.operatorCode ? String(project.operatorCode).split(',').map((s) => s.trim()).filter(Boolean) : []);
+    setAssignSelectedOperatorCodes(opCodes);
+    setAssignSelectedOperatorNames(project.operatorName || '');
   };
 
-  async function handleSaveSupervisors(e) {
+  async function handleSaveTeam(e) {
     e?.preventDefault?.();
     if (!assignModalProject) return;
     setAssignBusy(true);
@@ -150,18 +190,24 @@ export default function ProjectsPage() {
       const res = await api(`/api/projects/${assignModalProject._id}`, {
         method: 'PATCH',
         body: {
-          supervisorCodes: assignSelectedCodes,
-          supervisorCode: assignSelectedCodes.join(','),
+          supervisorCodes: assignSelectedSupervisorCodes,
+          supervisorCode: assignSelectedSupervisorCodes.join(','),
+          operatorCodes: assignSelectedOperatorCodes,
+          operatorCode: assignSelectedOperatorCodes.join(','),
         },
       });
-      toast.success(`Supervisors updated for ${assignModalProject.name}`);
+      toast.success(`Team assigned for ${assignModalProject.name}`);
       setAssignModalProject(null);
       if (selectedProject?._id === assignModalProject._id) {
         setSelectedProject((prev) => ({
           ...prev,
-          supervisorCodes: assignSelectedCodes,
-          supervisorCode: assignSelectedCodes.join(','),
-          supervisorName: res?.supervisorName || assignSelectedNames,
+          ...(res || {}),
+          supervisorCodes: assignSelectedSupervisorCodes,
+          supervisorCode: assignSelectedSupervisorCodes.join(','),
+          supervisorName: res?.supervisorName || assignSelectedSupervisorNames,
+          operatorCodes: assignSelectedOperatorCodes,
+          operatorCode: assignSelectedOperatorCodes.join(','),
+          operatorName: res?.operatorName || assignSelectedOperatorNames,
         }));
       }
       window.dispatchEvent(new CustomEvent('vss-data-changed'));
@@ -187,6 +233,9 @@ export default function ProjectsPage() {
     const patch = {};
     if (full.supervisorCodes && full.supervisorCodes.length && (!full.supervisorCode || !full.supervisorCode.includes(','))) {
       patch.supervisorCode = full.supervisorCodes.join(',');
+    }
+    if (full.operatorCodes && full.operatorCodes.length && (!full.operatorCode || !full.operatorCode.includes(','))) {
+      patch.operatorCode = full.operatorCodes.join(',');
     }
     if (full.deliverables) {
       const parts = full.deliverables.split('|').map((s) => s.trim());
@@ -301,6 +350,22 @@ export default function ProjectsPage() {
         query: { status: 'active', job: 'Supervisor' },
       },
     },
+    {
+      name: 'operatorCode',
+      label: 'Operators in Charge',
+      type: 'ref',
+      multiple: true,
+      section: 'Project Planning & Team',
+      placeholder: 'Select one or more operators…',
+      emptyText: 'No operators found',
+      ref: {
+        model: 'employees',
+        valueKey: 'empCode',
+        nameField: 'operatorName',
+        label: (e) => `${e.name} (${e.empCode})`,
+        query: { status: 'active', job: 'Operator' },
+      },
+    },
     { name: 'startDate', label: 'Start Date', type: 'date', default: () => todayISO(), section: 'Project Planning & Team' },
     { name: 'targetDate', label: 'Target Deadline', type: 'date', required: true, section: 'Project Planning & Team' },
     { name: 'status', label: 'Project Status', type: 'select', options: STATUS_OPTIONS, default: 'In Progress', section: 'Project Planning & Team' },
@@ -401,14 +466,24 @@ export default function ProjectsPage() {
       },
     },
     {
-      key: 'supervisorName',
-      label: 'Supervisors',
+      key: 'team',
+      label: 'Team',
       render: (r) => (
-        <div className="flex items-center gap-1.5 text-xs max-w-[200px]">
-          <User size={13} className="text-terra shrink-0" />
-          <span className="font-medium text-char-800 line-clamp-2" title={r.supervisorName || r.supervisorCode || 'Unassigned'}>
-            {r.supervisorName || r.supervisorCode || 'Unassigned'}
-          </span>
+        <div className="flex flex-col gap-1 text-xs max-w-[210px]">
+          <div className="flex items-center gap-1.5" title={r.supervisorName || r.supervisorCode || undefined}>
+            <User size={13} className="text-terra shrink-0" />
+            <span className="font-medium text-char-800 line-clamp-1">
+              {r.supervisorName || r.supervisorCode || <span className="text-char-400 font-normal">Unassigned</span>}
+            </span>
+          </div>
+          {(r.operatorName || r.operatorCode) ? (
+            <div className="flex items-center gap-1.5 text-char-600" title={r.operatorName || r.operatorCode || undefined}>
+              <Cog size={13} className="text-char-500 shrink-0" />
+              <span className="text-[11px] line-clamp-1">
+                {r.operatorName || r.operatorCode}
+              </span>
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -500,15 +575,15 @@ export default function ProjectsPage() {
           ]}
           wide
           loadExtra={loadExtra}
-          onRowClick={(row) => setSelectedProject(row)}
+          onRowClick={(row) => openProjectDetails(row)}
           rowActions={(row) => [
             {
               label: 'View Project Details',
               icon: <FolderKanban size={14} className="text-terra" />,
-              onClick: () => setSelectedProject(row),
+              onClick: () => openProjectDetails(row),
             },
             {
-              label: 'Assign Supervisors',
+              label: 'Assign Team (Supervisors / Operators)',
               icon: <User size={14} className="text-terra" />,
               onClick: () => openAssignModal(row),
             },
@@ -526,24 +601,10 @@ export default function ProjectsPage() {
               <span className="text-xs text-char-500">
                 Created: {fmtDate(selectedProject?.createdAt)}
               </span>
-              <div className="flex gap-2">
+              <div>
                 <button
                   type="button"
-                  className="btn-outline !text-xs !py-1.5 !px-3 flex items-center gap-1.5 text-terra border-terra-300 hover:bg-terra-50 font-semibold"
-                  onClick={() => openProgressModal(selectedProject)}
-                >
-                  <Pencil size={13} /> Update Pieces
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary !text-xs !py-1.5 !px-3 flex items-center gap-1.5"
-                  onClick={() => openAssignModal(selectedProject)}
-                >
-                  <User size={14} /> Assign Supervisors
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline !text-xs !py-1.5 !px-3"
+                  className="btn-outline !text-xs !py-1.5 !px-4 font-medium"
                   onClick={() => setSelectedProject(null)}
                 >
                   Close
@@ -612,47 +673,168 @@ export default function ProjectsPage() {
                 );
               })()}
 
-              {/* Top metadata grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-none bg-sand-50/80 border border-sand-200">
-                {isOwner && <KV label="Client">{selectedProject.clientName || 'Direct Order'}</KV>}
-                <KV label="Site / Yard">{selectedProject.site || 'Factory'}</KV>
-                <KV label="Supervisors in Charge">
-                  <div className="flex items-center justify-between gap-1.5 w-full">
-                    <span className="font-semibold text-terra">
-                      {selectedProject.supervisorName || selectedProject.supervisorCode || 'Unassigned'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openAssignModal(selectedProject)}
-                      className="text-terra hover:underline text-[11px] font-bold shrink-0 ml-1"
-                    >
-                      Change
-                    </button>
+              {/* Order Details & Schedule Information */}
+              <div className="p-3.5 rounded-none border border-sand-300 bg-sand-50/50 space-y-2.5">
+                <div className="flex items-center gap-1.5">
+                  <FolderKanban size={15} className="text-terra" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-char-900">
+                    Order Details & Project Schedule
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 text-xs">
+                  {isOwner && (
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Client / Customer</span>
+                      <span className="font-semibold text-char-900 truncate block" title={selectedProject.clientName || 'Direct Order'}>
+                        {selectedProject.clientName || 'Direct Order'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Site / Yard</span>
+                    <span className="font-semibold text-char-800">{selectedProject.site || 'Factory'}</span>
                   </div>
-                </KV>
-                <KV label="Start Date">{fmtDate(selectedProject.startDate)}</KV>
-                <KV label="Target Deadline">
-                  <span className={selectedProject.targetDate < today && selectedProject.status !== 'Completed' ? 'text-red-600 font-bold' : ''}>
-                    {fmtDate(selectedProject.targetDate)}
-                  </span>
-                </KV>
-                <KV label="Status">
-                  <Badge tone={selectedProject.status === 'Completed' ? 'green' : 'amber'}>
-                    {selectedProject.status}
-                  </Badge>
-                </KV>
-                <KV label="Priority">
-                  <Badge tone={selectedProject.priority === 'Urgent' ? 'red' : 'gray'}>
-                    {selectedProject.priority}
-                  </Badge>
-                </KV>
-                {isOwner && selectedProject.contractValue > 0 && (
-                  <KV label="Contract Value">{inr(selectedProject.contractValue)}</KV>
-                )}
-                {selectedProject.orderNo && <KV label="Order No">{selectedProject.orderNo}</KV>}
-                {selectedProject.partyPoNo && <KV label="Party P.O. No">{selectedProject.partyPoNo}</KV>}
-                {selectedProject.ourSaleInvoice && <KV label="Our Sale Invoice">{selectedProject.ourSaleInvoice}</KV>}
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Status</span>
+                    <Badge tone={selectedProject.status === 'Completed' ? 'green' : selectedProject.status === 'In Progress' ? 'amber' : 'gray'}>
+                      {selectedProject.status || 'Planning'}
+                    </Badge>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Priority</span>
+                    <Badge tone={selectedProject.priority === 'Urgent' ? 'red' : selectedProject.priority === 'High' ? 'amber' : 'gray'}>
+                      {selectedProject.priority || 'Normal'}
+                    </Badge>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Start Date</span>
+                    <span className="font-semibold text-char-800">{fmtDate(selectedProject.startDate)}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Target Deadline</span>
+                    <span className={`font-semibold ${selectedProject.targetDate < today && selectedProject.status !== 'Completed' ? 'text-red-600 font-bold' : 'text-char-800'}`}>
+                      {fmtDate(selectedProject.targetDate)}
+                    </span>
+                  </div>
+                  {isOwner && selectedProject.contractValue > 0 && (
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Contract Value</span>
+                      <span className="font-semibold text-char-900">{inr(selectedProject.contractValue)}</span>
+                    </div>
+                  )}
+                  {selectedProject.orderNo && (
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Order No</span>
+                      <span className="font-semibold text-char-800">{selectedProject.orderNo}</span>
+                    </div>
+                  )}
+                  {selectedProject.partyPoNo && (
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Party P.O. No</span>
+                      <span className="font-semibold text-char-800">{selectedProject.partyPoNo}</span>
+                    </div>
+                  )}
+                  {selectedProject.ourSaleInvoice && (
+                    <div className="bg-white p-2.5 rounded-none border border-sand-200">
+                      <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Our Sale Invoice</span>
+                      <span className="font-semibold text-char-800">{selectedProject.ourSaleInvoice}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Dedicated Project Team: Supervisors & Operators in Charge */}
+              {(() => {
+                const supervisorList = selectedProject.supervisorName
+                  ? selectedProject.supervisorName.split(',').map((s) => s.trim()).filter(Boolean)
+                  : (selectedProject.supervisorCode ? [selectedProject.supervisorCode] : []);
+
+                const operatorList = selectedProject.operatorName
+                  ? selectedProject.operatorName.split(',').map((s) => s.trim()).filter(Boolean)
+                  : (selectedProject.operatorCode ? [selectedProject.operatorCode] : []);
+
+                return (
+                  <div className="p-3.5 rounded-none border border-sand-300 bg-sand-50/70 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-sand-200">
+                      <div className="flex items-center gap-1.5">
+                        <Users size={15} className="text-terra" />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-char-900">
+                          Project Team & Personnel in Charge
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openAssignModal(selectedProject)}
+                        className="btn-outline !text-xs !py-1 !px-2.5 flex items-center gap-1.5 font-bold text-terra border-terra-300 hover:bg-terra-50"
+                      >
+                        <User size={12} /> Assign / Change Team
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      {/* Supervisors in Charge */}
+                      <div className="bg-white p-3 rounded-none border border-sand-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-char-700 flex items-center gap-1.5">
+                            <User size={13} className="text-terra" />
+                            Supervisors in Charge
+                          </span>
+                          {supervisorList.length > 0 && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sand-100 text-char-700 border border-sand-200">
+                              {supervisorList.length} {supervisorList.length === 1 ? 'Supervisor' : 'Supervisors'}
+                            </span>
+                          )}
+                        </div>
+                        {supervisorList.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {supervisorList.map((name, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-terra-50 text-terra-900 border border-terra-200 text-xs font-semibold rounded-none shadow-2xs"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-terra shrink-0" />
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-char-400 italic">No supervisors assigned</span>
+                        )}
+                      </div>
+
+                      {/* Operators in Charge */}
+                      <div className="bg-white p-3 rounded-none border border-sand-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-char-700 flex items-center gap-1.5">
+                            <Cog size={13} className="text-terra" />
+                            Operators in Charge
+                          </span>
+                          {operatorList.length > 0 && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sand-100 text-char-700 border border-sand-200">
+                              {operatorList.length} {operatorList.length === 1 ? 'Operator' : 'Operators'}
+                            </span>
+                          )}
+                        </div>
+                        {operatorList.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {operatorList.map((name, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-sand-100 text-char-900 border border-sand-300 text-xs font-semibold rounded-none shadow-2xs"
+                              >
+                                <Cog size={12} className="text-char-500 shrink-0" />
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-char-400 italic">No operators assigned</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Stone Specifications & Attributes Grid */}
               <div className="p-3.5 rounded-none border border-terra-200 bg-terra-50/30 space-y-2.5">
@@ -754,13 +936,13 @@ export default function ProjectsPage() {
           )}
         </Sheet>
 
-        {/* Assign Multiple Supervisors Modal */}
+        {/* Assign Team (Supervisors & Operators) Modal */}
         <Sheet
           open={Boolean(assignModalProject)}
           onClose={() => setAssignModalProject(null)}
-          title={tr('Assign Supervisors – {name}', { name: assignModalProject?.name || 'Project' })}
-          className="md:!min-h-[520px] md:!max-w-2xl"
-          bodyClassName="!min-h-[380px] overflow-visible pb-28"
+          title={tr('Assign Team – {name}', { name: assignModalProject?.name || 'Project' })}
+          className="md:!min-h-[580px] md:!max-w-2xl"
+          bodyClassName="!min-h-[460px] overflow-visible pb-28 space-y-5"
           footer={
             <div className="flex items-center justify-end gap-2 w-full">
               <button
@@ -774,16 +956,16 @@ export default function ProjectsPage() {
               <button
                 type="button"
                 className="btn-primary !text-xs !py-1.5 !px-4 flex items-center gap-1.5 font-bold"
-                onClick={handleSaveSupervisors}
+                onClick={handleSaveTeam}
                 disabled={assignBusy}
               >
-                {assignBusy ? 'Saving…' : 'Save Supervisors'}
+                {assignBusy ? 'Saving…' : 'Save Team'}
               </button>
             </div>
           }
         >
           {assignModalProject && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="p-3 rounded-none bg-sand-50 border border-sand-200 text-xs">
                 <div className="font-bold text-char-900 text-sm">{assignModalProject.name}</div>
                 <div className="text-char-500 mt-0.5">
@@ -794,23 +976,43 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              <div className="min-h-[260px] pb-6">
+              <div>
                 <label className="label">Select Supervisors (Checkbox Multi-Select)</label>
                 <MultiLookupSelect
                   kind="employees"
                   by="empCode"
                   query={{ status: 'active', job: 'Supervisor' }}
-                  value={assignSelectedCodes}
-                  valueLabel={assignSelectedNames}
+                  value={assignSelectedSupervisorCodes}
+                  valueLabel={assignSelectedSupervisorNames}
                   placeholder="Select one or more supervisors…"
                   emptyText="No supervisors found"
                   onChange={(selected) => {
-                    setAssignSelectedCodes(selected.map((s) => s.id));
-                    setAssignSelectedNames(selected.map((s) => s.label).join(', '));
+                    setAssignSelectedSupervisorCodes(selected.map((s) => s.id));
+                    setAssignSelectedSupervisorNames(selected.map((s) => s.label).join(', '));
                   }}
                 />
                 <p className="text-[11px] text-char-500 mt-1.5">
-                  Multiple supervisors can be selected to oversee this project and its deliverables.
+                  Supervisors will oversee site operations, review checklists, and manage work schedules.
+                </p>
+              </div>
+
+              <div>
+                <label className="label">Select Operators (Checkbox Multi-Select)</label>
+                <MultiLookupSelect
+                  kind="employees"
+                  by="empCode"
+                  query={{ status: 'active', job: 'Operator' }}
+                  value={assignSelectedOperatorCodes}
+                  valueLabel={assignSelectedOperatorNames}
+                  placeholder="Select one or more operators…"
+                  emptyText="No operators found"
+                  onChange={(selected) => {
+                    setAssignSelectedOperatorCodes(selected.map((s) => s.id));
+                    setAssignSelectedOperatorNames(selected.map((s) => s.label).join(', '));
+                  }}
+                />
+                <p className="text-[11px] text-char-500 mt-1.5">
+                  Operators assigned to run machines, cutting, sizing, and calibration for this project.
                 </p>
               </div>
             </div>

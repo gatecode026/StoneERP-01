@@ -40,6 +40,9 @@ export const Project = defineModel(
     supervisorCode: { type: S, uppercase: true },
     supervisorCodes: { type: [S], default: [] },
     supervisorName: { type: S, maxlength: 300 },
+    operatorCode: { type: S, uppercase: true },
+    operatorCodes: { type: [S], default: [] },
+    operatorName: { type: S, maxlength: 300 },
     startDate: dateStr(),
     targetDate: dateStr(),
     status: { type: S, enum: PROJECT_STATUSES as unknown as string[], default: 'In Progress' },
@@ -55,6 +58,8 @@ export const Project = defineModel(
       [{ status: 1, targetDate: 1 }],
       [{ supervisorCode: 1 }],
       [{ supervisorCodes: 1 }],
+      [{ operatorCode: 1 }],
+      [{ operatorCodes: 1 }],
       [{ name: 1 }],
     ],
   }

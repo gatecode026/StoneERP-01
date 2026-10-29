@@ -186,14 +186,20 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       };
     },
     keyOf: (d) => {
-      const sz = d.size || (d.sizeL && d.sizeW ? `${d.sizeL}x${d.sizeW}` : '');
-      return `${low(d.name)}|${low(sz)}|${low(d.finish || '')}`;
+      const norm = (v: any) => String(v ?? '').trim().toLowerCase().replace(/×/g, 'x').replace(/\s+/g, '');
+      const sz = d.size || (d.sizeL && d.sizeW ? `${d.sizeL}x${d.sizeW}` : (d.sizeL ? `${d.sizeL}` : ''));
+      return [norm(d.name), norm(d.finish), norm(sz), norm(d.thickness), norm(d.edges)].join('|');
     },
     async existing(rows) {
-      const found: any[] = await StockItem.find({ name: { $in: [...new Set(rows.map((r) => r.name))] }, isVoid: false }, 'name size sizeL sizeW finish').lean();
+      const names = [...new Set(rows.map((r) => r.name).filter(Boolean))];
+      const found: any[] = await StockItem.find(
+        { name: { $in: names }, isVoid: false },
+        'name size sizeL sizeW finish thickness edges'
+      ).lean();
+      const norm = (v: any) => String(v ?? '').trim().toLowerCase().replace(/×/g, 'x').replace(/\s+/g, '');
       return new Set(found.map((i) => {
-        const sz = i.size || (i.sizeL && i.sizeW ? `${i.sizeL}x${i.sizeW}` : '');
-        return `${low(i.name)}|${low(sz)}|${low(i.finish || '')}`;
+        const sz = i.size || (i.sizeL && i.sizeW ? `${i.sizeL}x${i.sizeW}` : (i.sizeL ? `${i.sizeL}` : ''));
+        return [norm(i.name), norm(i.finish), norm(sz), norm(i.thickness), norm(i.edges)].join('|');
       }));
     },
   },
