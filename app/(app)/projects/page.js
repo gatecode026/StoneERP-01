@@ -376,29 +376,7 @@ export default function ProjectsPage() {
                   {num(left)} left
                 </span>
               )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openProgressModal(r);
-                }}
-                className="text-terra hover:text-terra-800 hover:underline inline-flex items-center gap-0.5 text-[11px] font-bold ml-1"
-                title="Update Pieces"
-              >
-                <Pencil size={10} /> Update
-              </button>
             </div>
-            {target > 0 && (
-              <div className="flex items-center gap-2 text-[10px] text-char-500 mt-1">
-                <div className="w-20 bg-sand-200 h-1.5 rounded-full overflow-hidden shrink-0">
-                  <div
-                    className={`h-full transition-all duration-300 ${pct === 100 ? 'bg-emerald-500' : 'bg-terra'}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span>{pct}% done</span>
-              </div>
-            )}
           </div>
         );
       },
@@ -526,11 +504,6 @@ export default function ProjectsPage() {
               label: 'Assign Supervisors',
               icon: <User size={14} className="text-terra" />,
               onClick: () => openAssignModal(row),
-            },
-            {
-              label: 'Update Completed Pieces',
-              icon: <CheckSquare size={14} className="text-emerald-600" />,
-              onClick: () => openProgressModal(row),
             },
           ]}
         />

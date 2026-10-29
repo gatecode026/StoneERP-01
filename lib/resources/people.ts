@@ -97,14 +97,14 @@ async function warnSharedMobile(ctx: any, mobile: string | undefined, selfId?: u
 export const employees: ResourceDef = {
   key: 'employees', model: Employee,
   label: (d) => `${d.name} (${d.empCode})`,
-  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'mobile', 'job', 'designation', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
+  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'plainPassword', 'mobile', 'job', 'designation', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
   sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
   filters: { status: { enum: ['active', 'left'] }, job: 'string', designation: { enum: DESIGNATIONS as unknown as readonly string[] }, site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
   named: {
     docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}),
     deactivated: (v) => (v === '1' ? { isVoid: true } : {}),
   },
-  serverOnly: ['docFlags', 'isVoid', 'hasLogin', 'loginRole'],
+  serverOnly: ['docFlags', 'isVoid', 'hasLogin', 'loginRole', 'plainPassword'],
   create: z.object({ empCode: empCode.optional(), ...employeeFields, login: loginSchema.optional() }).strict(),
   update: z.object({ ...employeeFields, login: loginSchema.optional() }).partial().strict(),
   lifecycle: {
@@ -116,6 +116,7 @@ export const employees: ResourceDef = {
       await assertBiometricFree(ctx, rest.biometricId);
       if (login) pendingLogin.set(ctx, { login, auth });
       const doc: any = { ...rest };
+      if (login?.password) doc.plainPassword = login.password;
       if (!doc.empCode) doc.empCode = await nextEmployeeCode(ctx);
       doc.status ??= 'active';
       doc.payType ??= 'monthly';
@@ -125,7 +126,11 @@ export const employees: ResourceDef = {
       return sealEmployee(doc);
     },
     async prepareUpdate(ctx, prev, patch, auth) {
-      if ('login' in patch) { pendingLogin.set(ctx, { login: patch.login, auth }); delete patch.login; } // never stored on the profile; applied in afterUpdate
+      if ('login' in patch) {
+        pendingLogin.set(ctx, { login: patch.login, auth });
+        if (patch.login?.password) patch.plainPassword = patch.login.password;
+        delete patch.login;
+      } // never stored on the profile; applied in afterUpdate
       if (patch.mobile && patch.mobile !== prev.mobile) {
         if (prev.hasLogin || (pendingLogin.get(ctx)?.login as LoginInput | undefined)?.enabled) await assertSignInIdFree(ctx, patch.mobile, prev._id);
         await warnSharedMobile(ctx, patch.mobile, prev._id);
@@ -586,8 +591,9 @@ export const attendance: ResourceDef = {
   lifecycle: {
     async create(ctx, input, auth) {
       const today = todayIST();
-      // Nobody marks their own attendance (there is no selfie any more): a supervisor, manager or the Owner marks it, and a biometric machine will later.
-      if (auth.scope === 'own') throw forbidden('Attendance is marked by your supervisor');
+      // Nobody marks their own attendance unless granted explicit Own mark/edit permission by the admin
+      const canMarkOwn = auth.perm.scope('attendance', 'create') === 'own' || auth.perm.scope('attendance', 'edit') === 'own' || auth.user.role === 'owner';
+      if (auth.scope === 'own' && !canMarkOwn) throw forbidden('Attendance is marked by your supervisor');
       const date = input.date ?? today;
       if (date > today) throw badRequest('You cannot mark a future day');
       if (!input.empCode) throw badRequest('Choose the employee');
@@ -762,9 +768,26 @@ export const tasks: ResourceDef = {
       }
       if (!rawCodes.length) throw badRequest('Please select at least one assignee');
 
-      const employees = await Promise.all(
-        rawCodes.map((code) => employeeByCode(ctx, code, { active: true }))
-      );
+      const employees: any[] = await Employee.find({
+        empCode: { $in: rawCodes },
+        isVoid: false,
+        status: 'active',
+      }).session(ctx.session ?? null).lean();
+
+      if (!employees.length) {
+        throw badRequest('No active employees found for the selected assignees');
+      }
+
+      const foundCodes = new Set(employees.map((e) => e.empCode));
+      for (const code of rawCodes) {
+        if (!foundCodes.has(code)) {
+          const anyEmp: any = await Employee.findOne({ empCode: code, isVoid: false }).session(ctx.session ?? null).lean();
+          if (anyEmp && anyEmp.status !== 'active') {
+            throw badRequest(`${anyEmp.name} has left the company`);
+          }
+          throw badRequest(`Employee ${code} not found`);
+        }
+      }
 
       let projectData: { id: string; code?: string; name?: string } | null = null;
       if (input.projectId) {
@@ -803,7 +826,7 @@ export const tasks: ResourceDef = {
         updatedByName: auth.user.name,
       }));
 
-      const inserted = await Task.create(docsToInsert, { session: ctx.session });
+      const inserted = await Task.create(docsToInsert, { session: ctx.session, ordered: true });
       return { doc: inserted[0].toObject() };
     },
     async prepareCreate(ctx, input) {

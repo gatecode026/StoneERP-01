@@ -146,7 +146,9 @@ export async function fixDay(ctx: SvcCtx, auth: AuthCtx, input: FixInput) {
   const reason = input.reason.trim();
   if (reason.length < 3) throw badRequest('Write the reason for the correction');
   const code = input.empCode.toUpperCase();
-  if (code === auth.user.empCode) throw forbidden('You cannot correct your own punches. Ask someone senior.');
+  const punchesEditScope = auth.perm.scope('punches', 'edit');
+  const canEditOwn = punchesEditScope === 'own' || auth.user.role === 'owner';
+  if (code === auth.user.empCode && !canEditOwn) throw forbidden('You cannot correct your own punches. Ask someone senior.');
   const sf = await scopeFilter(auth.user, auth.perm, 'punches', 'edit');
   const emp: any = await Employee.findOne({ $and: [{ empCode: code, isVoid: false }, sf] }).session(s(ctx)).lean();
   if (!emp) throw notFound();

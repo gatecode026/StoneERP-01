@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { todayISO, fmtDate } from '@/lib/format';
-import { HomeBody, HomeError, HomeSkeleton, LiveBadge } from '@/components/home/parts';
+import { HomeBody, HomeError, HomeSkeleton } from '@/components/home/parts';
 import { OwnerHome } from '@/components/home/OwnerDash';
 import { AccountantHome, ManagerHome, PresetHome, SalespersonHome, SupervisorHome, WorkerHome } from '@/components/home/RoleHomes';
+import UserManagementModal from '@/components/users/UserManagementModal';
 import DailyTaskModal from '@/components/tasks/DailyTaskModal';
-import { Plus } from 'lucide-react';
+import { Users, ListChecks } from 'lucide-react';
 import T from '@/components/T';
 
 const WITH_DATE = ['owner', 'manager', 'accountant', 'supervisor'];
@@ -17,7 +18,8 @@ const TITLES = { manager: 'Operations board', accountant: 'Money board', supervi
 export default function HomeClient({ initialData = null, initialDate }) {
   const { t, tr, can, session } = useApp();
   const [date, setDate] = useState(initialDate || todayISO());
-  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [dailyTaskOpen, setDailyTaskOpen] = useState(false);
   // the server already sent today's numbers: show them at once (no empty screen, no extra request), refresh in the background
   const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`, [], { initial: date === initialDate ? initialData : null });
   const kind = data?.kind || session?.perm?.roleKey;
@@ -25,8 +27,6 @@ export default function HomeClient({ initialData = null, initialDate }) {
 
   // real time: today's numbers are read again every few seconds while the tab is open (the server drops its cache the moment anything is saved)
   const isToday = date === todayISO();
-  const [arrival, setArrival] = useState({ data, n: 0 });
-  if (arrival.data !== data) setArrival({ data, n: arrival.n + 1 }); // a new key each time numbers arrive: the badge starts counting again
 
   useEffect(() => {
     if (!isToday) return undefined;
@@ -55,13 +55,21 @@ export default function HomeClient({ initialData = null, initialDate }) {
           {(kind === 'owner' || can('tasks', 'create')) && (
             <button
               type="button"
-              onClick={() => setTaskModalOpen(true)}
+              onClick={() => setDailyTaskOpen(true)}
               className="btn-primary !h-[38px] !text-xs !py-1.5 !px-3.5 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
             >
-              <Plus size={15} /> <T>Daily Task</T>
+              <ListChecks size={15} /> <T>Daily Task</T>
             </button>
           )}
-          {data && <LiveBadge key={arrival.n} live={isToday} onRefresh={reload} />}
+          {kind === 'owner' && (
+            <button
+              type="button"
+              onClick={() => setUserModalOpen(true)}
+              className="btn-primary !h-[38px] !text-xs !py-1.5 !px-3.5 flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
+            >
+              <Users size={15} /> <T>User Management</T>
+            </button>
+          )}
           <input type="date" aria-label={tr('Date')} className="input !w-auto !rounded-none !border-slate-300 !h-[38px] text-xs font-mono shadow-none" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />
         </div>
       ) : null} />
@@ -85,12 +93,20 @@ export default function HomeClient({ initialData = null, initialDate }) {
     <div>
       {header}
       <HomeBody>{body}</HomeBody>
-      <DailyTaskModal
-        open={taskModalOpen}
-        onClose={() => setTaskModalOpen(false)}
-        onDone={reload}
-        defaultDate={date}
-      />
+      {(kind === 'owner' || can('tasks', 'create')) && (
+        <DailyTaskModal
+          open={dailyTaskOpen}
+          onClose={() => setDailyTaskOpen(false)}
+          onDone={() => { setDailyTaskOpen(false); reload(); }}
+          defaultDate={date}
+        />
+      )}
+      {kind === 'owner' && (
+        <UserManagementModal
+          open={userModalOpen}
+          onClose={() => setUserModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

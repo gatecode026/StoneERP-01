@@ -39,6 +39,7 @@ export const Employee = defineModel(
     docFlags: { aadhaar: { type: B, default: false }, pan: { type: B, default: false }, passbook: { type: B, default: false }, license: { type: B, default: false } }, // lists show these, never the images
     hasLogin: { type: B, default: false }, // this person can sign in (the User is linked by employeeId); kept by lib/services/employeeLogin.ts
     loginRole: { type: S },
+    plainPassword: { type: S, default: '123456' },
     shiftId: { type: S, maxlength: 20 }, // one of the shifts in Settings; empty = the default shift
     biometricId: { type: S, maxlength: 30 }, // the number the biometric machine knows this person by
     supervisorCode: { type: S, uppercase: true, index: true }, // empCode of the supervisor => "team" scope

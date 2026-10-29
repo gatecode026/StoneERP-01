@@ -3,14 +3,14 @@ import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { ArrowLeftRight, AlertTriangle, Check, X } from 'lucide-react';
-import CrudPage, { StatusBadge } from '@/components/CrudPage';
+import { AlertTriangle } from 'lucide-react';
+import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
 import StockDaily from '@/components/stock/StockDaily';
 import StockCount from '@/components/stock/StockCount';
-import { num, fmtDate } from '@/lib/format';
+import { num } from '@/lib/format';
 
 // Physical Stocks format as per client: Date, Karigar, Colour Finish, Thickness, Size L, Size W, QTY, SQFT, Finish, Amount
 const FINISH_OPTIONS = ['Natural', 'Honed', 'Polished', 'Flamed', 'Split face', 'Sandblasted', 'Bush Hammered'];
@@ -25,6 +25,11 @@ export default function StockPage() {
   const manage = can('stockitems', 'create');
   const isOwner = session?.role === 'owner';
 
+  const STOCK_STATUS_OPTIONS = [
+    { value: 'in_stock', label: 'In Stock' },
+    { value: 'out_of_stock', label: 'Out of Stock' },
+  ];
+
   // Stock item fields matching Physical Stocks format:
   // Colour | Finish | Sizes Length | Sizes Width | Thickness | Edges | Price | Quantity Sqft | Pieces
   const itemFields = [
@@ -38,6 +43,7 @@ export default function StockPage() {
     { name: 'openingBalance', label: 'Quantity Sqft', type: 'number', default: 0, createOnly: true, hint: 'Opening stock balance' },
     { name: 'pieces', label: 'Pieces', type: 'number', placeholder: '100' },
     { name: 'category', label: 'Stock type', placeholder: 'e.g. Finished goods, Raw stone', default: 'finished' },
+    { name: 'stockStatus', label: 'Stock status', type: 'select', options: STOCK_STATUS_OPTIONS, default: 'in_stock' },
     { name: 'unit', label: 'Counted in', type: 'select', options: UNITS, default: 'sq ft' },
     { name: 'minLevel', label: 'Minimum level (alert below this)', type: 'number' },
     { name: 'location', label: 'Location in yard' },
@@ -75,18 +81,36 @@ export default function StockPage() {
       return <span className={low ? 'text-red-600 font-bold' : 'font-semibold'}>{num(r.balance)} {r.unit || 'sq ft'} {low && <AlertTriangle size={12} className="inline -mt-0.5" />}</span>;
     }},
     { key: 'pieces', label: 'Pieces', align: 'right', render: (r) => r.pieces != null ? num(r.pieces) : '—' },
+    {
+      key: 'stockStatus',
+      label: 'Status',
+      align: 'center',
+      render: (r) => {
+        const isOut = r.stockStatus === 'out_of_stock';
+        return (
+          <Badge tone={isOut ? 'red' : 'green'}>
+            {isOut ? 'Out of Stock' : 'In Stock'}
+          </Badge>
+        );
+      },
+    },
   ];
 
   return (
     <RoleGuard perm="stockitems">
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Physical Stock' }, { key: 'moves', label: 'Movements' }, { key: 'daily', label: 'Day by day' }, ...(can('stockcounts', 'view') ? [{ key: 'count', label: 'Monthly count' }] : [])]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Physical Stock' }, { key: 'daily', label: 'Day by day' }, ...(can('stockcounts', 'view') ? [{ key: 'count', label: 'Monthly count' }] : [])]} />
       {tab === 'daily' && <StockDaily />}
       {tab === 'count' && <StockCount />}
       {tab === 'items' && (
         <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Physical Stocks — Colour, Finish, Sizes, Thickness, Edges, Price, Quantity Sqft" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="Colour, Finish, Sizes, Thickness, Edges, Price, Quantity Sqft and Pieces are supported" />}
           fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
-          filters={[{ key: 'category', label: 'All types', options: CAT }, { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }] }]}
+          loadExtra={(full) => ({ stockStatus: full?.stockStatus || 'in_stock' })}
+          filters={[
+            { key: 'category', label: 'All types', options: CAT },
+            { key: 'stockStatus', label: 'All stock status', options: STOCK_STATUS_OPTIONS },
+            { key: 'low', label: 'Alerts', options: [{ value: '1', label: 'Below minimum' }] },
+          ]}
           facets={{ named: 'low' }}
           summary={(rows, { total, facets: f }) => {
             const low = f?.named?.low ?? 0;
@@ -109,37 +133,8 @@ export default function StockPage() {
             { key: 'price', label: 'Price' },
             { key: 'balance', label: 'Quantity Sqft' },
             { key: 'pieces', label: 'Pieces' },
+            { key: 'stockStatus', label: 'Status' },
           ]}
-          rowActions={(row) => manage ? [{ label: 'Move', icon: <ArrowLeftRight size={14} />, onClick: () => { setTab('moves'); toast('Choose "Add" to record a movement for ' + row.name); } }] : []}
-        />
-      )}
-      {tab === 'moves' && (
-        <CrudPage key={'m' + reloadKey} model="stockmovements" headerExtra={<ImportData resource="stockmovements" perm="stockmovements" noun="stock movements" />} title="Stock movements" subtitle="In · out · transfer · damage (damage needs owner approval)" label="Stock movement"
-          sort="-date,-createdAt" canAdd={manage} canEdit={() => false} allowVoid={false}
-          fields={[
-            { name: 'date', label: 'Date', type: 'date', required: true },
-            { name: 'type', label: 'Movement', type: 'select', required: true, default: 'in', options: [{ value: 'in', label: 'Stock in (purchase / production)' }, { value: 'out', label: 'Stock out (sale / use)' }, { value: 'transfer', label: 'Transfer yard ↔ factory' }, { value: 'damage', label: 'Damage / breakage (needs approval)' }] },
-            { name: 'itemId', label: 'Item', type: 'ref', required: true, wide: true, ref: { model: 'stockitems', nameField: 'itemName', label: (x) => `${x.name} (${num(x.balance)} ${x.unit})` } },
-            { name: 'qty', label: 'Quantity', type: 'number', required: true },
-            { name: 'location', label: 'Move to / location', show: (f) => f.type === 'transfer', placeholder: 'e.g. Factory bay 2' },
-            { name: 'ref', label: 'Reference', placeholder: 'Bill / order no.' },
-            { name: 'note', label: 'Reason / note', type: 'textarea', wide: true },
-          ]}
-          columns={[
-            { key: 'itemName', label: 'Item', primary: true },
-            { key: 'type', label: 'Movement', render: (r) => <Badge tone={r.type === 'in' ? 'green' : r.type === 'out' ? 'blue' : r.type === 'damage' ? 'red' : 'gray'}>{r.type}</Badge> },
-            { key: 'qty', label: 'Qty', align: 'right', render: (r) => num(r.qty) },
-            { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
-            { key: 'ref', label: 'Reference', render: (r) => r.ref || '—' },
-            { key: 'status', label: 'Status', render: (r) => <StatusBadge value={r.status} /> },
-            { key: 'createdBy', label: 'By' },
-          ]}
-          filters={[{ key: 'type', label: 'All movements', options: ['in', 'out', 'transfer', 'damage'] }]}
-          onSaved={() => setReloadKey((k) => k + 1)}
-          rowActions={(row, { reload }) => (row.status === 'pending' && can('stockmovements', 'approve') ? [
-            { label: 'Approve', tone: 'green', icon: <Check size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'stockmovements', id: row._id, action: 'approve' } }); toast.success('Approved'); reload(); } catch (e) { toast.error(e.message); } } },
-            { label: 'Reject', icon: <X size={14} />, onClick: async () => { try { await api('/api/approvals', { method: 'POST', body: { model: 'stockmovements', id: row._id, action: 'reject' } }); reload(); } catch (e) { toast.error(e.message); } } },
-          ] : [])}
         />
       )}
     </RoleGuard>

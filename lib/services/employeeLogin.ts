@@ -46,40 +46,48 @@ export async function applyLogin(ctx: SvcCtx, auth: AuthCtx, emp: any, login: Lo
   const role = login.role ?? existing?.role;
   if (!role) throw badRequest('Choose the role for this sign-in');
   if ((role === 'owner' || existing?.role === 'owner') && auth.user.role !== 'owner') throw badRequest('Only an Owner can give or change the Owner role');
-  const mobile = mobileSchema.safeParse(emp.mobile ?? '');
-  if (!mobile.success) throw badRequest('Add a valid 10-digit mobile number to this employee first: it is the sign-in ID');
+  const parsedMobile = mobileSchema.safeParse(emp.mobile ?? '');
+  const username = parsedMobile.success ? parsedMobile.data : (existing?.username || emp.empCode);
+  if (!username) throw badRequest('Valid 10-digit mobile number or employee code is required for sign-in');
   if (existing && String(existing._id) === auth.user.id && (role !== existing.role || login.preset)) throw badRequest('You cannot reduce your own access');
   const preset = role === 'worker' ? (login.preset === undefined ? existing?.preset ?? null : login.preset) : null;
 
-  const taken: any = await User.findOne({ username: mobile.data }).session(session).lean();
-  if (taken && (!existing || String(taken._id) !== String(existing._id))) throw conflict('Another sign-in already uses this mobile number');
+  const taken: any = await User.findOne({ username }).session(session).lean();
+  if (taken && (!existing || String(taken._id) !== String(existing._id))) throw conflict('Another sign-in already uses this mobile number or employee code');
 
-  const base = { username: mobile.data, name: emp.name, role, preset, empCode: emp.empCode, employeeId: emp._id, active: true, ...(login.extraAccess ? { extraAccess: login.extraAccess } : {}) };
+  const base = { username, name: emp.name, role, preset, empCode: emp.empCode, employeeId: emp._id, active: true, ...(login.extraAccess ? { extraAccess: login.extraAccess } : {}) };
   if (existing) {
     const set: any = { ...base };
-    if (login.password) { set.passwordHash = await hashPassword(login.password); set.mustChangePassword = false; }
+    if (login.password) {
+      set.passwordHash = await hashPassword(login.password);
+      set.plainPassword = login.password;
+      set.mustChangePassword = false;
+    }
     await User.updateOne({ _id: existing._id }, { $set: set }, { session: ctx.session });
     if (login.password || role !== existing.role || preset !== (existing.preset ?? null) || !existing.active) await destroyUserSessions(existing._id);
   } else {
     if (!login.password) throw badRequest('Set a password for the new sign-in');
-    await User.create([{ ...base, extraAccess: login.extraAccess ?? [], lang: 'hi', passwordHash: await hashPassword(login.password), mustChangePassword: false, createdBy: auth.user.name }], { session: session as any });
+    await User.create([{ ...base, extraAccess: login.extraAccess ?? [], lang: 'hi', passwordHash: await hashPassword(login.password), plainPassword: login.password, mustChangePassword: false, createdBy: auth.user.name }], { session: session as any });
   }
-  await Employee.updateOne({ _id: emp._id }, { $set: { hasLogin: true, loginRole: role } }, { session: ctx.session });
+  const empUpdate: any = { hasLogin: true, loginRole: role };
+  if (login.password) empUpdate.plainPassword = login.password;
+  await Employee.updateOne({ _id: emp._id }, { $set: empUpdate }, { session: ctx.session });
   clearTeamCache();
 }
 
 /** Keep the sign-in in step when the profile's name or mobile changes. */
 export async function syncLoginIdentity(ctx: SvcCtx, doc: any, prev: any) {
-  if (!doc.hasLogin || (doc.mobile === prev.mobile && doc.name === prev.name)) return;
+  if (doc.mobile === prev.mobile && doc.name === prev.name) return;
   const session = ctx.session ?? null;
-  const u: any = await User.findOne({ employeeId: doc._id }).session(session).lean();
+  const u: any = await User.findOne({ $or: [{ employeeId: doc._id }, { empCode: doc.empCode }] }).session(session).lean();
   if (!u) return;
   const set: any = { name: doc.name };
-  if (doc.mobile !== prev.mobile) {
+  if (doc.mobile && doc.mobile !== prev.mobile) {
     const m = mobileSchema.safeParse(doc.mobile ?? '');
-    if (!m.success) throw badRequest('This employee can sign in, so the mobile number must stay a valid 10-digit number');
-    if (await User.exists({ username: m.data, _id: { $ne: u._id } }).session(session)) throw conflict('Another sign-in already uses this mobile number');
-    set.username = m.data;
+    if (m.success) {
+      if (await User.exists({ username: m.data, _id: { $ne: u._id } }).session(session)) throw conflict('Another sign-in already uses this mobile number');
+      set.username = m.data;
+    }
   }
   await User.updateOne({ _id: u._id }, { $set: set }, { session: ctx.session });
 }

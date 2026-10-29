@@ -27,9 +27,9 @@ describe('a day shift', () => {
   it('coming early earns nothing', () => {
     expect(calc(day, '2026-10-12', '07:30', '18:00')).toMatchObject({ otMinutes: 0, late: false, lateMinutes: 0 });
   });
-  it('short days: half day from 4 h, absent below it', () => {
+  it('short days: half day when under full day hours, anyone who punched in is never absent', () => {
     expect(calc(day, '2026-10-12', '09:00', '14:00')).toMatchObject({ state: 'half', workedMinutes: 240 });
-    expect(calc(day, '2026-10-12', '09:00', '12:00')).toMatchObject({ state: 'absent', workedMinutes: 180 }); // a short stint has no break taken off
+    expect(calc(day, '2026-10-12', '09:00', '12:00')).toMatchObject({ state: 'half', workedMinutes: 180 }); // a short stint has no break taken off
     expect(calc(day, '2026-10-12', '09:00', '16:00')).toMatchObject({ state: 'half', workedMinutes: 360 }); // 7 h less the 1 h break = 6 h: not yet the 7 h of a full day
     expect(calc(day, '2026-10-12', '09:00', '17:00')).toMatchObject({ state: 'present', workedMinutes: 420 });
   });
@@ -50,7 +50,7 @@ describe('a night shift crossing midnight', () => {
 describe('weekly off and holidays', () => {
   it('every worked minute is overtime, and there is no lateness', () => {
     expect(calc(day, '2026-10-11', '09:30', '17:30', 'weekoff')).toMatchObject({ state: 'present', late: false, lateMinutes: 0, workedMinutes: 420, otMinutes: 420 });
-    expect(calc(day, '2026-11-09', '10:00', '12:20', 'holiday')).toMatchObject({ state: 'absent', workedMinutes: 140, otMinutes: 120 });
+    expect(calc(day, '2026-11-09', '10:00', '12:20', 'holiday')).toMatchObject({ state: 'present', workedMinutes: 140, otMinutes: 120 });
   });
 });
 

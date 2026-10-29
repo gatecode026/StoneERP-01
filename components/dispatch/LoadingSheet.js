@@ -118,10 +118,17 @@ function LoadingForm({ sale, slips, onClose, onDone }) {
     } catch (e) { if (!e.data?.cancelled) toast.error(e.message); setBusy(false); return; }
     const out = f.markOut !== false && canOut;
     if (out) {
-      try { await apiAsk(`/api/dispatches/${slip._id}/out`); toast.success('Truck out – stock deducted'); } catch (e) {
+      try {
+        await apiAsk(`/api/dispatches/${slip._id}/out`);
+        toast.success('Truck out – stock deducted');
+        window.dispatchEvent(new Event('vss-data-changed'));
+      } catch (e) {
         toast.error(e.data?.cancelled ? tr('Gate pass {n} issued. The truck is not marked out yet.', { n: slip.gatePassNo }) : `${tr('Gate pass {n} issued, but the truck could not be marked out', { n: slip.gatePassNo })}: ${e.message}`);
       }
-    } else toast.success('Gate pass issued – the guard marks the truck out');
+    } else {
+      toast.success('Gate pass issued – the guard marks the truck out');
+      window.dispatchEvent(new Event('vss-data-changed'));
+    }
     setBusy(false);
     onDone?.(slip);
     onClose();

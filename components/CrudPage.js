@@ -19,7 +19,7 @@ import T from '@/components/T';
 const TONE = {
   active: 'gray', approved: 'green', applied: 'green', paid: 'green', closed: 'green', done: 'green', ok: 'green', in: 'blue', out: 'green',
   pending: 'amber', open: 'red', in_progress: 'amber', loading: 'amber', due: 'amber', rejected: 'red', void: 'red', draft: 'amber', not_ok: 'red',
-  deactivated: 'red', left: 'amber',
+  deactivated: 'red', left: 'amber', in_stock: 'green', out_of_stock: 'red',
 };
 export function StatusBadge({ value, isVoid }) {
   const v = isVoid ? 'void' : value;
@@ -506,9 +506,10 @@ export default function CrudPage({
   // lists carry no photos or documents, so editing loads the full record first
   async function startEdit(row) {
     try {
-      const full = await api(`/api/${model}/${row._id}`);
+      const full = await api(`/api/${model}/${row._id}?_t=${Date.now()}`);
       const extra = loadExtra ? await loadExtra(full) : {};
-      setEditing(full); setShowErrors(false); setForm({ ...full, ...extra }); setOpen(true);
+      const merged = { ...full, ...extra };
+      setEditing(merged); setShowErrors(false); setForm(merged); setOpen(true);
     } catch (e) { toast.error(e.message); }
   }
 
@@ -541,6 +542,9 @@ export default function CrudPage({
         ? await saveWithConfirm(`/api/${model}/${editing._id}`, body, { method: 'PATCH', label })
         : await saveWithConfirm(`/api/${model}`, body, { label });
       toast.success(res?.queued ? t('offline') : trNow('{label} saved', { label: trNow(label) }));
+      if (editing) {
+        list.mutateRow?.(editing._id, { ...editing, ...body, ...(res || {}) });
+      }
       setOpen(false);
       onSaved?.(res, editing);
       reload();

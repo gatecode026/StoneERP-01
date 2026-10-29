@@ -179,7 +179,8 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
         }
       }
       return {
-        empCode: p.empCode, name: p.name, job: p.job, shiftName: m?.shiftName ?? shift.name, markable: markable.has(p.empCode) && !m?.inAt, fixable: fixable.has(p.empCode) && p.empCode !== auth.user.empCode,
+        empCode: p.empCode, name: p.name, job: p.job, shiftName: m?.shiftName ?? shift.name, markable: markable.has(p.empCode) && !m?.inAt,
+        fixable: fixable.has(p.empCode) && (p.empCode !== auth.user.empCode || auth.perm.scope('punches', 'edit') === 'own' || auth.perm.scope('attendance', 'edit') === 'own'),
         punchable: punchable.has(p.empCode), canDecideOt: otDecider.has(p.empCode) && p.empCode !== auth.user.empCode,
         ...(m ? {
           state: st, otHours: m.otHours ?? null, late, lateMinutes, method: m.method ?? '', inAt: m.inAt ?? null, outAt: m.outAt ?? null,

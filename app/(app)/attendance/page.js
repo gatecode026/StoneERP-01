@@ -60,13 +60,16 @@ function PunchLine({ m }) {
 }
 
 export default function AttendancePage() {
-  const { t, tr, can, perm } = useApp();
+  const { t, tr, can, perm, session } = useApp();
   // The screen follows the Roles & permissions exactly:
   //   See = Own  -> only their own attendance, never a list of other people
   //   Add = Team / All -> they mark other people; no Add -> nothing to mark (nobody marks themselves: supervisors now, a biometric machine later)
   const ownOnly = scopeOf(perm, 'attendance', 'view') === 'own';
   const canMarkOthers = can('attendance', 'create') && scopeOf(perm, 'attendance', 'create') !== 'own';
   const canApprove = can('attendance', 'approve');
+  const canFix = can('punches', 'edit') || can('attendance', 'edit');
+  const canPunch = can('punches', 'create');
+  const canMarkOwn = can('attendance', 'create') || can('attendance', 'edit');
   const leavesOn = can('leaves', 'view');
   const leaveOwn = scopeOf(perm, 'leaves', 'create') === 'own'; // may only apply for themselves: no "employee" choice
   const canImportLeaves = can('leaves', 'create') && !leaveOwn;
@@ -81,6 +84,8 @@ export default function AttendancePage() {
   const sheet = useNumberedList(ownOnly ? null : '/api/attendance/sheet', { date, q: dq, role: roleFilter, status: statusFilter }, { size: 25 });
   const ot = useFetch(canApprove ? '/api/attendance/overtime' : null);
   const att = useFetch(ownOnly ? `/api/attendance?from=${monthOf(date)}-01&to=${date}&sort=-date&limit=100` : null);
+  const todayRow = ownOnly ? (att.data || []).find((r) => r.date === todayISO()) : null;
+  const todayNext = !todayRow?.inAt ? 'In' : !todayRow?.outAt ? 'Out' : null;
   const [over, setOver] = useState({}); // marks tapped on this screen, shown at once (optimistic)
   const canMark = canMarkOthers;
 
@@ -91,11 +96,15 @@ export default function AttendancePage() {
   const [busyRow, setBusyRow] = useState('');
 
   async function mark(e, state) {
-    const prev = over[e.empCode];
-    setOver((m) => ({ ...m, [e.empCode]: { ...(m[e.empCode] || {}), state } }));
+    const code = e?.empCode || session?.empCode;
+    const name = e?.name || session?.name;
+    const targetDate = e?.date || date;
+    const prev = over[code];
+    setOver((m) => ({ ...m, [code]: { ...(m[code] || {}), state } }));
     try {
-      await submit('/api/attendance', { date, empCode: e.empCode, state }, { label: trNow('Attendance {n}', { n: e.name }) });
-    } catch (err) { toast.error(err.message); setOver((m) => { const n = { ...m }; if (prev) n[e.empCode] = prev; else delete n[e.empCode]; return n; }); }
+      await submit('/api/attendance', { date: targetDate, empCode: code, state }, { label: trNow('Attendance {n}', { n: name }) });
+      att.reload?.();
+    } catch (err) { toast.error(err.message); setOver((m) => { const n = { ...m }; if (prev) n[code] = prev; else delete n[code]; return n; }); }
   }
   async function markAll() {
     const todo = unmarked;
@@ -110,12 +119,14 @@ export default function AttendancePage() {
   }
   // Punch In / Out for somebody (the same thing the biometric machine will send): for testing until the machine is connected
   async function punch(e) {
-    if (busyRow) return;
-    setBusyRow(e.empCode);
+    const code = e?.empCode || session?.empCode;
+    const name = e?.name || session?.name;
+    if (busyRow || !code) return;
+    setBusyRow(code);
     try {
-      const r = await api('/api/punches', { method: 'POST', body: { empCode: e.empCode } });
-      toast.success(r.ignored ? 'Already punched a moment ago' : r.type === 'in' ? trNow('{n} punched in', { n: e.name }) : trNow('{n} punched out', { n: e.name }));
-      sheet.reload(); ot.reload?.();
+      const r = await api('/api/punches', { method: 'POST', body: { empCode: code } });
+      toast.success(r.ignored ? 'Already punched a moment ago' : r.type === 'in' ? trNow('{n} punched in', { n: name }) : trNow('{n} punched out', { n: name }));
+      sheet.reload?.(); ot.reload?.(); att.reload?.();
     } catch (err) { toast.error(err.message); }
     setBusyRow('');
   }
@@ -136,6 +147,47 @@ export default function AttendancePage() {
 
   const dayOff = sheet.meta.dayKind && sheet.meta.dayKind !== 'working';
   const otCount = ot.data?.data?.length || 0;
+
+  const getOwnRowActions = (r) => {
+    const items = [];
+    const isToday = r.date === todayISO();
+    const next = !r.inAt ? 'In' : !r.outAt ? 'Out' : null;
+    const busy = busyRow === (r.empCode || session?.empCode);
+
+    if (canPunch && isToday && next) {
+      items.push({
+        key: 'punch',
+        label: next === 'In' ? 'Punch In' : 'Punch Out',
+        icon: next === 'In' ? <LogIn size={15} className="text-emerald-600" /> : <LogOut size={15} className="text-amber-600" />,
+        tone: next === 'In' ? 'green' : 'amber',
+        disabled: busy,
+        onClick: () => punch({ empCode: r.empCode || session?.empCode, name: r.empName || session?.name }),
+      });
+    }
+
+    if (canFix) {
+      items.push({
+        key: 'fix',
+        label: tr('Fix punch'),
+        icon: <Pencil size={15} className="text-char-500" />,
+        onClick: () => setFix({ ...r, empCode: r.empCode || session?.empCode, name: r.empName || session?.name, date: r.date }),
+      });
+    }
+
+    if (canMarkOwn && !r.inAt) {
+      STATES.forEach((s, idx) => {
+        items.push({
+          key: `mark-${s.v}`,
+          label: `Mark ${tr(s.label)}`,
+          icon: <span className={cx('w-2.5 h-2.5 rounded-full shrink-0', s.v === 'present' ? 'bg-emerald-500' : s.v === 'absent' ? 'bg-red-500' : s.v === 'half' ? 'bg-amber-500' : 'bg-violet-500')} />,
+          dividerBefore: idx === 0 && items.length > 0,
+          onClick: () => mark({ empCode: r.empCode || session?.empCode, name: r.empName || session?.name, date: r.date }, s.v),
+        });
+      });
+    }
+
+    return items;
+  };
 
   const getAttendanceRowActions = (r, m, next, showPunch, busy) => {
     const items = [];
@@ -208,21 +260,70 @@ export default function AttendancePage() {
       {tabsEl}
       {showMark && (
         <PageHeader title={t('attendance')} subtitle={ownOnly ? 'Your attendance this month' : canMarkOthers ? 'Punches come from the biometric machine. Mark leave, absent or half day here, and fix a wrong punch.' : tr('Your team\'s attendance (view only)')}
-          actions={<>{!ownOnly && (sheet.total ?? 0) > 0 && <Badge tone="amber"><T vars={{ n: sheet.total }}>{'{n} records'}</T></Badge>}{!ownOnly && can('attendance', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&date=${date}`)} />}{canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}{!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}</>} />
+          actions={<>
+            {ownOnly && canPunch && todayNext && (
+              <button
+                type="button"
+                className={cx('btn-sm gap-1.5', todayNext === 'In' ? 'btn-green' : 'btn-primary')}
+                disabled={Boolean(busyRow)}
+                onClick={() => punch({ empCode: session?.empCode, name: session?.name })}
+              >
+                {todayNext === 'In' ? <LogIn size={15} /> : <LogOut size={15} />}
+                <T>{todayNext === 'In' ? 'Punch In' : 'Punch Out'}</T>
+              </button>
+            )}
+            {ownOnly && can('attendance', 'export') && (
+              <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&from=${monthOf(date)}-01&to=${date}`)} />
+            )}
+            {!ownOnly && (sheet.total ?? 0) > 0 && <Badge tone="amber"><T vars={{ n: sheet.total }}>{'{n} records'}</T></Badge>}
+            {!ownOnly && can('attendance', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&date=${date}`)} />}
+            {canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}
+            {!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}
+          </>} />
       )}
 
       {canApprove && tab === 'overtime' && <OvertimeTab list={ot} onChanged={() => sheet.reload()} />}
 
       {showMark && ownOnly && (
         att.loading ? <SkeletonList /> : (att.data || []).length ? (
-          <DataList rows={att.data} columns={[
-            { key: 'date', label: 'Date', primary: true, render: (r) => fmtDate(r.date) },
-            { key: 'state', label: 'Status', render: (r) => <Badge tone={TONE[r.state === 'overtime' ? 'present' : r.state] || 'green'}>{STATES.find((x) => x.v === (r.state === 'overtime' ? 'present' : r.state))?.label || r.state}</Badge> },
-            { key: 'inAt', label: 'In', render: (r) => (r.inAt ? fmtClock(r.inAt) : '—') },
-            { key: 'outAt', label: 'Out', render: (r) => (r.outAt ? fmtClock(r.outAt) : '—') },
-            { key: 'workedMinutes', label: 'Worked', render: (r) => fmtDuration(r.workedMinutes) },
-            { key: 'otMinutes', label: 'Overtime', render: (r) => (r.otMinutes > 0 ? <OtBadge m={r} /> : '—') },
-          ]} />
+          <DataList
+            rows={att.data}
+            columns={[
+              { key: 'date', label: 'Date', primary: true, render: (r) => fmtDate(r.date) },
+              { key: 'state', label: 'Status', render: (r) => (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge tone={TONE[r.state === 'overtime' ? 'present' : r.state] || 'green'}>
+                    {STATES.find((x) => x.v === (r.state === 'overtime' ? 'present' : r.state))?.label || r.state}
+                  </Badge>
+                  {r.corrected && <Badge tone="blue"><T>corrected</T></Badge>}
+                </div>
+              )},
+              { key: 'inAt', label: 'In', render: (r) => (r.inAt ? fmtClock(r.inAt) : '—') },
+              { key: 'outAt', label: 'Out', render: (r) => (r.outAt ? fmtClock(r.outAt) : '—') },
+              { key: 'workedMinutes', label: 'Worked', render: (r) => fmtDuration(r.workedMinutes) },
+              { key: 'otMinutes', label: 'Overtime', render: (r) => (r.otMinutes > 0 ? <OtBadge m={r} /> : '—') },
+            ]}
+            actions={(canFix || canPunch || canMarkOwn) ? (r) => {
+              const items = getOwnRowActions(r);
+              if (!items.length) return null;
+              return (
+                <div className="flex items-center justify-end gap-1.5">
+                  {canFix && (
+                    <button
+                      type="button"
+                      className="btn-outline !py-1 !px-2.5 !text-xs !min-h-[28px] gap-1 inline-flex items-center text-char-700 hover:text-char-900 border-sand-300"
+                      onClick={() => setFix({ ...r, empCode: r.empCode || session?.empCode, name: r.empName || session?.name, date: r.date })}
+                      title={tr('Fix punch')}
+                    >
+                      <Pencil size={13} className="text-char-500" />
+                      <span><T>Fix</T></span>
+                    </button>
+                  )}
+                  <ActionMenu items={items} />
+                </div>
+              );
+            } : undefined}
+          />
         ) : <Empty text="No attendance marked yet this month" />
       )}
 
@@ -359,7 +460,14 @@ export default function AttendancePage() {
                         </td>
                         <td className="td whitespace-nowrap text-xs text-char-700">{m.method ? (m.method === 'app' ? <T>App</T> : m.method === 'biometric' ? <T>Biometric</T> : <T>Manual</T>) : <span className="text-char-300">—</span>}</td>
                         <td className="td whitespace-nowrap text-right w-px" onClick={(e) => e.stopPropagation()}>
-                          <ActionMenu items={getAttendanceRowActions(r, m, next, showPunch, busy)} />
+                          <div className="flex items-center justify-end gap-1">
+                            {r.fixable && (
+                              <button className="icon-btn text-char-600 hover:text-char-900" disabled={busy} onClick={() => setFix(r)} title={tr('Fix punch')} aria-label={tr('Fix punch')}>
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                            <ActionMenu items={getAttendanceRowActions(r, m, next, showPunch, busy)} />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -374,7 +482,7 @@ export default function AttendancePage() {
         </>
       )}
 
-      <FixSheet row={fix} date={date} onClose={() => setFix(null)} onSaved={() => { setFix(null); sheet.reload(); ot.reload?.(); }} />
+      <FixSheet row={fix} date={fix?.date || date} onClose={() => setFix(null)} onSaved={() => { setFix(null); sheet.reload?.(); ot.reload?.(); att.reload?.(); }} />
 
       {leavesOn && tab === 'leaves' && (
         <CrudPage model="leaves" title="Leave requests" label="Leave request" subtitle={leaveOwn ? 'Apply for leave and see your requests' : 'Requests from your team'} headerExtra={canImportLeaves && <ImportData resource="leaves" perm="leaves" noun="leave requests" />} addLabel={leaveOwn ? 'Apply for leave' : undefined} canEdit={(r) => r.status === 'pending'} sort="-createdAt" searchKeys={['empName', 'reason']}

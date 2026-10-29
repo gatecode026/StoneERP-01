@@ -61,7 +61,11 @@ export function calcDay(o: { date: string; shift: Shift; inAt: Date | null; outA
   // the break comes off only for a stay long enough to include one (a short stint has no lunch break in it)
   const workedMinutes = gross >= BREAK_APPLIES_FROM_MINUTES ? Math.max(0, gross - (shift.breakMinutes || 0)) : gross;
   const hours = workedMinutes / 60;
-  const state: DayCalc['state'] = hours >= shift.fullDayHours ? 'present' : hours >= shift.halfDayHours ? 'half' : 'absent';
+  const state: DayCalc['state'] = kind !== 'working'
+    ? 'present'
+    : hours >= shift.fullDayHours
+      ? 'present'
+      : 'half';
 
   let otMinutes = 0;
   const block = Math.max(1, shift.otRoundMinutes || 1);

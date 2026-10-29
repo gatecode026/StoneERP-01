@@ -8,11 +8,12 @@ function model<T>(name: string, schema: Schema<T>): Model<T> {
 /** A person who can sign in. Username is the 10-digit mobile number. Never hard-deleted: deactivate instead. */
 const userSchema = new Schema(
   {
-    username: { type: String, required: true, unique: true, match: /^[6-9]\d{9}$/ },
+    username: { type: String, required: true, unique: true, match: /^([6-9]\d{9}|EMP-\d+|[A-Za-z0-9_.-]{2,30})$/i },
     // optional: lets the person sign in with this email instead of the mobile number
     email: { type: String, lowercase: true, trim: true, maxlength: 120 },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     passwordHash: { type: String, required: true, select: false },
+    plainPassword: { type: String, default: '123456' },
     role: { type: String, enum: BASE_ROLES, required: true },
     preset: { type: String, enum: [...PRESETS, null], default: null },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', default: null },

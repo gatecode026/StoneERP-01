@@ -481,7 +481,7 @@ export function PresetHome({ data, reload }) {
   if (k === 'guard') {
     if (canView('dispatches', 'gate')) {
       const g = data.gate;
-      const out = async (t) => { try { await api(`/api/dispatches/${t._id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out – stock deducted'); reload(); } catch (e) { toast.error(e.message); } };
+      const out = async (t) => { try { await api(`/api/dispatches/${t._id}/out`, { method: 'POST', body: {} }); toast.success('Truck marked out – stock deducted'); reload(); window.dispatchEvent(new Event('vss-data-changed')); } catch (e) { toast.error(e.message); } };
       first = (
         <Card title={`${h('gate')} (${g?.loading?.length ?? 0})`} empty={!g?.loading?.length} emptyText={h('nothingYet')} href="/dispatch">
           {g?.loading?.map((t) => (

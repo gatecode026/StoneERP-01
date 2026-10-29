@@ -5,11 +5,11 @@
  *  - writes are never touched here: the app's IndexedDB queue sends them later with idempotency keys
  * Private data never outlives the sign-in: the page tells us to wipe every cache on sign-out. */
 // Bump this on a release that must reach everyone at once: every cache of an older version (old screens and old data) is deleted when the new worker starts.
-const V = 'vss-v3';
+const V = 'vss-v5';
 const SHELL = V + '-shell';
 const PAGES = V + '-pages';
 const DATA = V + '-data';
-const NO_CACHE_API = /^\/api\/(auth|export|files|jobs)\b/;
+const NO_CACHE_API = /^\/api\/(auth|export|files|jobs|admin|employees|users|stockitems|stockmovements|stockcounts)\b/;
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {

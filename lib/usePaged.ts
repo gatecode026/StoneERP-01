@@ -28,6 +28,7 @@ export type PagedList = {
   hasMore: boolean;
   loadMore: () => Promise<void>;
   reload: () => Promise<void>;
+  mutateRow?: (id: string, patch: Record<string, any>) => void;
   /** everything else the first page of the endpoint returned (e.g. exact counts for a sheet) */
   meta: Record<string, any>;
 };
@@ -50,12 +51,15 @@ export function usePagedList(path: string | null, params: Record<string, unknown
   const [meta, setMeta] = useState<Record<string, any>>({});
   const seq = useRef(0);
 
+  const [reloadKey, setReloadKey] = useState(0);
+
   const load = useCallback(async () => {
     if (!path) { setRows([]); setCursor(null); setTotal(null); setLoading(false); return; }
     const mine = ++seq.current;
     setLoading(true);
     try {
-      const r = await api(`${path}?${qs}${count ? '&count=1' : ''}`);
+      const cacheBust = reloadKey ? `&_t=${Date.now()}` : '';
+      const r = await api(`${path}?${qs}${count ? '&count=1' : ''}${cacheBust}`);
       if (mine !== seq.current) return;
       setRows(r.data ?? []); setCursor(r.nextCursor ?? null); setTotal(r.total ?? null); setError(null); { const { data: _d, nextCursor: _n, ...rest } = r; void _d; void _n; setMeta(rest); }
     } catch (e) {
@@ -63,7 +67,11 @@ export function usePagedList(path: string | null, params: Record<string, unknown
     } finally {
       if (mine === seq.current) setLoading(false);
     }
-  }, [path, qs, count]);
+  }, [path, qs, count, reloadKey]);
+
+  const reload = useCallback(async () => {
+    setReloadKey((k) => k + 1);
+  }, []);
 
   useEffect(() => { void load(); }, [load, key]);
 
@@ -82,7 +90,11 @@ export function usePagedList(path: string | null, params: Record<string, unknown
     }
   }, [path, qs, cursor, loadingMore]);
 
-  return { rows, total, loading, loadingMore, error, hasMore: !!cursor, loadMore, reload: load, meta };
+  const mutateRow = useCallback((id: string, patch: Record<string, any>) => {
+    setRows((prev) => prev.map((r) => (String(r._id) === String(id) ? { ...r, ...patch } : r)));
+  }, []);
+
+  return { rows, total, loading, loadingMore, error, hasMore: !!cursor, loadMore, reload, mutateRow, meta };
 }
 
 /** A list shown as numbered pages (Prev / 1 2 3 / Next): the server returns page N and the exact total; changing the search or filters goes back to page 1. */

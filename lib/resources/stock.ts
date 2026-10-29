@@ -18,13 +18,17 @@ const itemFields = {
   colourFinish: text(80).optional(), karigar: text(120).optional(),
   grade: enumOf(['A', 'B', 'C']).optional(), location: text(80).optional(), photo: photo.optional(),
   minLevel: num().optional(), price: num().optional(), sellRate: num().optional(), costRate: num().optional(), allowNegative: z.boolean().optional(),
+  stockStatus: enumOf(['in_stock', 'out_of_stock']).optional(),
 };
 export const stockitems: ResourceDef = {
   key: 'stockitems', model: StockItem, label: (d) => d.name,
-  listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'edges', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative'],
-  sortable: ['name', 'category', 'balance', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish', 'edges'],
-  filters: { category: 'string', grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string' },
-  named: { low: (v) => (v === '1' ? { belowMin: true } : {}) }, // uses the indexed flag kept by incBalance
+  listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'edges', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative', 'stockStatus'],
+  sortable: ['name', 'category', 'balance', 'stockStatus', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish', 'edges'],
+  filters: { category: 'string', grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string', stockStatus: { enum: ['in_stock', 'out_of_stock'] } },
+  named: {
+    low: (v) => (v === '1' ? { belowMin: true } : {}),
+    stockStatus: (v) => (v === 'out_of_stock' ? { stockStatus: 'out_of_stock' } : v === 'in_stock' ? { stockStatus: { $ne: 'out_of_stock' } } : {}),
+  }, // uses the indexed flag kept by incBalance
   computed: { value: { expr: { $multiply: [{ $ifNull: ['$balance', 0] }, { $ifNull: ['$costRate', 0] }] }, needs: ['costRate'] } },
   serverOnly: ['balance', 'belowMin'],
   create: z.object({ ...itemFields, openingBalance: num(0, 1e9).optional() }).strict(),
@@ -37,7 +41,8 @@ export const stockitems: ResourceDef = {
       const size = rest.size || (rest.sizeL && rest.sizeW ? `${rest.sizeL}×${rest.sizeW}` : undefined);
       const price = rest.price ?? rest.sellRate;
       const sellRate = rest.sellRate ?? rest.price;
-      const [doc] = await StockItem.create([{ ...rest, unit, category, size, price, sellRate, balance: 0, belowMin: Number(rest.minLevel) > 0, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
+      const stockStatus = rest.stockStatus || 'in_stock';
+      const [doc] = await StockItem.create([{ ...rest, stockStatus, unit, category, size, price, sellRate, balance: 0, belowMin: Number(rest.minLevel) > 0, createdById: oid(ctx.actor.id), createdByName: ctx.actor.name, updatedById: oid(ctx.actor.id), updatedByName: ctx.actor.name }], { session: ctx.session });
       if (openingBalance > 0) await applyStock(ctx, { itemId: doc._id, delta: openingBalance, type: 'in', ref: 'Opening balance', refModel: 'stockitems', refId: doc._id });
       const fresh: any = await StockItem.findById(doc._id).session(s(ctx)).lean();
       return { doc: fresh };
@@ -54,9 +59,9 @@ export const stockitems: ResourceDef = {
 
 export const stockmovements: ResourceDef = {
   key: 'stockmovements', model: StockMovement, label: (d) => `${d.type} ${d.qty} ${d.itemName}`,
-  listFields: ['itemId', 'itemName', 'type', 'qty', 'date', 'ref', 'note', 'location', 'status', 'refModel', 'createdByName'],
+  listFields: ['itemId', 'itemName', 'type', 'qty', 'date', 'ref', 'note', 'location', 'status', 'refModel', 'createdByName', 'createdAt'],
   sortable: ['date', 'createdAt'], defaultSort: '-date', searchFields: ['itemName', 'ref'],
-  dateFields: ['date'], filters: { itemId: 'oid', type: { enum: ['in', 'out', 'transfer', 'damage', 'adjust'] }, status: { enum: ['applied', 'pending', 'rejected'] } },
+  dateFields: ['date'], filters: { date: 'date', itemId: 'oid', type: { enum: ['in', 'out', 'transfer', 'damage', 'adjust'] }, status: { enum: ['applied', 'pending', 'rejected'] } },
   serverOnly: ['status', 'itemName', 'refModel', 'refId', 'reversalOf', 'approvedBy', 'approvedAt'],
   create: z.object({ date: dateStr.optional(), type: enumOf(['in', 'out', 'transfer', 'damage']), itemId: oidStr, qty: posNum(1e9), location: text(80).optional(), ref: text(120).optional(), note: text(500).optional() }).strict(),
   lifecycle: {
@@ -212,7 +217,14 @@ export const stockcounts: ResourceDef = {
       if (!patch.lines) return patch;
       const byId = new Map<string, any>((prev.lines ?? []).map((l: any) => [String(l.itemId), { ...l }]));
       for (const l of patch.lines) {
-        const line = byId.get(String(l.itemId));
+        let line = byId.get(String(l.itemId));
+        if (!line) {
+          const it: any = await StockItem.findOne({ _id: l.itemId, isVoid: false }).session(s(ctx)).lean();
+          if (it) {
+            line = { itemId: it._id, name: it.name, unit: it.unit, systemQty: round2(it.balance ?? 0), countedQty: null };
+            byId.set(String(it._id), line);
+          }
+        }
         if (!line) throw badRequest('An item in this count is not part of it');
         line.countedQty = l.countedQty;
         if (l.reason !== undefined) line.reason = l.reason;

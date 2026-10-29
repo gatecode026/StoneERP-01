@@ -162,7 +162,8 @@ export async function updateResource(auth: AuthCtx, def: ResourceDef, id: string
     if (def.lifecycle?.afterUpdate) await def.lifecycle.afterUpdate(c, doc, prev);
     const changes = diffObjects(prev, set);
     await writeAudit({ resource: def.key, refId: doc._id, action: 'update', label: def.label(prev), changes, requestId: auth.requestId }, c.actor, session);
-    return doc;
+    const fresh = (await def.model.findById(doc._id).session(session ?? null).lean()) ?? doc;
+    return fresh;
   });
   return NextResponse.json(projectDoc(auth.perm, def.key, result));
 }

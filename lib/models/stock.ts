@@ -26,8 +26,9 @@ export const StockItem = defineModel(
     costRate: money(), // cost
     allowNegative: { type: B, default: false },
     belowMin: { type: B, default: false }, // maintained with every balance / minimum change => the low-stock alert is an index lookup, not a scan
+    stockStatus: { type: S, enum: ['in_stock', 'out_of_stock'], default: 'in_stock' },
   },
-  { indexes: [[{ belowMin: 1 }, { partialFilterExpression: { belowMin: true } }], [{ category: 1, name: 1 }], [{ name: 1 }], [{ name: 1, size: 1, finish: 1 }, { unique: true, partialFilterExpression: { isVoid: false } }]] }
+  { indexes: [[{ belowMin: 1 }, { partialFilterExpression: { belowMin: true } }], [{ category: 1, name: 1 }], [{ name: 1 }], [{ stockStatus: 1 }], [{ name: 1, size: 1, finish: 1 }, { unique: true, partialFilterExpression: { isVoid: false } }]] }
 );
 
 export const StockMovement = defineModel(

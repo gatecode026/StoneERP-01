@@ -354,7 +354,13 @@ export async function markTruckOut(ctx: SvcCtx, id: string) {
   if (value > EWAY_LIMIT && !d.eway && !ctx.confirmed) throw confirmable(`No e-way bill number is entered. Goods worth ₹${Math.round(value).toLocaleString('en-IN')} usually need one. Mark the truck out anyway?`);
   await roll.truck(d.date, 'out', 1, ctx.session);
   for (const it of d.items ?? []) {
-    if (it.stockItemId) await applyStock(ctx, { itemId: it.stockItemId, delta: -it.qty, type: 'out', date: d.date, ref: `Gate pass ${d.gatePassNo}`, note: d.customerName, refModel: 'dispatches', refId: d._id });
+    let stockItemId = it.stockItemId;
+    if (!stockItemId && it.name) {
+      const escaped = String(it.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const found: any = await StockItem.findOne({ name: new RegExp(`^${escaped}$`, 'i'), isVoid: false }).session(s(ctx)).lean();
+      if (found) stockItemId = found._id;
+    }
+    if (stockItemId) await applyStock(ctx, { itemId: stockItemId, delta: -it.qty, type: 'out', date: d.date, ref: `Gate pass ${d.gatePassNo}`, note: d.customerName, refModel: 'dispatches', refId: d._id });
   }
   const sale: any = await Sale.findById(d.saleId).session(s(ctx)).lean();
   const inc: Record<string, number> = {};
