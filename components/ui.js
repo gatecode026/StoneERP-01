@@ -163,13 +163,21 @@ export function Tabs({ tabs, value, onChange }) {
   );
 }
 
-export function SearchBox({ value, onChange, placeholder }) {
+export function SearchBox({ value, onChange, placeholder, list, id, autoComplete }) {
   const { t } = useApp();
   const tx = useTx();
   return (
     <div className="relative flex-1 min-w-[160px]">
       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-char-300" />
-      <input className="input pl-9" value={value} onChange={(e) => onChange(e.target.value)} placeholder={tx(placeholder) || t('search')} />
+      <input
+        id={id}
+        list={list}
+        autoComplete={autoComplete}
+        className="input pl-9"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={tx(placeholder) || t('search')}
+      />
     </div>
   );
 }

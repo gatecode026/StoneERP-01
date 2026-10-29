@@ -23,7 +23,9 @@ const itemFields = {
 export const stockitems: ResourceDef = {
   key: 'stockitems', model: StockItem, label: (d) => d.name,
   listFields: ['name', 'category', 'unit', 'size', 'sizeL', 'sizeW', 'thickness', 'edges', 'finish', 'pieces', 'colourFinish', 'karigar', 'grade', 'location', 'balance', 'minLevel', 'price', 'sellRate', 'costRate', 'allowNegative', 'stockStatus'],
-  sortable: ['name', 'category', 'balance', 'stockStatus', 'createdAt'], defaultSort: 'name', searchFields: ['name', 'size', 'location', 'finish', 'edges'],
+  sortable: ['name', 'category', 'balance', 'stockStatus', 'createdAt'], defaultSort: 'name',
+  searchFields: ['name', 'finish', 'colourFinish', 'size', 'edges', 'karigar', 'location'],
+  searchNumbers: ['sizeL', 'sizeW', 'pieces'],
   filters: { category: 'string', grade: { enum: ['A', 'B', 'C'] }, finish: 'string', size: 'string', stockStatus: { enum: ['in_stock', 'out_of_stock'] } },
   named: {
     low: (v) => (v === '1' ? { belowMin: true } : {}),

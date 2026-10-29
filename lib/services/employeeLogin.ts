@@ -47,8 +47,11 @@ export async function applyLogin(ctx: SvcCtx, auth: AuthCtx, emp: any, login: Lo
   if (!role) throw badRequest('Choose the role for this sign-in');
   if ((role === 'owner' || existing?.role === 'owner') && auth.user.role !== 'owner') throw badRequest('Only an Owner can give or change the Owner role');
   const parsedMobile = mobileSchema.safeParse(emp.mobile ?? '');
-  const username = parsedMobile.success ? parsedMobile.data : (existing?.username || emp.empCode);
-  if (!username) throw badRequest('Valid 10-digit mobile number or employee code is required for sign-in');
+  if (!parsedMobile.success && !existing?.username) {
+    throw badRequest('Add a valid 10-digit mobile number to this employee first: it is the sign-in ID');
+  }
+  const username = parsedMobile.success ? parsedMobile.data : existing?.username;
+  if (!username) throw badRequest('Valid 10-digit mobile number is required for sign-in');
   if (existing && String(existing._id) === auth.user.id && (role !== existing.role || login.preset)) throw badRequest('You cannot reduce your own access');
   const preset = role === 'worker' ? (login.preset === undefined ? existing?.preset ?? null : login.preset) : null;
 
@@ -82,7 +85,7 @@ export async function syncLoginIdentity(ctx: SvcCtx, doc: any, prev: any) {
   if (!u) return;
   const set: any = {};
   if (doc.name && doc.name !== prev?.name) set.name = doc.name;
-  if (doc.job) {
+  if (doc.job && prev && doc.job !== prev.job) {
     const expectedRole = roleOfJob(doc.job);
     if (expectedRole && expectedRole !== u.role) {
       set.role = expectedRole;

@@ -1,6 +1,6 @@
 'use client';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
 import { Plus, History as HistoryIcon, Pencil, Ban, MoreVertical, CheckSquare, Square, Download, Share2, Trash2, X } from 'lucide-react';
@@ -382,6 +382,7 @@ export default function CrudPage({
   rowActions, canAdd = true, canEdit = () => true, addLabel, exportName, exportColumns, beforeSave, onSaved, headerExtra,
   rowClass, emptyText, formTitle, noHeader, summary, label = 'Entry', wide, allowVoid = true, topContent,
   voidLabel, voidTitle, voidPrompt, voidSuccessMsg, onRowClick,
+  searchPlaceholder, searchDatalist,
 }) {
   const { t, can, perm } = useApp();
   const tx = useTx();
@@ -431,7 +432,22 @@ export default function CrudPage({
   const [voidBusy, setVoidBusy] = useState(false);
   const voidBusyRef = useRef(false);
   const [menuRow, setMenuRow] = useState(null);
-  useEffect(() => { setMenuRow(null); }, [narrowing, page, pageSize]);
+  const datalistItems = useMemo(() => {
+    if (searchDatalist && Array.isArray(searchDatalist)) return searchDatalist;
+    if (model === 'stockitems' && rows && rows.length) {
+      const set = new Set();
+      rows.forEach((r) => {
+        const name = r.name || r.colour;
+        const finish = r.finish;
+        if (name && finish && finish !== '—') set.add(`${name} ${finish}`);
+        if (name) set.add(name);
+        if (finish && finish !== '—') set.add(finish);
+      });
+      return Array.from(set).slice(0, 60);
+    }
+    return [];
+  }, [rows, searchDatalist, model]);
+
 
   // ── Bulk select state ─────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false);
@@ -766,7 +782,20 @@ export default function CrudPage({
             <span>{selectMode ? 'Done' : 'Select'}</span>
           </button>
         )}
-        <SearchBox value={q} onChange={setQ} />
+        <SearchBox
+          value={q}
+          onChange={setQ}
+          placeholder={searchPlaceholder}
+          list={datalistItems?.length ? `${model}_search_list` : undefined}
+        />
+        {datalistItems?.length > 0 && (
+          <datalist id={`${model}_search_list`}>
+            {datalistItems.map((item, idx) => {
+              const val = typeof item === 'string' ? item : item.value || item.label;
+              return <option key={idx} value={val}>{typeof item === 'object' && item.label ? item.label : val}</option>;
+            })}
+          </datalist>
+        )}
         {effectiveSortOptions && (
           <select
             aria-label="Sort order"

@@ -103,6 +103,7 @@ export default function StockPage() {
       {tab === 'count' && <StockCount />}
       {tab === 'items' && (
         <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Physical Stocks — Colour, Finish, Sizes, Thickness, Edges, Price, Quantity Sqft" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="Colour, Finish, Sizes, Thickness, Edges, Price, Quantity Sqft and Pieces are supported" />}
+          searchPlaceholder="Search colour, finish, sizes, thickness..."
           fields={itemFields} columns={itemCols}
           canAdd={manage} canEdit={() => manage}
           loadExtra={(full) => ({ stockStatus: full?.stockStatus || 'in_stock' })}

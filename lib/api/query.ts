@@ -152,6 +152,28 @@ export function parseListQuery(sp: URLSearchParams, spec: ListSpec, opts: { hidd
   return { page, extra, limit, cursor: cursorRaw ? decodeCursor(cursorRaw) : undefined, sortField, sortDir, q, match, includeVoid: sp.get('includeVoid') === '1', count: sp.get('count') === '1', select };
 }
 
+const TERM_SYNONYMS: Record<string, string[]> = {
+  swan: ['sawn', 'swan'],
+  sawn: ['sawn', 'swan'],
+  poly: ['polish', 'polished'],
+  pol: ['polish', 'polished'],
+  nat: ['natural'],
+  hon: ['honed'],
+  flam: ['flamed'],
+  kadapa: ['kadpa', 'cuddapah'],
+  cuddapah: ['kadpa', 'cuddapah'],
+  kota: ['kotah'],
+};
+
+export function buildTermRegex(term: string): RegExp {
+  const low = term.toLowerCase();
+  const variants = TERM_SYNONYMS[low];
+  if (variants?.length) {
+    return new RegExp(variants.map(escapeRe).join('|'), 'i');
+  }
+  return new RegExp(escapeRe(term), 'i');
+}
+
 /** Compose the final Mongo filter: user filters + search + scope + keyset cursor. */
 export function buildFilter(lq: ListQuery, spec: ListSpec, scope: Record<string, any>) {
   const and: Record<string, any>[] = [];
@@ -159,9 +181,27 @@ export function buildFilter(lq: ListQuery, spec: ListSpec, scope: Record<string,
   for (const c of lq.extra) and.push(c);
   if (!lq.includeVoid) and.push({ isVoid: false });
   if (lq.q && (spec.searchFields?.length || spec.searchNumbers?.length)) {
-    const re = new RegExp('^' + escapeRe(lq.q), 'i');
-    const numeric = /^\d{1,9}$/.test(lq.q) ? (spec.searchNumbers ?? []).map((f) => ({ [f]: Number(lq.q) })) : [];
-    and.push({ $or: [...(spec.searchFields ?? []).map((f) => ({ [f]: re })), ...numeric] });
+    const rawQ = lq.q.trim();
+    const words = rawQ.split(/[\s,]+/).filter(Boolean);
+    if (words.length <= 1) {
+      const w = words[0] || rawQ;
+      const re = buildTermRegex(w);
+      const numeric = /^\d{1,9}$/.test(w) ? (spec.searchNumbers ?? []).map((f) => ({ [f]: Number(w) })) : [];
+      and.push({ $or: [...(spec.searchFields ?? []).map((f) => ({ [f]: re })), ...numeric] });
+    } else {
+      const phrasePattern = words.map((w) => {
+        const syn = TERM_SYNONYMS[w.toLowerCase()];
+        return syn ? `(?:${syn.map(escapeRe).join('|')})` : escapeRe(w);
+      }).join('\\s+');
+      const phraseRe = new RegExp(phrasePattern, 'i');
+      const phraseOr = (spec.searchFields ?? []).map((f) => ({ [f]: phraseRe }));
+      const tokenAnd = words.map((w) => {
+        const re = buildTermRegex(w);
+        const numeric = /^\d{1,9}$/.test(w) ? (spec.searchNumbers ?? []).map((f) => ({ [f]: Number(w) })) : [];
+        return { $or: [...(spec.searchFields ?? []).map((f) => ({ [f]: re })), ...numeric] };
+      });
+      and.push({ $or: [...phraseOr, { $and: tokenAnd }] });
+    }
   }
   if (Object.keys(scope).length) and.push(scope);
   if (lq.cursor) {

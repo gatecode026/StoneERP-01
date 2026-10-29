@@ -44,7 +44,8 @@ export function toResponse(e: unknown, requestId?: string): NextResponse<ErrorBo
     message = 'This value already exists';
     details = { fields: Object.keys(err.keyPattern ?? {}) };
   } else if (err?.name === 'CastError') {
-    status = 400; code = 'BAD_REQUEST'; message = 'Invalid value';
+    console.error('CastError occurred:', { path: (err as any)?.path, value: (err as any)?.value, kind: (err as any)?.kind, message: (err as any)?.message });
+    status = 400; code = 'BAD_REQUEST'; message = (err as any)?.path ? `Invalid value for ${(err as any).path}` : 'Invalid value';
   } else if (err?.name === 'ValidationError') {
     status = 400; code = 'VALIDATION'; message = 'Some fields are not valid';
   } else {
