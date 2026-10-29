@@ -56,6 +56,7 @@ const PRIORITY_OPTIONS = ['Normal', 'High', 'Urgent'];
 
 export default function ProjectsPage() {
   const { t, tr, can, session } = useApp();
+  const isOwner = Boolean(session?.isOwner || session?.perm?.isOwner || session?.role === 'owner');
   const sp = useSearchParams();
   const today = todayISO();
 
@@ -250,7 +251,7 @@ export default function ProjectsPage() {
   const fields = [
     // ── General & Order Details ──
     { name: 'name', label: 'Project Name', required: true, wide: true, section: 'General & Order Details', placeholder: 'e.g. Airport Terminal 3 - Sandstone Cladding' },
-    { name: 'clientName', label: 'Client / Customer', section: 'General & Order Details', placeholder: 'e.g. L&T Infrastructure, Oberoi Hotels' },
+    ...(isOwner ? [{ name: 'clientName', label: 'Client / Customer', section: 'General & Order Details', placeholder: 'e.g. L&T Infrastructure, Oberoi Hotels' }] : []),
     { name: 'orderNo', label: 'Order No', section: 'General & Order Details', placeholder: 'e.g. SO-101' },
     { name: 'partyPoNo', label: 'Party P.O. No', section: 'General & Order Details', placeholder: 'e.g. PO-882' },
     { name: 'ourSaleInvoice', label: 'Our Sale Invoice', section: 'General & Order Details', placeholder: 'e.g. INV-2026-01' },
@@ -264,8 +265,10 @@ export default function ProjectsPage() {
     { name: 'edges', label: 'Edges', section: 'Stone Specifications', placeholder: 'e.g. Hand Cut, Machine Cut, Bullnose, Chamfered' },
 
     // ── Quantities & Commercials ──
-    { name: 'price', label: 'Price (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 65' },
-    { name: 'contractValue', label: 'Total Order Amount (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'Optional budget / value' },
+    ...(isOwner ? [
+      { name: 'price', label: 'Price (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 65' },
+      { name: 'contractValue', label: 'Total Order Amount (₹)', type: 'number', section: 'Quantities & Commercials', placeholder: 'Optional budget / value' },
+    ] : []),
     { name: 'qtyInPcs', label: 'Qty In Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 2100' },
     { name: 'completedPcs', label: 'Completed Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 1200' },
     { name: 'balancePcs', label: 'Balance / Left Pcs', type: 'number', section: 'Quantities & Commercials', placeholder: 'e.g. 900', hint: 'Auto-calculated: Target - Completed' },
@@ -277,7 +280,9 @@ export default function ProjectsPage() {
     // ── Dispatch & Balances ──
     { name: 'dispatchQty', label: 'Dispatch Qty', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 0' },
     { name: 'balanceOrderQty', label: 'Balance Order Qty', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 2000' },
-    { name: 'balanceOrderAmount', label: 'Balance Order Amount (₹)', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 130000' },
+    ...(isOwner ? [
+      { name: 'balanceOrderAmount', label: 'Balance Order Amount (₹)', type: 'number', section: 'Dispatch & Balances', placeholder: 'e.g. 130000' },
+    ] : []),
 
     // ── Project Planning & Team ──
     {
@@ -340,7 +345,7 @@ export default function ProjectsPage() {
               <Badge tone="amber">High</Badge>
             ) : null}
           </div>
-          {r.clientName && (
+          {isOwner && r.clientName && (
             <span className="text-xs text-char-500 font-normal">
               Client: <b className="text-char-700">{r.clientName}</b>
             </span>
@@ -462,12 +467,14 @@ export default function ProjectsPage() {
           label="Project"
           addLabel="New Project"
           headerExtra={
-            <ImportData
-              resource="projects"
-              perm="projects"
-              noun="projects"
-              hint="order date, order no, party name, colour, finish, sizes, quantities and total amount"
-            />
+            isOwner ? (
+              <ImportData
+                resource="projects"
+                perm="projects"
+                noun="projects"
+                hint="order date, order no, party name, colour, finish, sizes, quantities and total amount"
+              />
+            ) : null
           }
           fields={fields}
           columns={columns}
@@ -607,7 +614,7 @@ export default function ProjectsPage() {
 
               {/* Top metadata grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 rounded-none bg-sand-50/80 border border-sand-200">
-                <KV label="Client">{selectedProject.clientName || 'Direct Order'}</KV>
+                {isOwner && <KV label="Client">{selectedProject.clientName || 'Direct Order'}</KV>}
                 <KV label="Site / Yard">{selectedProject.site || 'Factory'}</KV>
                 <KV label="Supervisors in Charge">
                   <div className="flex items-center justify-between gap-1.5 w-full">
@@ -639,7 +646,7 @@ export default function ProjectsPage() {
                     {selectedProject.priority}
                   </Badge>
                 </KV>
-                {selectedProject.contractValue > 0 && (
+                {isOwner && selectedProject.contractValue > 0 && (
                   <KV label="Contract Value">{inr(selectedProject.contractValue)}</KV>
                 )}
                 {selectedProject.orderNo && <KV label="Order No">{selectedProject.orderNo}</KV>}
@@ -676,7 +683,7 @@ export default function ProjectsPage() {
                       <span className="font-semibold text-char-800">{selectedProject.edges}</span>
                     </div>
                   )}
-                  {selectedProject.price > 0 && (
+                  {isOwner && selectedProject.price > 0 && (
                     <div className="bg-white p-2.5 rounded-none border border-sand-200">
                       <span className="text-[10px] uppercase font-bold text-char-500 block">Price</span>
                       <span className="font-semibold text-char-800">₹{selectedProject.price}</span>
@@ -780,8 +787,10 @@ export default function ProjectsPage() {
               <div className="p-3 rounded-none bg-sand-50 border border-sand-200 text-xs">
                 <div className="font-bold text-char-900 text-sm">{assignModalProject.name}</div>
                 <div className="text-char-500 mt-0.5">
-                  Code: <b className="text-char-700">{assignModalProject.projectCode}</b> · Client:{' '}
-                  <b className="text-char-700">{assignModalProject.clientName || 'Direct'}</b>
+                  Code: <b className="text-char-700">{assignModalProject.projectCode}</b>
+                  {isOwner && assignModalProject.clientName ? (
+                    <> · Client: <b className="text-char-700">{assignModalProject.clientName}</b></>
+                  ) : null}
                 </div>
               </div>
 

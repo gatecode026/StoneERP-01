@@ -801,6 +801,8 @@ function SupervisorTeamAttendance({ selectedSupCode, setSelectedSupCode, isOwner
 // COMPONENT 2: Supervisor Projects View
 // ─────────────────────────────────────────────────────────────────────────────
 function SupervisorProjectsView({ selectedSupCode, setSelectedSupCode, isOwnerOrManager }) {
+  const { session } = useApp();
+  const isOwner = Boolean(session?.isOwner || session?.perm?.isOwner || session?.role === 'owner');
   const prjRes = useFetch('/api/projects?limit=50', [selectedSupCode]);
   const projects = prjRes.data?.data || prjRes.data || [];
 
@@ -841,7 +843,7 @@ function SupervisorProjectsView({ selectedSupCode, setSelectedSupCode, isOwnerOr
                         {p.projectCode}
                       </span>
                       <h4 className="font-bold text-base text-char-900 leading-snug">{p.name}</h4>
-                      <p className="text-xs text-char-500 mt-0.5">{p.clientName} · {p.site}</p>
+                      <p className="text-xs text-char-500 mt-0.5">{isOwner && p.clientName ? `${p.clientName} · ` : ''}{p.site}</p>
                     </div>
                     <Badge tone={p.status === 'Completed' ? 'green' : 'terra'}>{p.status}</Badge>
                   </div>

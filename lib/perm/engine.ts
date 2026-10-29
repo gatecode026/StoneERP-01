@@ -142,6 +142,10 @@ export function projectDoc<T extends Record<string, any>>(perm: Pick<EffectivePe
       delete out[f];
       continue;
     }
+    if (resource === 'projects' && (f === 'clientName' || f === 'price' || f === 'contractValue' || f === 'balanceOrderAmount') && !(perm as any)?.isOwner) {
+      delete out[f];
+      continue;
+    }
     const level = fieldLevel(perm, resource, f);
     const e = enc.find((x) => x.field === f);
     const raw = out[f];
@@ -169,6 +173,9 @@ export function assertWritable(perm: Pick<EffectivePerm, 'fields'>, resource: Re
   if (resource === 'stockitems' && keys.includes('price') && !(perm as any)?.isOwner) {
     throw forbidden('You cannot change: price');
   }
+  if (resource === 'projects' && (keys.includes('clientName') || keys.includes('price') || keys.includes('contractValue') || keys.includes('balanceOrderAmount')) && !(perm as any)?.isOwner) {
+    throw forbidden('Only an Owner can set or change client name and price on projects');
+  }
   const blocked = keys.filter((k) => fieldLevel(perm, resource, k) !== 'write');
   if (blocked.length) throw forbidden(`You cannot change: ${blocked.join(', ')}`);
 }
@@ -183,6 +190,12 @@ export function hiddenFields(perm: Pick<EffectivePerm, 'fields'>, resource: Reso
   }
   if (resource === 'stockitems' && !(perm as any)?.isOwner) {
     out.add('price');
+  }
+  if (resource === 'projects' && !(perm as any)?.isOwner) {
+    out.add('clientName');
+    out.add('price');
+    out.add('contractValue');
+    out.add('balanceOrderAmount');
   }
   return out;
 }

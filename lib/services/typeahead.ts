@@ -36,7 +36,7 @@ export const KINDS: Record<string, Kind> = {
   vehicles: { resource: 'vehicles', model: Vehicle, search: ['name', 'regNo'], select: 'name regNo kind', sort: { name: 1 }, label: (d) => (d.regNo ? `${d.name} (${d.regNo})` : d.name) },
   blocks: { resource: 'blocks', model: Block, search: [], by: ['blockNo'], filters: { stage: ['received', 'cutting', 'cut'], source: ['own', 'supplier'] }, select: 'blockNo cft rawanna', sort: { blockNo: -1 }, label: (d) => `Block ${d.blockNo} · ${n(d.cft)} CFT`, hint: (d) => d.rawanna },
   sales: { resource: 'sales', model: Sale, search: ['saleNo', 'customerName'], filters: { stage: ['quotation', 'order', 'dispatched'], toSend: ['1'] }, select: 'saleNo customerName stage', sort: { date: -1 }, label: (d) => `${d.saleNo} · ${d.customerName}`, hint: (d) => d.stage },
-  projects: { resource: 'projects', model: Project, search: ['name', 'projectCode', 'clientName'], select: 'name projectCode clientName status', sort: { name: 1 }, label: (d) => `${d.name} (${d.projectCode})`, hint: (d) => d.clientName },
+  projects: { resource: 'projects', model: Project, search: ['name', 'projectCode'], select: 'name projectCode status', sort: { name: 1 }, label: (d) => `${d.name} (${d.projectCode})` },
 };
 export const lookupKind = (k: string) => {
   if (!Object.prototype.hasOwnProperty.call(KINDS, k)) throw notFound();
