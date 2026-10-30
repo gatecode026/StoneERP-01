@@ -155,8 +155,8 @@ export default function DailyReportPage() {
     };
     try {
       const res = editing
-        ? await submit(`/api/dailyreports/${editing._id}`, body, { method: 'PATCH', label: 'Daily report' })
-        : await submit('/api/dailyreports', { ...body, date: form.date || date, ...(isWorker ? {} : { empCode: form.empCode }) }, { label: 'Daily report' });
+        ? await submit(`/api/dailyreports/${editing._id}`, { ...body, ...(isMonthlySubmission ? { monthly: true } : {}) }, { method: 'PATCH', label: 'Daily report' })
+        : await submit('/api/dailyreports', { ...body, date: form.date || date, ...(isWorker ? {} : { empCode: form.empCode }), ...(isMonthlySubmission ? { monthly: true } : {}) }, { label: 'Daily report' });
       toast.success(res?.queued ? t('offline') : 'Report submitted ✔');
       setOpen(false); reload(); mine.reload?.();
     } catch (e) { toast.error(e.message); }

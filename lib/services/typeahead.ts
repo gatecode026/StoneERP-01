@@ -105,7 +105,9 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
     }
   }
   const maxLimit = kind.limit ?? LOOKUP_MAX;
-  const limit = Math.min(Math.max(Number(sp.get('limit') ?? maxLimit) || maxLimit, 1), maxLimit);
+  const defaultLimit = LOOKUP_MAX;
+  const requested = sp.get('limit') != null ? Number(sp.get('limit')) : defaultLimit;
+  const limit = Math.min(Math.max(requested || defaultLimit, 1), maxLimit);
   const rows: any[] = await kind.model.find({ $and: and }, kind.select + ' ' + idField).sort(kind.sort).limit(limit).lean();
   return { data: rows.map((d) => ({ id: String(d[idField]), label: kind.label(d), ...(kind.hint?.(d) ? { hint: kind.hint(d) } : {}) })) };
 }

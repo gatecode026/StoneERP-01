@@ -398,7 +398,7 @@ export const dailyreports: ResourceDef = {
   dateFields: ['date'], filters: { date: 'date', empCode: 'string', projectId: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
   serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job', 'stockItemId', 'stockUpdated'],
   create: z.object({
-    date: dateStr.optional(), empCode: empCode.optional(),
+    date: dateStr.optional(), empCode: empCode.optional(), monthly: z.boolean().optional(),
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
     machineId: z.union([z.string().trim(), z.null()]).optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
@@ -407,6 +407,7 @@ export const dailyreports: ResourceDef = {
     narration: req(4000), hours: num(0, 24).optional(), quantity: num(0, 1e6).optional(), problem: text(1000).optional(), plan: text(1000).optional(), photos: photos().optional()
   }).strict(),
   update: z.object({
+    monthly: z.boolean().optional(),
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
     machineId: z.union([z.string().trim(), z.null()]).optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
@@ -419,6 +420,9 @@ export const dailyreports: ResourceDef = {
       const today = todayIST();
       const date = input.date ?? today;
       if (date > today) throw badRequest('You cannot write a report for a future day');
+      if (today > addDays(date, 1) && !input.monthly && !['owner', 'admin'].includes(auth.user?.role)) {
+        throw forbidden('This day is locked — reports can only be entered until the next day');
+      }
       const code = auth.scope === 'own' ? auth.user.empCode : input.empCode;
       if (!code) throw badRequest(auth.scope === 'own' ? 'Your login is not linked to an employee profile. Ask the Owner.' : 'Choose the employee');
       if (auth.scope === 'own' && input.empCode && input.empCode !== code) throw forbidden('You can only write your own report');
@@ -521,6 +525,9 @@ export const dailyreports: ResourceDef = {
         patch.reopenedFrom = '';
       }
       if (isContent) {
+        if (todayIST() > addDays(prev.date, 1) && !patch.monthly && !['owner', 'admin'].includes(auth.user?.role)) {
+          throw forbidden('Report is locked (correction allowed only until the next day)');
+        }
         if (prev.supCheck === 'ok') throw forbidden('This report was marked OK and is locked. The Owner or a Manager can undo the decision to open it again.');
         if (prev.supCheck === 'not_ok') { patch.supCheck = ''; patch.reopenedFrom = 'not_ok'; } // corrected: waits for a new check, the old remark stays visible
         if (patch.photos) patch.photoCount = patch.photos.length;

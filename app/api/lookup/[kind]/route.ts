@@ -9,33 +9,36 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth(
   async (c) => {
     const k = c.params.kind;
-    if (['machines', 'employees'].includes(k) && c.user) {
+    const res = lookupKind(k).resource;
+    if (c.user) {
       const perm = await getEffectivePerm(c.user);
-      if (
-        perm.can('projects', 'view') ||
-        perm.can('projects', 'create') ||
-        perm.can('projects', 'edit') ||
-        perm.can('dailyreports', 'create') ||
-        perm.can('dailyreports', 'view') ||
-        perm.can('machineentries', 'create') ||
-        perm.can('machineentries', 'view') ||
-        perm.can('tasks', 'view') ||
-        perm.can('tasks', 'create') ||
-        perm.can('attendance', 'view') ||
-        perm.can('attendance', 'create') ||
-        perm.can('dashboard', 'view')
-      ) {
-        return 'dashboard';
+      if (perm.can(res, 'view')) return res;
+      if (['machines', 'employees'].includes(k)) {
+        if (
+          perm.can('projects', 'view') ||
+          perm.can('projects', 'create') ||
+          perm.can('projects', 'edit') ||
+          perm.can('dailyreports', 'create') ||
+          perm.can('dailyreports', 'view') ||
+          perm.can('machineentries', 'create') ||
+          perm.can('machineentries', 'view') ||
+          perm.can('tasks', 'view') ||
+          perm.can('tasks', 'create') ||
+          perm.can('attendance', 'view') ||
+          perm.can('attendance', 'create')
+        ) {
+          return 'dashboard';
+        }
       }
     }
-    return lookupKind(k).resource;
+    return res;
   },
   'view',
   async (auth) => {
     const kind = lookupKind(auth.params.kind);
-    // For dropdown pickers (machines, employees, items, vehicles, etc.), show all active master records across the plant
-    // so any authorized user can assign/pick supervisors, operators, drivers, machines, etc.
-    const filter = ['machines', 'employees', 'items', 'vehicles', 'suppliers', 'customers'].includes(auth.params.kind)
+    const hasJobOrRole = auth.query.has('job') || auth.query.has('loginRole') || auth.query.get('all') === '1';
+    const filter = ['machines', 'items', 'vehicles', 'suppliers', 'customers'].includes(auth.params.kind) ||
+      (auth.params.kind === 'employees' && hasJobOrRole)
       ? {}
       : await auth.filter('view');
     const out = await runLookup(kind, auth.query, filter);
