@@ -9,8 +9,10 @@ export const Project = defineModel(
   {
     projectCode: { type: S, required: true, trim: true, uppercase: true },
     name: { type: S, required: true, trim: true, maxlength: 200 },
-    clientName: { type: S, maxlength: 150 },
-    site: { type: S, enum: SITES as unknown as string[], default: 'Factory' },
+    site: { type: S, maxlength: 100 },
+    place: { type: S, trim: true, maxlength: 150 },
+    state: { type: S, trim: true, maxlength: 100, default: 'Rajasthan' },
+    country: { type: S, trim: true, maxlength: 100, default: 'India' },
     stoneType: { type: S, maxlength: 100 }, // e.g. Teakwood Sandstone, Kandla Grey, Black Granite
     // Order & invoice references
     orderNo: { type: S, maxlength: 100 },

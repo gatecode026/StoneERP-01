@@ -16,6 +16,7 @@ import { fmtDate, todayISO, inr, num } from '@/lib/format';
 import { api } from '@/lib/client';
 import toast from '@/lib/toast';
 import T from '@/components/T';
+import { INDIAN_STATES, COUNTRIES } from '@/lib/config';
 
 function getProjectTarget(project) {
   if (!project) return { target: 0, unit: 'Pcs', type: 'pcs' };
@@ -50,7 +51,6 @@ const STONE_VARIETIES = [
   'Custom Architectural Stone',
 ];
 
-const SITE_OPTIONS = ['Factory', 'Yard', 'Quarry', 'Office', 'Gate', 'On-site Installation'];
 const STATUS_OPTIONS = ['In Progress', 'Completed', 'Pending', 'Planning', 'On Hold', 'Review'];
 const PRIORITY_OPTIONS = ['Normal', 'High', 'Urgent'];
 
@@ -304,7 +304,9 @@ export default function ProjectsPage() {
     { name: 'orderNo', label: 'Order No', section: 'General & Order Details', placeholder: 'e.g. SO-101' },
     { name: 'partyPoNo', label: 'Party P.O. No', section: 'General & Order Details', placeholder: 'e.g. PO-882' },
     { name: 'ourSaleInvoice', label: 'Our Sale Invoice', section: 'General & Order Details', placeholder: 'e.g. INV-2026-01' },
-    { name: 'site', label: 'Site Location', type: 'select', options: SITE_OPTIONS, default: 'Factory', section: 'General & Order Details' },
+    { name: 'place', label: 'Place', section: 'General & Order Details', placeholder: 'e.g. Bijoliya, Jaipur, Mumbai' },
+    { name: 'state', label: 'State', type: 'select', options: INDIAN_STATES, default: 'Rajasthan', section: 'General & Order Details' },
+    { name: 'country', label: 'Country', type: 'select', options: COUNTRIES, default: 'India', section: 'General & Order Details' },
 
     // ── Stone Specifications ──
     { name: 'stoneType', label: 'Colour Name', section: 'Stone Specifications', placeholder: 'e.g. Teakwood Sandstone, Kotah Blue, Dholpur Pink' },
@@ -691,8 +693,13 @@ export default function ProjectsPage() {
                     </div>
                   )}
                   <div className="bg-white p-2.5 rounded-none border border-sand-200">
-                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Site / Yard</span>
-                    <span className="font-semibold text-char-800">{selectedProject.site || 'Factory'}</span>
+                    <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Location</span>
+                    <span
+                      className="font-semibold text-char-800 truncate block"
+                      title={[selectedProject.place, selectedProject.state, selectedProject.country].filter(Boolean).join(', ') || selectedProject.site || '—'}
+                    >
+                      {[selectedProject.place, selectedProject.state, selectedProject.country].filter(Boolean).join(', ') || selectedProject.site || '—'}
+                    </span>
                   </div>
                   <div className="bg-white p-2.5 rounded-none border border-sand-200">
                     <span className="text-[10px] uppercase font-bold text-char-500 block mb-0.5">Status</span>

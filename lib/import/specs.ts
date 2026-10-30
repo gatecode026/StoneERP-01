@@ -518,7 +518,9 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
       col('ordDate', 'Ord. Date', ['orderdate', 'orddate', 'date'], '24-10-2026', { parse: parseDate }),
       col('orderNo', 'Order No', ['orderno', 'ordernumber', 'ordno', 'so'], 'SO-101'),
       col('partyName', 'Party Name', ['partyname', 'party', 'client', 'clientname', 'customer', 'customername', 'name', 'projectname'], 'Delhi Builders'),
-      col('dispatchFrom', 'Dispatch From', ['dispatchfrom', 'dispatchsite', 'from', 'site'], 'Factory', { note: (SITES as readonly string[]).join(' / ') }),
+      col('place', 'Place', ['place', 'city', 'location', 'town', 'site', 'dispatchfrom'], 'Bijoliya'),
+      col('state', 'State', ['state', 'province'], 'Rajasthan'),
+      col('country', 'Country', ['country', 'nation'], 'India'),
       col('ourSaleInvoice', 'Our Sale Invoice', ['oursaleinvoice', 'saleinvoice', 'invoiceno', 'invoice'], 'INV-2026-01'),
       col('partyPoNo', 'Party P.O. No', ['partypono', 'partypo', 'pono', 'po'], 'PO-882'),
       col('colour', 'Colour', ['colour', 'color', 'stonetype', 'variety'], 'Teakwood Sandstone'),
@@ -553,9 +555,12 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
         name = name.slice(0, 200);
       }
 
-      // Site
+      // Site / Location
       const siteCandidate = String(input.dispatchFrom || input.site || '').trim();
       const matchedSite = (SITES as readonly string[]).find((s) => s.toLowerCase() === siteCandidate.toLowerCase()) || 'Factory';
+      const place = (input.place || input.dispatchFrom || input.site) ? String(input.place || input.dispatchFrom || input.site).trim().slice(0, 150) : undefined;
+      const state = input.state ? String(input.state).trim().slice(0, 100) : 'Rajasthan';
+      const country = input.country ? String(input.country).trim().slice(0, 100) : 'India';
 
       // targetQty
       const qtyParts: string[] = [];
@@ -627,7 +632,10 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
         site: matchedSite,
         status,
         priority,
+        state,
+        country,
       };
+      if (place) out.place = place;
       if (party) out.clientName = party.slice(0, 150);
       if (colour) out.stoneType = colour.slice(0, 100);
       if (orderNo) out.orderNo = orderNo;

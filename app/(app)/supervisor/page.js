@@ -843,7 +843,7 @@ function SupervisorProjectsView({ selectedSupCode, setSelectedSupCode, isOwnerOr
                         {p.projectCode}
                       </span>
                       <h4 className="font-bold text-base text-char-900 leading-snug">{p.name}</h4>
-                      <p className="text-xs text-char-500 mt-0.5">{isOwner && p.clientName ? `${p.clientName} · ` : ''}{p.site}</p>
+                      <p className="text-xs text-char-500 mt-0.5">{isOwner && p.clientName ? `${p.clientName} · ` : ''}{[p.place, p.state].filter(Boolean).join(', ') || p.site || ''}</p>
                     </div>
                     <Badge tone={p.status === 'Completed' ? 'green' : 'terra'}>{p.status}</Badge>
                   </div>
