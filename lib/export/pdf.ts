@@ -19,27 +19,34 @@ const W = 595.28, H = 841.89, M = 36;
 const INK = rgb(0.07, 0.07, 0.07), GREY = rgb(0.4, 0.4, 0.4), LINE = rgb(0.75, 0.75, 0.75), FILL = rgb(0.94, 0.94, 0.94);
 
 export class PdfBuilder {
-  readonly contentWidth = W - 2 * M;
-  y = H - M;
+  readonly pageW: number;
+  readonly pageH: number;
+  readonly contentWidth: number;
+  y: number;
   private page!: PDFPage;
   private chars!: { regular: Set<number>; bold: Set<number> };
-  private constructor(private pdf: PDFDocument, private regular: PDFFont, private bold: PDFFont) {}
+  private constructor(private pdf: PDFDocument, private regular: PDFFont, private bold: PDFFont, landscape = false) {
+    this.pageW = landscape ? H : W;
+    this.pageH = landscape ? W : H;
+    this.contentWidth = this.pageW - 2 * M;
+    this.y = this.pageH - M;
+  }
 
-  static async create(title: string) {
+  static async create(title: string, opts: { landscape?: boolean } = {}) {
     const [r, b] = await loadFonts();
     const pdf = await PDFDocument.create();
     pdf.registerFontkit(fontkit);
     pdf.setTitle(title);
     pdf.setProducer('Vipul Stone Suppliers ERP');
-    const doc = new PdfBuilder(pdf, await pdf.embedFont(r, { subset: true }), await pdf.embedFont(b, { subset: true }));
+    const doc = new PdfBuilder(pdf, await pdf.embedFont(r, { subset: true }), await pdf.embedFont(b, { subset: true }), opts.landscape);
     doc.chars = { regular: new Set(doc.regular.getCharacterSet()), bold: new Set(doc.bold.getCharacterSet()) };
     doc.newPage();
     return doc;
   }
 
   newPage() {
-    this.page = this.pdf.addPage([W, H]);
-    this.y = H - M;
+    this.page = this.pdf.addPage([this.pageW, this.pageH]);
+    this.y = this.pageH - M;
   }
   ensure(h: number) {
     if (this.y - h < M) this.newPage();
@@ -100,7 +107,7 @@ export class PdfBuilder {
   }
   space(h: number) { this.y -= h; }
   rule(thick = 0.8) {
-    this.page.drawLine({ start: { x: M, y: this.y }, end: { x: W - M, y: this.y }, thickness: thick, color: INK });
+    this.page.drawLine({ start: { x: M, y: this.y }, end: { x: this.pageW - M, y: this.y }, thickness: thick, color: INK });
     this.y -= 6;
   }
 
@@ -168,11 +175,11 @@ export class PdfBuilder {
 
   /** Right-aligned label / amount lines (totals). */
   totals(rows: [string, string, boolean?][], o: { w?: number } = {}) {
-    const w = o.w ?? 220, x = W - M - w;
+    const w = o.w ?? 220, x = this.pageW - M - w;
     for (const [k, v, strong] of rows) {
       const size = strong ? 10.5 : 9, lead = size * 1.5;
       this.ensure(lead + 2);
-      if (strong) this.page.drawLine({ start: { x, y: this.y }, end: { x: W - M, y: this.y }, thickness: 0.8, color: INK });
+      if (strong) this.page.drawLine({ start: { x, y: this.y }, end: { x: this.pageW - M, y: this.y }, thickness: 0.8, color: INK });
       this.y -= lead;
       this.put(k, x, this.y + size * 0.3, size, !!strong, 'left', w);
       this.put(v, x, this.y + size * 0.3, size, !!strong, 'right', w);
