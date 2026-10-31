@@ -96,13 +96,16 @@ input:focus, select:focus, textarea:focus {
 @media (min-width: 640px) { .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input { flex: 0 0 auto; } }
 /* the primary action ("Add", "New entry") always sits at the end of the bar and is easy to hit */
 .page-actions > .btn-primary { margin-left: auto; }
-/* tab rows scroll sideways; a soft edge shows there is more */
-@media (max-width: 767px) { .tabs-row { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); scroll-snap-type: x proximity; } .tabs-row > * { scroll-snap-align: start; } }
+/* tab rows scroll sideways with smooth snap */
+@media (max-width: 767px) {
+  .tabs-row { scroll-snap-type: x proximity; }
+  .tabs-row > * { scroll-snap-align: start; }
+}
 /* nothing may push the page wider than the phone */
 html, body { max-width: 100%; overflow-x: clip; }
 img, video, canvas, svg { max-width: 100%; }
 @media (max-width: 480px) { .card { border-radius: 0 !important; } }
-.tabs-row { scroll-padding-left: 1rem; scroll-padding-right: 1rem; }
+.tabs-row { scroll-padding-left: 0.75rem; scroll-padding-right: 0.75rem; }
 .page-actions input[type='month'] { min-width: 172px; }
 .page-actions input[type='date'] { min-width: 150px; }
 /* an odd last stat card spans the full row instead of sitting alone in half of it */
@@ -111,24 +114,132 @@ img, video, canvas, svg { max-width: 100%; }
   .filter-row > div:first-child { flex: 1 1 100%; }
   .filter-row > select { flex: 1 1 calc(50% - .25rem); width: auto !important; min-width: 0 !important; }
 }
-/* phones: the whole action bar is ONE small row — the main action ("Add", "New quotation", "New entry") first, then Import, the date and Excel.
-   Everything shrinks to fit; on a very narrow phone the row scrolls sideways instead of wrapping to a second line. */
+
+/* phones: compact buttons and controls that adjust cleanly on mobile screens without overflowing */
 @media (max-width: 639px) {
-  .page-actions { flex-wrap: nowrap; gap: .375rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
-  .page-actions::-webkit-scrollbar { display: none; }
-  .page-actions > .btn-primary { order: -1; flex: 0 0 auto; margin-left: 0; }
-  .page-actions > .btn, .page-actions > .btn-sm, .page-actions > button, .page-actions > a { min-height: 38px; padding: 0 .7rem; font-size: .75rem; gap: .3rem; white-space: nowrap; flex: 0 0 auto; border-radius: 0 !important; }
-  .page-actions > button svg, .page-actions > a svg { width: 14px; height: 14px; }
-  .page-actions input[type='date'], .page-actions input[type='month'], .page-actions select, .page-actions .input {
-    min-height: 38px; padding: 0 .55rem; font-size: .75rem; border-radius: 0 !important; flex: 1 1 auto; min-width: 118px; max-width: 160px;
+  /* Smaller general buttons on mobile */
+  .btn {
+    min-height: 30px !important;
+    padding: 0 0.55rem !important;
+    font-size: 0.72rem !important;
+    gap: 0.25rem !important;
   }
-  .page-actions input[type='month'] { min-width: 118px; }
-  .page-actions input[type='date'] { min-width: 118px; }
-  /* four or more controls in the bar: Import / Excel keep only their icon, the date and filter shrink, so it still fits in one row */
-  .page-actions:has(> :nth-child(4)) > .btn-outline > span, .page-actions:has(> :nth-child(4)) > .btn-sm > span { display: none; }
-  .page-actions:has(> :nth-child(4)) > .btn, .page-actions:has(> :nth-child(4)) > .btn-sm, .page-actions:has(> :nth-child(4)) > button { padding: 0 .6rem; }
-  .page-actions:has(> :nth-child(4)) input[type='date'], .page-actions:has(> :nth-child(4)) input[type='month'] { min-width: 98px; padding: 0 .4rem; }
-  .page-actions:has(> :nth-child(4)) select { min-width: 76px; padding: 0 .4rem; }
+  .btn svg {
+    width: 13px !important;
+    height: 13px !important;
+  }
+  .btn-sm {
+    min-height: 26px !important;
+    padding: 0 0.45rem !important;
+    font-size: 0.68rem !important;
+    gap: 0.2rem !important;
+  }
+  .btn-sm svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+  .icon-btn {
+    min-width: 28px !important;
+    min-height: 28px !important;
+    padding: 2px !important;
+  }
+  .icon-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  /* One compact action bar under page header */
+  .page-actions {
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .page-actions::-webkit-scrollbar { display: none; }
+  .page-actions > .btn-primary {
+    order: -1;
+    flex: 0 0 auto;
+    margin-left: 0;
+    padding: 0 0.55rem !important;
+  }
+  .page-actions > .btn,
+  .page-actions > .btn-sm,
+  .page-actions > button,
+  .page-actions > a {
+    min-height: 30px !important;
+    padding: 0 0.5rem !important;
+    font-size: 0.72rem !important;
+    gap: 0.25rem !important;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    border-radius: 0 !important;
+  }
+  .page-actions > button svg,
+  .page-actions > a svg {
+    width: 13px !important;
+    height: 13px !important;
+  }
+  .page-actions input[type='date'],
+  .page-actions input[type='month'],
+  .page-actions select,
+  .page-actions .input {
+    min-height: 30px !important;
+    height: 30px !important;
+    padding: 0 0.35rem !important;
+    font-size: 0.7rem !important;
+    border-radius: 0 !important;
+    flex: 0 0 auto;
+    min-width: 90px;
+    max-width: 116px;
+  }
+  .page-actions select {
+    background-position: right 0.35rem center !important;
+    background-size: 0.75rem !important;
+    padding-left: 0.45rem !important;
+    padding-right: 1.25rem !important;
+  }
+  .page-actions input[type='month'] { min-width: 100px; }
+  .page-actions input[type='date'] { min-width: 100px; }
+
+  /* When there are 3 or more controls, make secondary action text concise */
+  .page-actions:has(> :nth-child(3)) > .btn-outline,
+  .page-actions:has(> :nth-child(3)) > .btn-sm {
+    padding: 0 0.45rem !important;
+  }
+  .page-actions:has(> :nth-child(4)) > .btn-outline > span,
+  .page-actions:has(> :nth-child(4)) > .btn-sm > span {
+    display: none;
+  }
+  .page-actions:has(> :nth-child(4)) > .btn,
+  .page-actions:has(> :nth-child(4)) > .btn-sm,
+  .page-actions:has(> :nth-child(4)) > button {
+    padding: 0 0.4rem !important;
+  }
+  .page-actions:has(> :nth-child(4)) input[type='date'],
+  .page-actions:has(> :nth-child(4)) input[type='month'] {
+    min-width: 86px;
+    padding: 0 0.25rem !important;
+  }
+  .page-actions:has(> :nth-child(4)) select {
+    min-width: 72px;
+    padding-left: 0.35rem !important;
+    padding-right: 1.15rem !important;
+  }
+
+  /* Filter row compact sizing */
+  .filter-row {
+    gap: 0.3rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  .filter-row .input,
+  .filter-row select,
+  .filter-row button {
+    min-height: 30px !important;
+    height: 30px !important;
+    font-size: 0.72rem !important;
+    padding: 0 0.45rem !important;
+  }
 }
 
 /* long lists: rows far below the screen are not laid out or painted until they scroll near (the browser does the windowing; a list is at most 100 rows) */

@@ -141,7 +141,7 @@ export function Sheet({ open, onClose, title, children, footer, wide, className,
           <h2 className="font-bold text-base md:text-lg text-char truncate pr-2">{tx(title)}</h2>
           <button onClick={onClose} className="min-w-[40px] min-h-[40px] flex items-center justify-center -mr-2 rounded-none text-char-500 hover:text-char hover:bg-sand-200 transition" aria-label={tx('Close')}><X size={20} /></button>
         </div>
-        <div className={cx('overflow-y-auto px-5 py-4 flex-1', bodyClassName)}>{children}</div>
+        <div className={cx('overflow-y-auto px-3.5 sm:px-5 py-3 sm:py-4 flex-1', bodyClassName)}>{children}</div>
         {footer && <div className="shrink-0 border-t border-sand-200 px-5 py-3.5 safe-pb bg-white flex items-center justify-end gap-3">{footer}</div>}
       </div>
     </div>
@@ -151,12 +151,12 @@ export function Sheet({ open, onClose, title, children, footer, wide, className,
 export function Tabs({ tabs, value, onChange }) {
   const tx = useTx();
   return (
-    <div className="tabs-row flex gap-1.5 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
+    <div className="tabs-row flex gap-1 sm:gap-1.5 overflow-x-auto pb-1.5 sm:pb-2 mb-2 sm:mb-3 -mx-4 px-4 md:mx-0 md:px-0 no-print" style={{ scrollbarWidth: 'none' }}>
       {tabs.map((t) => (
         <button key={t.key} onClick={() => onChange(t.key)}
-          className={cx('shrink-0 min-h-[38px] px-3.5 rounded-none text-xs font-semibold border transition-all duration-75 active:scale-98 cursor-pointer select-none',
+          className={cx('shrink-0 min-h-[30px] sm:min-h-[36px] px-2.5 sm:px-3.5 rounded-none text-[11px] sm:text-xs font-semibold border transition-all duration-75 active:scale-98 cursor-pointer select-none',
             value === t.key ? 'bg-terra text-white border-terra-600 shadow-none' : 'bg-white text-char border-sand-300 hover:bg-sand-50 hover:text-terra hover:border-terra active:bg-sand-100')}>
-          {tx(t.label)}{t.count != null && <span className={cx('ml-1.5 text-xs', value === t.key ? 'text-white/80' : 'text-char-500')}>{t.count}</span>}
+          {tx(t.label)}{t.count != null && <span className={cx('ml-1 sm:ml-1.5 text-[10px] sm:text-xs', value === t.key ? 'text-white/80' : 'text-char-500')}>{t.count}</span>}
         </button>
       ))}
     </div>
@@ -265,7 +265,12 @@ export function Pager({ list }) {
 export function ExportBtn({ onClick, label }) {
   const { t } = useApp();
   const tx = useTx();
-  return <button className="btn-outline btn-sm" onClick={onClick}><Download size={14} /> {tx(label) || t('export')}</button>;
+  return (
+    <button className="btn-outline btn-sm" onClick={onClick} title={tx(label) || t('export')} aria-label={tx(label) || t('export')}>
+      <Download size={13} className="shrink-0" />
+      <span>{tx(label) || t('export')}</span>
+    </button>
+  );
 }
 
 // Camera / gallery photo, compressed in the browser and stored as base64

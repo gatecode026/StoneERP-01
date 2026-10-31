@@ -41,15 +41,6 @@ export default function EmployeesPage() {
     },
     { key: 'site', label: 'Site' },
     { key: 'mobile', label: 'Mobile' },
-    ...(mayLogin ? [{
-      key: 'plainPassword',
-      label: 'Password',
-      render: (r) => (
-        <span className="font-mono bg-sand-50 px-2 py-0.5 border border-sand-200 text-xs font-bold text-char-800">
-          {r.plainPassword || '123456'}
-        </span>
-      ),
-    }] : []),
     ...(showPay ? [{ key: 'payType', label: 'Pay', render: (r) => r.payType ? `${inr(r.rate)} ${r.payType === 'monthly' ? '/ month' : r.payType === 'daily' ? '/ day' : r.pieceUnit === 'piece' ? '/ piece' : '/ sq ft'}` : '—' }] : []),
     { key: 'joiningDate', label: 'Joined', render: (r) => fmtDate(r.joiningDate) },
     { label: 'Documents', wide: true, render: (r) => {

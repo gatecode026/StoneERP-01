@@ -18,7 +18,6 @@ export default function MachinesPage() {
   const [tab, setTab] = useState('entries');
   const sp = useSearchParams();
   const [date, setDate] = useState(sp.get('date') || todayISO());
-  const [mode, setMode] = useState('day');
   const [month, setMonth] = useState(monthOf(todayISO()));
   const today = todayISO();
   // monthly output is summed by the server (one aggregate), never by downloading the month's entries
@@ -66,7 +65,7 @@ export default function MachinesPage() {
     { key: 'stoppedMins', label: 'Stopped', render: (r) => (r.stoppedMins ? <span className={r.breakdown ? 'text-red-600 font-bold' : 'text-amber-700'}><T vars={{ n: r.stoppedMins }}>{'{n} min'}</T> · {r.stopReason}</span> : '—') },
   ];
 
-  const baseQuery = mode === 'day' ? { date } : { from: `${monthOf(date)}-01`, to: date };
+  const baseQuery = { date };
 
 
   const byMachine = monthEntries.data?.byMachine || [];
@@ -86,7 +85,7 @@ export default function MachinesPage() {
         <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift · Daily cutting output & block consumption" label="Machine entry" addLabel="New entry" wide
           fields={entryFields} columns={columns} sort="-date,-createdAt" canEdit={() => false}
           exportName={`machine-entries-${date}`} onSaved={() => {}}
-          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /><select className="input !w-auto" value={mode} onChange={(e) => setMode(e.target.value)}><option value="day">{tr('This day')}</option><option value="month">{tr('Month to date')}</option></select></>}
+          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /></>}
           facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
           summary={(rows, { facets: f }) => {
             const totalSqft = f?.sums.outputSqft || 0;

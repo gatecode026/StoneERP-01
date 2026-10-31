@@ -142,18 +142,21 @@ export default function PapersVault() {
   return (
     <div className="space-y-4">
       {/* header */}
-      <div className="card p-4 flex flex-wrap items-center gap-3 justify-between">
+      <div className="card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 rounded-none bg-terra-50 text-terra grid place-items-center shrink-0"><FolderOpen size={24} /></div>
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-none bg-terra-50 text-terra grid place-items-center shrink-0">
+            <FolderOpen size={20} className="sm:hidden" />
+            <FolderOpen size={24} className="hidden sm:block" />
+          </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-extrabold leading-tight"><T>Important papers</T></h1>
+            <h1 className="text-lg sm:text-xl font-extrabold leading-tight"><T>Important papers</T></h1>
             <p className="text-xs text-char-500"><T vars={{ n: total }}>{'{n} papers kept. Reminders 30 and 7 days before they expire'}</T></p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="page-actions no-print">
+          {can('documents', 'create') && <button className="btn-primary" onClick={() => setSheet({ category: folder && folder !== 'all' ? folder : undefined })}><Plus size={15} /><span><T>Add a paper</T></span></button>}
           {can('documents', 'create') && <ImportData resource="documents" perm="documents" noun="papers" />}
-          {can('documents', 'export') && <button className="btn-outline" onClick={() => window.location.assign('/api/export/documents?format=xlsx&sort=expiryDate')}><Download size={16} /><T> Export list</T></button>}
-          {can('documents', 'create') && <button className="btn-primary" onClick={() => setSheet({ category: folder && folder !== 'all' ? folder : undefined })}><Plus size={18} /><T> Add a paper</T></button>}
+          {can('documents', 'export') && <button className="btn-outline btn-sm" onClick={() => window.location.assign('/api/export/documents?format=xlsx&sort=expiryDate')}><Download size={13} /><span><T>Export</T></span></button>}
         </div>
       </div>
 

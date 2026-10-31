@@ -50,7 +50,7 @@ export default function UserManagementModal({ open, onClose }) {
           </div>
           <button
             type="button"
-            className="btn-outline !text-xs !py-1.5 !px-4"
+            className="btn-outline !text-xs !py-1 !px-3 !min-h-[30px]"
             onClick={onClose}
           >
             <T>Close</T>
@@ -58,12 +58,12 @@ export default function UserManagementModal({ open, onClose }) {
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Info header alert */}
-        <div className="p-3 bg-amber-50/70 border border-amber-200 text-amber-900 rounded-none text-xs flex items-center justify-between gap-2">
+        <div className="p-2.5 sm:p-3 bg-amber-50/70 border border-amber-200 text-amber-900 rounded-none text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <KeyRound size={16} className="text-amber-700 shrink-0" />
-            <span>
+            <KeyRound size={15} className="text-amber-700 shrink-0" />
+            <span className="text-[11px] sm:text-xs">
               <T>Default password for all employee logins is set to</T>{' '}
               <strong className="font-mono bg-white px-1.5 py-0.5 border border-amber-300">123456</strong>
             </span>
@@ -71,52 +71,103 @@ export default function UserManagementModal({ open, onClose }) {
           <button
             type="button"
             onClick={() => setShowPasswords((v) => !v)}
-            className="text-xs font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer bg-white px-2 py-1 border border-amber-200"
+            className="self-end sm:self-auto text-[11px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer bg-white px-2 py-1 border border-amber-200 whitespace-nowrap shrink-0 min-h-[26px]"
           >
-            {showPasswords ? <EyeOff size={13} /> : <Eye size={13} />}
+            {showPasswords ? <EyeOff size={12} /> : <Eye size={12} />}
             {showPasswords ? <T>Hide Passwords</T> : <T>Show Passwords</T>}
           </button>
         </div>
 
         {/* Filters bar */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
           <SearchBox
             value={q}
             onChange={setQ}
             placeholder="Search name or phone…"
-            className="flex-1 min-w-[200px]"
+            className="flex-1 min-w-0"
           />
-          <select
-            className="input !w-auto min-w-[150px] bg-white cursor-pointer font-medium text-xs text-char-800"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            aria-label="Filter by role"
-          >
-            <option value=""><T>All roles</T></option>
-            <option value="supervisor"><T>Supervisor</T></option>
-            <option value="operator"><T>Operator</T></option>
-            <option value="worker"><T>Worker / Labour</T></option>
-            <option value="manager"><T>Manager</T></option>
-            <option value="accountant"><T>Accountant</T></option>
-            <option value="salesperson"><T>Salesperson</T></option>
-          </select>
-          {(q || roleFilter) && (
-            <button
-              type="button"
-              onClick={() => {
-                setQ('');
-                setRoleFilter('');
-              }}
-              className="btn-ghost !text-xs !py-1.5 !px-2.5 border border-sand-300 text-char-600"
+          <div className="flex items-center gap-1.5">
+            <select
+              className="input !w-auto flex-1 sm:flex-initial min-w-[120px] bg-white cursor-pointer font-medium text-xs text-char-800 !h-8 !min-h-[30px] py-1 px-2"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter by role"
             >
-              <T>Clear</T>
-            </button>
+              <option value=""><T>All roles</T></option>
+              <option value="supervisor"><T>Supervisor</T></option>
+              <option value="operator"><T>Operator</T></option>
+              <option value="worker"><T>Worker / Labour</T></option>
+              <option value="manager"><T>Manager</T></option>
+              <option value="accountant"><T>Accountant</T></option>
+              <option value="salesperson"><T>Salesperson</T></option>
+            </select>
+            {(q || roleFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQ('');
+                  setRoleFilter('');
+                }}
+                className="btn-ghost !text-xs !py-1 !px-2.5 border border-sand-300 text-char-600 !min-h-[30px] shrink-0"
+              >
+                <T>Clear</T>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="sm:hidden space-y-2 max-h-[55vh] overflow-y-auto">
+          {loading && users.length === 0 ? (
+            <div className="py-6 text-center text-char-400 text-xs">
+              <T>Loading users…</T>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="py-6 text-center text-char-400 text-xs">
+              <T>No people found</T>
+            </div>
+          ) : (
+            users.map((u) => (
+              <div key={u.id} className="p-2.5 bg-white border border-sand-200 flex flex-col gap-1.5">
+                <span className="font-semibold text-char-900 text-xs truncate">{u.name}</span>
+                <div className="flex items-center justify-between gap-2 text-xs pt-1 border-t border-sand-100">
+                  {/* Phone */}
+                  <div className="flex items-center gap-1 font-mono text-[11px] text-char-700">
+                    <span>{u.phone && u.phone !== '—' ? u.phone : '—'}</span>
+                    {u.phone && u.phone !== '—' && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(u.phone, `phone-${u.id}`)}
+                        className="p-1 text-char-400 hover:text-char-700 cursor-pointer"
+                        title="Copy phone"
+                      >
+                        {copiedId === `phone-${u.id}` ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                      </button>
+                    )}
+                  </div>
+                  {/* Password */}
+                  <div className="inline-flex items-center gap-1 font-mono bg-sand-50 px-1.5 py-0.5 border border-sand-200 text-[11px]">
+                    <span className="font-bold text-char-800 tracking-wider">
+                      {showPasswords ? u.password : '••••••'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(u.password, `pw-${u.id}`)}
+                      className="p-0.5 text-char-400 hover:text-char-700 cursor-pointer"
+                      title="Copy password"
+                    >
+                      {copiedId === `pw-${u.id}` ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
           )}
         </div>
 
-        {/* Table containing strictly Name, Phone Number, Password */}
-        <div className="border border-sand-200 overflow-x-auto bg-white max-h-[60vh] overflow-y-auto">
-          <table className="w-full text-left border-collapse text-xs">
+        {/* Desktop View: Table */}
+        <div className="hidden sm:block border border-sand-200 overflow-x-auto bg-white max-h-[60vh] overflow-y-auto">
+          <table className="w-full text-left border-collapse text-xs min-w-[420px]">
             <thead className="bg-sand-50/80 sticky top-0 z-10 border-b border-sand-200">
               <tr>
                 <th className="py-2.5 px-3 font-semibold text-char-700">
