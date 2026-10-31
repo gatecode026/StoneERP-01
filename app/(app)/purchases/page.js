@@ -7,7 +7,7 @@ import toast from '@/lib/toast';
 import { Check, X, Banknote } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, StatCard, Badge } from '@/components/ui';
-import { useApp } from '@/components/Providers';
+import { useApp, useFetch } from '@/components/Providers';
 import { api } from '@/lib/client';
 import { inr, num, fmtDate, todayISO } from '@/lib/format';
 import T from '@/components/T';
@@ -19,6 +19,14 @@ export default function PurchasesPage() {
   const sp = useSearchParams();
   const [tab, setTab] = useState(sp.get('tab') || 'purchases');
   const approver = can('purchases', 'approve');
+
+  const itemsReq = useFetch('/api/stockitems?limit=200');
+  const suppliersReq = useFetch('/api/suppliers?limit=200');
+  const itemsList = (Array.isArray(itemsReq.data) ? itemsReq.data : itemsReq.data?.data) || [];
+  const suppliersList = (Array.isArray(suppliersReq.data) ? suppliersReq.data : suppliersReq.data?.data) || [];
+
+  const productOptions = [...new Set(itemsList.map((x) => x.name).filter(Boolean))];
+  const partyOptions = [...new Set(suppliersList.map((x) => x.name).filter(Boolean))];
 
   const payable = (p) => Math.max(0, p.outstanding ?? (p.total || 0) - (p.paidAmount || 0));
   async function pay(p, reload) {
@@ -45,9 +53,8 @@ export default function PurchasesPage() {
   // Purchase form fields — client's format: Date, Party Name, Product Name, Qty, Rate, CGST%, SGST%, IGST%
   const fields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'partyName', label: 'Party Name', required: true, placeholder: 'e.g. Shree Ram Stones' },
-    { name: 'itemId', label: 'Product Name', type: 'ref', required: true, wide: true, ref: { model: 'stockitems', nameField: 'itemName', label: (x) => `${x.name} (${x.unit})` },
-      onPick: (row) => (row ? { unit: row.unit } : {}) },
+    { name: 'partyName', label: 'Party Name', required: true, options: partyOptions, placeholder: 'e.g. Shree Ram Stones' },
+    { name: 'itemName', label: 'Product Name', required: true, wide: true, options: productOptions, placeholder: 'e.g. 14" Blade, Cutting & Molding, Blocks' },
     { name: 'qty', label: 'Qun. (Quantity)', type: 'number', required: true },
     { name: 'rate', label: 'Rate (₹)', type: 'number', required: true },
     { name: 'gstPercent', label: 'GST %', type: 'number', options: ['0', '5', '12', '18', '28'], placeholder: 'e.g. 18', default: 0 },
@@ -124,6 +131,16 @@ export default function PurchasesPage() {
             { key: 'total', label: 'Total Amount' },
             { key: 'billNo', label: 'Bill No.' },
           ]}
+          beforeSave={(body) => {
+            const p = (body.itemName || body.productName || '').trim();
+            const matched = itemsList.find((x) => (x.name || '').trim().toLowerCase() === p.toLowerCase());
+            return {
+              ...body,
+              itemName: p,
+              productName: p,
+              ...(matched?._id ? { itemId: matched._id } : {}),
+            };
+          }}
           rowActions={rowActions}
         />
       )}
