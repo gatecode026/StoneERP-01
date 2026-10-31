@@ -1,7 +1,7 @@
 'use client';
 import ImportEmployees from '@/components/ImportEmployees';
 import { loginFields, toLogin } from '@/components/loginFields';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { AlertTriangle, RotateCcw, Trash2 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Badge } from '@/components/ui';
 import { EMPLOYEE_FIELDS, missingDocs } from '@/components/fields';
@@ -11,6 +11,7 @@ import { inr, fmtDate } from '@/lib/format';
 import { api } from '@/lib/client';
 import toast from '@/lib/toast';
 import T from '@/components/T';
+import { confirmDialog } from '@/components/Dialogs';
 
 export default function EmployeesPage() {
   const { t, can, perm, session } = useApp();
@@ -24,7 +25,20 @@ export default function EmployeesPage() {
   const fields = mayLogin ? [...base.slice(0, at), ...loginFields(), ...base.slice(at)] : base;
   const columns = [
     { key: 'name', label: 'Name', primary: true, render: (r) => <span>{r.name} <span className="text-char-500 font-normal text-xs">{r.empCode}</span></span> },
-    { key: 'job', label: 'Job' },
+    {
+      key: 'job',
+      label: 'Job',
+      render: (r) => (
+        <span>
+          <span>{r.job}</span>
+          {r.operatorCategory ? (
+            <span className="block text-[11px] font-semibold text-terra">
+              {r.operatorCategory}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
     { key: 'site', label: 'Site' },
     { key: 'mobile', label: 'Mobile' },
     ...(mayLogin ? [{
@@ -54,22 +68,56 @@ export default function EmployeesPage() {
         voidTitle="Deactivate Employee"
         voidPrompt="Nothing is deleted — the profile will be deactivated, sign-in access disabled, and moved to the deactivated list."
         voidSuccessMsg="Employee deactivated"
-        rowActions={(row, { reload }) => (
-          row.isVoid && can('employees', 'edit') ? [{
-            label: 'Reactivate',
-            tone: 'green',
-            icon: <RotateCcw size={14} className="shrink-0 text-emerald-600" />,
-            onClick: async () => {
-              try {
-                await api(`/api/employees/${row._id}/reactivate`, { method: 'POST' });
-                toast.success('Employee reactivated');
-                reload();
-              } catch (e) {
-                toast.error(e.message);
-              }
-            },
-          }] : []
-        )}
+        rowActions={(row, { reload }) => {
+          const acts = [];
+          if (row.isVoid && can('employees', 'edit')) {
+            acts.push({
+              key: 'reactivate',
+              label: 'Reactivate',
+              tone: 'green',
+              icon: <RotateCcw size={14} className="shrink-0 text-emerald-600" />,
+              onClick: async () => {
+                try {
+                  await api(`/api/employees/${row._id}/reactivate`, { method: 'POST' });
+                  toast.success('Employee reactivated');
+                  window.dispatchEvent(new Event('vss-data-changed'));
+                  reload();
+                } catch (e) {
+                  toast.error(e.message);
+                }
+              },
+            });
+          }
+          if (can('employees', 'void')) {
+            acts.push({
+              key: 'delete',
+              label: 'Delete',
+              danger: true,
+              icon: <Trash2 size={14} className="shrink-0 text-red-500" />,
+              onClick: async () => {
+                const isSelf = session?.empCode && session.empCode.toUpperCase() === String(row.empCode).toUpperCase();
+                if (isSelf) {
+                  toast.error('You cannot delete your own employee profile');
+                  return;
+                }
+                const ok = await confirmDialog(
+                  `Permanently delete ${row.name || 'this employee'} (${row.empCode})? Their login credentials will expire immediately and they will not show in any list across the dashboard.`,
+                  { danger: true, okLabel: 'Delete' }
+                );
+                if (!ok) return;
+                try {
+                  await api(`/api/employees/${row._id}?permanent=1`, { method: 'DELETE' });
+                  toast.success('Employee deleted successfully');
+                  window.dispatchEvent(new Event('vss-data-changed'));
+                  reload();
+                } catch (e) {
+                  toast.error(e.message);
+                }
+              },
+            });
+          }
+          return acts;
+        }}
         loadExtra={async (full) => ({ _job0: full.job, loginPassword: full.plainPassword || '123456' })}
         mapBody={(body, mode, form) => {
           const { loginPassword, ...rest } = body;
@@ -80,6 +128,7 @@ export default function EmployeesPage() {
         
         filters={[
           { key: 'job', label: 'All jobs', options: JOBS },
+          { key: 'operatorCategory', label: 'All operator types', options: ['Bridge Cutter', 'Block Cutter'] },
           { key: 'site', label: 'All sites', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] },
           { key: 'docs', label: 'Documents', options: [{ value: 'missing', label: 'Missing documents' }] },
           {
@@ -99,7 +148,7 @@ export default function EmployeesPage() {
           return miss ? <div className="rounded-none bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 flex items-center gap-2"><AlertTriangle size={16} /> <T vars={{ n: miss }}>{'{n} working employees have a missing document'}</T></div> : null;
         }}
         exportName="employees"
-        exportColumns={[{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'site', label: 'Site' }, { key: 'mobile', label: 'Mobile' }, { key: 'payType', label: 'Pay type' }, { key: 'rate', label: 'Rate' }, { key: 'joiningDate', label: 'Joining date' }]}
+        exportColumns={[{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'operatorCategory', label: 'Operator Category' }, { key: 'site', label: 'Site' }, { key: 'mobile', label: 'Mobile' }, { key: 'payType', label: 'Pay type' }, { key: 'rate', label: 'Rate' }, { key: 'joiningDate', label: 'Joining date' }]}
       />
     </RoleGuard>
   );

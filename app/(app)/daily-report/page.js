@@ -4,13 +4,13 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye, Boxes, Calendar, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye, Boxes, Calendar, ChevronLeft, ChevronRight, Trash2, Camera, Maximize2, Download } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu } from '@/components/ui';
+import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu, Photo, PhotoModal } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
 import MultiLookupSelect from '@/components/MultiLookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
-import { api, submit } from '@/lib/client';
+import { api, submit, fileUrl } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, fmtDateTime, fmtMonth, num } from '@/lib/format';
 import T from '@/components/T';
@@ -165,6 +165,20 @@ export default function DailyReportPage() {
 
   const [detail, setDetail] = useState(null);
   const [checking, setChecking] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+
+  async function openDetail(r) {
+    if (!r) { setDetail(null); return; }
+    setDetail(r);
+    if (r._id && ((r.photoCount != null && r.photoCount > 0) || !r.photos)) {
+      try {
+        const full = await api(`/api/dailyreports/${r._id}`);
+        setDetail((prev) => (prev && prev._id === r._id ? { ...prev, ...full } : prev));
+      } catch {
+        /* proceed with initial r */
+      }
+    }
+  }
 
   async function check(r, supCheck) {
     if (checking) return;
@@ -269,7 +283,7 @@ export default function DailyReportPage() {
       label: tr('View details'),
       icon: <Eye size={15} className="text-char-500" />,
       dividerBefore: items.length > 0,
-      onClick: () => setDetail(r),
+      onClick: () => openDetail(r),
     });
     if (canDeleteRow(r)) {
       items.push({
@@ -290,7 +304,7 @@ export default function DailyReportPage() {
       <ul className="md:hidden divide-y divide-sand-100">
         {items.map((r) => (
           <li key={r._id}>
-            <button type="button" className="w-full text-left px-4 py-3 active:bg-sand-50 min-h-[44px]" onClick={() => setDetail(r)}>
+            <button type="button" className="w-full text-left px-4 py-3 active:bg-sand-50 min-h-[44px]" onClick={() => openDetail(r)}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0"><div className="font-semibold text-[15px] truncate">{r.empName}</div><div className="text-xs text-char-500 truncate">{r.job}{isWorker ? ` · ${fmtDate(r.date)}` : ''}</div></div>
                 <div className="flex items-center gap-1.5 shrink-0">{statusBadge(r)}{locked(r.date) && <Lock size={12} className="text-char-300" aria-label="Locked" />}</div>
@@ -303,6 +317,11 @@ export default function DailyReportPage() {
               )}
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-char-500">
                 {r.hours != null && r.hours > 0 && <span><T vars={{ n: r.hours }}>{'{n} h'}</T></span>}{r.quantity != null && r.quantity > 0 && <span><T vars={{ n: num(r.quantity) }}>{'{n} sq ft'}</T></span>}{r.problem && <span className="text-red-600 break-words"><T>Problem:</T> {r.problem}</span>}
+                {(r.photoCount > 0 || (r.photos && r.photos.length > 0)) && (
+                  <span className="inline-flex items-center gap-1 text-terra font-semibold">
+                    <Camera size={12} /> <T vars={{ n: r.photos?.length || r.photoCount }}>{(r.photos?.length || r.photoCount) > 1 ? '{n} photos attached' : '{n} photo attached'}</T>
+                  </span>
+                )}
               </div>
             </button>
           </li>
@@ -317,10 +336,17 @@ export default function DailyReportPage() {
           </thead>
           <tbody>
             {items.map((r) => (
-              <tr key={r._id} className="hover:bg-sand-50 cursor-pointer" onClick={() => setDetail(r)}>
+              <tr key={r._id} className="hover:bg-sand-50 cursor-pointer" onClick={() => openDetail(r)}>
                 <td className="td whitespace-nowrap"><div className="font-semibold">{r.empName}</div><div className="text-xs text-char-500">{r.job}</div></td>
                 {isWorker && <td className="td whitespace-nowrap">{fmtDate(r.date)}</td>}
-                <td className="td max-w-[22rem]"><p className="line-clamp-2 break-words">{r.narration}</p></td>
+                <td className="td max-w-[22rem]">
+                  <p className="line-clamp-2 break-words">{r.narration}</p>
+                  {(r.photoCount > 0 || (r.photos && r.photos.length > 0)) && (
+                    <div className="inline-flex items-center gap-1 text-xs text-terra font-semibold mt-0.5">
+                      <Camera size={12} /> <T vars={{ n: r.photos?.length || r.photoCount }}>{(r.photos?.length || r.photoCount) > 1 ? '{n} photos attached' : '{n} photo attached'}</T>
+                    </div>
+                  )}
+                </td>
                 <td className="td max-w-[14rem]"><span className="text-xs text-char-700 line-clamp-2 break-words">{r.machineNames || r.machineName || '—'}</span></td>
                 <td className="td text-right whitespace-nowrap">{r.hours != null && r.hours > 0 ? r.hours : '—'}</td>
                 <td className="td text-right whitespace-nowrap">{r.quantity != null && r.quantity > 0 ? num(r.quantity) : '—'}</td>
@@ -566,7 +592,52 @@ export default function DailyReportPage() {
             <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Work done</T></div><p className="whitespace-pre-wrap break-words">{detail.narration}</p></div>
             {detail.problem && <div><div className="text-xs font-semibold uppercase text-red-600 mb-1"><T>Problem</T></div><p className="break-words">{detail.problem}</p></div>}
             {detail.plan && <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Plan for tomorrow</T></div><p className="break-words">{detail.plan}</p></div>}
-            {detail.photoCount > 0 && <div className="text-xs text-char-500"><T vars={{ n: detail.photoCount }}>{detail.photoCount > 1 ? '{n} photos attached' : '{n} photo attached'}</T>{canEditRow(detail) && <> <T>(open Edit to view)</T></>}</div>}
+            {((detail.photos && detail.photos.length > 0) || (detail.photoCount != null && detail.photoCount > 0)) && (
+              <div className="pt-2 border-t border-sand-200">
+                <div className="text-xs font-semibold uppercase text-char-500 mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Camera size={13} className="text-terra" /><T>Attached Photos</T></span>
+                  {detail.photos?.length ? (
+                    <span className="text-[11px] font-normal text-char-500">
+                      <T vars={{ n: detail.photos.length }}>
+                        {detail.photos.length > 1 ? '{n} photos attached' : '{n} photo attached'}
+                      </T>
+                    </span>
+                  ) : null}
+                </div>
+                {detail.photos && detail.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {detail.photos.map((src, idx) => (
+                      <div
+                        key={idx}
+                        className="group relative aspect-square rounded-none border border-sand-300 bg-sand-100 overflow-hidden cursor-pointer hover:border-terra transition shadow-sm"
+                        onClick={() => setLightboxSrc(src)}
+                        title={tr('Click to enlarge')}
+                      >
+                        <Photo src={src} eager className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" alt={`Report photo ${idx + 1}`} />
+                        <div className="absolute inset-0 bg-char-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-1 text-xs font-medium">
+                          <Maximize2 size={16} /> <T>View</T>
+                        </div>
+                        <a
+                          href={fileUrl(src)}
+                          download={`daily-report-${detail.date}-${idx + 1}.jpg`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute bottom-1.5 right-1.5 p-1 bg-char-900/70 hover:bg-char-900 text-white rounded-none opacity-0 group-hover:opacity-100 transition-opacity"
+                          title={tr('Download')}
+                        >
+                          <Download size={13} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-char-500 italic py-1 flex items-center gap-2">
+                    <span className="animate-spin text-terra">⏳</span> <T>Loading photo preview…</T>
+                  </div>
+                )}
+              </div>
+            )}
             {detail.supCheck && detail.checkedBy && <div className="text-xs text-char-500">{detail.supCheck === 'ok' ? tr('Marked OK by {n}', { n: detail.checkedBy }) : tr('Marked not OK by {n}', { n: detail.checkedBy })}{detail.checkedAt ? ` · ${fmtDateTime(detail.checkedAt)}` : ''}</div>}
             {detail.supRemark && <div className="rounded-none bg-sand-100 px-3 py-2"><div className="text-xs font-semibold text-char-500 mb-0.5">{detail.reopenedFrom === 'not_ok' ? tr('Earlier remark') : <T>Supervisor</T>}{detail.checkedBy ? ` · ${detail.checkedBy}` : ''}</div>{detail.supRemark}</div>}
             {detail.supCheck === 'ok' && <div className="text-xs text-char-500 flex items-center gap-1"><Lock size={11} /><T>An OK report is locked. The Owner or a Manager can undo the decision to open it again.</T></div>}
@@ -738,6 +809,7 @@ export default function DailyReportPage() {
           <p className="text-[11px] text-char-500"><T>Saved even without internet and sent later. Correct it until tomorrow — after that it is locked.</T></p>
         </div>
       </Sheet>
+      {lightboxSrc && <PhotoModal src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </RoleGuard>
   );
 }

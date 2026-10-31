@@ -26,7 +26,7 @@ export interface StorageDriver {
   health(): Promise<boolean>;
 }
 
-const KEY_RE = /^(photos|docs|selfies|signatures|voice|logos|exports|backups)\/[A-Za-z0-9_\-/.]+$/;
+const KEY_RE = /^([A-Za-z0-9_.-]+\/)?(photos|docs|selfies|signatures|voice|logos|exports|backups)\/[A-Za-z0-9_\-/.]+$/;
 export const isValidKey = (k: unknown): k is string => typeof k === 'string' && k.length < 200 && KEY_RE.test(k) && !k.includes('..') && !k.includes('//');
 
 export function newKey(kind: string, ext = 'jpg', at = new Date()): string {
@@ -157,36 +157,61 @@ class CloudinaryDriver implements StorageDriver {
 class ImageKitDriver implements StorageDriver {
   readonly name = 'imagekit';
   private endpoint: string;
-  constructor(private cfg: { privateKey: string; urlEndpoint: string }) { this.endpoint = cfg.urlEndpoint.replace(/\/+$/, ''); }
+  private rootFolder: string;
+  constructor(private cfg: { privateKey: string; urlEndpoint: string; folder?: string }) {
+    this.endpoint = cfg.urlEndpoint.replace(/\/+$/, '');
+    this.rootFolder = (cfg.folder ?? process.env.IMAGEKIT_FOLDER ?? '').replace(/^\/+|\/+$/g, '');
+  }
   private auth() { return 'Basic ' + Buffer.from(`${this.cfg.privateKey}:`).toString('base64'); }
-  private readUrl(key: string, ttlSec = 300) {
+  private toIkPath(key: string): string {
+    const cleanKey = key.replace(/^\/+/, '');
+    if (!this.rootFolder) return cleanKey;
+    if (cleanKey === this.rootFolder || cleanKey.startsWith(this.rootFolder + '/')) {
+      return cleanKey;
+    }
+    return `${this.rootFolder}/${cleanKey}`;
+  }
+  private readUrl(ikPath: string, ttlSec = 300) {
+    const clean = ikPath.replace(/^\/+/, '');
     const expiry = String(Math.floor(Date.now() / 1000) + ttlSec);
-    const sig = createHmac('sha1', this.cfg.privateKey).update(key + expiry).digest('hex');
-    return `${this.endpoint}/${key}?ik-t=${expiry}&ik-s=${sig}`;
+    const sig = createHmac('sha1', this.cfg.privateKey).update(clean + expiry).digest('hex');
+    return `${this.endpoint}/${clean}?ik-t=${expiry}&ik-s=${sig}`;
   }
   async put(key: string, body: Buffer, contentType: string) {
+    const ikPath = this.toIkPath(key);
     const form = new FormData();
-    form.set('file', new Blob([new Uint8Array(body)], { type: contentType }), path.posix.basename(key));
-    form.set('fileName', path.posix.basename(key));
-    form.set('folder', '/' + path.posix.dirname(key));
+    form.set('file', new Blob([new Uint8Array(body)], { type: contentType }), path.posix.basename(ikPath));
+    form.set('fileName', path.posix.basename(ikPath));
+    form.set('folder', '/' + path.posix.dirname(ikPath));
     form.set('useUniqueFileName', 'false');
     form.set('overwriteFile', 'true');
-    form.set('isPrivateFile', 'true');
+    form.set('isPrivateFile', 'false');
     const r = await fetch('https://upload.imagekit.io/api/v1/files/upload', { method: 'POST', headers: { Authorization: this.auth() }, body: form });
     if (!r.ok) throw new Error(`imagekit upload failed (${r.status})`);
   }
   async get(key: string) {
-    const r = await fetch(this.readUrl(key));
+    const primaryPath = this.toIkPath(key);
+    let r = await fetch(this.readUrl(primaryPath));
+    if (!r.ok && primaryPath !== key) {
+      const fallback = await fetch(this.readUrl(key.replace(/^\/+/, '')));
+      if (fallback.ok) r = fallback;
+    }
     if (!r.ok) return null;
     return { body: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') ?? 'application/octet-stream' };
   }
   async exists(key: string) {
-    const r = await fetch(this.readUrl(key), { method: 'HEAD' });
+    const primaryPath = this.toIkPath(key);
+    let r = await fetch(this.readUrl(primaryPath), { method: 'HEAD' });
+    if (!r.ok && primaryPath !== key) {
+      const fallback = await fetch(this.readUrl(key.replace(/^\/+/, '')), { method: 'HEAD' });
+      if (fallback.ok) return true;
+    }
     return r.ok;
   }
   async remove(key: string) {
-    const fileName = path.posix.basename(key);
-    const folder = '/' + path.posix.dirname(key);
+    const ikPath = this.toIkPath(key);
+    const fileName = path.posix.basename(ikPath);
+    const folder = '/' + path.posix.dirname(ikPath);
     const q = new URLSearchParams({ path: folder, name: fileName, limit: '1' });
     let rows: { fileId?: string }[] = [];
     try {
@@ -229,7 +254,7 @@ export function getStorage(): StorageDriver {
     driver = new CloudinaryDriver({ cloud: e.CLOUDINARY_CLOUD!, key: e.CLOUDINARY_API_KEY!, secret: e.CLOUDINARY_API_SECRET! });
   } else if (kind === 'imagekit') {
     for (const k of ['IMAGEKIT_PRIVATE_KEY', 'IMAGEKIT_URL_ENDPOINT']) if (!e[k]) throw new Error(`${k} is required when STORAGE_DRIVER=imagekit`);
-    driver = new ImageKitDriver({ privateKey: e.IMAGEKIT_PRIVATE_KEY!, urlEndpoint: e.IMAGEKIT_URL_ENDPOINT! });
+    driver = new ImageKitDriver({ privateKey: e.IMAGEKIT_PRIVATE_KEY!, urlEndpoint: e.IMAGEKIT_URL_ENDPOINT!, folder: e.IMAGEKIT_FOLDER });
   } else {
     throw new Error('Set STORAGE_DRIVER to mongo, s3, cloudinary, imagekit (or local for development)');
   }

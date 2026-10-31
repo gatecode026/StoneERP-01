@@ -77,4 +77,11 @@ describe('Project Field-Level Permissions (Owner-only Client & Price)', () => {
     expect(() => assertWritable(supervisorPerm as any, 'projects', ['contractValue'])).toThrow(/Only an Owner/);
     expect(() => assertWritable(supervisorPerm as any, 'projects', ['balanceOrderAmount'])).toThrow(/Only an Owner/);
   });
+
+  it('Project mongoose model defines clientName field in its schema', async () => {
+    const { Project } = await import('@/lib/models/projects');
+    const p = Project.schema.path('clientName');
+    expect(p).toBeDefined();
+    expect(p.instance).toBe('String');
+  });
 });

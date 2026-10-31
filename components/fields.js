@@ -26,6 +26,7 @@ export const EMPLOYEE_FIELDS = [
   { name: 'address', label: 'Address', group: 'pii', wide: true, section: 'Personal Details' },
 
   { name: 'job', label: 'Job', type: 'select', options: JOBS, required: true, section: 'Job & Workplace' },
+  { name: 'operatorCategory', label: 'Operator Category', type: 'select', options: ['Bridge Cutter', 'Block Cutter'], show: (f) => f.job === 'Operator', required: true, section: 'Job & Workplace', hint: 'Category: Bridge Cutter or Block Cutter' },
   { name: 'designation', label: 'Designation', type: 'select', options: DESIGNATIONS, hint: 'Optional. What they actually do, e.g. Driver. Trips offer only Drivers', section: 'Job & Workplace' },
   { name: 'site', label: 'Where they work', type: 'select', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'], default: 'Factory', section: 'Job & Workplace' },
   { name: 'supervisorCode', label: 'Supervisor (team)', type: 'ref', ref: { model: 'employees', valueKey: 'empCode', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Supervisor' } }, hint: 'Pick a supervisor to assign this employee to their team. Supervisors: Pintu Ji Purohit, Kalu Ji Meena, Shiv Ji Mali, Jagdhi Ji Dhakar, Ashish Ji Parashar, Naresh Ji Meena, Dilkhush Ji Dhakar, Harish Vijay, Mukesh Ji Jain, Mukesh Ji Regar, Piyush Parashar, Dharmraj Banjara, Deepak Sen, Kamlesh Ji Meena', section: 'Job & Workplace' },

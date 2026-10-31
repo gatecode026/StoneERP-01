@@ -25,6 +25,7 @@ const schema = z.object({
   IMAGEKIT_URL_ENDPOINT: z.string().optional(),
   IMAGEKIT_PRIVATE_KEY: z.string().optional(),
   IMAGEKIT_PUBLIC_KEY: z.string().optional(),
+  IMAGEKIT_FOLDER: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(), // the Owner's dashboard assistant; without it the assistant says it is not set up
   OPENROUTER_MODEL: z.string().default('nvidia/nemotron-3.5-super-vl:free'),
 });

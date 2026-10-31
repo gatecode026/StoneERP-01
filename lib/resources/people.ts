@@ -25,7 +25,7 @@ const FLAG: Record<string, string> = { docAadhaar: 'aadhaar', docPan: 'pan', doc
 const rate = z.coerce.number().finite().gt(0, 'Pay rate must be more than 0').max(1e7, 'Pay rate is too large');
 const employeeFields = {
   name: ruled('name', { required: true }), mobile: ruled('mobile').optional(), photo: photo.optional(), fatherName: ruled('fatherName').optional(), address: text(400).optional(),
-  job: req(80), designation: enumOf(DESIGNATIONS as unknown as readonly [string, ...string[]]).optional().or(z.literal('')), site: enumOf(SITES).optional(), shiftId: z.string().trim().max(20).optional(), biometricId: z.string().trim().regex(/^([A-Za-z0-9-]{1,30})?$/, 'Biometric ID: letters, digits and - only').optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
+  job: req(80), operatorCategory: enumOf(['Bridge Cutter', 'Block Cutter']).optional().or(z.literal('')).nullable(), designation: enumOf(DESIGNATIONS as unknown as readonly [string, ...string[]]).optional().or(z.literal('')), site: enumOf(SITES).optional(), shiftId: z.string().trim().max(20).optional(), biometricId: z.string().trim().regex(/^([A-Za-z0-9-]{1,30})?$/, 'Biometric ID: letters, digits and - only').optional(), joiningDate: dateStr.optional(), leavingDate: dateStr.optional().or(z.literal('')),
   status: enumOf(['active', 'left']).optional(),
   payType: enumOf(['monthly', 'daily', 'piece']).optional(), rate: rate.optional(), pieceUnit: enumOf(['sqft', 'piece']).optional().or(z.literal('')),
   bankAccount: ruled('bankAccount').optional(), ifsc: ruled('ifsc').optional(), upi: ruled('upi').optional(), pfApplicable: z.boolean().optional(), pfNo: ruled('pfNo').optional(),
@@ -97,9 +97,9 @@ async function warnSharedMobile(ctx: any, mobile: string | undefined, selfId?: u
 export const employees: ResourceDef = {
   key: 'employees', model: Employee,
   label: (d) => `${d.name} (${d.empCode})`,
-  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'plainPassword', 'mobile', 'job', 'designation', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
-  sortable: ['empCode', 'name', 'job', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'mobile'],
-  filters: { status: { enum: ['active', 'left'] }, job: 'string', designation: { enum: DESIGNATIONS as unknown as readonly string[] }, site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
+  listFields: ['empCode', 'name', 'hasLogin', 'loginRole', 'plainPassword', 'mobile', 'job', 'operatorCategory', 'designation', 'site', 'shiftId', 'biometricId', 'status', 'joiningDate', 'leavingDate', 'payType', 'rate', 'pieceUnit', 'pfApplicable', 'esiApplicable', 'supervisorCode', 'docFlags', 'photoCount'],
+  sortable: ['empCode', 'name', 'job', 'operatorCategory', 'joiningDate', 'createdAt'], defaultSort: 'empCode', searchFields: ['name', 'empCode', 'job', 'operatorCategory', 'mobile'],
+  filters: { status: { enum: ['active', 'left'] }, job: 'string', operatorCategory: { enum: ['Bridge Cutter', 'Block Cutter'] }, designation: { enum: DESIGNATIONS as unknown as readonly string[] }, site: { enum: SITES }, empCode: 'string', supervisorCode: 'string' },
   named: {
     docs: (v) => (v === 'missing' ? { $or: [{ 'docFlags.aadhaar': { $ne: true } }, { 'docFlags.passbook': { $ne: true } }] } : {}),
     deactivated: (v) => (v === '1' ? { isVoid: true } : {}),
@@ -123,6 +123,7 @@ export const employees: ResourceDef = {
       if (doc.payType === 'piece' && !doc.pieceUnit) doc.pieceUnit = 'sqft';
       doc.rate ??= 0;
       if (doc.status === 'left' && !doc.leavingDate) doc.leavingDate = todayIST();
+      if (doc.job !== 'Operator') doc.operatorCategory = null;
       return sealEmployee(doc);
     },
     async prepareUpdate(ctx, prev, patch, auth) {
@@ -139,6 +140,8 @@ export const employees: ResourceDef = {
       if (patch.biometricId) await assertBiometricFree(ctx, patch.biometricId, prev._id);
       if (patch.status === 'left' && !patch.leavingDate && !prev.leavingDate) patch.leavingDate = todayIST();
       if (patch.status === 'active') patch.leavingDate = '';
+      const finalJob = patch.job ?? prev.job;
+      if (finalJob !== 'Operator') patch.operatorCategory = null;
       return sealEmployee(patch, prev);
     },
     async afterCreate(ctx, doc) {
@@ -157,8 +160,12 @@ export const employees: ResourceDef = {
     },
     // a profile cancelled by mistake must not leave a working sign-in behind (sessions check "active" on every request)
     async beforeVoid(ctx, d) {
-      const { User } = await import('../models');
+      const { User, Session } = await import('../models');
+      const uids = (await User.find({ $or: [{ employeeId: d._id }, { empCode: d.empCode }] }, '_id').session(ctx.session ?? null).lean()).map((u: any) => u._id);
       await User.updateMany({ $or: [{ employeeId: d._id }, { empCode: d.empCode }] }, { $set: { active: false } }, { session: ctx.session });
+      if (uids.length) {
+        await Session.deleteMany({ userId: { $in: uids } }, ctx.session ? { session: ctx.session } : undefined);
+      }
     },
   },
 };
@@ -393,7 +400,7 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineId', 'machineName', 'machineIds', 'machineNames', 'colour', 'output', 'thickness', 'edges', 'pieces', 'rate', 'stockItemId', 'stockUpdated', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
+  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineId', 'machineName', 'machineIds', 'machineNames', 'colour', 'output', 'thickness', 'edges', 'pieces', 'rate', 'stockItemId', 'stockUpdated', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'photos', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
   sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName', 'machineName', 'machineNames', 'colour'],
   dateFields: ['date'], filters: { date: 'date', empCode: 'string', projectId: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
   serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job', 'stockItemId', 'stockUpdated'],

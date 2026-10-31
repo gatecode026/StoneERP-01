@@ -599,16 +599,24 @@ export default function CrudPage({
     const isVoid = Boolean(row.isVoid || row.status === 'void' || row.status === 'cancelled');
     const acts = rowActions ? rowActions(row, { reload }) : [];
     const items = [];
+    const nonDangerActs = [];
+    const dangerActs = [];
 
     acts.filter((a) => a && (a.show ? a.show(row) : true)).forEach((a, i) => {
-      items.push({
-        key: `custom-${i}`,
+      const it = {
+        key: a.key || `custom-${i}`,
         label: a.label,
         icon: a.icon,
         tone: a.tone,
+        danger: Boolean(a.danger),
+        disabled: Boolean(a.disabled),
         onClick: () => a.onClick(row, reload),
-      });
+      };
+      if (a.danger) dangerActs.push(it);
+      else nonDangerActs.push(it);
     });
+
+    items.push(...nonDangerActs);
 
     if (can(model, 'edit') && canEdit(row) && !isVoid) {
       items.push({
@@ -659,6 +667,8 @@ export default function CrudPage({
         },
       });
     }
+
+    items.push(...dangerActs);
 
     if (!items.length) return null;
 

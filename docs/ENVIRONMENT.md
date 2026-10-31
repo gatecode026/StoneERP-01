@@ -21,7 +21,7 @@
 ## Storage (photos, documents, backups)
 
 `STORAGE_DRIVER` = `mongo` (default in production) | `s3` | `cloudinary` | `imagekit` | `local` (development and tests only).
-ImageKit: `IMAGEKIT_URL_ENDPOINT` (e.g. `https://ik.imagekit.io/<id>`), `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_PUBLIC_KEY` (not used by the server). Files are uploaded as private and read through short-lived signed URLs; downloads are streamed by the app after the permission check.
+ImageKit: `IMAGEKIT_URL_ENDPOINT` (e.g. `https://ik.imagekit.io/<id>`), `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_PUBLIC_KEY` (not used by the server), `IMAGEKIT_FOLDER` (optional root folder, e.g. `StoneEPR`). Files are read through short-lived signed URLs; downloads are streamed by the app after the permission check.
 S3 / R2 / MinIO: `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` (`auto` for R2, `ap-south-1` for AWS), `S3_ENDPOINT` (R2/MinIO), `S3_FORCE_PATH_STYLE=yes` (MinIO).
 Cloudinary: `CLOUDINARY_CLOUD`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`. `STORAGE_LOCAL_DIR` for the local driver.
 

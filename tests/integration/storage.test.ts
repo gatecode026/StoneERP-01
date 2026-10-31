@@ -156,12 +156,13 @@ describe('production refuses the local driver', () => {
 });
 
 describe('the ImageKit driver', () => {
-  const env = { d: process.env.STORAGE_DRIVER, k: process.env.IMAGEKIT_PRIVATE_KEY, u: process.env.IMAGEKIT_URL_ENDPOINT };
+  const env = { d: process.env.STORAGE_DRIVER, k: process.env.IMAGEKIT_PRIVATE_KEY, u: process.env.IMAGEKIT_URL_ENDPOINT, f: process.env.IMAGEKIT_FOLDER };
   afterAll(async () => {
     vi.unstubAllGlobals();
     process.env.STORAGE_DRIVER = env.d;
     if (env.k === undefined) delete process.env.IMAGEKIT_PRIVATE_KEY; else process.env.IMAGEKIT_PRIVATE_KEY = env.k;
     if (env.u === undefined) delete process.env.IMAGEKIT_URL_ENDPOINT; else process.env.IMAGEKIT_URL_ENDPOINT = env.u;
+    if (env.f === undefined) delete process.env.IMAGEKIT_FOLDER; else process.env.IMAGEKIT_FOLDER = env.f;
     (await import('@/lib/storage')).setStorageForTests(null);
   });
 
@@ -170,6 +171,7 @@ describe('the ImageKit driver', () => {
     const { createHmac } = await import('node:crypto');
     process.env.STORAGE_DRIVER = 'imagekit';
     delete process.env.IMAGEKIT_PRIVATE_KEY;
+    delete process.env.IMAGEKIT_FOLDER;
     setStorageForTests(null);
     expect(() => gs()).toThrow(/IMAGEKIT_PRIVATE_KEY/);
     process.env.IMAGEKIT_PRIVATE_KEY = 'private_test_key=';
@@ -195,7 +197,7 @@ describe('the ImageKit driver', () => {
     const form = up.init.body as FormData;
     expect(form.get('fileName')).toBe('abc.jpg');
     expect(form.get('folder')).toBe('/photos/2026/10');
-    expect(form.get('isPrivateFile')).toBe('true');
+    expect(form.get('isPrivateFile')).toBe('false');
     expect(form.get('useUniqueFileName')).toBe('false');
 
     const got = await d.get(key);
@@ -210,5 +212,39 @@ describe('the ImageKit driver', () => {
     await d.remove(key);
     expect(calls.at(-1)!.url).toBe('https://api.imagekit.io/v1/files/F1');
     expect(calls.at(-1)!.init.method).toBe('DELETE');
+  });
+
+  it('supports IMAGEKIT_FOLDER prefix (e.g. StoneEPR)', async () => {
+    const { setStorageForTests, getStorage: gs } = await import('@/lib/storage');
+    process.env.STORAGE_DRIVER = 'imagekit';
+    process.env.IMAGEKIT_PRIVATE_KEY = 'private_test_key=';
+    process.env.IMAGEKIT_URL_ENDPOINT = 'https://ik.imagekit.io/testid/';
+    process.env.IMAGEKIT_FOLDER = 'StoneEPR';
+    setStorageForTests(null);
+    const d = gs();
+
+    const calls: { url: string; init: any }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: any = {}) => {
+      calls.push({ url: String(url), init });
+      if (String(url).startsWith('https://upload.imagekit.io')) return new Response('{}', { status: 200 });
+      if (String(url).startsWith('https://api.imagekit.io/v1/files?')) return new Response(JSON.stringify([{ fileId: 'F2' }]), { status: 200 });
+      if (String(url).startsWith('https://api.imagekit.io/v1/files/F2')) return new Response(null, { status: 204 });
+      return new Response(new Uint8Array([4, 5, 6]), { status: 200, headers: { 'content-type': 'image/jpeg' } });
+    }));
+
+    const key = 'photos/2026/10/xyz.jpg';
+    await d.put(key, Buffer.from([1, 1]), 'image/jpeg');
+    const up = calls[0];
+    const form = up.init.body as FormData;
+    expect(form.get('folder')).toBe('/StoneEPR/photos/2026/10');
+    expect(form.get('fileName')).toBe('xyz.jpg');
+
+    const got = await d.get(key);
+    expect(got).not.toBeNull();
+    const u = new URL(calls[1].url);
+    expect(u.origin + u.pathname).toBe('https://ik.imagekit.io/testid/StoneEPR/' + key);
+
+    await d.remove(key);
+    expect(calls.at(-1)!.url).toBe('https://api.imagekit.io/v1/files/F2');
   });
 });

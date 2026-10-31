@@ -171,17 +171,33 @@ export default function MultiLookupSelect({
     }
   }, [open]);
 
-  // Filtered items based on search input
+  const isOperator = kind === 'employees' && (
+    query?.job === 'Operator' ||
+    (typeof query?.job === 'string' && query.job.toLowerCase().includes('operator')) ||
+    String(id || '').toLowerCase().includes('operator')
+  );
+  const [opCategory, setOpCategory] = useState('');
+
+  // Filtered items based on search input and operator category
   const filteredItems = useMemo(() => {
-    if (!search.trim()) return items;
+    let list = items;
+    if (isOperator && opCategory) {
+      list = list.filter((it) => {
+        if (it.operatorCategory) return it.operatorCategory === opCategory;
+        const full = `${it.label || ''} ${it.hint || ''}`.toLowerCase();
+        return full.includes(opCategory.toLowerCase());
+      });
+    }
+    if (!search.trim()) return list;
     const q = search.toLowerCase();
-    return items.filter(
+    return list.filter(
       (it) =>
         it.label?.toLowerCase().includes(q) ||
         it.hint?.toLowerCase().includes(q) ||
+        it.operatorCategory?.toLowerCase().includes(q) ||
         String(it.id).toLowerCase().includes(q)
     );
-  }, [items, search]);
+  }, [items, search, isOperator, opCategory]);
 
   const toggleItem = (it) => {
     const sid = String(it.id);
@@ -302,6 +318,42 @@ export default function MultiLookupSelect({
       {/* Dropdown Menu */}
       {open && (
         <div className="absolute z-50 left-0 right-0 mt-1 rounded-none bg-white shadow-xl border border-sand-300 overflow-hidden animate-in fade-in duration-100">
+          {/* Operator Category Selector */}
+          {isOperator && (
+            <div className="p-2 border-b border-sand-200 bg-sand-50/90 flex items-center justify-between gap-1.5 select-none">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-char-500 shrink-0">
+                Category:
+              </span>
+              <div className="flex items-center gap-1">
+                {[
+                  { id: '', label: 'All' },
+                  { id: 'Bridge Cutter', label: 'Bridge Cutter' },
+                  { id: 'Block Cutter', label: 'Block Cutter' },
+                ].map((cat) => {
+                  const active = opCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpCategory(cat.id);
+                      }}
+                      className={cx(
+                        'px-2 py-0.5 text-xs font-semibold rounded-none transition-all duration-75',
+                        active
+                          ? 'bg-terra text-white shadow-sm'
+                          : 'bg-white text-char-700 hover:bg-sand-200 border border-sand-300'
+                      )}
+                    >
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Search Bar */}
           <div className="p-2 border-b border-sand-200 bg-sand-50/50">
             <div className="relative">
@@ -373,8 +425,18 @@ export default function MultiLookupSelect({
                       onChange={() => {}} // handled by parent div click
                       className="w-4 h-4 rounded-none text-terra accent-terra cursor-pointer shrink-0"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{it.label}</div>
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <span className="text-sm truncate">{it.label}</span>
+                      {it.operatorCategory && (
+                        <span className={cx(
+                          'text-[10px] px-1.5 py-0.2 font-bold uppercase tracking-wider rounded-none shrink-0',
+                          it.operatorCategory === 'Bridge Cutter'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        )}>
+                          {it.operatorCategory}
+                        </span>
+                      )}
                     </div>
                     {it.hint && (
                       <span className="text-xs font-mono text-char-400 font-semibold shrink-0">

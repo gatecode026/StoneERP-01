@@ -9,6 +9,7 @@ export const Project = defineModel(
   {
     projectCode: { type: S, required: true, trim: true, uppercase: true },
     name: { type: S, required: true, trim: true, maxlength: 200 },
+    clientName: { type: S, trim: true, maxlength: 150 },
     site: { type: S, maxlength: 100 },
     place: { type: S, trim: true, maxlength: 150 },
     state: { type: S, trim: true, maxlength: 100, default: 'Rajasthan' },
@@ -63,6 +64,7 @@ export const Project = defineModel(
       [{ operatorCode: 1 }],
       [{ operatorCodes: 1 }],
       [{ name: 1 }],
+      [{ clientName: 1 }],
     ],
   }
 );

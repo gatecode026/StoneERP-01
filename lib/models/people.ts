@@ -13,6 +13,7 @@ export const Employee = defineModel(
     fatherName: { type: S, maxlength: 120 },
     address: { type: S, maxlength: 400 }, // pii
     job: { type: S, required: true, maxlength: 80 },
+    operatorCategory: { type: S, enum: ['Bridge Cutter', 'Block Cutter', null, ''], default: null, trim: true },
     site: { type: S, enum: SITES, default: 'Factory' },
     designation: { type: S, maxlength: 40 }, // optional: Driver, Machine operator, Loader … (lets a picker show only the right people)
     joiningDate: dateStr(),

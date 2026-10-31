@@ -28,7 +28,7 @@ type Kind = {
 const n = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN');
 
 export const KINDS: Record<string, Kind> = {
-  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', supervisorCode: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'operator', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.job})`, hint: (d) => d.empCode, limit: 300 },
+  employees: { resource: 'employees', model: Employee, search: ['name', 'empCode'], by: ['empCode'], filters: { status: ['active', 'left'], job: 'string', operatorCategory: ['Bridge Cutter', 'Block Cutter'], supervisorCode: 'string', designation: DESIGNATIONS, loginRole: ['supervisor', 'operator', 'worker', 'manager', 'owner', 'admin'] }, defaults: { status: 'active' }, select: 'name empCode job operatorCategory designation loginRole', sort: { name: 1 }, label: (d) => `${d.name} (${d.operatorCategory || d.job})`, hint: (d) => [d.operatorCategory, d.empCode].filter(Boolean).join(' · '), limit: 300 },
   machines: { resource: 'machines', model: Machine, search: ['name'], by: ['name'], select: 'name type', sort: { name: 1 }, label: (d) => `${d.name} (${d.type})`, limit: 100 },
   items: { resource: 'stockitems', model: StockItem, search: ['name', 'finish', 'colourFinish'], filters: { category: ['raw', 'finished', 'consumable'] }, select: 'name finish colourFinish unit balance category', sort: { name: 1 }, label: (d) => `${d.name}${d.finish ? ' ' + d.finish : ''} (${n(d.balance)} ${d.unit})`, hint: (d) => [d.finish, d.unit].filter(Boolean).join(' · ') },
   customers: { resource: 'customers', model: Customer, search: ['name', 'city'], select: 'name city', sort: { name: 1 }, label: (d) => d.name, hint: (d) => d.city },
@@ -45,7 +45,7 @@ export const lookupKind = (k: string) => {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-export type LookupItem = { id: string; label: string; hint?: string };
+export type LookupItem = { id: string; label: string; hint?: string; operatorCategory?: string };
 
 /** {id, label} pairs for a dropdown: search, max 50, only what the caller is allowed to see (scope filter applied by the caller). */
 export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<string, any>): Promise<{ data: LookupItem[] }> {
@@ -109,5 +109,5 @@ export async function runLookup(kind: Kind, sp: URLSearchParams, scope: Record<s
   const requested = sp.get('limit') != null ? Number(sp.get('limit')) : defaultLimit;
   const limit = Math.min(Math.max(requested || defaultLimit, 1), maxLimit);
   const rows: any[] = await kind.model.find({ $and: and }, kind.select + ' ' + idField).sort(kind.sort).limit(limit).lean();
-  return { data: rows.map((d) => ({ id: String(d[idField]), label: kind.label(d), ...(kind.hint?.(d) ? { hint: kind.hint(d) } : {}) })) };
+  return { data: rows.map((d) => ({ id: String(d[idField]), label: kind.label(d), ...(kind.hint?.(d) ? { hint: kind.hint(d) } : {}), ...(d.operatorCategory ? { operatorCategory: d.operatorCategory } : {}) })) };
 }

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon, MoreVertical } from 'lucide-react';
+import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon, MoreVertical, Maximize2, ExternalLink } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useApp, useTx } from './Providers';
 import toast from '@/lib/toast';
@@ -273,6 +273,7 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
   const { t } = useApp();
   const tx = useTx();
   const ref = useRef();
+  const [previewSrc, setPreviewSrc] = useState(null);
   const items = multiple ? (Array.isArray(value) ? value : []) : value ? [value] : [];
   async function pick(e) {
     const files = [...(e.target.files || [])];
@@ -297,43 +298,132 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
           </button>
         )}
         {items.map((src, i) => (
-          <div key={i} className="relative inline-flex items-center gap-2 p-1.5 rounded-none border border-sand-300 bg-sand-50/60 shadow-none">
-            <Photo src={src} thumb width={40} height={40} className="h-10 w-10 rounded-none object-cover border border-sand-300" />
-            {!multiple && (
-              <button
-                type="button"
-                className="text-xs text-terra font-semibold hover:underline px-1"
-                onClick={() => ref.current?.click()}
-              ><T>
-                Change</T>
-              </button>
-            )}
+          <div key={i} className="group relative inline-flex items-center gap-2 p-1.5 rounded-none border border-sand-300 bg-sand-50/60 shadow-none hover:border-sand-400 transition">
             <button
               type="button"
-              onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
-              className="text-char-500 hover:text-red-600 p-1 rounded-none transition"
-              title={tx('Remove')}
+              className="relative block h-14 w-14 rounded-none overflow-hidden border border-sand-300 hover:border-terra focus:outline-none focus:ring-1 focus:ring-terra cursor-pointer shrink-0"
+              onClick={() => setPreviewSrc(src)}
+              title={tx('Click to enlarge')}
             >
-              <X size={15} />
+              <Photo src={src} thumb width={56} height={56} eager className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+              <div className="absolute inset-0 bg-char-950/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                <Maximize2 size={14} />
+              </div>
             </button>
+            <div className="flex flex-col gap-1">
+              {!multiple && (
+                <button
+                  type="button"
+                  className="text-xs text-terra font-semibold hover:underline text-left"
+                  onClick={() => ref.current?.click()}
+                >
+                  <T>Change</T>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onChange(multiple ? items.filter((_, j) => j !== i) : '')}
+                className="text-char-500 hover:text-red-600 p-0.5 text-xs inline-flex items-center gap-1 transition"
+                title={tx('Remove')}
+              >
+                <X size={13} /> <span className="text-[11px]"><T>Remove</T></span>
+              </button>
+            </div>
           </div>
         ))}
       </div>
       <input ref={ref} type="file" accept="image/*" capture={capture} multiple={multiple} className="hidden" onChange={pick} />
+      {previewSrc && <PhotoModal src={previewSrc} onClose={() => setPreviewSrc(null)} />}
     </div>
   );
 }
 
+/** Full-screen / modal lightbox to inspect an attached photo */
+export function PhotoModal({ src, onClose, title = '' }) {
+  const tx = useTx();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!src) return null;
+  const full = fileUrl(src, false);
+
+  const modal = (
+    <div
+      className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150 no-print"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="relative max-w-4xl w-full max-h-[92vh] bg-neutral-900 border border-neutral-700 rounded-none overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 bg-neutral-950 border-b border-neutral-800 text-stone-100 shrink-0">
+          <span className="text-xs font-semibold text-neutral-200 truncate">{tx(title) || tx('Photo Preview')}</span>
+          <div className="flex items-center gap-2">
+            <a
+              href={full}
+              target="_blank"
+              rel="noreferrer"
+              className="p-1.5 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-none transition"
+              title={tx('Open original in new tab')}
+            >
+              <ExternalLink size={16} />
+            </a>
+            <a
+              href={full}
+              download="photo.jpg"
+              className="p-1.5 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-none transition"
+              title={tx('Download')}
+            >
+              <Download size={16} />
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-none transition"
+              title={tx('Close')}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center overflow-auto p-4 bg-neutral-950/90 min-h-[260px]">
+          <img
+            src={full}
+            alt="Preview"
+            className="max-h-[75vh] max-w-full object-contain rounded-none shadow-2xl border border-neutral-800/60"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  return mounted && typeof document !== 'undefined' ? createPortal(modal, document.body) : modal;
+}
+
 /** A picture from our own storage: loads when it scrolls into view, keeps its box (no jumping) and shows a soft placeholder until it arrives. */
-export function Photo({ src, thumb = false, alt = '', className = '', width, height }) {
+export function Photo({ src, thumb = false, alt = '', className = '', width, height, eager = false }) {
   const [state, setState] = useState('loading');
   const url = fileUrl(src, thumb);
+
+  useEffect(() => {
+    setState('loading');
+  }, [url]);
+
   if (!url) return null;
   if (state === 'error') return <div className={cx('flex items-center justify-center bg-sand-100 text-char-300', className)} style={{ width, height }} role="img" aria-label={alt}><ImageIcon size={16} /></div>;
   return (
-     
     <img
-      src={url} alt={alt} loading="lazy" decoding="async" width={width} height={height}
+      src={url} alt={alt} loading={eager || thumb || (typeof src === 'string' && src.startsWith('data:')) ? 'eager' : 'lazy'} decoding="async" width={width} height={height}
       onLoad={() => setState('ready')} onError={() => setState('error')}
       className={cx(className, state === 'loading' && 'animate-pulse bg-sand-200')}
     />
