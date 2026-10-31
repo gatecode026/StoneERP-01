@@ -109,7 +109,7 @@ export const Purchase = defineModel(
     itemName: S,
     qty: { type: N, required: true, min: 0.0001 },
     rate: money({ required: true }), // cost
-    gstPercent: { type: N, enum: [0, 5, 12, 18, 28], default: 0 },
+    gstPercent: { type: N, default: 0, min: 0, max: 100 },
     isInterState: { type: B, default: false }, // true = IGST, false = CGST + SGST
     total: money({ required: true }), // cost
     paidAmount: money({ default: 0 }),

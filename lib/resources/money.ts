@@ -43,6 +43,16 @@ export const expenses: ResourceDef = {
     async afterCreate(ctx, d) {
       await roll.expenseCounted(d.date, d.head, d.amount, 1, ctx.session);
       if (d.status === 'approved') await postExpenseCash(ctx, d);
+      if (d.head && typeof d.head === 'string') {
+        const trimmed = d.head.trim();
+        if (trimmed) {
+          await ExpenseHead.updateOne(
+            { name: trimmed },
+            { $setOnInsert: { name: trimmed, isVoid: false } },
+            { upsert: true }
+          ).catch(() => {});
+        }
+      }
     },
     async beforeVoid(ctx, d) {
       if (['approved', 'pending'].includes(d.status)) await roll.expenseCounted(d.date, d.head, d.amount, -1, ctx.session);

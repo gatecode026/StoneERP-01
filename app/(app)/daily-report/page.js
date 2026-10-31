@@ -15,10 +15,23 @@ import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, addDays, fmtDate, fmtDateTime, fmtMonth, num } from '@/lib/format';
 import T from '@/components/T';
 
+const blankEntry = () => ({
+  colour: '',
+  finish: '',
+  output: '',
+  thickness: '',
+  size: '',
+  quantity: '',
+  feet: '',
+  rate: '',
+  amount: '',
+});
+
 const blank = () => ({
   narration: '', hours: '', quantity: '', problem: '', plan: '', photos: [], empCode: '',
   machineId: '', machineName: '', machineIds: [], machineNames: '',
-  colour: '', output: '', thickness: '', edges: '', pieces: '', rate: '',
+  colour: '', output: '', finish: '', thickness: '', size: '', edges: '', pieces: '', feet: '', rate: '', amount: '',
+  entries: [blankEntry()],
 });
 
 export default function DailyReportPage() {
@@ -86,30 +99,63 @@ export default function DailyReportPage() {
       try {
         const full = await api(`/api/dailyreports/${row._id}`);
         setEditing(full);
-        const mId = full.machineId ? String(full.machineId) : (full.machineIds?.[0] ? String(full.machineIds[0]) : '');
-        let mName = full.machineName || full.machineNames || '';
-        if (mId && !mName) {
+        const mIds = full.machineIds?.length ? full.machineIds.map(String) : (full.machineId ? [String(full.machineId)] : []);
+        let mNames = full.machineNames || full.machineName || '';
+        if (mIds.length && !mNames) {
           try {
-            const res = await api(`/api/lookup/machines?ids=${mId}`);
-            if (res.data?.[0]?.label) mName = res.data[0].label;
+            const res = await api(`/api/lookup/machines?ids=${mIds.join(',')}`);
+            if (res.data?.length) mNames = res.data.map((x) => x.label).join(', ');
           } catch { /* proceed */ }
+        }
+        let entries = [];
+        if (full.entries && full.entries.length > 0) {
+          entries = full.entries.map((e) => ({
+            colour: e.colour || '',
+            finish: e.finish || e.output || '',
+            output: e.output || e.finish || '',
+            thickness: e.thickness != null && e.thickness !== '' ? String(e.thickness) : '',
+            size: e.size || '',
+            quantity: e.quantity != null && e.quantity !== '' ? String(e.quantity) : (e.pieces != null && e.pieces !== '' ? String(e.pieces) : ''),
+            feet: e.feet != null && e.feet !== '' ? String(e.feet) : '',
+            rate: e.rate != null && e.rate !== '' ? String(e.rate) : '',
+            amount: e.amount != null && e.amount !== '' ? String(e.amount) : '',
+          }));
+        } else if (full.colour || full.output || full.finish || full.thickness || full.size || full.pieces || full.feet || full.rate || full.amount) {
+          entries = [{
+            colour: full.colour || '',
+            finish: full.finish || full.output || '',
+            output: full.output || full.finish || '',
+            thickness: full.thickness != null && full.thickness !== '' ? String(full.thickness) : '',
+            size: full.size || '',
+            quantity: full.pieces != null && full.pieces !== '' ? String(full.pieces) : (full.quantity != null && full.quantity !== '' ? String(full.quantity) : ''),
+            feet: full.feet != null && full.feet !== '' ? String(full.feet) : '',
+            rate: full.rate != null && full.rate !== '' ? String(full.rate) : '',
+            amount: full.amount != null && full.amount !== '' ? String(full.amount) : '',
+          }];
+        } else {
+          entries = [blankEntry()];
         }
         setForm({
           ...blank(),
           ...full,
           photos: full.photos || [],
-          machineId: mId,
-          machineName: mName,
-          machineIds: mId ? [mId] : (full.machineIds?.length ? full.machineIds.map(String) : []),
-          machineNames: mName,
+          machineId: mIds[0] || '',
+          machineName: full.machineName || mNames.split(',')[0]?.trim() || '',
+          machineIds: mIds,
+          machineNames: mNames,
+          entries,
           colour: full.colour || '',
-          output: full.output || '',
+          finish: full.finish || full.output || '',
+          output: full.output || full.finish || '',
           thickness: full.thickness != null && full.thickness !== '' ? String(full.thickness) : '',
+          size: full.size || '',
           edges: full.edges || '',
           pieces: full.pieces != null && full.pieces !== '' ? String(full.pieces) : '',
+          quantity: full.pieces != null && full.pieces !== '' ? String(full.pieces) : (full.quantity != null && full.quantity !== '' ? String(full.quantity) : ''),
+          feet: full.feet != null && full.feet !== '' ? String(full.feet) : '',
           rate: full.rate != null && full.rate !== '' ? String(full.rate) : '',
+          amount: full.amount != null && full.amount !== '' ? String(full.amount) : '',
           hours: full.hours != null && full.hours !== '' ? String(full.hours) : '',
-          quantity: full.quantity != null && full.quantity !== '' ? String(full.quantity) : '',
           problem: full.problem || '',
           plan: full.plan || '',
         });
@@ -133,12 +179,45 @@ export default function DailyReportPage() {
     if (!form.narration?.trim()) { toast.error('Write or speak what you did today'); return; }
     if (!isWorker && !editing && !form.empCode) { toast.error('Choose the employee'); return; }
     setSaving(true);
-    const mIds = form.machineId ? [form.machineId] : (form.machineIds?.length ? form.machineIds : []);
-    const mName = form.machineName || form.machineNames || '';
+    const mIds = form.machineIds?.length ? form.machineIds : (form.machineId ? [form.machineId] : []);
+    const mName = form.machineNames || form.machineName || '';
+
+    const rawEntries = form.entries && form.entries.length > 0 ? form.entries : [{
+      colour: form.colour,
+      finish: form.finish || form.output,
+      output: form.output || form.finish,
+      thickness: form.thickness,
+      size: form.size,
+      quantity: form.quantity || form.pieces,
+      feet: form.feet,
+      rate: form.rate,
+      amount: form.amount,
+    }];
+
+    const validEntries = rawEntries
+      .map((e) => ({
+        colour: (e.colour || '').trim(),
+        finish: (e.finish || e.output || '').trim(),
+        output: (e.finish || e.output || '').trim(),
+        thickness: e.thickness !== '' && e.thickness != null ? Number(e.thickness) : undefined,
+        size: (e.size || '').trim(),
+        quantity: e.quantity !== '' && e.quantity != null ? Number(e.quantity) : undefined,
+        pieces: e.quantity !== '' && e.quantity != null ? Number(e.quantity) : undefined,
+        feet: e.feet !== '' && e.feet != null ? Number(e.feet) : undefined,
+        rate: e.rate !== '' && e.rate != null ? Number(e.rate) : undefined,
+        amount: e.amount !== '' && e.amount != null ? Number(e.amount) : undefined,
+      }))
+      .filter((e) => Boolean(e.colour || e.finish || e.output || e.thickness || e.size || e.quantity || e.feet || e.rate || e.amount));
+
+    const totalFeet = validEntries.reduce((s, e) => s + (e.feet || 0), 0);
+    const totalPieces = validEntries.reduce((s, e) => s + (e.quantity || 0), 0);
+    const totalAmount = validEntries.reduce((s, e) => s + (e.amount || 0), 0);
+    const firstEntry = validEntries[0] || {};
+
     const body = {
       narration: form.narration,
       hours: form.hours === '' ? 0 : Number(form.hours),
-      quantity: form.quantity === '' ? 0 : Number(form.quantity),
+      quantity: totalFeet > 0 ? totalFeet : (form.feet !== '' && form.feet != null ? Number(form.feet) : (totalPieces > 0 ? totalPieces : (form.quantity === '' ? 0 : Number(form.quantity)))),
       problem: form.problem || '',
       plan: form.plan || '',
       photos: form.photos || [],
@@ -146,12 +225,17 @@ export default function DailyReportPage() {
       machineName: mName,
       machineIds: mIds,
       machineNames: mName,
-      colour: form.colour || '',
-      output: form.output || '',
-      thickness: form.thickness === '' ? undefined : Number(form.thickness),
+      entries: validEntries,
+      colour: validEntries.length ? validEntries.map((e) => e.colour).filter(Boolean).join(', ') : (form.colour || ''),
+      output: firstEntry.output || form.finish || form.output || '',
+      finish: firstEntry.finish || form.finish || form.output || '',
+      thickness: firstEntry.thickness != null ? firstEntry.thickness : (form.thickness === '' ? undefined : Number(form.thickness)),
+      size: validEntries.length ? validEntries.map((e) => e.size).filter(Boolean).join(', ') : (form.size || ''),
       edges: form.edges || '',
-      pieces: form.pieces === '' ? undefined : Number(form.pieces),
-      rate: form.rate === '' ? undefined : Number(form.rate),
+      pieces: totalPieces > 0 ? totalPieces : (form.quantity !== '' && form.quantity != null ? Number(form.quantity) : (form.pieces === '' ? undefined : Number(form.pieces))),
+      feet: totalFeet > 0 ? totalFeet : (form.feet === '' ? undefined : Number(form.feet)),
+      rate: firstEntry.rate != null ? firstEntry.rate : (form.rate === '' ? undefined : Number(form.rate)),
+      amount: totalAmount > 0 ? totalAmount : (form.amount === '' ? undefined : Number(form.amount)),
     };
     try {
       const res = editing
@@ -367,13 +451,17 @@ export default function DailyReportPage() {
     ['Employee', `${detail.empName}${detail.job ? ' · ' + detail.job : ''}`], ['Date', fmtDate(detail.date)],
     ...(detail.filledBy && detail.filledBy !== detail.empName ? [['Filled by', detail.filledBy]] : []),
     ...((detail.machineNames || detail.machineName) ? [['Machines', detail.machineNames || detail.machineName]] : []),
-    ...(detail.colour ? [['Colour Name', detail.colour]] : []),
-    ...(detail.output ? [['Output / Finish', detail.output]] : []),
+    ...(detail.colour ? [['Colour', detail.colour]] : []),
+    ...((detail.finish || detail.output) ? [['Finish', detail.finish || detail.output]] : []),
     ...(detail.thickness ? [['Thickness', `${detail.thickness} mm`]] : []),
+    ...(detail.size ? [['Size', detail.size]] : []),
     ...(detail.edges ? [['Edges', detail.edges]] : []),
-    ...(detail.pieces ? [['Pieces', num(detail.pieces)]] : []),
-    ...(detail.rate ? [['Rate', `₹${num(detail.rate)}`]] : []),
-    ['Hours', detail.hours != null && detail.hours > 0 ? `${detail.hours} h` : '—'], ['Quantity', detail.quantity != null && detail.quantity > 0 ? `${num(detail.quantity)} sq ft` : '—'],
+    ...(detail.pieces != null && detail.pieces !== '' ? [['Quantity (Pieces)', num(detail.pieces)]] : []),
+    ...(detail.feet != null && detail.feet !== '' ? [['Feet', `${num(detail.feet)} sq ft`]] : []),
+    ...(detail.rate != null && detail.rate !== '' ? [['Rate', `₹${num(detail.rate)}`]] : []),
+    ...(detail.amount != null && detail.amount !== '' ? [['Amount', `₹${num(detail.amount)}`]] : []),
+    ['Hours', detail.hours != null && detail.hours > 0 ? `${detail.hours} h` : '—'],
+    ...(!detail.feet && detail.quantity != null && detail.quantity > 0 ? [['Quantity', `${num(detail.quantity)} sq ft`]] : []),
     ...(detail.stockUpdated ? [['Stock Status', '✔ Automatically credited to Stock']] : []),
   ] : [];
 
@@ -589,6 +677,44 @@ export default function DailyReportPage() {
             <dl className="divide-y divide-sand-100">
               {detailRows.map(([k, v]) => <div key={k} className="flex justify-between gap-3 py-1.5"><dt className="text-char-500">{k}</dt><dd className="font-medium text-right">{v}</dd></div>)}
             </dl>
+            {detail.entries && detail.entries.length > 0 && (
+              <div className="pt-2 border-t border-sand-200 space-y-2">
+                <div className="text-xs font-semibold uppercase text-char-500 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Boxes size={13} className="text-terra" /><T>Stone Production Entries</T></span>
+                  <span className="text-[11px] font-normal text-char-500">{detail.entries.length} <T>entries</T></span>
+                </div>
+                <div className="border border-sand-200 overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-sand-100 text-char-700">
+                      <tr>
+                        <th className="p-1.5 text-left"><T>Colour</T></th>
+                        <th className="p-1.5 text-left"><T>Finish</T></th>
+                        <th className="p-1.5 text-right"><T>Thickness</T></th>
+                        <th className="p-1.5 text-left"><T>Size</T></th>
+                        <th className="p-1.5 text-right"><T>Quantity</T></th>
+                        <th className="p-1.5 text-right"><T>Feet</T></th>
+                        <th className="p-1.5 text-right"><T>Rate</T></th>
+                        <th className="p-1.5 text-right"><T>Amount</T></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-sand-100">
+                      {detail.entries.map((e, idx) => (
+                        <tr key={idx} className="hover:bg-sand-50">
+                          <td className="p-1.5 font-medium">{e.colour || '—'}</td>
+                          <td className="p-1.5">{e.finish || e.output || '—'}</td>
+                          <td className="p-1.5 text-right">{e.thickness ? `${e.thickness}mm` : '—'}</td>
+                          <td className="p-1.5">{e.size || '—'}</td>
+                          <td className="p-1.5 text-right">{e.quantity != null ? num(e.quantity) : (e.pieces != null ? num(e.pieces) : '—')}</td>
+                          <td className="p-1.5 text-right font-semibold text-terra-900">{e.feet != null ? num(e.feet) : '—'}</td>
+                          <td className="p-1.5 text-right">{e.rate != null ? `₹${num(e.rate)}` : '—'}</td>
+                          <td className="p-1.5 text-right font-bold text-char-900">{e.amount != null ? `₹${num(e.amount)}` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Work done</T></div><p className="whitespace-pre-wrap break-words">{detail.narration}</p></div>
             {detail.problem && <div><div className="text-xs font-semibold uppercase text-red-600 mb-1"><T>Problem</T></div><p className="break-words">{detail.problem}</p></div>}
             {detail.plan && <div><div className="text-xs font-semibold uppercase text-char-500 mb-1"><T>Plan for tomorrow</T></div><p className="break-words">{detail.plan}</p></div>}
@@ -687,25 +813,43 @@ export default function DailyReportPage() {
             <SpeakButton onText={(x) => set({ narration: (form.narration ? form.narration + ' ' : '') + x })} />
             <div className="[&>div]:h-full"><PhotoInput multiple value={form.photos} onChange={(p) => set({ photos: p })} label={t('addPhoto')} /></div>
           </div>
-          <Field label={tr('Machine worked on')} hint={tr('Select the machine you operated / worked on today')}>
-            <LookupSelect
+          <Field label={tr('Machine(s) worked on')} hint={tr('Check all machines you operated / worked on today')}>
+            <MultiLookupSelect
               kind="machines"
-              value={form.machineId || (form.machineIds?.[0] || '')}
-              valueLabel={form.machineName || form.machineNames || ''}
-              placeholder={tr('Select machine worked on…')}
+              value={form.machineIds?.length ? form.machineIds : (form.machineId ? [form.machineId] : [])}
+              valueLabel={form.machineNames || form.machineName || ''}
+              placeholder={tr('Select machines worked on…')}
               emptyText={tr('No machines found')}
-              onChange={(m) => {
+              onChange={(arr) => {
+                const list = Array.isArray(arr) ? arr : arr ? [arr] : [];
+                const ids = list.map((x) => String(x.id));
+                const names = list.map((x) => x.label).join(', ');
                 set({
-                  machineId: m ? m.id : '',
-                  machineName: m ? m.label : '',
-                  machineIds: m ? [m.id] : [],
-                  machineNames: m ? m.label : '',
+                  machineIds: ids,
+                  machineNames: names,
+                  machineId: ids[0] || '',
+                  machineName: list[0]?.label || '',
                 });
               }}
             />
           </Field>
-          {Boolean(form.machineId || (form.machineIds || []).length > 0 || form.colour || form.output || form.thickness || form.edges || form.pieces || form.rate || form.quantity) && (
-            <div className="p-3.5 rounded-none border border-terra-200 bg-sand-50/70 space-y-3 animate-in fade-in duration-150">
+          {Boolean(
+            form.machineId ||
+            (form.machineIds || []).length > 0 ||
+            (form.entries || []).some((e) => e.colour || e.finish || e.thickness || e.size || e.quantity || e.feet || e.rate || e.amount) ||
+            form.colour ||
+            form.finish ||
+            form.output ||
+            form.thickness ||
+            form.size ||
+            form.edges ||
+            form.pieces ||
+            form.quantity ||
+            form.feet ||
+            form.rate ||
+            form.amount
+          ) && (
+            <div className="p-3.5 rounded-none border border-terra-200 bg-sand-50/70 space-y-3.5 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-char-900 flex items-center gap-1.5">
                   <Boxes size={14} className="text-terra" /> Stone Production & Stock Work
@@ -715,81 +859,204 @@ export default function DailyReportPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Colour Name">
-                  <input
-                    type="text"
-                    className="input !bg-white"
-                    placeholder="e.g. Kotah Blue, Dholpur Pink"
-                    value={form.colour || ''}
-                    onChange={(e) => set({ colour: e.target.value })}
-                  />
-                </Field>
-                <Field label="Output / Finish">
-                  <input
-                    type="text"
-                    className="input !bg-white"
-                    placeholder="e.g. Slabs, Tiles, Cobbles, Sawn"
-                    value={form.output || ''}
-                    onChange={(e) => set({ output: e.target.value })}
-                  />
-                </Field>
+              {/* Multiple stone entries */}
+              <div className="space-y-3">
+                {(form.entries || [blankEntry()]).map((entry, idx) => (
+                  <div key={idx} className="p-3 bg-white/90 border border-sand-300 rounded space-y-2.5 relative shadow-2xs">
+                    {(form.entries || []).length > 1 && (
+                      <div className="flex items-center justify-between pb-1 border-b border-sand-200 text-xs">
+                        <span className="font-bold text-char-800">
+                          <T>Entry</T> #{idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-0.5 rounded inline-flex items-center gap-1 font-semibold transition cursor-pointer"
+                          onClick={() => {
+                            const list = (form.entries || []).filter((_, i) => i !== idx);
+                            set({ entries: list.length ? list : [blankEntry()] });
+                          }}
+                        >
+                          <Trash2 size={13} /> <T>Remove</T>
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                      <Field label="Colour">
+                        <input
+                          type="text"
+                          className="input !bg-white"
+                          placeholder="e.g. Kotah Blue, Dholpur Pink"
+                          value={entry.colour || ''}
+                          onChange={(e) => {
+                            const list = [...(form.entries || [blankEntry()])];
+                            list[idx] = { ...list[idx], colour: e.target.value };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Finish">
+                        <input
+                          type="text"
+                          className="input !bg-white"
+                          placeholder="e.g. Sawn, Polished, Honed"
+                          value={entry.finish || entry.output || ''}
+                          onChange={(e) => {
+                            const list = [...(form.entries || [blankEntry()])];
+                            list[idx] = { ...list[idx], finish: e.target.value, output: e.target.value };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Thickness (mm)">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input !bg-white"
+                          placeholder="e.g. 25"
+                          value={entry.thickness ?? ''}
+                          onChange={(e) => {
+                            const list = [...(form.entries || [blankEntry()])];
+                            list[idx] = { ...list[idx], thickness: e.target.value };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Size">
+                        <input
+                          type="text"
+                          className="input !bg-white"
+                          placeholder="e.g. 600 × 600, 2 × 2"
+                          value={entry.size || ''}
+                          onChange={(e) => {
+                            const list = [...(form.entries || [blankEntry()])];
+                            list[idx] = { ...list[idx], size: e.target.value };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <Field label="Quantity">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input !bg-white"
+                          placeholder="e.g. 100"
+                          value={entry.quantity ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const list = [...(form.entries || [blankEntry()])];
+                            const patch = { quantity: val };
+                            if (!entry.feet && entry.rate) {
+                              const rateNum = Number(entry.rate);
+                              const qtyNum = Number(val);
+                              if (rateNum > 0 && qtyNum > 0 && (!entry.amount || entry.amount === String(Math.round(Number(entry.quantity || 0) * rateNum * 100) / 100))) {
+                                patch.amount = String(Math.round(qtyNum * rateNum * 100) / 100);
+                              }
+                            }
+                            list[idx] = { ...list[idx], ...patch };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Feet">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="input !bg-white font-semibold text-terra-900"
+                          placeholder="e.g. 410"
+                          value={entry.feet ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const list = [...(form.entries || [blankEntry()])];
+                            const patch = { feet: val };
+                            if (entry.rate) {
+                              const rateNum = Number(entry.rate);
+                              const feetNum = Number(val);
+                              if (rateNum > 0 && feetNum > 0 && (!entry.amount || entry.amount === String(Math.round(Number(entry.feet || 0) * rateNum * 100) / 100))) {
+                                patch.amount = String(Math.round(feetNum * rateNum * 100) / 100);
+                              }
+                            }
+                            list[idx] = { ...list[idx], ...patch };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Rate (₹)">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="input !bg-white"
+                          placeholder="e.g. 65"
+                          value={entry.rate ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const list = [...(form.entries || [blankEntry()])];
+                            const patch = { rate: val };
+                            const rateNum = Number(val);
+                            const baseQty = entry.feet ? Number(entry.feet) : (entry.quantity ? Number(entry.quantity) : 0);
+                            const prevRate = Number(entry.rate || 0);
+                            const prevExpectedAmt = String(Math.round(baseQty * prevRate * 100) / 100);
+                            if (rateNum > 0 && baseQty > 0 && (!entry.amount || entry.amount === prevExpectedAmt)) {
+                              patch.amount = String(Math.round(baseQty * rateNum * 100) / 100);
+                            }
+                            list[idx] = { ...list[idx], ...patch };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Amount (₹)">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="input !bg-white font-semibold text-terra-900"
+                          placeholder="e.g. 26650"
+                          value={entry.amount ?? ''}
+                          onChange={(e) => {
+                            const list = [...(form.entries || [blankEntry()])];
+                            list[idx] = { ...list[idx], amount: e.target.value };
+                            set({ entries: list });
+                          }}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-                <Field label="Thickness (mm)">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="input !bg-white"
-                    placeholder="e.g. 25"
-                    value={form.thickness ?? ''}
-                    onChange={(e) => set({ thickness: e.target.value })}
-                  />
-                </Field>
-                <Field label="Edges">
-                  <input
-                    type="text"
-                    className="input !bg-white"
-                    placeholder="e.g. Machine Cut, Hand Cut"
-                    value={form.edges || ''}
-                    onChange={(e) => set({ edges: e.target.value })}
-                  />
-                </Field>
-                <Field label="Pieces">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="input !bg-white"
-                    placeholder="e.g. 100"
-                    value={form.pieces ?? ''}
-                    onChange={(e) => set({ pieces: e.target.value })}
-                  />
-                </Field>
-                <Field label={`${t('quantity')} (sq ft)`}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="input !bg-white font-semibold text-terra-900"
-                    placeholder="e.g. 410"
-                    value={form.quantity ?? ''}
-                    onChange={(e) => set({ quantity: e.target.value })}
-                  />
-                </Field>
-                <Field label="Rate (₹)">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="input !bg-white"
-                    placeholder="e.g. 65"
-                    value={form.rate ?? ''}
-                    onChange={(e) => set({ rate: e.target.value })}
-                  />
-                </Field>
+              {/* Action bar with Add Button and Summary totals */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-terra-200">
+                <button
+                  type="button"
+                  className="btn-outline !text-xs !py-1.5 !px-3 font-semibold text-terra-800 border-terra-300 hover:bg-terra-100/70 inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  onClick={() => set({ entries: [...(form.entries || []), blankEntry()] })}
+                >
+                  <Plus size={14} className="text-terra" /> <T>Add Entry</T>
+                </button>
+                {(() => {
+                  const list = form.entries || [];
+                  const totFeet = list.reduce((s, e) => s + (Number(e.feet) || 0), 0);
+                  const totQty = list.reduce((s, e) => s + (Number(e.quantity) || 0), 0);
+                  const totAmt = list.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+                  if (list.length > 1 || totFeet > 0 || totQty > 0 || totAmt > 0) {
+                    return (
+                      <div className="text-[11px] text-char-700 bg-sand-200/60 px-2.5 py-1 rounded font-medium flex items-center gap-2.5">
+                        <span className="font-bold text-char-900">{list.length} <T>entries</T></span>
+                        {totQty > 0 && <span>· {num(totQty)} pcs</span>}
+                        {totFeet > 0 && <span className="text-terra-900 font-semibold">· {num(totFeet)} sq ft</span>}
+                        {totAmt > 0 && <span className="font-bold text-char-950">· ₹{num(totAmt)}</span>}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           )}
@@ -797,7 +1064,21 @@ export default function DailyReportPage() {
             <Field label={t('hours')}>
               <input className="input text-lg" type="number" inputMode="decimal" value={form.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} placeholder="8" />
             </Field>
-            {!Boolean(form.machineId || (form.machineIds || []).length > 0 || form.colour || form.output || form.thickness || form.edges || form.pieces || form.rate || form.quantity) && (
+            {!Boolean(
+              form.machineId ||
+              (form.machineIds || []).length > 0 ||
+              form.colour ||
+              form.finish ||
+              form.output ||
+              form.thickness ||
+              form.size ||
+              form.edges ||
+              form.pieces ||
+              form.quantity ||
+              form.feet ||
+              form.rate ||
+              form.amount
+            ) && (
               <Field label={`${t('quantity')} (sq ft)`}>
                 <input className="input text-lg" type="number" inputMode="decimal" value={form.quantity ?? ''} onChange={(e) => set({ quantity: e.target.value })} placeholder="410" />
               </Field>

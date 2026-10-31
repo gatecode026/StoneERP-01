@@ -50,7 +50,7 @@ export default function PurchasesPage() {
       onPick: (row) => (row ? { unit: row.unit } : {}) },
     { name: 'qty', label: 'Qun. (Quantity)', type: 'number', required: true },
     { name: 'rate', label: 'Rate (₹)', type: 'number', required: true },
-    { name: 'gstPercent', label: 'GST %', type: 'select', options: ['0', '5', '12', '18'], default: '0' },
+    { name: 'gstPercent', label: 'GST %', type: 'number', options: ['0', '5', '12', '18', '28'], placeholder: 'e.g. 18', default: 0 },
     { name: 'isInterState', label: 'GST type', type: 'checkbox', checkLabel: 'Inter-state (IGST) — uncheck for Intra-state (CGST + SGST)' },
     { name: 'billNo', label: 'Bill number' },
     { name: 'billPhoto', label: 'Bill photo', type: 'photo' },

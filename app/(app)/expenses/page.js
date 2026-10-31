@@ -42,7 +42,7 @@ export default function ExpensesPage() {
 
   const fields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'head', label: 'Expense head', type: 'select', options: headOptions, required: true },
+    { name: 'head', label: 'Expense head', options: headOptions, required: true, placeholder: 'e.g. Diesel, Transport' },
     { name: 'amount', label: 'Amount (₹)', type: 'number', required: true, hint: tr('Above {a} goes to owner for approval', { a: inr(LIMITS.expenseApproval) }) },
     { name: 'paidBy', label: 'Paid by', type: 'select', options: ['Cash', 'UPI', 'Bank'], default: 'Cash', required: true },
     { name: 'paidTo', label: 'Paid to (shop or person)' },

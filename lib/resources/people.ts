@@ -201,103 +201,134 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
       }
     }
 
-    if (hasMachine || hasStone) {
-      const colour = (d.colour || 'Finished Stone').trim();
-      const output = (d.output || '').trim();
-      const thickness = d.thickness != null && Number(d.thickness) > 0 ? Number(d.thickness) : undefined;
-      const edges = d.edges ? String(d.edges).trim() : undefined;
-      const pieces = d.pieces != null && Number(d.pieces) > 0 ? Number(d.pieces) : undefined;
-      const rate = d.rate != null && Number(d.rate) > 0 ? Number(d.rate) : undefined;
-      const quantity = d.quantity != null && Number(d.quantity) > 0 ? Number(d.quantity) : 0;
+    const colour = (d.colour || 'Finished Stone').trim();
+    const output = (d.finish || d.output || '').trim();
+    const thickness = d.thickness != null && Number(d.thickness) > 0 ? Number(d.thickness) : undefined;
+    const size = d.size ? String(d.size).trim() : undefined;
+    const edges = d.edges ? String(d.edges).trim() : undefined;
+    const pieces = d.pieces != null && Number(d.pieces) > 0 ? Number(d.pieces) : undefined;
+    const rate = d.rate != null && Number(d.rate) > 0 ? Number(d.rate) : undefined;
+    const amount = d.amount != null && Number(d.amount) > 0 ? Number(d.amount) : undefined;
+    const quantity = d.feet != null && Number(d.feet) > 0 ? Number(d.feet) : (d.quantity != null && Number(d.quantity) > 0 ? Number(d.quantity) : 0);
 
-      let item: any = null;
+    const rawEntries: any[] = (d.entries && Array.isArray(d.entries) && d.entries.length > 0)
+      ? d.entries
+      : (hasStone || colour !== 'Finished Stone' ? [{
+          colour,
+          finish: output,
+          output,
+          thickness,
+          size,
+          edges,
+          pieces,
+          feet: d.feet,
+          rate,
+          amount,
+          quantity,
+        }] : []);
 
-      // 1. Process Stock Item and Stock Movement if stone details or quantity are present
-      if (hasStone || colour !== 'Finished Stone') {
-        const nameRegex = new RegExp('^' + colour.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+    const entryList = rawEntries.filter((e) => Boolean(e.colour || e.finish || e.output || e.thickness || e.size || e.pieces || e.quantity || e.feet || e.rate || e.amount));
 
-        if (output) {
-          const finishRegex = new RegExp('^' + output.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
-          item = await StockItem.findOne({ name: nameRegex, finish: finishRegex, isVoid: false }).session(s(ctx));
-        }
-        if (!item) {
-          item = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
-        }
+    if (hasMachine || entryList.length > 0 || hasStone) {
+      const createdItemIds: any[] = [];
 
-        if (item) {
-          const $set: any = {};
-          if (output && !item.finish) $set.finish = output;
-          if (thickness && (!item.thickness || item.thickness !== thickness)) $set.thickness = thickness;
-          if (edges && (!item.edges || item.edges !== edges)) $set.edges = edges;
-          if (rate) { $set.price = rate; $set.sellRate = rate; }
-          if (d.empName && !item.karigar) $set.karigar = d.empName;
-          if (d.photos?.[0] && !item.photo) $set.photo = d.photos[0];
+      // 1. Process Stock Items and Stock Movements for each stone entry
+      for (const e of entryList) {
+        const eColour = (e.colour || colour || 'Finished Stone').trim();
+        const eOutput = (e.finish || e.output || output || '').trim();
+        const eThickness = e.thickness != null && Number(e.thickness) > 0 ? Number(e.thickness) : undefined;
+        const eSize = e.size ? String(e.size).trim() : undefined;
+        const eEdges = e.edges ? String(e.edges).trim() : undefined;
+        const ePieces = (e.pieces != null && Number(e.pieces) > 0) ? Number(e.pieces) : ((e.quantity != null && Number(e.quantity) > 0) ? Number(e.quantity) : undefined);
+        const eRate = e.rate != null && Number(e.rate) > 0 ? Number(e.rate) : undefined;
+        const eQty = e.feet != null && Number(e.feet) > 0 ? Number(e.feet) : (e.quantity != null && Number(e.quantity) > 0 ? Number(e.quantity) : 0);
 
-          const updateDoc: any = {};
-          if (Object.keys($set).length) updateDoc.$set = $set;
-          if (pieces) updateDoc.$inc = { pieces };
-
-          if (Object.keys(updateDoc).length) {
-            await StockItem.updateOne({ _id: item._id }, updateDoc, { session: ctx.session });
+        if (eColour !== 'Finished Stone' || eQty > 0 || ePieces || eOutput) {
+          const nameRegex = new RegExp('^' + eColour.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+          let subItem: any = null;
+          if (eOutput) {
+            const finishRegex = new RegExp('^' + eOutput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+            subItem = await StockItem.findOne({ name: nameRegex, finish: finishRegex, isVoid: false }).session(s(ctx));
           }
-        } else {
-          try {
-            const [newItem] = await StockItem.create([{
-              name: colour,
-              finish: output || undefined,
-              thickness,
-              edges,
-              price: rate,
-              sellRate: rate,
-              pieces: pieces || 0,
-              unit: 'sq ft',
-              category: 'finished',
-              karigar: d.empName,
-              photo: d.photos?.[0],
-              balance: 0,
-              createdById: oid(ctx.actor.id),
-              createdByName: ctx.actor.name,
-              updatedById: oid(ctx.actor.id),
-              updatedByName: ctx.actor.name,
-            }], { session: ctx.session });
-            item = newItem;
-          } catch {
-            item = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
+          if (!subItem) {
+            subItem = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
+          }
+
+          if (subItem) {
+            const $set: any = {};
+            if (eOutput && !subItem.finish) $set.finish = eOutput;
+            if (eSize && !subItem.size) $set.size = eSize;
+            if (eThickness && (!subItem.thickness || subItem.thickness !== eThickness)) $set.thickness = eThickness;
+            if (eEdges && (!subItem.edges || subItem.edges !== eEdges)) $set.edges = eEdges;
+            if (eRate) { $set.price = eRate; $set.sellRate = eRate; }
+            if (d.empName && !subItem.karigar) $set.karigar = d.empName;
+            if (d.photos?.[0] && !subItem.photo) $set.photo = d.photos[0];
+
+            const updateDoc: any = {};
+            if (Object.keys($set).length) updateDoc.$set = $set;
+            if (ePieces) updateDoc.$inc = { pieces: ePieces };
+
+            if (Object.keys(updateDoc).length) {
+              await StockItem.updateOne({ _id: subItem._id }, updateDoc, { session: ctx.session });
+            }
+          } else {
+            try {
+              const [newItem] = await StockItem.create([{
+                name: eColour,
+                finish: eOutput || undefined,
+                size: eSize || undefined,
+                thickness: eThickness,
+                edges: eEdges,
+                price: eRate,
+                sellRate: eRate,
+                pieces: ePieces || 0,
+                unit: 'sq ft',
+                category: 'finished',
+                karigar: d.empName,
+                photo: d.photos?.[0],
+                balance: 0,
+                createdById: oid(ctx.actor.id),
+                createdByName: ctx.actor.name,
+                updatedById: oid(ctx.actor.id),
+                updatedByName: ctx.actor.name,
+              }], { session: ctx.session });
+              subItem = newItem;
+            } catch {
+              subItem = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
+            }
+          }
+
+          if (subItem) {
+            createdItemIds.push(subItem._id);
+            if (eQty > 0) {
+              await applyStock(ctx, {
+                itemId: subItem._id,
+                delta: eQty,
+                type: 'in',
+                date: d.date,
+                ref: `Daily report: ${d.empName} (${d.machineNames || d.machineName || 'Plant'})`,
+                note: [
+                  eColour,
+                  eOutput ? `Finish: ${eOutput}` : '',
+                  eThickness ? `${eThickness}mm` : '',
+                  eSize ? `Size: ${eSize}` : '',
+                  ePieces ? `${ePieces} pcs` : '',
+                  eRate ? `₹${eRate}/sqft` : '',
+                ].filter(Boolean).join(' · '),
+                refModel: 'dailyreports',
+                refId: d._id,
+              });
+            }
           }
         }
+      }
 
-        // Credit quantity to Stock balance atomically
-        if (item && quantity > 0) {
-          await applyStock(ctx, {
-            itemId: item._id,
-            delta: quantity,
-            type: 'in',
-            date: d.date,
-            ref: `Daily report: ${d.empName} (${d.machineNames || d.machineName || 'Plant'})`,
-            note: [
-              colour,
-              output ? `Finish: ${output}` : '',
-              thickness ? `${thickness}mm` : '',
-              edges ? `Edges: ${edges}` : '',
-              pieces ? `${pieces} pcs` : '',
-              rate ? `₹${rate}/sqft` : '',
-            ].filter(Boolean).join(' · '),
-            refModel: 'dailyreports',
-            refId: d._id,
-          });
-
-          await DailyReport.updateOne(
-            { _id: d._id },
-            { $set: { stockItemId: item._id, stockUpdated: true } },
-            { session: ctx.session }
-          );
-        } else if (item && pieces) {
-          await DailyReport.updateOne(
-            { _id: d._id },
-            { $set: { stockItemId: item._id, stockUpdated: true } },
-            { session: ctx.session }
-          );
-        }
+      if (createdItemIds.length) {
+        await DailyReport.updateOne(
+          { _id: d._id },
+          { $set: { stockItemId: createdItemIds[0], stockUpdated: true } },
+          { session: ctx.session }
+        );
       }
 
       // 2. Record machine work entries and advance machine hour meter
@@ -306,11 +337,22 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
         : (d.machineId ? [d.machineId] : []);
 
       if (machineIds.length) {
-        const splitQty = quantity > 0 ? Math.round((quantity / machineIds.length) * 100) / 100 : 0;
-        const splitPieces = pieces ? Math.max(1, Math.round(pieces / machineIds.length)) : undefined;
+        const totalEntryQty = entryList.reduce((sum, e) => sum + (e.feet != null && Number(e.feet) > 0 ? Number(e.feet) : (e.quantity != null && Number(e.quantity) > 0 ? Number(e.quantity) : 0)), 0) || quantity;
+        const totalEntryPieces = entryList.reduce((sum, e) => sum + (e.pieces != null && Number(e.pieces) > 0 ? Number(e.pieces) : (e.quantity != null && Number(e.quantity) > 0 ? Number(e.quantity) : 0)), 0) || pieces;
+
+        const splitQty = totalEntryQty > 0 ? Math.round((totalEntryQty / machineIds.length) * 100) / 100 : 0;
+        const splitPieces = totalEntryPieces ? Math.max(1, Math.round(totalEntryPieces / machineIds.length)) : undefined;
         const splitHours = d.hours ? Math.round((Number(d.hours) / machineIds.length) * 10) / 10 : 0;
 
-        const workDetails = [
+        const workDetails = entryList.length > 0 ? entryList.map((e) => [
+          e.colour,
+          (e.finish || e.output) ? `Finish: ${e.finish || e.output}` : '',
+          e.thickness ? `${e.thickness}mm` : '',
+          e.size ? `Size: ${e.size}` : '',
+          (e.pieces || e.quantity) ? `${e.pieces || e.quantity} pcs` : '',
+          e.feet ? `${e.feet} sq ft` : '',
+          e.rate ? `₹${e.rate}` : '',
+        ].filter(Boolean).join(' · ')).join(' | ') : [
           d.colour ? `Colour: ${d.colour}` : '',
           output ? `Output: ${output}` : '',
           thickness ? `Thick: ${thickness}mm` : '',
@@ -354,7 +396,7 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
                       ? `${existingEntry.workDone} | ${workDetails}`
                       : workDetails,
                     ...(d.photos?.[0] && !existingEntry.photo ? { photo: d.photos[0] } : {}),
-                    ...(item?._id && !existingEntry.stockItemId ? { stockItemId: item._id } : {}),
+                    ...(createdItemIds[0] && !existingEntry.stockItemId ? { stockItemId: createdItemIds[0] } : {}),
                   },
                 },
                 { session: ctx.session }
@@ -372,7 +414,7 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
                 outputSqft: splitQty,
                 pieces: splitPieces,
                 workDone: workDetails,
-                stockItemId: item?._id,
+                stockItemId: createdItemIds[0] || d.stockItemId,
                 photo: d.photos?.[0],
                 remarks: [
                   d.problem ? `Problem: ${d.problem}` : '',
@@ -397,10 +439,24 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
   }
 }
 
+const stoneEntryInput = z.object({
+  colour: text(120).optional(),
+  output: text(120).optional(),
+  finish: text(120).optional(),
+  thickness: num(0, 1000).optional(),
+  size: text(120).optional(),
+  edges: text(120).optional(),
+  pieces: num(0, 1e7).optional(),
+  quantity: num(0, 1e7).optional(),
+  feet: num(0, 1e7).optional(),
+  rate: num().optional(),
+  amount: num().optional(),
+});
+
 export const dailyreports: ResourceDef = {
   key: 'dailyreports', model: DailyReport,
   label: (d) => `${d.empName} ${d.date}`,
-  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineId', 'machineName', 'machineIds', 'machineNames', 'colour', 'output', 'thickness', 'edges', 'pieces', 'rate', 'stockItemId', 'stockUpdated', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'photos', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
+  listFields: ['date', 'empCode', 'empName', 'job', 'projectId', 'projectCode', 'projectName', 'machineId', 'machineName', 'machineIds', 'machineNames', 'entries', 'colour', 'output', 'finish', 'thickness', 'size', 'edges', 'pieces', 'feet', 'rate', 'amount', 'stockItemId', 'stockUpdated', 'narration', 'hours', 'quantity', 'problem', 'plan', 'photoCount', 'photos', 'supCheck', 'supRemark', 'checkedBy', 'checkedAt', 'reopenedFrom', 'onTime', 'filledBy', 'submittedAt'],
   sortable: ['date', 'empName', 'createdAt'], defaultSort: '-date', searchFields: ['empName', 'empCode', 'projectName', 'machineName', 'machineNames', 'colour'],
   dateFields: ['date'], filters: { date: 'date', empCode: 'string', projectId: 'string', supCheck: { enum: ['', 'ok', 'not_ok'] }, job: 'string' },
   serverOnly: ['onTime', 'submittedAt', 'filledBy', 'checkedBy', 'checkedAt', 'reopenedFrom', 'undoneBy', 'undoneAt', 'photoCount', 'empName', 'job', 'stockItemId', 'stockUpdated'],
@@ -409,8 +465,11 @@ export const dailyreports: ResourceDef = {
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
     machineId: z.union([z.string().trim(), z.null()]).optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
-    colour: text(120).optional(), output: text(120).optional(), thickness: num(0, 1000).optional(),
-    edges: text(120).optional(), pieces: num(0, 1e7).optional(), rate: num().optional(),
+    entries: z.array(stoneEntryInput).optional(),
+    colour: text(120).optional(), output: text(120).optional(), finish: text(120).optional(),
+    thickness: num(0, 1000).optional(), size: text(120).optional(),
+    edges: text(120).optional(), pieces: num(0, 1e7).optional(),
+    feet: num(0, 1e7).optional(), rate: num().optional(), amount: num().optional(),
     narration: req(4000), hours: num(0, 24).optional(), quantity: num(0, 1e6).optional(), problem: text(1000).optional(), plan: text(1000).optional(), photos: photos().optional()
   }).strict(),
   update: z.object({
@@ -418,8 +477,11 @@ export const dailyreports: ResourceDef = {
     projectId: z.string().trim().optional(), projectCode: z.string().trim().optional(), projectName: z.string().trim().optional(),
     machineId: z.union([z.string().trim(), z.null()]).optional(), machineName: z.string().optional(),
     machineIds: z.array(z.string()).optional(), machineNames: z.string().optional(),
-    colour: text(120).optional(), output: text(120).optional(), thickness: num(0, 1000).optional(),
-    edges: text(120).optional(), pieces: num(0, 1e7).optional(), rate: num().optional(),
+    entries: z.array(stoneEntryInput).optional(),
+    colour: text(120).optional(), output: text(120).optional(), finish: text(120).optional(),
+    thickness: num(0, 1000).optional(), size: text(120).optional(),
+    edges: text(120).optional(), pieces: num(0, 1e7).optional(),
+    feet: num(0, 1e7).optional(), rate: num().optional(), amount: num().optional(),
     narration: req(4000), hours: num(0, 24), quantity: num(0, 1e6), problem: text(1000), plan: text(1000), photos: photos(), supCheck: enumOf(['', 'ok', 'not_ok']), supRemark: text(500), undoReason: text(300)
   }).partial().strict(),
   lifecycle: {
@@ -461,6 +523,22 @@ export const dailyreports: ResourceDef = {
           if (ms.length) machineNames = ms.map((m) => `${m.name} (${m.type})`).join(', ');
         } catch { /* proceed */ }
       }
+      if (input.entries && Array.isArray(input.entries) && input.entries.length > 0) {
+        const first = input.entries[0] || {};
+        if (!input.colour) input.colour = input.entries.map((e: any) => e.colour).filter(Boolean).join(', ') || first.colour;
+        if (!input.finish) input.finish = first.finish || first.output;
+        if (!input.output) input.output = first.output || first.finish;
+        if (input.thickness == null && first.thickness != null) input.thickness = first.thickness;
+        if (!input.size) input.size = input.entries.map((e: any) => e.size).filter(Boolean).join(', ') || first.size;
+        const totalPieces = input.entries.reduce((s: number, e: any) => s + (Number(e.quantity || e.pieces || 0)), 0);
+        const totalFeet = input.entries.reduce((s: number, e: any) => s + (Number(e.feet || 0)), 0);
+        const totalAmt = input.entries.reduce((s: number, e: any) => s + (Number(e.amount || 0)), 0);
+        if (input.pieces == null && totalPieces > 0) input.pieces = totalPieces;
+        if (input.feet == null && totalFeet > 0) input.feet = totalFeet;
+        if (input.amount == null && totalAmt > 0) input.amount = totalAmt;
+        if (input.rate == null && first.rate != null) input.rate = first.rate;
+        if (input.quantity == null || input.quantity === 0) input.quantity = totalFeet > 0 ? totalFeet : totalPieces;
+      }
       const doc: any = {
         ...input, date, empCode: e.empCode, empName: e.name, job: e.job,
         projectId: input.projectId ? oid(input.projectId) : undefined,
@@ -468,12 +546,17 @@ export const dailyreports: ResourceDef = {
         machineId,
         machineName: machineNames,
         machineIds, machineNames,
+        entries: input.entries || [],
         colour: input.colour ? String(input.colour).trim() : undefined,
         output: input.output ? String(input.output).trim() : undefined,
+        finish: input.finish ? String(input.finish).trim() : (input.output ? String(input.output).trim() : undefined),
         thickness: input.thickness != null && input.thickness !== '' ? Number(input.thickness) : undefined,
+        size: input.size ? String(input.size).trim() : undefined,
         edges: input.edges ? String(input.edges).trim() : undefined,
         pieces: input.pieces != null && input.pieces !== '' ? Number(input.pieces) : undefined,
+        feet: input.feet != null && input.feet !== '' ? Number(input.feet) : undefined,
         rate: input.rate != null && input.rate !== '' ? Number(input.rate) : undefined,
+        amount: input.amount != null && input.amount !== '' ? Number(input.amount) : undefined,
         quantity: input.quantity ?? 0, hours: input.hours ?? 0,
         submittedAt: new Date(), onTime: date === today, filledBy: ctx.actor.name, photoCount: input.photos?.length ?? 0
       };
@@ -570,12 +653,33 @@ export const dailyreports: ResourceDef = {
           patch.machineNames = '';
         }
 
+        if (patch.entries && Array.isArray(patch.entries) && patch.entries.length > 0) {
+          const first = patch.entries[0] || {};
+          if (patch.colour === undefined) patch.colour = patch.entries.map((e: any) => e.colour).filter(Boolean).join(', ') || first.colour;
+          if (patch.finish === undefined) patch.finish = first.finish || first.output;
+          if (patch.output === undefined) patch.output = first.output || first.finish;
+          if (patch.thickness === undefined && first.thickness != null) patch.thickness = first.thickness;
+          if (patch.size === undefined) patch.size = patch.entries.map((e: any) => e.size).filter(Boolean).join(', ') || first.size;
+          const totalPieces = patch.entries.reduce((s: number, e: any) => s + (Number(e.quantity || e.pieces || 0)), 0);
+          const totalFeet = patch.entries.reduce((s: number, e: any) => s + (Number(e.feet || 0)), 0);
+          const totalAmt = patch.entries.reduce((s: number, e: any) => s + (Number(e.amount || 0)), 0);
+          if (patch.pieces === undefined && totalPieces > 0) patch.pieces = totalPieces;
+          if (patch.feet === undefined && totalFeet > 0) patch.feet = totalFeet;
+          if (patch.amount === undefined && totalAmt > 0) patch.amount = totalAmt;
+          if (patch.rate === undefined && first.rate != null) patch.rate = first.rate;
+          if (patch.quantity === undefined) patch.quantity = totalFeet > 0 ? totalFeet : totalPieces;
+        }
+
         if (patch.colour !== undefined) patch.colour = patch.colour ? String(patch.colour).trim() : '';
         if (patch.output !== undefined) patch.output = patch.output ? String(patch.output).trim() : '';
+        if (patch.finish !== undefined) patch.finish = patch.finish ? String(patch.finish).trim() : '';
+        if (patch.size !== undefined) patch.size = patch.size ? String(patch.size).trim() : '';
         if (patch.thickness !== undefined) patch.thickness = patch.thickness != null && patch.thickness !== '' ? Number(patch.thickness) : undefined;
         if (patch.edges !== undefined) patch.edges = patch.edges ? String(patch.edges).trim() : '';
         if (patch.pieces !== undefined) patch.pieces = patch.pieces != null && patch.pieces !== '' ? Number(patch.pieces) : undefined;
+        if (patch.feet !== undefined) patch.feet = patch.feet != null && patch.feet !== '' ? Number(patch.feet) : undefined;
         if (patch.rate !== undefined) patch.rate = patch.rate != null && patch.rate !== '' ? Number(patch.rate) : undefined;
+        if (patch.amount !== undefined) patch.amount = patch.amount != null && patch.amount !== '' ? Number(patch.amount) : undefined;
         if (patch.hours !== undefined) patch.hours = patch.hours != null && patch.hours !== '' ? Number(patch.hours) : 0;
         if (patch.quantity !== undefined) patch.quantity = patch.quantity != null && patch.quantity !== '' ? Number(patch.quantity) : 0;
       }

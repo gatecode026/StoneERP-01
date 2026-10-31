@@ -113,6 +113,24 @@ export const Punch = defineModel(
   { indexes: [[{ empCode: 1, at: -1 }], [{ date: 1, empCode: 1, at: 1 }]] }
 );
 
+export const dailyReportStoneEntry = new Schema(
+  {
+    colour: { type: S, maxlength: 120 },
+    output: { type: S, maxlength: 120 },
+    finish: { type: S, maxlength: 120 },
+    thickness: { type: N, min: 0 },
+    size: { type: S, maxlength: 120 },
+    edges: { type: S, maxlength: 120 },
+    quantity: { type: N, min: 0 },
+    pieces: { type: N, min: 0 },
+    feet: { type: N, min: 0 },
+    rate: money(),
+    amount: money(),
+    stockItemId: { type: OID, ref: 'StockItem' },
+  },
+  { _id: false }
+);
+
 export const DailyReport = defineModel(
   'DailyReport',
   {
@@ -128,12 +146,17 @@ export const DailyReport = defineModel(
     machineName: { type: S },
     machineIds: { type: [OID], default: [] },
     machineNames: { type: S },
+    entries: { type: [dailyReportStoneEntry], default: [] },
     colour: { type: S, maxlength: 120 },
     output: { type: S, maxlength: 120 },
+    finish: { type: S, maxlength: 120 },
     thickness: { type: N, min: 0 },
+    size: { type: S, maxlength: 120 },
     edges: { type: S, maxlength: 120 },
     pieces: { type: N, min: 0 },
+    feet: { type: N, min: 0 },
     rate: money(),
+    amount: money(),
     stockItemId: { type: OID, ref: 'StockItem' },
     stockUpdated: { type: B, default: false },
     hours: { type: N, min: 0, max: 24, default: 0 },
