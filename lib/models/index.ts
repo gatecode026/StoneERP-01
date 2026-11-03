@@ -3,7 +3,7 @@ import './settings';
 import { Employee, Attendance, DailyReport, Leave, Advance, SalarySheet, PerfRemark, SafetyRecord, Task } from './people';
 import { Machine, MachineEntry, Block, Royalty, Repair, Vehicle, VehicleTrip, TruckTrip } from './production';
 import { Project } from './projects';
-import { StockItem, StockMovement, StockCount, Supplier, Purchase } from './stock';
+import { StockItem, StockMovement, StockCount, Supplier, Purchase, StockTool, StockMaterial, StockMachinery } from './stock';
 import { Customer, Sale, Payment, Dispatch, Complaint } from './sales';
 import { Expense, ExpenseHead, CashEntry, CashClosing, Account } from './money';
 import { PaperDoc, AuditLog, Counter, RolePermission, IdempotencyKey } from './system';
@@ -42,6 +42,9 @@ export const MODELS: Record<string, AnyModel> = {
   stockitems: StockItem,
   stockmovements: StockMovement,
   stockcounts: StockCount,
+  stocktools: StockTool,
+  stockmaterials: StockMaterial,
+  stockmachinery: StockMachinery,
   suppliers: Supplier,
   purchases: Purchase,
   customers: Customer,

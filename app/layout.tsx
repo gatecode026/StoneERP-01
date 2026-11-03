@@ -11,6 +11,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { publicUser } from '@/lib/auth/public';
 import type { ClientSession } from '@/components/Providers';
 import { getEffectivePerm, describePerm } from '@/lib/perm/engine';
+import { extraJobs } from '@/lib/perm/store';
 import { getSettings } from '@/lib/settings';
 import { Employee } from '@/lib/models';
 
@@ -31,10 +32,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const user = await getSessionUser().catch(() => null);
   let session: ClientSession | null = null;
   if (user) {
-    const [perm, st] = await Promise.all([getEffectivePerm(user), getSettings()]);
-    // what the person is called at work (their designation, else their job) for the name line on phones; none for a login that is not an employee
-    const emp: any = user.empCode ? await Employee.findOne({ empCode: user.empCode, isVoid: false }).select('job designation').lean().exec().catch(() => null) : null;
-    session = { ...publicUser(user), title: emp?.designation || emp?.job || undefined, perm: describePerm(perm), company: st.company, shifts: st.workHours.shifts.map(({ id, name, start, end }) => ({ id, name, start, end })), defaultShiftId: st.workHours.defaultShiftId } as ClientSession;
+    // three independent reads: they go out together, not one after the other. `emp` is what the person is called at work (their
+    // designation, else their job) for the name line on phones; none for a login that is not an employee.
+    const [perm, st, emp, added] = await Promise.all([
+      getEffectivePerm(user),
+      getSettings(),
+      user.empCode ? (Employee.findOne({ empCode: user.empCode, isVoid: false }).select('job designation').lean().exec().catch(() => null) as Promise<any>) : Promise.resolve<any>(null),
+      extraJobs(), // roles the Owner added or switched on: offered as Jobs and in the role filters, and named in the header for the people who have one
+    ]);
+    session = { ...publicUser(user), customJobs: added.map((r) => r.label), roleLabel: added.find((r) => r.custom && r.key === perm.roleKey)?.label, title: emp?.designation || emp?.job || undefined, perm: describePerm(perm), company: st.company, shifts: st.workHours.shifts.map(({ id, name, start, end }) => ({ id, name, start, end })), defaultShiftId: st.workHours.defaultShiftId } as ClientSession;
   }
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';

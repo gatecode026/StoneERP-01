@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { withAuth } from '@/lib/api/withAuth';
-import { getRoleConfig, saveRoleConfig, ROLE_KEYS } from '@/lib/perm/store';
+import { deleteCustomRole, getRoleConfig, isRoleKey, saveRoleConfig } from '@/lib/perm/store';
 import { badRequest, notFound } from '@/lib/errors';
 import { writeAudit } from '@/lib/audit';
 import { diffObjects } from '@/lib/audit';
@@ -18,7 +18,7 @@ const body = z.object({
 /** Owner edits one role. The Owner role itself is fixed, so the Owner can never lock themselves out. Before/after is audit-logged. */
 export const PUT = withAuth('roles', 'edit', async (auth) => {
   const key = auth.params.key;
-  if (!ROLE_KEYS.includes(key)) throw notFound();
+  if (!(await isRoleKey(key))) throw notFound();
   if (key === 'owner') throw badRequest('The Owner role cannot be changed');
   const input = await auth.json(body);
   const before = await getRoleConfig(key);
@@ -30,5 +30,15 @@ export const PUT = withAuth('roles', 'edit', async (auth) => {
     requestId: auth.requestId,
   }, { id: auth.user.id, name: auth.user.name, role: auth.user.role, preset: auth.user.preset, empCode: auth.user.empCode });
   void oid;
+  return { ok: true };
+});
+
+/** Delete a role the Owner added (refused while anybody still has it as their Job). The built-in roles cannot be deleted. */
+export const DELETE = withAuth('roles', 'edit', async (auth) => {
+  const key = auth.params.key;
+  if (!(await isRoleKey(key))) throw notFound();
+  const { label } = await deleteCustomRole(key);
+  await writeAudit({ resource: 'roles', refId: key, action: 'void', label, changes: [], requestId: auth.requestId },
+    { id: auth.user.id, name: auth.user.name, role: auth.user.role, preset: auth.user.preset, empCode: auth.user.empCode });
   return { ok: true };
 });

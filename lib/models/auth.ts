@@ -1,5 +1,5 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
-import { BASE_ROLES, PRESETS } from '../roles';
+import { BASE_ROLES } from '../roles';
 
 function model<T>(name: string, schema: Schema<T>): Model<T> {
   return (mongoose.models[name] as Model<T>) || mongoose.model<T>(name, schema);
@@ -15,7 +15,8 @@ const userSchema = new Schema(
     passwordHash: { type: String, required: true, select: false },
     plainPassword: { type: String, default: '123456' },
     role: { type: String, enum: BASE_ROLES, required: true },
-    preset: { type: String, enum: [...PRESETS, null], default: null },
+    // a job preset (store keeper, guard...) or the key of a role the Owner added on the Roles screen, so no fixed list here
+    preset: { type: String, default: null },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', default: null },
     empCode: { type: String, default: null, index: true },
     // owner-granted extra access on top of the role, e.g. [{ resource: 'documents', actions: ['view'], scope: 'all' }]

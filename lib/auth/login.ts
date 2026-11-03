@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { User } from '../models/auth';
 import { Employee } from '../models/people';
 import { roleOfJob } from '../roles';
+import { presetOfJob, resolvePreset } from '../perm/store';
 import { connect } from '../db';
 import { AppError, badRequest } from '../errors';
 import { burnVerify, hashPassword, mobileSchema, passwordSchema, verifyPassword } from './password';
@@ -64,7 +65,7 @@ export async function loginWithPassword(input: { username: string; password: str
         username: mob,
         name: emp.name,
         role,
-        preset: null,
+        preset: role === 'worker' ? await presetOfJob(emp.job) : null,
         empCode: emp.empCode,
         employeeId: emp._id,
         extraAccess: [],
@@ -92,6 +93,13 @@ export async function loginWithPassword(input: { username: string; password: str
         user.role = correctRole;
         await User.updateOne({ _id: user._id }, { $set: { role: correctRole } });
         await Employee.updateOne({ _id: emp._id }, { $set: { loginRole: correctRole } });
+      }
+      // a Job that is a role the Owner added gives that role (and takes it away when the Job changes)
+      const cur: string | null = user.preset ?? null;
+      const wanted = correctRole !== 'worker' ? null : await resolvePreset(emp.job, cur);
+      if (wanted !== cur) {
+        user.preset = wanted;
+        await User.updateOne({ _id: user._id }, { $set: { preset: wanted } });
       }
     }
   }

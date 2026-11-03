@@ -24,7 +24,7 @@ export type EffectivePerm = {
 export async function getEffectivePerm(user: Pick<SessionUser, 'id' | 'role' | 'preset' | 'extraAccess'>): Promise<EffectivePerm> {
   const roleKey = user.preset ?? user.role;
   const isOwner = user.role === 'owner' && !user.preset;
-  const cfg = isOwner ? { grants: OWNER_ALL, fields: { money: 'write', cost: 'write', pii: 'write' } as FieldAccess, approvalLimit: null as number | null } : await getRoleConfig(roleKey);
+  const cfg = isOwner ? { grants: OWNER_ALL, fields: { money: 'write', cost: 'write', pii: 'write' } as FieldAccess, approvalLimit: null as number | null } : await getRoleConfig(roleKey).catch((e) => (user.preset ? getRoleConfig(user.role) : Promise.reject(e)));
   const grants: Grants = {};
   for (const [r, acts] of Object.entries(cfg.grants)) grants[r as Resource] = { ...(acts as object) };
   // per-user "Extra access" (e.g. let one accountant open Important Papers): can only add, never remove

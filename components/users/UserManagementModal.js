@@ -1,12 +1,13 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { Sheet, SearchBox, Badge } from '@/components/ui';
-import { useFetch } from '@/components/Providers';
+import { useApp, useFetch } from '@/components/Providers';
 import toast from '@/lib/toast';
 import { Users, Copy, Check, KeyRound, Eye, EyeOff } from 'lucide-react';
 import T from '@/components/T';
 
 export default function UserManagementModal({ open, onClose }) {
+  const { session } = useApp();
   const [q, setQ] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [copiedId, setCopiedId] = useState(null);
@@ -100,6 +101,7 @@ export default function UserManagementModal({ open, onClose }) {
               <option value="manager"><T>Manager</T></option>
               <option value="accountant"><T>Accountant</T></option>
               <option value="salesperson"><T>Salesperson</T></option>
+              {(session?.customJobs || []).filter((j) => !['manager', 'accountant', 'salesperson'].includes(j.toLowerCase())).map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
             {(q || roleFilter) && (
               <button

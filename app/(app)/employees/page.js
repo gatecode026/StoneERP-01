@@ -21,7 +21,9 @@ export default function EmployeesPage() {
   const at = EMPLOYEE_FIELDS.findIndex((f) => f.name === 'mobile') + 1;
   // the shift list comes from Settings (Working hours)
   const shiftOptions = (session?.shifts || []).map((x) => ({ value: x.id, label: `${x.name} (${x.start}–${x.end})` }));
-  const base = EMPLOYEE_FIELDS.map((f) => (f.name === 'shiftId' ? { ...f, options: shiftOptions } : f));
+  // the Jobs: the three built in, plus every role the Owner added on Settings → Roles (giving someone that Job gives them that role)
+  const jobOptions = [...JOBS, ...(session?.customJobs || [])];
+  const base = EMPLOYEE_FIELDS.map((f) => (f.name === 'shiftId' ? { ...f, options: shiftOptions } : f.name === 'job' ? { ...f, options: jobOptions } : f));
   const fields = mayLogin ? [...base.slice(0, at), ...loginFields(), ...base.slice(at)] : base;
   const columns = [
     { key: 'name', label: 'Name', primary: true, render: (r) => <span>{r.name} <span className="text-char-500 font-normal text-xs">{r.empCode}</span></span> },
@@ -118,7 +120,7 @@ export default function EmployeesPage() {
         }}
         
         filters={[
-          { key: 'job', label: 'All jobs', options: JOBS },
+          { key: 'job', label: 'All jobs', options: jobOptions },
           { key: 'operatorCategory', label: 'All operator types', options: ['Bridge Cutter', 'Block Cutter'] },
           { key: 'site', label: 'All sites', options: ['Factory', 'Yard', 'Quarry', 'Office', 'Gate'] },
           { key: 'docs', label: 'Documents', options: [{ value: 'missing', label: 'Missing documents' }] },

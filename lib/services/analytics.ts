@@ -2,13 +2,14 @@
 import mongoose from 'mongoose';
 import { cached, invalidate } from '../cache';
 import { reportRead } from '../db';
-import { Advance, Attendance, Block, Complaint, DailyReport, Employee, Leave, Machine, MachineEntry, PaperDoc, Payment, PerfRemark, Purchase, SafetyRecord, Sale, StockItem, Task, User, Vehicle } from '../models';
+import { Advance, Attendance, Block, Complaint, DailyReport, Employee, Leave, Machine, MachineEntry, PaperDoc, Payment, PerfRemark, Purchase, SafetyRecord, Sale, Task, User, Vehicle } from '../models';
 import { scopeFilter, type EffectivePerm } from '../perm/engine';
 import type { SessionUser } from '../auth/session';
 import type { AppSettings } from '../settings';
 import { addDays, daysBetween, daysInMonth, monthEnd, monthOf, monthStart, todayIST } from '../time';
 import { fmtInr } from '../fmt';
 import { trackQueries } from '../api/reqctx';
+import { stockSnapshot } from './stockSnapshot';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const r0 = (n: number) => Math.round(Number(n) || 0);
@@ -213,7 +214,7 @@ export async function computeReminders(user: U, perm: EffectivePerm, settings: A
     for (const p of rows) out.push({ type: 'supplier_payment', to: 'Accountant', title: `${p.supplierName}: ${fmtInr(p.outstanding)} due ${p.dueDate}`, severity: p.dueDate < today ? 'high' : 'med', link: '/purchases' });
   })());
   if (v('stockitems')) jobs.push((async () => {
-    const rows: any[] = await StockItem.find({ belowMin: true, isVoid: false }).limit(100).select('name balance unit minLevel').lean();
+    const rows = (await stockSnapshot()).low;
     for (const i of rows) out.push({ type: 'stock_low', to: 'Store keeper, owner', title: `${i.name}: ${r0(i.balance)} ${i.unit} (min ${r0(i.minLevel)})`, severity: 'high', link: '/stock' });
   })());
   if (v('machines')) jobs.push((async () => {

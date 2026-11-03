@@ -2,15 +2,15 @@
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useMemo, useState } from 'react';
 import toast from '@/lib/toast';
-import { Eye, RotateCcw, Save, ShieldCheck } from 'lucide-react';
+import { Eye, Plus, RotateCcw, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Section, Sheet, Badge, Field, SkeletonList, cx } from '@/components/ui';
 import { api } from '@/lib/client';
 import { NAV_GROUPS } from '@/lib/nav';
 import T from '@/components/T';
 
-// Only the roles people are given through their Job are shown (Supervisor, Operator, Worker / Labour).
-const EDITABLE_ROLES = ['supervisor', 'operator', 'worker'];
+// Shown: the roles people are given through their Job (Supervisor, Operator, Worker / Labour), plus every role the Owner adds or switches on here
+// (the server says which: `shown`).
 const SCOPE_LABEL = { '': '—', own: 'Own', team: 'Team', all: 'All' };
 const ACT_LABEL = { view: 'See', create: 'Add', edit: 'Edit', void: 'Cancel', approve: 'Approve', export: 'Export' };
 const LEVELS = [['none', 'Hidden'], ['masked', 'Masked'], ['read', 'See'], ['write', 'See + change']];
@@ -23,9 +23,14 @@ function RolesEditor() {
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [pendingSel, setPendingSel] = useState(null); // a role just added: select it as soon as the list has it
 
   const role = useMemo(() => data?.roles.find((r) => r.key === sel), [data, sel]);
   useEffect(() => { if (role) setDraft({ grants: JSON.parse(JSON.stringify(role.grants)), fields: { ...role.fields }, approvalLimit: role.approvalLimit }); }, [role]);
+
+  useEffect(() => {
+    if (pendingSel && data?.roles.some((r) => r.key === pendingSel)) { setSel(pendingSel); setPendingSel(null); }
+  }, [data, pendingSel]);
 
   const dirty = role && draft && JSON.stringify({ g: role.grants, f: role.fields, a: role.approvalLimit }) !== JSON.stringify({ g: draft.grants, f: draft.fields, a: draft.approvalLimit });
   const groups = useMemo(() => {
@@ -63,6 +68,34 @@ function RolesEditor() {
     } catch (e) { toast.error(e.message); }
     setBusy(false);
   }
+  // only a name is asked for: the role starts like Worker / Labour and is then set up on this same screen
+  async function addRole() {
+    const name = await promptDialog('Name of the new role (for example Electrician)');
+    if (name === null) return;
+    if (!name.trim()) { toast.error('Type the role name'); return; }
+    setBusy(true);
+    try {
+      const r = await api('/api/roles', { method: 'POST', body: { name } });
+      toast.success('Role added. Now choose what it can see and do, then Save.');
+      setPendingSel(r.key);
+      reload();
+    } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  }
+  async function removeRole() {
+    // a role that already exists in the app (Manager, Guard...) is only taken off the lists; one the Owner made is deleted
+    const hideOnly = !role.userDefined;
+    if (!await confirmDialog(hideOnly ? tr('Remove “{r}” from these lists? The role itself stays in the app.', { r: role.label.en }) : tr('Delete the role “{r}”? This cannot be undone.', { r: role.label.en }), { danger: true, okLabel: hideOnly ? 'Remove' : 'Delete' })) return;
+    setBusy(true);
+    try {
+      await api(`/api/roles/${sel}`, { method: 'DELETE' });
+      toast.success(hideOnly ? 'Removed from the lists' : 'Role deleted');
+      setSel('supervisor');
+      broadcastSync();
+      reload();
+    } catch (e) { toast.error(e.message); }
+    setBusy(false);
+  }
   async function reset() {
     if (!await confirmDialog('Reset this role to the standard permissions from the requirements document?')) return;
     setBusy(true);
@@ -81,22 +114,30 @@ function RolesEditor() {
   return (
     <div>
       <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label={tr('Roles')}>
-        {data.roles.filter((r) => EDITABLE_ROLES.includes(r.key)).map((r) => (
+        {data.roles.filter((r) => r.shown).map((r) => (
           <button key={r.key} role="tab" aria-selected={sel === r.key} onClick={() => setSel(r.key)}
             className={cx('shrink-0 min-h-[44px] px-4 rounded-full text-sm font-semibold border transition', sel === r.key ? 'bg-terra text-white border-terra' : 'bg-white text-char-700 border-sand-300')}>
-            {r.label[lang] || r.label.en}{r.custom && <span className="ml-1.5 text-[10px] opacity-80"><T>edited</T></span>}
+            {r.label[lang] || r.label.en}{r.custom && !r.userDefined && <span className="ml-1.5 text-[10px] opacity-80"><T>edited</T></span>}
           </button>
         ))}
+        <button type="button" onClick={addRole} disabled={busy} className="shrink-0 min-h-[44px] px-4 rounded-full text-sm font-semibold border border-dashed border-terra text-terra bg-white hover:bg-sand-50 transition inline-flex items-center gap-1.5">
+          <Plus size={15} /> <T>New role</T>
+        </button>
       </div>
 
       <div className="card p-3 mb-3 grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 sticky top-[56px] z-30">
         <div className="col-span-3 flex items-center gap-2 sm:contents"><ShieldCheck size={18} className="text-terra shrink-0" />
-        <div className="text-sm flex-1 min-w-[160px]"><b>{role.label.en}</b> {role.base ? <Badge tone="gray"><T>base role</T></Badge> : <Badge tone="blue"><T>job preset</T></Badge>}{dirty && <Badge tone="amber" className="ml-1.5"><T>unsaved</T></Badge>}</div>
+        <div className="text-sm flex-1 min-w-[160px]"><b>{role.label.en}</b> {role.userDefined ? <Badge tone="green"><T>added role</T></Badge> : role.base ? <Badge tone="gray"><T>base role</T></Badge> : <Badge tone="blue"><T>job preset</T></Badge>}{dirty && <Badge tone="amber" className="ml-1.5"><T>unsaved</T></Badge>}</div>
         </div>
         <button className="btn-outline btn-sm w-full sm:w-auto" onClick={() => setPreview(true)}><Eye size={14} /> <span><T>View as</T></span></button>
         <button className="btn-outline btn-sm w-full sm:w-auto" onClick={reset} disabled={busy || !role.custom}><RotateCcw size={14} /><T> Reset</T></button>
+        {role.removable && <button className="btn-outline btn-sm w-full sm:w-auto text-red-600" onClick={removeRole} disabled={busy}><Trash2 size={14} /> <span>{role.userDefined ? <T>Delete role</T> : <T>Remove from list</T>}</span></button>}
         <button className="btn-primary btn-sm w-full sm:w-auto" onClick={save} disabled={busy || !dirty}><Save size={14} /><T> Save</T></button>
       </div>
+
+      {role.removable && (
+        <p className="text-xs text-char-600 bg-sand-50 border border-sand-200 px-3 py-2 mb-3">{tr('To give this role to someone, choose “{r}” as their Job on the Employees screen.', { r: role.label.en })}</p>
+      )}
 
       <Section title="Hidden information (applies to every screen)" className="mb-3">
         <div className="grid sm:grid-cols-3 gap-3">

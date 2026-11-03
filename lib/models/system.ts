@@ -47,6 +47,11 @@ export const RolePermission = defineModel(
     version: { type: N, default: 0 },
     known: { type: [S], default: undefined }, // the resources that existed when this role was saved; ones added later start from the code defaults
     updatedBy: S,
+    // a role the Owner added from the Roles screen (the built-in roles have neither): its name, which is also the Job people are given
+    label: S,
+    userDefined: B,
+    // only on the one '_visible' document: the built-in roles the Owner switched on for the Roles screen and the Job lists
+    keys: { type: [S], default: undefined },
   },
   { noBase: true }
 );

@@ -565,14 +565,8 @@ export default function ProjectsPage() {
               options: [
                 { value: 'In Progress', label: 'In Progress' },
                 { value: 'Completed', label: 'Completed' },
-                { value: 'Pending', label: 'Pending' },
-                { value: 'Planning', label: 'Planning' },
-                { value: 'On Hold', label: 'On Hold' },
               ],
-              toQuery: (v) => {
-                if (v === 'Pending') return { status: 'Pending,Planning,On Hold' };
-                return { status: v };
-              },
+              toQuery: (v) => ({ status: v }),
             },
           ]}
           wide

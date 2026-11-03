@@ -83,8 +83,12 @@ function cellText(v: any): string {
 
 export type ParsedRow = { row: number; input: Record<string, unknown>; errors: string[] };
 
-/** Read the first sheet; the first row holds the column titles (any order, any of the accepted spellings). */
-export async function readSheet(buf: Buffer, filename: string, columns: Col[] = COLUMNS, required: string[] = ['name', 'job']): Promise<{ rows: ParsedRow[]; unknownColumns: string[] }> {
+/**
+ * Read the first sheet; the first row holds the column titles (any order, any of the accepted spellings).
+ * With `table: true` the titles may be further down (a heading such as "Tools Stock" above them) and the table ends at the first blank
+ * row, so one sheet can hold several tables, one after another, and each list picks up only its own.
+ */
+export async function readSheet(buf: Buffer, filename: string, columns: Col[] = COLUMNS, required: string[] = ['name', 'job'], opts: { table?: boolean } = {}): Promise<{ rows: ParsedRow[]; unknownColumns: string[] }> {
   const byHeader = new Map<string, Col>();
   for (const c of columns) for (const h of [c.label, c.key, ...c.aliases]) byHeader.set(norm(h), c);
   const wb = new ExcelJS.Workbook();
@@ -97,7 +101,18 @@ export async function readSheet(buf: Buffer, filename: string, columns: Col[] = 
   }
   const ws = wb.worksheets[0];
   if (!ws) throw badRequest('The file has no sheet');
-  const head = ws.getRow(1);
+  // which row holds the titles: always row 1, unless this list may sit in a table further down (the first row that has every
+  // required title and at least three of the list's columns: another table's titles share too few of them)
+  let headRow = 1;
+  if (opts.table) {
+    const need = Math.min(3, columns.filter((c) => !c.hiddenInTemplate).length);
+    const titles = (r: number) => { const found = new Set<string>(); ws.getRow(r).eachCell({ includeEmpty: false }, (cell) => { const c = byHeader.get(norm(cellText(cell.value))); if (c) found.add(c.key); }); return found; };
+    for (let r = 1; r <= Math.min(ws.rowCount, 500); r++) {
+      const f = titles(r);
+      if (required.every((k) => f.has(k)) && f.size >= need) { headRow = r; break; }
+    }
+  }
+  const head = ws.getRow(headRow);
   const cols: (Col | null)[] = [];
   const unknownColumns: string[] = [];
   head.eachCell({ includeEmpty: true }, (cell, n) => {
@@ -109,7 +124,7 @@ export async function readSheet(buf: Buffer, filename: string, columns: Col[] = 
   const missing = required.filter((k) => !cols.some((c) => c?.key === k));
   if (missing.length) throw badRequest(`The first row must have the column titles, including ${missing.map((k) => '"' + (columns.find((c) => c.key === k)?.label ?? k) + '"').join(' and ')}. Download the template to see them.`);
   const rows: ParsedRow[] = [];
-  for (let r = 2; r <= ws.rowCount; r++) {
+  for (let r = headRow + 1; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const input: Record<string, unknown> = {};
     const errors: string[] = [];
@@ -121,7 +136,7 @@ export async function readSheet(buf: Buffer, filename: string, columns: Col[] = 
       any = true;
       try { input[c.key] = c.parse ? c.parse(raw) : raw; } catch (e: any) { errors.push(`${c.label}: ${e.message}`); }
     });
-    if (!any) continue; // blank line
+    if (!any) { if (opts.table && rows.length) break; continue; } // blank line (in a table: the table has ended)
     if (rows.length >= MAX_ROWS) throw badRequest(`Too many rows: at most ${MAX_ROWS} employees per file`);
     rows.push({ row: r, input, errors });
   }

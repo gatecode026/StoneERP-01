@@ -7,6 +7,7 @@ import { badRequest, conflict, forbidden } from '../errors';
 import { hashPassword, initialPasswordSchema, mobileSchema } from '../auth/password';
 import { destroyUserSessions } from '../auth/session';
 import { clearTeamCache } from '../perm/engine';
+import { resolvePreset } from '../perm/store';
 import { extraAccessSchema } from '../api/userView';
 import type { AuthCtx } from '../api/withAuth';
 import type { SvcCtx } from './core';
@@ -53,7 +54,9 @@ export async function applyLogin(ctx: SvcCtx, auth: AuthCtx, emp: any, login: Lo
   const username = parsedMobile.success ? parsedMobile.data : existing?.username;
   if (!username) throw badRequest('Valid 10-digit mobile number is required for sign-in');
   if (existing && String(existing._id) === auth.user.id && (role !== existing.role || login.preset)) throw badRequest('You cannot reduce your own access');
-  const preset = role === 'worker' ? (login.preset === undefined ? existing?.preset ?? null : login.preset) : null;
+  // A Job that is a role the Owner added gives that role. Otherwise keep the chosen job preset; an added role the person no longer has as a Job is dropped.
+  const keep = login.preset === undefined ? existing?.preset ?? null : login.preset;
+  const preset = role !== 'worker' ? null : await resolvePreset(emp.job, keep);
 
   const taken: any = await User.findOne({ username }).session(session).lean();
   if (taken && (!existing || String(taken._id) !== String(existing._id))) throw conflict('Another sign-in already uses this mobile number or employee code');
@@ -91,6 +94,10 @@ export async function syncLoginIdentity(ctx: SvcCtx, doc: any, prev: any) {
       set.role = expectedRole;
       await Employee.updateOne({ _id: doc._id }, { $set: { loginRole: expectedRole } }, { session: ctx.session });
     }
+    // the new Job may be (or may no longer be) a role the Owner added
+    const cur: string | null = u.preset ?? null;
+    const next = (set.role ?? u.role) !== 'worker' ? null : await resolvePreset(doc.job, cur);
+    if (next !== cur) set.preset = next;
   }
   if (doc.mobile && doc.mobile !== prev?.mobile) {
     const m = mobileSchema.safeParse(doc.mobile ?? '');
@@ -101,8 +108,8 @@ export async function syncLoginIdentity(ctx: SvcCtx, doc: any, prev: any) {
   }
   if (Object.keys(set).length > 0) {
     await User.updateOne({ _id: u._id }, { $set: set }, { session: ctx.session });
-    if (set.role && set.role !== u.role) {
-      await destroyUserSessions(u._id);
+    if ((set.role && set.role !== u.role) || 'preset' in set) {
+      await destroyUserSessions(u._id); // the permissions changed: sign them in again so the change is not half applied
     }
   }
 }

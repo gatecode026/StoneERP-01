@@ -155,7 +155,11 @@ describe('server cache for dashboards', () => {
     const m = cacheStats().misses;
     await api.create(owner, 'machines', { name: 'GS-cache', type: 'Gang saw' }); // a committed write
     await call(owner, home.GET as never, '/api/home');
-    expect(cacheStats().misses).toBe(m + 1);
+    expect(cacheStats().misses).toBeGreaterThan(m); // the commit dropped the cached home (and what it is built from): it was rebuilt, not served stale
+    const after = cacheStats();
+    await call(owner, home.GET as never, '/api/home');
+    expect(cacheStats().hits).toBe(after.hits + 1); // ...and the rebuilt copy is served from the cache again
+    expect(cacheStats().misses).toBe(after.misses);
   });
 });
 

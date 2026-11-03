@@ -74,6 +74,9 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
       { job: { $not: new RegExp('^(operator|supervisor)$', 'i') } },
       { designation: { $ne: 'Supervisor' } },
     ];
+  } else if (role) {
+    // a role the Owner added or switched on (Electrician, Guard...): it is the person's Job
+    roleCond.job = new RegExp(`^${role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
   }
 
   const teamFilter: Record<string, any>[] = [base, teamSf];

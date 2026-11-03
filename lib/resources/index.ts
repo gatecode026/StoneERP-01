@@ -13,7 +13,7 @@ export const DEFS: Partial<Record<Resource, ResourceDef>> = {
   perfremarks: people.perfremarks, safetyrecords: people.safetyrecords, tasks: people.tasks, projects: projects.projects,
   machines: production.machines, machineentries: production.machineentries, blocks: production.blocks, royalties: production.royalties,
   repairs: production.repairs, vehicles: production.vehicles, vehicletrips: production.vehicletrips,
-  stockitems: stock.stockitems, stockmovements: stock.stockmovements, stockcounts: stock.stockcounts, suppliers: stock.suppliers, purchases: stock.purchases,
+  stockitems: stock.stockitems, stockmovements: stock.stockmovements, stockcounts: stock.stockcounts, stocktools: stock.stocktools, stockmaterials: stock.stockmaterials, stockmachinery: stock.stockmachinery, suppliers: stock.suppliers, purchases: stock.purchases,
   customers: selling.customers, sales: selling.sales, payments: selling.payments, dispatches: selling.dispatches, complaints: selling.complaints,
   expenses: money.expenses, expenseheads: money.expenseheads, cashentries: money.cashentries, cashclosings: money.cashclosings,
   documents: money.documents, auditlogs: money.auditlogs,

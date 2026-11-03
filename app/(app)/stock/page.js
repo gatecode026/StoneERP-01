@@ -10,7 +10,7 @@ import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
 import StockDaily from '@/components/stock/StockDaily';
 import StockCount from '@/components/stock/StockCount';
-import { num } from '@/lib/format';
+import { inr, num } from '@/lib/format';
 
 // Physical Stocks format as per client: Date, Karigar, Colour Finish, Thickness, Size L, Size W, QTY, SQFT, Finish, Amount
 const FINISH_OPTIONS = ['Natural', 'Honed', 'Polished', 'Flamed', 'Split face', 'Sandblasted', 'Bush Hammered'];
@@ -20,7 +20,9 @@ const UNITS = ['sq ft', 'sq m', 'pieces', 'CFT', 'tonne', 'litres', 'kg', 'numbe
 export default function StockPage() {
   const { t, can, perm, session } = useApp();
   const sp = useSearchParams();
-  const [tab, setTab] = useState(sp.get('tab') || 'items');
+  // the first section this person may open (a role may be given the new lists without the stone stock)
+  const firstTab = can('stockitems', 'view') ? 'items' : can('stocktools', 'view') ? 'tools' : can('stockmaterials', 'view') ? 'material' : can('stockmachinery', 'view') ? 'machinery' : 'items';
+  const [tab, setTab] = useState(sp.get('tab') || firstTab);
   const [reloadKey, setReloadKey] = useState(0);
   const manage = can('stockitems', 'create');
   const isOwner = session?.role === 'owner';
@@ -96,11 +98,116 @@ export default function StockPage() {
     },
   ];
 
+  // ---- Tools stock: Tool Name | Company | Pieces | Rate
+  const toolFields = [
+    { name: 'name', label: 'Tool Name', required: true, wide: true, placeholder: 'e.g. 14" blade' },
+    { name: 'company', label: 'Company', placeholder: 'e.g. Sona, DK' },
+    { name: 'pieces', label: 'Pieces', type: 'number', placeholder: '10' },
+    { name: 'rate', label: 'Rate (₹)', type: 'number', placeholder: '1100', hint: 'Price of one piece' },
+  ];
+  const toolCols = [
+    { key: 'name', label: 'Tool Name', primary: true, render: (r) => <b className="text-char-900">{r.name}</b> },
+    { key: 'company', label: 'Company', render: (r) => r.company || '—' },
+    { key: 'pieces', label: 'Pieces', align: 'right', render: (r) => (r.pieces != null ? num(r.pieces) : '—') },
+    { key: 'rate', label: 'Rate', align: 'right', render: (r) => (r.rate != null && r.rate !== '' ? <b className="text-emerald-700">{inr(r.rate)}</b> : <span className="text-char-300">—</span>) },
+  ];
+
+  // ---- Material stock: Colour | Top Finish | Edge Finish | Bottom Finish | Size | Thickness | Pieces | Sqft
+  const materialFields = [
+    { name: 'colour', label: 'Colour', required: true, wide: true, placeholder: 'e.g. Basalt, Grey' },
+    { name: 'topFinish', label: 'Top Finish', placeholder: 'e.g. Swan, Leather, Natural' },
+    { name: 'edgeFinish', label: 'Edge Finish', placeholder: 'e.g. Uncut, Machine cut' },
+    { name: 'bottomFinish', label: 'Bottom Finish', placeholder: 'e.g. Sawn, Natural, Calibrated' },
+    { name: 'size', label: 'Size', placeholder: 'e.g. 72x24' },
+    { name: 'thickness', label: 'Thickness', placeholder: 'e.g. 20mm' },
+    { name: 'pieces', label: 'Pieces', type: 'number', placeholder: '20' },
+    { name: 'sqft', label: 'Sqft', type: 'number', placeholder: '240' },
+  ];
+  const materialCols = [
+    { key: 'colour', label: 'Colour', primary: true, render: (r) => <b className="text-char-900">{r.colour}</b> },
+    { key: 'topFinish', label: 'Top Finish', render: (r) => r.topFinish || '—' },
+    { key: 'edgeFinish', label: 'Edge Finish', render: (r) => r.edgeFinish || '—' },
+    { key: 'bottomFinish', label: 'Bottom Finish', render: (r) => r.bottomFinish || '—' },
+    { key: 'size', label: 'Size', render: (r) => r.size || '—' },
+    { key: 'thickness', label: 'Thickness', render: (r) => r.thickness || '—' },
+    { key: 'pieces', label: 'Pieces', align: 'right', render: (r) => (r.pieces != null ? num(r.pieces) : '—') },
+    { key: 'sqft', label: 'Sqft', align: 'right', render: (r) => (r.sqft != null ? <b>{num(r.sqft)}</b> : '—') },
+  ];
+
+  // ---- Machinery stock: Name | Condition | Repairing cost | Purchase Price | Pieces
+  const machineryFields = [
+    { name: 'name', label: 'Name', required: true, wide: true, placeholder: 'e.g. Grinder, Hand cutting machine' },
+    { name: 'condition', label: 'Condition', placeholder: 'e.g. Ready, Bearing, Armature' },
+    { name: 'repairingCost', label: 'Repairing cost (₹)', type: 'number', placeholder: '0' },
+    { name: 'purchasePrice', label: 'Purchase Price (₹)', type: 'number', placeholder: '1500' },
+    { name: 'pieces', label: 'Pieces', type: 'number', placeholder: '1' },
+  ];
+  const money = (v) => (v != null && v !== '' ? <b className="text-emerald-700">{inr(v)}</b> : <span className="text-char-300">—</span>);
+  const machineryCols = [
+    { key: 'name', label: 'Name', primary: true, render: (r) => <b className="text-char-900">{r.name}</b> },
+    { key: 'condition', label: 'Condition', render: (r) => (r.condition ? (String(r.condition).toLowerCase() === 'ready' ? <Badge tone="green">{r.condition}</Badge> : <Badge tone="amber">{r.condition}</Badge>) : '—') },
+    { key: 'repairingCost', label: 'Repairing cost', align: 'right', render: (r) => money(r.repairingCost) },
+    { key: 'purchasePrice', label: 'Purchase Price', align: 'right', render: (r) => money(r.purchasePrice) },
+    { key: 'pieces', label: 'Pieces', align: 'right', render: (r) => (r.pieces != null ? num(r.pieces) : '—') },
+  ];
+
+  const sections = [
+    ...(can('stocktools', 'view') ? [{ key: 'tools', label: 'Tools stock' }] : []),
+    ...(can('stockmaterials', 'view') ? [{ key: 'material', label: 'Material stock' }] : []),
+    ...(can('stockmachinery', 'view') ? [{ key: 'machinery', label: 'Machinery stock' }] : []),
+  ];
+
   return (
-    <RoleGuard perm="stockitems">
-      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Physical Stock' }, { key: 'daily', label: 'Day by day' }, ...(can('stockcounts', 'view') ? [{ key: 'count', label: 'Monthly count' }] : [])]} />
+    <RoleGuard perm={['stockitems', 'stocktools', 'stockmaterials', 'stockmachinery']}>
+      <Tabs value={tab} onChange={setTab} tabs={[{ key: 'items', label: 'Physical Stock' }, { key: 'daily', label: 'Day by day' }, ...(can('stockcounts', 'view') ? [{ key: 'count', label: 'Monthly count' }] : []), ...sections]} />
       {tab === 'daily' && <StockDaily />}
       {tab === 'count' && <StockCount />}
+      {tab === 'tools' && (
+        <CrudPage key="t" model="stocktools" title="Tools stock" subtitle="Blades and other tools: name, company, pieces and rate" label="Tool" sort="name"
+          headerExtra={<ImportData resource="stocktools" noun="tools" hint="Tool Name, Company, Pieces and Rate" />}
+          searchPlaceholder="Search tool or company..." fields={toolFields} columns={toolCols}
+          canAdd={can('stocktools', 'create')} canEdit={() => can('stocktools', 'edit')}
+          facets={{ sum: 'pieces' }}
+          summary={(rows, { total, facets: f }) => (
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Tools" value={total ?? '…'} />
+              <StatCard label="Total pieces" value={num(f?.sums?.pieces ?? 0)} />
+            </div>
+          )}
+          exportName="tools-stock" exportColumns={[{ key: 'name', label: 'Tool Name' }, { key: 'company', label: 'Company' }, { key: 'pieces', label: 'Pieces' }, { key: 'rate', label: 'Rate' }]}
+        />
+      )}
+      {tab === 'material' && (
+        <CrudPage key="m" model="stockmaterials" title="Material stock" subtitle="Colour, finishes, size, thickness, pieces and sqft" label="Material" sort="colour"
+          headerExtra={<ImportData resource="stockmaterials" noun="material stock" hint="Colour, Top Finish, Edge Finish, Bottom Finish, Size, Thickness, Pieces and Sqft" />}
+          searchPlaceholder="Search colour, finish, size..." fields={materialFields} columns={materialCols}
+          canAdd={can('stockmaterials', 'create')} canEdit={() => can('stockmaterials', 'edit')}
+          facets={{ sum: 'pieces,sqft' }}
+          summary={(rows, { total, facets: f }) => (
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="Rows" value={total ?? '…'} />
+              <StatCard label="Total pieces" value={num(f?.sums?.pieces ?? 0)} />
+              <StatCard label="Total sqft" value={num(f?.sums?.sqft ?? 0)} />
+            </div>
+          )}
+          exportName="material-stock" exportColumns={[{ key: 'colour', label: 'Colour' }, { key: 'topFinish', label: 'Top Finish' }, { key: 'edgeFinish', label: 'Edge Finish' }, { key: 'bottomFinish', label: 'Bottom Finish' }, { key: 'size', label: 'Size' }, { key: 'thickness', label: 'Thickness' }, { key: 'pieces', label: 'Pieces' }, { key: 'sqft', label: 'Sqft' }]}
+        />
+      )}
+      {tab === 'machinery' && (
+        <CrudPage key="y" model="stockmachinery" title="Machinery stock" subtitle="Small machines: name, condition, repairing cost, purchase price and pieces" label="Machine" sort="name"
+          headerExtra={<ImportData resource="stockmachinery" noun="machinery" hint="Name, Condition, Repairing cost, Purchase Price and Pieces" />}
+          searchPlaceholder="Search machine or condition..." fields={machineryFields} columns={machineryCols}
+          canAdd={can('stockmachinery', 'create')} canEdit={() => can('stockmachinery', 'edit')}
+          facets={{ sum: 'pieces' }}
+          summary={(rows, { total, facets: f }) => (
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Machines" value={total ?? '…'} />
+              <StatCard label="Total pieces" value={num(f?.sums?.pieces ?? 0)} />
+            </div>
+          )}
+          exportName="machinery-stock" exportColumns={[{ key: 'name', label: 'Name' }, { key: 'condition', label: 'Condition' }, { key: 'repairingCost', label: 'Repairing cost' }, { key: 'purchasePrice', label: 'Purchase Price' }, { key: 'pieces', label: 'Pieces' }]}
+        />
+      )}
       {tab === 'items' && (
         <CrudPage key={'i' + reloadKey} model="stockitems" title={t('stock')} subtitle="Physical Stocks — Colour, Finish, Sizes, Thickness, Edges, Price, Quantity Sqft" label="Stock item" sort="name" headerExtra={<ImportData resource="stockitems" noun="stock items" hint="Colour, Finish, Sizes, Thickness, Edges, Price, Quantity Sqft and Pieces are supported" />}
           searchPlaceholder="Search colour, finish, sizes, thickness..."

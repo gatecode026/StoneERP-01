@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from 'zod';
-import { Purchase, StockCount, StockItem, StockMovement, Supplier } from '../models';
+import { Purchase, StockCount, StockItem, StockMachinery, StockMaterial, StockMovement, StockTool, Supplier } from '../models';
 import type { ResourceDef } from '../api/resource';
 import { badRequest, conflict } from '../errors';
 import { addDays, todayIST } from '../time';
@@ -59,6 +59,37 @@ export const stockitems: ResourceDef = {
       }
     },
   },
+};
+
+// ------------------------------------------------------------------ tools, material and machinery stock (plain lists)
+const pcs = num(0, 1e7);
+const money0 = num(0, 1e9);
+
+const toolFields = { name: req(160), company: text(80).optional(), pieces: pcs.optional(), rate: money0.optional() };
+export const stocktools: ResourceDef = {
+  key: 'stocktools', model: StockTool, label: (d) => (d.company ? `${d.name} (${d.company})` : d.name),
+  listFields: ['name', 'company', 'pieces', 'rate'], sortable: ['name', 'company', 'pieces', 'createdAt'], defaultSort: 'name',
+  searchFields: ['name', 'company'], filters: { company: 'string' }, statFields: ['pieces'],
+  create: z.object(toolFields).strict(), update: z.object(toolFields).partial().strict(),
+};
+
+const materialFields = {
+  colour: req(80), topFinish: text(60).optional(), edgeFinish: text(60).optional(), bottomFinish: text(60).optional(),
+  size: text(40).optional(), thickness: text(40).optional(), pieces: pcs.optional(), sqft: num(0, 1e9).optional(),
+};
+export const stockmaterials: ResourceDef = {
+  key: 'stockmaterials', model: StockMaterial, label: (d) => [d.colour, d.size].filter(Boolean).join(' '),
+  listFields: ['colour', 'topFinish', 'edgeFinish', 'bottomFinish', 'size', 'thickness', 'pieces', 'sqft'], sortable: ['colour', 'pieces', 'sqft', 'createdAt'], defaultSort: 'colour',
+  searchFields: ['colour', 'topFinish', 'edgeFinish', 'bottomFinish', 'size', 'thickness'], filters: { colour: 'string' }, statFields: ['pieces', 'sqft'],
+  create: z.object(materialFields).strict(), update: z.object(materialFields).partial().strict(),
+};
+
+const machineryFields = { name: req(120), condition: text(60).optional(), repairingCost: money0.optional(), purchasePrice: money0.optional(), pieces: pcs.optional() };
+export const stockmachinery: ResourceDef = {
+  key: 'stockmachinery', model: StockMachinery, label: (d) => (d.condition ? `${d.name} (${d.condition})` : d.name),
+  listFields: ['name', 'condition', 'repairingCost', 'purchasePrice', 'pieces'], sortable: ['name', 'condition', 'pieces', 'createdAt'], defaultSort: 'name',
+  searchFields: ['name', 'condition'], filters: { condition: 'string' }, statFields: ['pieces'],
+  create: z.object(machineryFields).strict(), update: z.object(machineryFields).partial().strict(),
 };
 
 export const stockmovements: ResourceDef = {

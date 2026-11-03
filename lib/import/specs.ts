@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Model } from 'mongoose';
 import {
-  Attendance, Block, Customer, DailyReport, Employee, Machine, PerfRemark, StockItem, Supplier, Vehicle, Sale, Project,
+  Attendance, Block, Customer, DailyReport, Employee, Machine, PerfRemark, StockItem, StockMachinery, StockMaterial, StockTool, Supplier, Vehicle, Sale, Project,
 } from '../models';
 import { SITES } from '../models/projects';
 import { MACHINE_TYPES } from '../config';
@@ -40,6 +40,8 @@ export type ImportSpec = {
   group?: { key: (input: Record<string, any>) => string; merge: (rows: Record<string, any>[]) => Record<string, any> };
   /** the user confirmed the usual "are you sure?" warnings by choosing to import (e.g. expenses without a bill photo) */
   confirmed?: boolean;
+  /** the sheet may hold this list as one table among others, with a heading above its titles (see readSheet) */
+  table?: boolean;
   /** what to show next to the name in the preview */
   describe?: (input: Record<string, any>) => string;
   keyOf?: (data: Record<string, any>) => string;
@@ -677,4 +679,66 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
     },
   },
 };
+// ---- Tools / Material / Machinery stock: the client's sheet holds the three tables one after another, so each list finds its own table.
+// A row is "already there" only when EVERY column is the same (the same tool from two companies, or the same machine in two conditions, are different rows).
+const NUMERIC = new Set(['pieces', 'rate', 'sqft', 'repairingCost', 'purchasePrice']); // a missing number is stored as 0
+const rowKey = (keys: string[]) => (d: Record<string, any>) => keys.map((k) => (NUMERIC.has(k) ? String(Number(d[k]) || 0) : low(d[k]))).join('|');
+const sameRowsAs = (model: Model<any>, keys: string[]) => async () => {
+  const k = rowKey(keys);
+  return new Set(((await model.find({ isVoid: false }, keys.join(' ')).lean()) as any[]).map((d) => k(d)));
+};
+const TOOL_KEYS = ['name', 'company', 'pieces', 'rate'];
+const MATERIAL_KEYS = ['colour', 'topFinish', 'edgeFinish', 'bottomFinish', 'size', 'thickness', 'pieces', 'sqft'];
+const MACHINERY_KEYS = ['name', 'condition', 'repairingCost', 'purchasePrice', 'pieces'];
+const QTY = ['pieces', 'pcs', 'qty', 'quantity', 'quntity'];
+// numbers here keep a minus sign and refuse text, so a typing slip (-4, abc) is reported on its row instead of becoming a different number
+const amount = (v: string) => {
+  const s = v.replace(/[^0-9.-]/g, '');
+  if (!/\d/.test(s)) throw new Error(`"${v}" is not a number`);
+  return s;
+};
+const amountCol = (key: string, label: string, aliases: string[], example: string) => col(key, label, aliases, example, { parse: amount });
+
+IMPORT_SPECS.stocktools = {
+  resource: 'stocktools', noun: 'tools', required: ['name'], table: true,
+  footnote: 'Delete the example row before importing. Only "Tool Name" is required. A row exactly like one already in the app is skipped. The sheet may have a heading above the titles.',
+  columns: [
+    col('name', 'Tool Name', ['name', 'tool', 'toolname', 'item'], '14" blade'),
+    col('company', 'Company', ['company', 'brand', 'make'], 'Sona'),
+    amountCol('pieces', 'Pieces', QTY, '10'),
+    amountCol('rate', 'Rate', ['rate', 'price', 'rate (rs)'], '1100'),
+  ],
+  describe: (i) => [i.name, i.company].filter(Boolean).join(' · '),
+  keyOf: rowKey(TOOL_KEYS), existing: sameRowsAs(StockTool, TOOL_KEYS),
+};
+IMPORT_SPECS.stockmaterials = {
+  resource: 'stockmaterials', noun: 'material stock', required: ['colour'], table: true,
+  footnote: 'Delete the example row before importing. Only "Colour" is required. A row exactly like one already in the app is skipped. The sheet may have a heading above the titles.',
+  columns: [
+    col('colour', 'Colour', ['colour', 'color'], 'Basalt'),
+    col('topFinish', 'Top Finish', ['top finish', 'topfinish', 'top'], 'Swan'),
+    col('edgeFinish', 'Edge Finish', ['edge finish', 'edgefinish', 'edge', 'edges'], 'Uncut'),
+    col('bottomFinish', 'Bottom Finish', ['bottom finish', 'bottam finish', 'bottomfinish', 'bottom', 'bottam'], 'Sawn'),
+    col('size', 'Size', ['size', 'sizes'], '72x24'),
+    col('thickness', 'Thickness', ['thickness', 'thikness', 'thk'], '20mm'),
+    amountCol('pieces', 'Pieces', QTY, '20'),
+    amountCol('sqft', 'Sqft', ['sqft', 'sq ft', 'area', 'total sqft', 'quantity sqft'], '240'),
+  ],
+  describe: (i) => [i.colour, i.size, i.thickness].filter(Boolean).join(' · '),
+  keyOf: rowKey(MATERIAL_KEYS), existing: sameRowsAs(StockMaterial, MATERIAL_KEYS),
+};
+IMPORT_SPECS.stockmachinery = {
+  resource: 'stockmachinery', noun: 'machinery', required: ['name'], table: true,
+  footnote: 'Delete the example row before importing. Only "Name" is required. A row exactly like one already in the app is skipped. The sheet may have a heading above the titles.',
+  columns: [
+    col('name', 'Name', ['name', 'machine', 'machinename', 'machinery'], 'Grinder'),
+    col('condition', 'Condition', ['condition', 'status', 'state'], 'Ready'),
+    amountCol('repairingCost', 'Repairing cost', ['repairing cost', 'repair cost', 'repairingcost', 'repair'], '0'),
+    amountCol('purchasePrice', 'Purchase Price', ['purchase price', 'purchaseprice', 'price', 'cost'], '1500'),
+    amountCol('pieces', 'Pieces', QTY, '1'),
+  ],
+  describe: (i) => [i.name, i.condition].filter(Boolean).join(' · '),
+  keyOf: rowKey(MACHINERY_KEYS), existing: sameRowsAs(StockMachinery, MACHINERY_KEYS),
+};
+
 export const importSpec = (k: string) => (Object.prototype.hasOwnProperty.call(IMPORT_SPECS, k) ? IMPORT_SPECS[k] : undefined);

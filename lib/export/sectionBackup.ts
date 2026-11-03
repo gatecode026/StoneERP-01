@@ -2,7 +2,7 @@
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import {
-  Project, StockItem, Employee, DailyReport, Attendance, Machine, MachineEntry,
+  Project, StockItem, StockTool, StockMaterial, StockMachinery, Employee, DailyReport, Attendance, Machine, MachineEntry,
   Block, Purchase, Sale, Dispatch, Customer, Supplier, Expense, CashEntry,
   Task, SafetyRecord, Vehicle, Repair, Complaint, PaperDoc,
 } from '@/lib/models';
@@ -91,6 +91,59 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
       balanceOrderAmount: d.balanceOrderAmount ?? '',
       otherRemark: d.otherRemark || d.notes || '',
     }),
+  },
+  {
+    id: 'stocktools',
+    name: 'Tools Stock',
+    group: 'Inventory & Materials',
+    icon: 'Wrench',
+    description: 'Blades and other tools: name, company, pieces and rate.',
+    importFormatNote: 'Same columns as the Tools stock sheet (Tool Name, Company, Pieces, Rate)',
+    model: StockTool,
+    columns: [
+      { key: 'name', label: 'Tool Name', w: 22 },
+      { key: 'company', label: 'Company', w: 16 },
+      { key: 'pieces', label: 'Pieces', w: 10 },
+      { key: 'rate', label: 'Rate', w: 12 },
+    ],
+    mapDoc: (d) => ({ name: d.name || '', company: d.company || '', pieces: d.pieces ?? 0, rate: d.rate ?? '' }),
+  },
+  {
+    id: 'stockmaterials',
+    name: 'Material Stock',
+    group: 'Inventory & Materials',
+    icon: 'Boxes',
+    description: 'Colour, top / edge / bottom finish, size, thickness, pieces and sqft.',
+    importFormatNote: 'Same columns as the Material stock sheet (Colour, Top Finish, Edge Finish, Bottom Finish, Size, Thickness, Pieces, sqft)',
+    model: StockMaterial,
+    columns: [
+      { key: 'colour', label: 'Colour', w: 16 },
+      { key: 'topFinish', label: 'Top Finish', w: 16 },
+      { key: 'edgeFinish', label: 'Edge Finish', w: 16 },
+      { key: 'bottomFinish', label: 'Bottom Finish', w: 16 },
+      { key: 'size', label: 'Size', w: 12 },
+      { key: 'thickness', label: 'Thickness', w: 12 },
+      { key: 'pieces', label: 'Pieces', w: 10 },
+      { key: 'sqft', label: 'sqft', w: 10 },
+    ],
+    mapDoc: (d) => ({ colour: d.colour || '', topFinish: d.topFinish || '', edgeFinish: d.edgeFinish || '', bottomFinish: d.bottomFinish || '', size: d.size || '', thickness: d.thickness || '', pieces: d.pieces ?? 0, sqft: d.sqft ?? 0 }),
+  },
+  {
+    id: 'stockmachinery',
+    name: 'Machinery Stock',
+    group: 'Inventory & Materials',
+    icon: 'Cog',
+    description: 'Small machines: name, condition, repairing cost, purchase price and pieces.',
+    importFormatNote: 'Same columns as the Mini Machine stock sheet (Name, Condition, Repairing cost, Purchase Price, Pieces)',
+    model: StockMachinery,
+    columns: [
+      { key: 'name', label: 'Name', w: 22 },
+      { key: 'condition', label: 'Condition', w: 14 },
+      { key: 'repairingCost', label: 'Repairing cost', w: 14 },
+      { key: 'purchasePrice', label: 'Purchase Price', w: 14 },
+      { key: 'pieces', label: 'Pieces', w: 10 },
+    ],
+    mapDoc: (d) => ({ name: d.name || '', condition: d.condition || '', repairingCost: d.repairingCost ?? 0, purchasePrice: d.purchasePrice ?? '', pieces: d.pieces ?? 0 }),
   },
   {
     id: 'stockitems',

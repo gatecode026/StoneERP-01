@@ -47,17 +47,16 @@ export const APPROVABLE: Record<string, Spec> = {
 
 /** Pending items this user may approve, newest first. Over-limit items are returned flagged `needsOwner` so the UI can say so. */
 export async function listPending(user: Pick<SessionUser, 'id' | 'empCode'>, perm: EffectivePerm, limit = 50) {
-  const out: any[] = [];
-  for (const [key, spec] of Object.entries(APPROVABLE)) {
-    if (!perm.can(spec.resource, 'approve')) continue;
+  // the five kinds are independent: ask for them all at once (one round trip, not five in a row)
+  const perKind = await Promise.all(Object.entries(APPROVABLE).filter(([, spec]) => perm.can(spec.resource, 'approve')).map(async ([key, spec]) => {
     const sf = await scopeFilter(user, perm, spec.resource, 'approve');
     const rows: any[] = await spec.model.find({ $and: [{ status: 'pending', isVoid: false }, sf] }).sort({ createdAt: -1 }).limit(limit).select('-billPhoto -photos').lean();
-    for (const d of rows) {
+    return rows.map((d) => {
       const amount = spec.amount(d);
-      out.push({ model: key, id: String(d._id), kind: spec.kind, title: spec.title(d), sub: spec.sub(d), amount, date: spec.date(d), by: d.createdByName, hasBill: Boolean(d.billPhoto), needsOwner: !withinApprovalLimit(perm, amount), createdAt: d.createdAt });
-    }
-  }
-  return out.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, limit);
+      return { model: key, id: String(d._id), kind: spec.kind, title: spec.title(d), sub: spec.sub(d), amount, date: spec.date(d), by: d.createdByName, hasBill: Boolean(d.billPhoto), needsOwner: !withinApprovalLimit(perm, amount), createdAt: d.createdAt };
+    });
+  }));
+  return perKind.flat().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, limit);
 }
 
 export async function decide(ctx: SvcCtx, user: Pick<SessionUser, 'id' | 'empCode'>, model: string, id: string, action: 'approve' | 'reject', remark = '') {

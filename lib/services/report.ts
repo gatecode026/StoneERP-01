@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSettings } from '../settings';
 import { punchState } from './punch';
-import { Account, Attendance, CashClosing, Customer, DailyReport, Dispatch, Employee, Expense, MachineEntry, Payment, Project, Repair, Sale, StockItem, Task } from '../models';
+import { Account, Attendance, CashClosing, Customer, DailyReport, Dispatch, Employee, Expense, MachineEntry, Payment, Project, Repair, Sale, Task } from '../models';
 import { scopeFilter, type EffectivePerm } from '../perm/engine';
 import type { SessionUser } from '../auth/session';
 import type { AppSettings } from '../settings';
 import { addDays, todayIST } from '../time';
 import { listPending } from './approvals';
 import { computeReminders } from './analytics';
-import { getDay, getRange } from '../rollup/dailySummary';
+import { stockSnapshot } from './stockSnapshot';
+import { getRange } from '../rollup/dailySummary';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -19,13 +20,21 @@ const n0 = (v: unknown) => Number(v) || 0;
  * scope. Viewers with scope "all" read the numbers from the DailySummary rollup (one document per day); viewers with a narrower
  * scope (a supervisor's team, a salesperson's own sales) get scoped, indexed live queries.
  */
-export async function buildDailyReport(date: string, user: U, perm: EffectivePerm, settings: AppSettings) {
+export async function buildDailyReport(date: string, user: U, perm: EffectivePerm, settings: AppSettings, rollup?: Promise<any[]> | any[]) {
   const out: Record<string, any> = { date };
   const can = (r: any) => perm.can(r, 'view');
   const all = (r: any) => perm.scope(r, 'view') === 'all';
   const week0 = addDays(date, -6);
   const needDay = all('attendance') || all('machineentries') || all('sales') || all('expenses');
-  const [day, weekDays] = needDay ? await Promise.all([getDay(date), getRange(week0, date)]) : [null, [] as any[]];
+  // The rollup rows (the day and the last week) are read ONCE, started right now and awaited only where they are used, so that read
+  // overlaps with all the other queries instead of delaying them. A caller that already holds the rows (the Owner's home) passes them in.
+  const rows0: Promise<any[]> = !needDay ? Promise.resolve([]) : rollup ? Promise.resolve(rollup) : getRange(week0, date);
+  const dayP = rows0.then((rows) => rows.find((r: any) => r._id === date) ?? null);
+  const weekP = rows0.then((rows) => rows.filter((r: any) => r._id >= week0 && r._id <= date));
+  dayP.catch(() => undefined); weekP.catch(() => undefined); // a failure surfaces where the rows are used; this only stops an unhandled-rejection warning
+  // the 7-day trend is put together at the end, once the machines part (sq ft) and the sales part (money) are both known
+  let trendSqft: Map<string, number> | null = null;
+  let trendSales: Map<string, number> | null = null;
   const tasks: Promise<void>[] = [];
 
   if (can('attendance')) tasks.push((async () => {
@@ -36,7 +45,8 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
       Attendance.aggregate([{ $match: { $and: [{ date, isVoid: false }, asf] } }, { $group: { _id: null, otMins: { $sum: '$otMinutes' }, otCount: { $sum: { $cond: [{ $gt: ['$otMinutes', 0] }, 1, 0] } } } }]),
     ]);
     let by: Record<string, number>;
-    if (all('attendance') && day) by = day.attendance ?? {};
+    const day = all('attendance') ? await dayP : null;
+    if (day) by = day.attendance ?? {};
     else {
       const rows = await Attendance.aggregate([{ $match: { $and: [{ date, isVoid: false }, asf] } }, { $group: { _id: '$state', n: { $sum: 1 } } }]);
       by = Object.fromEntries(rows.map((x: any) => [x._id, x.n]));
@@ -72,37 +82,34 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
       all('machineentries') ? Promise.resolve(null) : MachineEntry.aggregate([{ $match: { $and: [{ date: { $gte: week0, $lte: date }, isVoid: false }, sf] } }, { $group: { _id: '$date', sqft: { $sum: '$outputSqft' } } }]),
       Repair.countDocuments({ status: 'open', isVoid: false }),
     ]);
+    const day = all('machineentries') ? await dayP : null;
+    const weekDays = all('machineentries') ? await weekP : [];
     const by: Record<string, any> = {};
     for (const e of today as any[]) {
       const m = (by[e.machineName] ??= { name: e.machineName, type: e.machineType, sqft: 0, stoppedMins: 0, reason: '', breakdown: false });
       m.sqft += e.outputSqft || 0; m.stoppedMins += e.stoppedMins || 0; m.breakdown ||= Boolean(e.breakdown); if (!m.reason && e.stoppedMins) m.reason = e.stopReason || '';
     }
     const byMachine = Object.values(by).sort((a: any, b: any) => b.sqft - a.sqft);
-    const sqft = all('machineentries') && day ? n0(day.machines?.sqft) : byMachine.reduce((t: number, m: any) => t + m.sqft, 0);
-    const stopped = all('machineentries') && day ? n0(day.machines?.stoppedMins) : byMachine.reduce((t: number, m: any) => t + m.stoppedMins, 0);
+    const sqft = day ? n0(day.machines?.sqft) : byMachine.reduce((t: number, m: any) => t + m.sqft, 0);
+    const stopped = day ? n0(day.machines?.stoppedMins) : byMachine.reduce((t: number, m: any) => t + m.stoppedMins, 0);
     out.machines = { totalSqft: sqft, byMachine, breakdowns: byMachine.filter((m: any) => m.breakdown || m.stoppedMins >= 60), idleHours: r1(stopped / 60), openRepairs };
-    out.trend = Array.from({ length: 7 }, (_, i) => addDays(week0, i)).map((d) => ({
-      date: d, sales: 0,
-      sqft: trendRows ? n0((trendRows as any[]).find((w) => w._id === d)?.sqft) : n0(weekDays.find((w: any) => w._id === d)?.machines?.sqft),
-    }));
+    trendSqft = new Map(Array.from({ length: 7 }, (_, i) => addDays(week0, i)).map((d) => [d, trendRows ? n0((trendRows as any[]).find((w) => w._id === d)?.sqft) : n0(weekDays.find((w: any) => w._id === d)?.machines?.sqft)]));
   })());
 
   if (can('stockitems')) tasks.push((async () => {
-    const [low, main, totalCount] = await Promise.all([
-      StockItem.find({ belowMin: true, isVoid: false }).select('name balance minLevel unit').limit(30).lean(),
-      StockItem.aggregate([{ $match: { isVoid: false, category: 'finished' } }, { $addFields: { value: { $multiply: ['$balance', { $ifNull: ['$sellRate', 0] }] } } }, { $sort: { value: -1 } }, { $limit: 6 }, { $project: { name: 1, balance: 1, unit: 1, minLevel: 1 } }]),
-      StockItem.countDocuments({ isVoid: false }),
-    ]);
-    out.stock = { lowStock: low.map((i: any) => ({ _id: String(i._id), name: i.name, balance: i.balance, minLevel: i.minLevel, unit: i.unit })), mainItems: main, totalCount };
+    const snap = await stockSnapshot(); // one shared read of the stock collection, not three queries of our own
+    out.stock = { lowStock: snap.low.slice(0, 30).map((i) => ({ _id: String(i._id), name: i.name, balance: i.balance, minLevel: i.minLevel, unit: i.unit })), mainItems: snap.main, totalCount: snap.total };
   })());
 
   if (can('sales')) tasks.push((async () => {
-    if (all('sales') && day) {
+    if (all('sales')) {
       // receivables = the customers' running totals (small, indexed), not a scan of every open order
-      const pend = await Customer.aggregate([{ $match: { isVoid: false, outstanding: { $gt: 0 } } }, { $group: { _id: null, t: { $sum: '$outstanding' } } }]);
-      out.sales = { today: n0(day.sales?.total), orders: n0(day.sales?.orders), dispatches: n0(day.dispatches?.out), received: n0(day.receipts?.total), pending: n0(pend[0]?.t) };
-      if (out.trend) out.trend = out.trend.map((t: any) => ({ ...t, sales: n0(weekDays.find((w: any) => w._id === t.date)?.sales?.total) }));
-      return;
+      const [day, weekDays, pend] = await Promise.all([dayP, weekP, Customer.aggregate([{ $match: { isVoid: false, outstanding: { $gt: 0 } } }, { $group: { _id: null, t: { $sum: '$outstanding' } } }])]);
+      if (day) {
+        out.sales = { today: n0(day.sales?.total), orders: n0(day.sales?.orders), dispatches: n0(day.dispatches?.out), received: n0(day.receipts?.total), pending: n0(pend[0]?.t) };
+        trendSales = new Map(weekDays.map((w: any) => [w._id, n0(w.sales?.total)]));
+        return;
+      }
     }
     const sf = await scopeFilter(user, perm, 'sales', 'view');
     const psf = await scopeFilter(user, perm, 'payments', 'view').catch(() => ({ _id: { $in: [] } }));
@@ -115,11 +122,12 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
       Sale.aggregate([{ $match: { $and: [{ date: { $gte: week0, $lte: date }, stage: { $ne: 'quotation' }, isVoid: false }, sf] } }, { $group: { _id: '$date', total: { $sum: '$total' } } }]),
     ]);
     out.sales = { today: today[0]?.total ?? 0, orders: today[0]?.n ?? 0, dispatches: disp, received: recv[0]?.total ?? 0, pending: pend[0]?.outstanding ?? 0 };
-    if (out.trend) out.trend = out.trend.map((t: any) => ({ ...t, sales: week.find((w: any) => w._id === t.date)?.total ?? 0 }));
+    trendSales = new Map((week as any[]).map((w) => [w._id, w.total ?? 0]));
   })());
 
   if (can('expenses')) tasks.push((async () => {
-    if (all('expenses') && day) {
+    const day = all('expenses') ? await dayP : null;
+    if (day) {
       const byHead = Object.entries(day.expenses?.byHead ?? {}).map(([head, amount]) => ({ head: head.replace(/_/g, ' '), amount: n0(amount) })).filter((x) => x.amount).sort((a, b) => b.amount - a.amount);
       out.expenses = { total: n0(day.expenses?.total), count: n0(day.expenses?.count), byHead };
       return;
@@ -147,24 +155,27 @@ export async function buildDailyReport(date: string, user: U, perm: EffectivePer
 
   tasks.push((async () => {
     try {
-      const [ongoing, total] = await Promise.all([
-        Project.countDocuments({ status: { $ne: 'Completed' }, isVoid: false }),
-        Project.countDocuments({ isVoid: false }),
-      ]);
-      out.projects = { ongoing, total };
+      const [c] = await Project.aggregate([{ $match: { isVoid: false } }, { $group: { _id: null, total: { $sum: 1 }, ongoing: { $sum: { $cond: [{ $ne: ['$status', 'Completed'] }, 1, 0] } } } }]);
+      out.projects = { ongoing: c?.ongoing ?? 0, total: c?.total ?? 0 };
     } catch {
       out.projects = { ongoing: 0, total: 0 };
     }
   })());
 
   tasks.push((async () => {
-    out.approvals = await listPending(user, perm, 20);
-    const rem = await computeReminders(user, perm, settings);
+    // independent of each other: asked together
+    const [approvals, rem] = await Promise.all([listPending(user, perm, 20), computeReminders(user, perm, settings)]);
+    out.approvals = approvals;
     out.alerts = rem.filter((r) => r.severity === 'high').slice(0, 8);
     out.reminderCount = rem.length;
   })());
 
   await Promise.all(tasks);
+  if (trendSqft) {
+    const sqftByDay = trendSqft as Map<string, number>;
+    const salesByDay = trendSales as Map<string, number> | null;
+    out.trend = Array.from({ length: 7 }, (_, i) => addDays(week0, i)).map((d) => ({ date: d, sales: salesByDay?.get(d) ?? 0, sqft: sqftByDay.get(d) ?? 0 }));
+  }
   return out;
 }
 

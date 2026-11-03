@@ -84,7 +84,7 @@ export default function Shell({ children }) {
   const showFab = quick.length > 0;
   const hi = lang === 'hi';
   // who is signed in: the name, and what the person does (designation or job; the role for the Owner)
-  const roleName = ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role;
+  const roleName = ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || session.roleLabel || role;
   const who = session.title && session.title.toLowerCase() !== String(roleName).toLowerCase() ? `${session.title} · ${roleName}` : roleName;
 
   const NavLink = ({ it, small }) => {
@@ -139,7 +139,7 @@ export default function Shell({ children }) {
                 </div>
                 <div className="min-w-0 leading-tight">
                   <div className="font-semibold text-xs text-slate-900 truncate">{session.name}</div>
-                  <div className="text-[10px] text-slate-500 truncate capitalize">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</div>
+                  <div className="text-[10px] text-slate-500 truncate capitalize">{roleName}</div>
                 </div>
               </div>
               <button onClick={logout} title={t('logout')} className="p-1.5 rounded-none text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" aria-label={t('logout')}>
@@ -170,7 +170,7 @@ export default function Shell({ children }) {
               </button>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="hidden sm:inline-flex rounded-none border border-[#D4C2AB] bg-[#FAF7F2] px-2 py-0.5 text-xs font-mono text-[#7D5333] capitalize font-medium">{ROLE_LABEL[session.perm.roleKey]?.[hi ? 'hi' : 'en'] || role}</span>
+              <span className="hidden sm:inline-flex rounded-none border border-[#D4C2AB] bg-[#FAF7F2] px-2 py-0.5 text-xs font-mono text-[#7D5333] capitalize font-medium">{roleName}</span>
               <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-none border border-[#D4C2AB] bg-[#FAF7F2] text-[#7D5333] hover:bg-[#F2ECE3] transition shadow-none" onClick={() => { setFq(''); setFinder(true); }} aria-label={tr('Search screens')}><Search size={16} /></button>
               <LangToggle />
               <button className="md:hidden h-9 w-9 flex items-center justify-center rounded-none border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 transition shadow-none" onClick={logout} aria-label={t('logout')}><LogOut size={16} /></button>

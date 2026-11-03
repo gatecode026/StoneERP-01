@@ -10,7 +10,8 @@ import { addDays, addMonths, daysBetween, monthEnd, monthOf, monthStart, todayIS
 import { buildDailyReport, workerHome } from './report';
 import { computeReminders, computeYield } from './analytics';
 import { listPending } from './approvals';
-import { getDay, getRange } from '../rollup/dailySummary';
+import { getRange } from '../rollup/dailySummary';
+import { stockSnapshot } from './stockSnapshot';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const sum = (a: any[], f: (x: any) => number) => a.reduce((t, x) => t + (Number(f(x)) || 0), 0);
@@ -28,9 +29,8 @@ function withDenied<T extends Record<string, any>>(perm: EffectivePerm, body: T,
 const canCost = (perm: EffectivePerm) => ['read', 'write'].includes(perm.fields.cost);
 
 // ------------------------------------------------------------------ shared pieces
-async function daySnapshot(date: string) {
-  const d = await getDay(date); // one document from the rollup, not five aggregations
-  const n = (v: unknown) => Number(v) || 0;
+function daySnapshot(d: any) {
+  const n = (v: unknown) => Number(v) || 0; // d is one rollup document (read once for the whole home), not five aggregations
   return { sales: n(d?.sales?.total), received: n(d?.receipts?.total), expenses: n(d?.expenses?.total), sqft: n(d?.machines?.sqft), reports: n(d?.reports?.filled) };
 }
 
@@ -39,11 +39,14 @@ export async function profitSummary(perm: EffectivePerm, user: U, settings: AppS
   if (!canCost(perm) || !perm.can('profit', 'view')) return null;
   const from = addDays(todayIST(), -days);
   const sf = await scopeFilter(user, perm, 'sales', 'view');
-  const orders: any[] = await Sale.find({ $and: [{ date: { $gte: from }, stage: { $ne: 'quotation' }, isVoid: false }, sf] }).sort({ date: -1 }).limit(200).select('saleNo date customerName taxable costTotal').lean();
+  // the orders, the finished-goods rates and the yield report do not depend on each other: asked together
+  const [orders, stock, y]: [any[], Awaited<ReturnType<typeof stockSnapshot>>, Awaited<ReturnType<typeof computeYield>>] = await Promise.all([
+    Sale.find({ $and: [{ date: { $gte: from }, stage: { $ne: 'quotation' }, isVoid: false }, sf] }).sort({ date: -1 }).limit(200).select('saleNo date customerName taxable costTotal').lean(),
+    stockSnapshot(),
+    computeYield(settings),
+  ]);
   const orderRows = orders.map((o) => ({ saleNo: o.saleNo, date: o.date, customerName: o.customerName, taxable: o.taxable, cost: o.costTotal || 0, profit: r0(o.taxable - (o.costTotal || 0)), margin: o.taxable ? r2(((o.taxable - (o.costTotal || 0)) / o.taxable) * 100) : 0 }));
-  const sell: any[] = await StockItem.find({ category: 'finished', isVoid: false, sellRate: { $gt: 0 } }).select('sellRate balance').lean();
-  const avgRate = sell.length ? sum(sell, (x) => x.sellRate) / sell.length : 0;
-  const y = await computeYield(settings);
+  const avgRate = stock.rateCount ? stock.rateSum / stock.rateCount : 0;
   const blockRows = y.rows.filter((b) => b.saleable > 0 && b.stage === 'cut').slice(0, 8).map((b) => ({ blockNo: b.blockNo, saleable: b.saleable, yieldPct: b.yieldPct, totalCost: b.totalCost, costPerSqft: b.costPerSqft, value: r0(b.saleable * avgRate), profit: r0(b.saleable * avgRate - b.totalCost) }));
   return {
     days, orderTotals: { revenue: r0(sum(orderRows, (x) => x.taxable)), cost: r0(sum(orderRows, (x) => x.cost)), profit: r0(sum(orderRows, (x) => x.profit)) },
@@ -54,14 +57,13 @@ export async function profitSummary(perm: EffectivePerm, user: U, settings: AppS
 async function ageing(user: U, perm: EffectivePerm) {
   const sf = await scopeFilter(user, perm, 'sales', 'view');
   const today = todayIST();
-  const rows: any[] = await Sale.aggregate([
+  const [rows, top]: [any[], any[]] = await Promise.all([Sale.aggregate([
     { $match: { $and: [{ stage: { $in: ['order', 'dispatched'] }, isVoid: false, outstanding: { $gt: 0 } }, sf] } },
     { $addFields: { age: { $dateDiff: { startDate: { $dateFromString: { dateString: { $ifNull: ['$invoiceDate', '$date'] } } }, endDate: new Date(`${today}T00:00:00Z`), unit: 'day' } } } },
     { $bucket: { groupBy: '$age', boundaries: [-1000, 16, 31, 61, 100000], default: 'other', output: { amount: { $sum: '$outstanding' }, n: { $sum: 1 } } } },
-  ]);
+  ]), Customer.find({ isVoid: false, outstanding: { $gt: 0 } }).sort({ outstanding: -1 }).limit(6).select('name outstanding mobile').lean()]);
   const labels = ['0-15', '16-30', '31-60', '60+'];
   const b = [-1000, 16, 31, 61].map((lo, i) => { const f = rows.find((r) => r._id === lo); return { label: labels[i], amount: f?.amount ?? 0, count: f?.n ?? 0 }; });
-  const top: any[] = await Customer.find({ isVoid: false, outstanding: { $gt: 0 } }).sort({ outstanding: -1 }).limit(6).select('name outstanding mobile').lean();
   return { buckets: b, total: sum(b, (x) => x.amount), topCustomers: top.map((c) => ({ id: String(c._id), name: c.name, amount: c.outstanding, mobile: c.mobile })) };
 }
 
@@ -71,11 +73,11 @@ async function ageing(user: U, perm: EffectivePerm) {
  * row, with a zero where nothing happened. A field is included only when the Owner may see all of that data. `money` is the running
  * cash + bank balance at the end of each day, worked back from today's balances through each day's money in and out.
  */
-export async function ownerSeries(date: string, perm: EffectivePerm, balanceNow: number | null) {
+export async function ownerSeries(date: string, perm: EffectivePerm, balanceNow: number | null, prefetched?: any[]) {
   const all = (r: any) => perm.scope(r, 'view') === 'all';
   const from = addDays(date, -29);
   const today = todayIST();
-  const rows = await getRange(from, date > today ? date : today);
+  const rows = prefetched ?? await getRange(from, date > today ? date : today);
   const by = new Map<string, any>(rows.map((r: any) => [r._id, r]));
   const n = (v: unknown) => Number(v) || 0;
   const flow = (d: any) => n(d?.cash?.cashIn) - n(d?.cash?.cashOut) + n(d?.cash?.bankIn) - n(d?.cash?.bankOut);
@@ -102,31 +104,35 @@ export async function ownerSeries(date: string, perm: EffectivePerm, balanceNow:
 
 async function stockLevels(perm: EffectivePerm) {
   if (!perm.can('stockitems', 'view')) return null;
-  const rows: any[] = await StockItem.find({ isVoid: false, minLevel: { $gt: 0 } }).select('name balance minLevel unit').limit(300).lean();
+  const rows = (await stockSnapshot()).levels;
   return rows.map((i) => ({ name: i.name, balance: n0(i.balance), minLevel: n0(i.minLevel), unit: i.unit, ratio: n0(i.balance) / i.minLevel })).sort((a, b) => a.ratio - b.ratio).slice(0, 8).map(({ ratio: _r, ...i }) => i);
 }
 const n0 = (v: unknown) => Number(v) || 0;
 
 async function ownerHome(date: string, user: U, perm: EffectivePerm, settings: AppSettings) {
-  const [report, cur, prev, profit, ageingData, stockRows] = await Promise.all([
-    buildDailyReport(date, user, perm, settings), daySnapshot(date), daySnapshot(addDays(date, -1)), profitSummary(perm, user, settings),
+  // The daily rollup (one small document per day) is read ONCE for everything on this screen: the report (the day + the last week), the
+  // today / yesterday cards and the 30-day graphs. It starts at once and every other query runs beside it.
+  const rollup = getRange(addDays(date, -29), date > todayIST() ? date : todayIST());
+  rollup.catch(() => undefined); // a failure surfaces through Promise.all below; this only stops an unhandled-rejection warning
+  const [report, rows, profit, ageingData, stockRows] = await Promise.all([
+    buildDailyReport(date, user, perm, settings, rollup), rollup, profitSummary(perm, user, settings),
     perm.can('sales', 'view') ? ageing(user, perm) : null, stockLevels(perm),
   ]);
+  const byDay = (d: string) => daySnapshot(rows.find((r: any) => r._id === d));
   const balanceNow = report.cash ? n0(report.cash.inHand) + n0(report.cash.bank) : null;
-  const series = await ownerSeries(date, perm, balanceNow);
-  return { kind: 'owner', date, report, compare: { today: cur, yesterday: prev }, profit, series, ageing: ageingData, stockLevels: stockRows, denied: [] as string[] };
+  const series = await ownerSeries(date, perm, balanceNow, rows); // no database access: the rows are already here
+  return { kind: 'owner', date, report, compare: { today: byDay(date), yesterday: byDay(addDays(date, -1)) }, profit, series, ageing: ageingData, stockLevels: stockRows, denied: [] as string[] };
 }
 
 // ------------------------------------------------------------------ MANAGER
 async function managerHome(date: string, user: U, perm: EffectivePerm, settings: AppSettings) {
-  const report = await buildDailyReport(date, user, perm, settings);
   const today = todayIST();
-  const [machines, entries, overdue, unchecked] = await Promise.all([
+  const [report, [machines, entries, overdue, unchecked]] = await Promise.all([buildDailyReport(date, user, perm, settings), Promise.all([
     perm.can('machines', 'view') ? Machine.find({ isVoid: false }).select('name type').lean() : [],
     perm.can('machineentries', 'view') ? MachineEntry.find({ date, isVoid: false }).select('machineId').lean() : [],
     perm.can('tasks', 'view') ? Task.find({ state: 'pending', dueDate: { $lt: today }, isVoid: false }).sort({ dueDate: 1 }).limit(6).select('title assignedName dueDate').lean() : [],
     perm.can('dailyreports', 'view') ? DailyReport.countDocuments({ date, supCheck: '', isVoid: false }) : 0,
-  ]);
+  ])]);
   const ran = new Set(entries.map((e: any) => String(e.machineId)));
   const idle = (machines as any[]).filter((m) => !ran.has(String(m._id))).map((m) => ({ id: String(m._id), name: m.name, type: m.type }));
   return withDenied(perm, { kind: 'manager', date, report, board: { machinesWithoutEntry: idle, overdueTasks: overdue, reportsToCheck: unchecked } },
@@ -135,10 +141,9 @@ async function managerHome(date: string, user: U, perm: EffectivePerm, settings:
 
 // ------------------------------------------------------------------ ACCOUNTANT
 async function accountantHome(date: string, user: U, perm: EffectivePerm, settings: AppSettings) {
-  const report = await buildDailyReport(date, user, perm, settings);
   const today = todayIST();
   const month = monthOf(addDays(`${monthOf(today)}-01`, -1)); // the month being closed
-  const [age, payables, invoicesPending, noEway, sheet, closings, unmarked] = await Promise.all([
+  const [report, [age, payables, invoicesPending, noEway, sheet, closings, unmarked]] = await Promise.all([buildDailyReport(date, user, perm, settings), Promise.all([
     perm.can('sales', 'view') ? ageing(user, perm) : null,
     perm.can('purchases', 'view') ? Purchase.find({ status: 'approved', isVoid: false, outstanding: { $gt: 0 }, dueDate: { $lte: addDays(today, 7) } }).sort({ dueDate: 1 }).limit(8).select('supplierName outstanding dueDate billNo').lean() : [],
     perm.can('sales', 'view') ? Sale.find({ stage: { $in: ['order', 'dispatched'] }, isVoid: false, invoiceNo: { $exists: false } }).sort({ date: 1 }).limit(8).select('saleNo customerName total stage').lean() : [],
@@ -146,7 +151,7 @@ async function accountantHome(date: string, user: U, perm: EffectivePerm, settin
     perm.can('salarysheets', 'view') ? SalarySheet.findOne({ month, isVoid: false }).select('status totals approvedBy').lean() : null,
     perm.can('cashclosings', 'view') ? CashClosing.find({ date: { $gte: monthStart(month), $lte: monthEnd(month) }, isVoid: false }).select('date flagged').lean() : [],
     perm.can('attendance', 'view') ? Attendance.countDocuments({ date: { $gte: monthStart(month), $lte: monthEnd(month) }, isVoid: false }) : 0,
-  ]);
+  ])]);
   const days = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
   const checklist = [
     { key: 'closings', ok: closings.length >= days - 4, detail: `${closings.length} of ${days} days closed` },
@@ -161,19 +166,18 @@ async function accountantHome(date: string, user: U, perm: EffectivePerm, settin
 
 // ------------------------------------------------------------------ SUPERVISOR (team board, no money)
 async function supervisorHome(date: string, user: U, perm: EffectivePerm, settings: AppSettings) {
-  const asf = await scopeFilter(user, perm, 'attendance', 'view');
-  const [emps, att, reps] = await Promise.all([
+  // every scope filter first (together), then EVERY query of this board together: nothing waits for something it does not need
+  const [asf, rsf, msf, esf, tsf] = await Promise.all([
+    scopeFilter(user, perm, 'attendance', 'view'),
+    perm.can('dailyreports', 'view') ? scopeFilter(user, perm, 'dailyreports', 'view') : null,
+    perm.can('machines', 'view') ? scopeFilter(user, perm, 'machines', 'view') : null,
+    perm.can('machineentries', 'view') ? scopeFilter(user, perm, 'machineentries', 'view') : null,
+    perm.can('tasks', 'view') ? scopeFilter(user, perm, 'tasks', 'view') : null,
+  ]);
+  const [emps, att, reps, machines, entries, repairs, safety, tasks, taskPendingCount, taskOverdueCount] = await Promise.all([
     Employee.find({ $and: [{ status: 'active', isVoid: false }, asf] }).sort({ name: 1 }).select('empCode name job').lean(),
     Attendance.find({ $and: [{ date, isVoid: false }, asf] }).select('empCode state otHours method').lean(),
-    perm.can('dailyreports', 'view') ? DailyReport.find({ $and: [{ date: { $gte: addDays(date, -1), $lte: date }, isVoid: false }, await scopeFilter(user, perm, 'dailyreports', 'view')] }).sort({ date: -1 }).select('empCode empName date narration quantity hours problem supCheck photoCount').lean() : [],
-  ]);
-  const marks = new Map((att as any[]).map((a) => [a.empCode, a]));
-  const team = (emps as any[]).map((e) => ({ empCode: e.empCode, name: e.name, job: e.job, state: marks.get(e.empCode)?.state ?? null, otHours: marks.get(e.empCode)?.otHours ?? null }));
-  const reported = new Set((reps as any[]).filter((r) => r.date === date).map((r) => r.empCode));
-  const msf = perm.can('machines', 'view') ? await scopeFilter(user, perm, 'machines', 'view') : null;
-  const esf = perm.can('machineentries', 'view') ? await scopeFilter(user, perm, 'machineentries', 'view') : null;
-  const tsf = perm.can('tasks', 'view') ? await scopeFilter(user, perm, 'tasks', 'view') : null;
-  const [machines, entries, repairs, safety, tasks, taskPendingCount, taskOverdueCount] = await Promise.all([
+    rsf ? DailyReport.find({ $and: [{ date: { $gte: addDays(date, -1), $lte: date }, isVoid: false }, rsf] }).sort({ date: -1 }).select('empCode empName date narration quantity hours problem supCheck photoCount').lean() : [],
     msf ? Machine.find({ $and: [{ isVoid: false }, msf] }).select('name type').lean() : [],
     esf ? MachineEntry.find({ $and: [{ date, isVoid: false }, esf] }).select('machineId machineName outputSqft stoppedMins breakdown').lean() : [],
     perm.can('repairs', 'view') ? Repair.countDocuments({ status: 'open', isVoid: false }) : 0,
@@ -182,6 +186,9 @@ async function supervisorHome(date: string, user: U, perm: EffectivePerm, settin
     tsf ? Task.countDocuments({ $and: [{ state: 'pending', isVoid: false }, tsf] }) : 0,
     tsf ? Task.countDocuments({ $and: [{ state: 'pending', dueDate: { $lt: date }, isVoid: false }, tsf] }) : 0,
   ]);
+  const marks = new Map((att as any[]).map((a) => [a.empCode, a]));
+  const team = (emps as any[]).map((e) => ({ empCode: e.empCode, name: e.name, job: e.job, state: marks.get(e.empCode)?.state ?? null, otHours: marks.get(e.empCode)?.otHours ?? null }));
+  const reported = new Set((reps as any[]).filter((r) => r.date === date).map((r) => r.empCode));
   const ran = new Set((entries as any[]).map((e) => String(e.machineId)));
   const counts = { present: team.filter((t) => ['present', 'overtime', 'half'].includes(t.state ?? '')).length, absent: team.filter((t) => t.state === 'absent').length, leave: team.filter((t) => t.state === 'leave').length, unmarked: team.filter((t) => !t.state).length };
   return withDenied(perm, {
@@ -294,8 +301,9 @@ async function presetHome(kind: HomeKind, date: string, user: U, perm: Effective
   }
 }
 
-async function withSelf<T extends object>(home: T, date: string, user: SessionUser) {
-  return { ...home, self: await workerHome(date, user as any) };
+async function withSelf<T extends object>(home: Promise<T>, date: string, user: SessionUser) {
+  const [h, self] = await Promise.all([home, workerHome(date, user as any)]);
+  return { ...h, self };
 }
 
 /** One round trip per role home. The response contains exactly the sections that role is allowed to see. */
@@ -304,10 +312,10 @@ export async function buildHome(date: string, user: SessionUser, perm: Effective
   switch (kind) {
     case 'owner': return ownerHome(date, user, perm, settings);
     // everybody who is also an employee sees their own attendance (and the Punch button) at the top of their home
-    case 'manager': return withSelf(await managerHome(date, user, perm, settings), date, user);
-    case 'accountant': return withSelf(await accountantHome(date, user, perm, settings), date, user);
-    case 'supervisor': return withSelf(await supervisorHome(date, user, perm, settings), date, user);
-    case 'salesperson': return withSelf(await salespersonHome(date, user, perm), date, user);
+    case 'manager': return withSelf(managerHome(date, user, perm, settings), date, user);
+    case 'accountant': return withSelf(accountantHome(date, user, perm, settings), date, user);
+    case 'supervisor': return withSelf(supervisorHome(date, user, perm, settings), date, user);
+    case 'salesperson': return withSelf(salespersonHome(date, user, perm), date, user);
     case 'worker': return { kind, date, self: await workerHome(date, user), denied: [] as string[] };
     default: return presetHome(kind, date, user, perm);
   }

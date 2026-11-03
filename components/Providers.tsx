@@ -17,6 +17,8 @@ export type ClientSession = {
   perm: ClientPerm;
   /** the shifts in Settings (for the employee form) */
   shifts?: { id: string; name: string; start: string; end: string }[]; defaultShiftId?: string;
+  /** names of the roles the Owner added (each is also a Job) and, for a person who has one, its name */
+  customJobs?: string[]; roleLabel?: string;
   company: { name: string; brand: string; address: string; gstin: string; state: string; stateCode: string; phone: string; email: string; bankName: string; bankAccount: string; ifsc: string };
 };
 type AppCtx = {

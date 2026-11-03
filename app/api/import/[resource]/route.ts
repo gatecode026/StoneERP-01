@@ -45,7 +45,7 @@ export const POST = withAuth((c) => spec(c.params).resource as Resource, 'create
   if (file.size > MAX_BYTES) throw payloadTooLarge(MAX_BYTES);
   if (!/\.(xlsx|csv)$/i.test(file.name)) throw badRequest('Only .xlsx and .csv files are accepted');
 
-  const { rows: parsed, unknownColumns } = await readSheet(Buffer.from(await file.arrayBuffer()), file.name, s.columns, s.required);
+  const { rows: parsed, unknownColumns } = await readSheet(Buffer.from(await file.arrayBuffer()), file.name, s.columns, s.required, { table: s.table });
   if (parsed.length > MAX_ROWS) throw badRequest(`At most ${MAX_ROWS} rows per file`);
   const fileHash = createHash('sha256').update(Buffer.from(await file.arrayBuffer())).digest('hex');
   const alreadyImported = Boolean(await AuditLog.exists({ model: def.key, action: 'bulk_import', refId: fileHash }));

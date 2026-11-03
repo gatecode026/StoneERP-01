@@ -368,6 +368,7 @@ export default function AttendancePage() {
               <option value="supervisor">Supervisor</option>
               <option value="operator">Operator</option>
               <option value="worker">Worker / Labour</option>
+              {(session?.customJobs || []).map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
             {statusFilter && (
               <button

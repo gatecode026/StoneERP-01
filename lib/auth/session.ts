@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { cache } from 'react';
 import type { Types } from 'mongoose';
 import { Session, User } from '../models/auth';
 import { connect } from '../db';
@@ -72,13 +73,23 @@ export async function resolveSession(cookieValue: string | undefined | null): Pr
   try {
     await connect();
     const now = Date.now();
-    const s = await Session.findOne({ tokenHash: sha256(token), expiresAt: { $gt: new Date(now) }, absoluteExpiresAt: { $gt: new Date(now) } }).lean();
-    if (!s) return null;
-    const u = await User.findOne({ _id: s.userId, active: true }).lean();
-    if (!u) return null;
+    // ONE round trip (session + its user) instead of two in a row: this runs on every page and every API call. The user is projected
+    // to the fields we need, so the password hash never leaves the database (an aggregate ignores the schema's `select: false`).
+    const [row] = await Session.aggregate([
+      { $match: { tokenHash: sha256(token), expiresAt: { $gt: new Date(now) }, absoluteExpiresAt: { $gt: new Date(now) } } },
+      { $limit: 1 },
+      { $lookup: {
+        from: User.collection.name, localField: 'userId', foreignField: '_id', as: 'user',
+        pipeline: [{ $match: { active: true } }, { $project: { username: 1, name: 1, role: 1, preset: 1, employeeId: 1, empCode: 1, extraAccess: 1, lang: 1 } }],
+      } },
+    ]);
+    const s = row;
+    const u = row?.user?.[0];
+    if (!s || !u) return null;
     if (now - new Date(s.lastSeenAt ?? 0).getTime() > TOUCH_EVERY_MS) {
       const idle = new Date(Math.min(now + IDLE_DAYS * DAY, new Date(s.absoluteExpiresAt).getTime()));
-      await Session.updateOne({ _id: s._id }, { $set: { lastSeenAt: new Date(now), expiresAt: idle } });
+      // bookkeeping only: the request must not wait for a (majority-acknowledged) write; if it is lost the next request simply tries again
+      void Session.updateOne({ _id: s._id }, { $set: { lastSeenAt: new Date(now), expiresAt: idle } }).catch(() => undefined);
     }
     return {
       id: String(u._id),
@@ -111,9 +122,13 @@ export async function destroyUserSessions(userId: Types.ObjectId | string, excep
   await Session.deleteMany({ userId, ...(exceptSessionId ? { _id: { $ne: exceptSessionId } } : {}) });
 }
 
+// One page render asks for the signed-in user in the root layout, the app layout and the page itself. React's per-request cache makes
+// that ONE lookup (it is keyed by the cookie value and lives only for the one request, so nothing is shared between people or requests).
+const resolveOncePerRequest = cache((cookieValue: string | undefined) => resolveSession(cookieValue));
+
 /** Next.js request-scoped helper (route handlers, server components, server actions). */
 export async function getSessionUser(): Promise<SessionUser | null> {
   const { cookies } = await import('next/headers');
   const jar = await cookies();
-  return resolveSession(jar.get(cookieName())?.value);
+  return resolveOncePerRequest(jar.get(cookieName())?.value);
 }

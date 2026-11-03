@@ -47,6 +47,46 @@ if (typeof window === 'undefined') {
   }).catch(() => {});
 }
 
+// ---- Three plain lists kept beside the stone stock: tools (blades...), material (finished slabs / tiles by colour and finish) and machinery
+// (small machines and their condition). Each is just rows to add, edit and count: no movements, no balances.
+export const StockTool = defineModel(
+  'StockTool',
+  {
+    name: { type: S, required: true, trim: true, maxlength: 160 }, // Tool Name, e.g. 14" blade
+    company: { type: S, trim: true, maxlength: 80 },
+    pieces: { type: N, min: 0, default: 0 },
+    rate: money(), // per piece
+  },
+  { indexes: [[{ name: 1 }], [{ company: 1 }]] }
+);
+
+export const StockMaterial = defineModel(
+  'StockMaterial',
+  {
+    colour: { type: S, required: true, trim: true, maxlength: 80 },
+    topFinish: { type: S, trim: true, maxlength: 60 },
+    edgeFinish: { type: S, trim: true, maxlength: 60 },
+    bottomFinish: { type: S, trim: true, maxlength: 60 },
+    size: { type: S, trim: true, maxlength: 40 }, // as written on the sheet, e.g. 72x24
+    thickness: { type: S, trim: true, maxlength: 40 }, // e.g. 20mm
+    pieces: { type: N, min: 0, default: 0 },
+    sqft: { type: N, min: 0, default: 0 },
+  },
+  { indexes: [[{ colour: 1 }]] }
+);
+
+export const StockMachinery = defineModel(
+  'StockMachinery',
+  {
+    name: { type: S, required: true, trim: true, maxlength: 120 }, // e.g. Grinder, Hand cutting machine
+    condition: { type: S, trim: true, maxlength: 60 }, // Ready, Bearing, Armature...: what is wrong with it, or Ready
+    repairingCost: money(),
+    purchasePrice: money(),
+    pieces: { type: N, min: 0, default: 0 },
+  },
+  { indexes: [[{ name: 1 }]] }
+);
+
 export const StockMovement = defineModel(
   'StockMovement',
   {

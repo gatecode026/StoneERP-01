@@ -73,8 +73,8 @@ const getDownloadAll = (who: Who, qs: string) =>
   ) as Promise<Response>;
 
 describe('Backups & Data Export System', () => {
-  it('defines 21 ERP sections with metadata and column specs', () => {
-    expect(BACKUP_SECTIONS.length).toBe(21);
+  it('defines 24 ERP sections with metadata and column specs', () => {
+    expect(BACKUP_SECTIONS.length).toBe(24);
     const emp = getSectionMeta('employees');
     expect(emp).toBeDefined();
     expect(emp?.name).toBe('Employees & Staff');
@@ -85,7 +85,7 @@ describe('Backups & Data Export System', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
 
-    expect(data.sections.length).toBe(21);
+    expect(data.sections.length).toBe(24);
     expect(data.totalRecords).toBeGreaterThanOrEqual(3);
 
     const empSec = data.sections.find((s: any) => s.id === 'employees');
@@ -167,7 +167,7 @@ describe('Backups & Data Export System', () => {
     expect(filenames.some((f) => f.includes('stockitems') && f.endsWith('.csv'))).toBe(true);
     expect(filenames.some((f) => f.includes('customers') && f.endsWith('.csv'))).toBe(true);
     expect(filenames.some((f) => f.includes('projects') && f.endsWith('.csv'))).toBe(true);
-    expect(filenames.length).toBe(22); // 21 sections + 1 README.txt
+    expect(filenames.length).toBe(25); // 24 sections + 1 README.txt
   });
 
   it('worker is forbidden from downloading all sections ZIP', async () => {
