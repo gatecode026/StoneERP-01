@@ -60,6 +60,15 @@ export const MachineEntry = defineModel(
     photo: S,
     remarks: { type: S, maxlength: 1000 },
     repairId: { type: OID },
+    // CNC & Pillar Machine / Baluster tracking
+    materialSize: { type: S, maxlength: 200 },
+    programName: { type: S, maxlength: 200 },
+    programSize: { type: S, maxlength: 200 },
+    bladeSize: { type: S, maxlength: 100 },
+    toolName: { type: S, maxlength: 200 },
+    toolsUsed: { type: N, min: 0 },
+    brokenToolsCount: { type: N, min: 0 },
+    toolBreakageReason: { type: S, maxlength: 500 },
   },
   {
     indexes: [

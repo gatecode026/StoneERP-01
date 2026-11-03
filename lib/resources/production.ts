@@ -35,22 +35,30 @@ const entryFields = {
   machineId: z.string().optional(),
   machineIds: z.array(z.string()).optional(),
   operatorCode: empCode,
-  startTime: timeStr.optional(), stopTime: timeStr.optional(), hourMeterStart: num().optional(), hourMeterEnd: num().optional(),
-  workDone: text(500).optional(), outputSqft: num(0, 1e6), pieces: num(0, 1e7).optional(), blockNo: num(1, 1e7).optional(),
+  startTime: timeStr.optional().or(z.literal('')), stopTime: timeStr.optional().or(z.literal('')), hourMeterStart: num().optional(), hourMeterEnd: num().optional(),
+  workDone: text(500).optional(), outputSqft: num(0, 1e6).optional().default(0), pieces: num(0, 1e7).optional(), blockNo: num(1, 1e7).optional(),
   wasteSqft: num(0, 1e6).optional(), wasteReason: text(300).optional(), stockItemId: oidStr.optional(),
   stoppedMins: num(0, 1440).optional(), stopReason: text(300).optional(), breakdown: z.boolean().optional(), bladeChanged: z.boolean().optional(), bladeCost: num().optional(),
   electricityUnits: num().optional(), electricityReadingStart: num().optional(), electricityReadingEnd: num().optional(), dieselLitres: num().optional(),
   photo: photo.optional(), remarks: text(1000).optional(),
+  materialSize: text(200).optional(),
+  programName: text(200).optional(),
+  programSize: text(200).optional(),
+  bladeSize: text(100).optional(),
+  toolName: text(200).optional(),
+  toolsUsed: num(0, 1000).optional(),
+  brokenToolsCount: num(0, 1000).optional(),
+  toolBreakageReason: text(500).optional(),
 };
 export const machineentries: ResourceDef = {
   key: 'machineentries', model: MachineEntry, label: (d) => `${d.machineName} ${d.date} ${d.shift}`,
-  listFields: ['date', 'shift', 'machineId', 'machineName', 'machineType', 'operatorCode', 'operatorName', 'startTime', 'stopTime', 'hoursRun', 'hourMeterStart', 'hourMeterEnd', 'workDone', 'outputSqft', 'pieces', 'blockNo', 'wasteSqft', 'wasteReason', 'stoppedMins', 'stopReason', 'breakdown', 'bladeChanged', 'bladeCost', 'electricityUnits', 'dieselLitres', 'remarks'],
-  sortable: ['date', 'createdAt', 'outputSqft'], defaultSort: '-date', searchFields: ['machineName', 'operatorName', 'workDone'],
+  listFields: ['date', 'shift', 'machineId', 'machineName', 'machineType', 'operatorCode', 'operatorName', 'startTime', 'stopTime', 'hoursRun', 'hourMeterStart', 'hourMeterEnd', 'workDone', 'outputSqft', 'pieces', 'blockNo', 'wasteSqft', 'wasteReason', 'stoppedMins', 'stopReason', 'breakdown', 'bladeChanged', 'bladeCost', 'electricityUnits', 'dieselLitres', 'remarks', 'photo', 'materialSize', 'programName', 'programSize', 'bladeSize', 'toolName', 'toolsUsed', 'brokenToolsCount', 'toolBreakageReason'],
+  sortable: ['date', 'createdAt', 'outputSqft'], defaultSort: '-date', searchFields: ['machineName', 'operatorName', 'workDone', 'programName', 'toolName'],
   dateFields: ['date'], filters: { date: 'date', machineId: 'oid', operatorCode: 'string', blockNo: 'number', shift: { enum: ['Day', 'Night'] }, breakdown: 'bool' },
   statFields: ['outputSqft', 'stoppedMins', 'wasteSqft', 'pieces'],
   serverOnly: ['machineName', 'machineType', 'operatorName', 'hoursRun', 'repairId'],
   create: z.object(entryFields).strict(),
-  update: z.object({ remarks: text(1000), photo, wasteReason: text(300), workDone: text(500) }).partial().strict(),
+  update: z.object({ remarks: text(1000), photo, wasteReason: text(300), workDone: text(500), materialSize: text(200), programName: text(200), programSize: text(200), bladeSize: text(100), toolName: text(200), toolsUsed: num(0, 1000), brokenToolsCount: num(0, 1000), toolBreakageReason: text(500) }).partial().strict(),
   lifecycle: {
     async create(ctx, input, auth) {
       const rawIds = (input.machineIds && input.machineIds.length > 0)
@@ -95,6 +103,17 @@ export const machineentries: ResourceDef = {
       }
 
       const { machineIds: _mIds, ...baseDoc } = input;
+      if (!baseDoc.startTime) delete (baseDoc as any).startTime;
+      if (!baseDoc.stopTime) delete (baseDoc as any).stopTime;
+      if (!baseDoc.workDone && baseDoc.programName) {
+        baseDoc.workDone = [
+          baseDoc.programName,
+          baseDoc.programSize ? '(' + baseDoc.programSize + ')' : '',
+          baseDoc.materialSize ? 'Size: ' + baseDoc.materialSize : '',
+          baseDoc.toolName ? 'Tool: ' + baseDoc.toolName : '',
+          baseDoc.bladeSize ? 'Blade: ' + baseDoc.bladeSize : '',
+        ].filter(Boolean).join(' ');
+      }
       const docsToInsert = machinesList.map((m) => ({
         ...baseDoc,
         date,

@@ -1,11 +1,11 @@
 'use client';
 import ImportData from '@/components/ImportData';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import CrudPage from '@/components/CrudPage';
-import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader } from '@/components/ui';
+import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader, Photo } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { MACHINE_TYPES, MACHINE_NAMES } from '@/lib/config';
 import { todayISO, addDays, fmtDate, monthOf, num, fmtMonth } from '@/lib/format';
@@ -23,6 +23,40 @@ export default function MachinesPage() {
   // monthly output is summed by the server (one aggregate), never by downloading the month's entries
   const monthEntries = useFetch(tab === 'monthly' ? `/api/machineentries/monthly?month=${month}` : null, [month]);
   const canManage = can('machines', 'create');
+
+  const machinesList = useFetch('/api/machines?limit=100');
+  const machinesMap = useMemo(() => {
+    const map = {};
+    for (const m of (machinesList.data?.data || [])) {
+      map[m._id] = m;
+    }
+    return map;
+  }, [machinesList.data]);
+
+  const isCnc = (form) => {
+    const name = String(form?.machineName || '');
+    const type = String(form?.machineType || '');
+    if (/\bcnc\b/i.test(name) || /\bcnc\b/i.test(type)) return true;
+    const ids = String(form?.machineId || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return ids.some((id) => {
+      const m = machinesMap[id];
+      return m && (/\bcnc\b/i.test(m.name) || /\bcnc\b/i.test(m.type));
+    });
+  };
+
+  const isPillar = (form) => {
+    const name = String(form?.machineName || '');
+    const type = String(form?.machineType || '');
+    if (/pillar/i.test(name) || /pillar/i.test(type) || /baluster/i.test(name) || /baluster/i.test(type)) return true;
+    const ids = String(form?.machineId || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return ids.some((id) => {
+      const m = machinesMap[id];
+      return m && (/pillar/i.test(m.name) || /pillar/i.test(m.type) || /baluster/i.test(m.name) || /baluster/i.test(m.type));
+    });
+  };
+
+  const isStandard = (form) => !isCnc(form) && !isPillar(form);
+  const isCncOrPillar = (form) => isCnc(form) || isPillar(form);
 
   const entryFields = [
     { name: 'date', label: 'Date', type: 'date', required: true },
@@ -43,30 +77,69 @@ export default function MachinesPage() {
       required: true,
       ref: { model: 'employees', valueKey: 'empCode', nameField: 'operatorName', label: (e) => `${e.name} (${e.job})`, query: { status: 'active', job: 'Worker / operator,Operator' } },
     },
-    { name: 'workDone', label: 'Work done', wide: true, placeholder: '600 × 600 × 30 mm slabs, natural finish' },
-    { name: 'outputSqft', label: 'Output (sq ft)', type: 'number', required: true },
-    { name: 'pieces', label: 'Output (pieces)', type: 'number' },
-    { name: 'photo', label: 'Photo', type: 'photo' },
-    { name: 'remarks', label: 'Remarks', type: 'textarea', wide: true },
+
+    // Standard Machine Fields (Bridge Cutter, Block Cutter, etc.)
+    { name: 'workDone', label: 'Work done', wide: true, placeholder: '600 × 600 × 30 mm slabs, natural finish', show: (form) => isStandard(form) },
+    { name: 'outputSqft', label: 'Output (sq ft)', type: 'number', required: true, show: (form) => isStandard(form) },
+    { name: 'pieces', label: 'Output (pieces)', type: 'number', show: (form) => isStandard(form) },
+    { name: 'photo', label: 'Photo', type: 'photo', show: (form) => isStandard(form) },
+    { name: 'remarks', label: 'Remarks', type: 'textarea', wide: true, show: (form) => isStandard(form) },
+
+    // CNC & Pillar Machine (Baluster) Fields
+    { name: 'startTime', label: 'Start time', type: 'time', placeholder: '09:30', show: (form) => isCncOrPillar(form) },
+    { name: 'stopTime', label: 'End time', type: 'time', placeholder: '17:00', show: (form) => isCncOrPillar(form) },
+    { name: 'materialSize', label: 'Material size', placeholder: '25" × 28" × 2"', show: (form) => isCncOrPillar(form) },
+    { name: 'programName', label: 'Program Name', required: true, show: (form) => isCncOrPillar(form) },
+    { name: 'programSize', label: 'Program size', placeholder: '600 × 600 × 17', show: (form) => isCncOrPillar(form) },
+
+    // Pillar Machine (Baluster) Specific Field
+    { name: 'bladeSize', label: 'Blade Size', placeholder: '24"', show: (form) => isPillar(form) },
+
+    // CNC Specific Fields
+    { name: 'toolName', label: 'Tool Name', show: (form) => isCnc(form) },
+    { name: 'toolsUsed', label: 'No. of tools used', type: 'number', placeholder: '2', show: (form) => isCnc(form) },
+    { name: 'brokenToolsCount', label: 'No. of broken tools in process', type: 'number', placeholder: '1', show: (form) => isCnc(form) },
+    { name: 'toolBreakageReason', label: 'Reasons for tool breakage', wide: true, show: (form) => isCnc(form) },
+
+    // CNC & Pillar Machine Shared Tail Fields
+    { name: 'stoppedMins', label: 'Stopped (minutes)', type: 'number', placeholder: '10', show: (form) => isCncOrPillar(form) },
+    { name: 'stopReason', label: 'Stop reason', wide: true, show: (form) => isCncOrPillar(form) },
+    { name: 'photo', label: 'Finished Product Image', type: 'photo', show: (form) => isCncOrPillar(form) },
+    { name: 'remarks', label: 'Remarks', type: 'textarea', wide: true, show: (form) => isCncOrPillar(form) },
   ];
 
   const columns = [
     { key: 'machineName', label: 'Machine', primary: true, render: (r) => <span>{r.machineName}<div className="text-[11px] text-char-500 font-normal">{r.operatorName} · {r.shift}</div></span> },
     { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
     { key: 'workDone', label: 'Work done', wide: true, render: (r) => (
-      <div>
-        <div className="text-sm text-char-900 leading-snug">{r.workDone || '—'}</div>
-        {r.remarks && <div className="text-xs text-char-500 italic mt-0.5">{r.remarks}</div>}
+      <div className="flex items-start gap-2.5">
+        {r.photo ? <Photo src={r.photo} thumb width={34} height={34} className="rounded shrink-0 border border-sand-200 object-cover mt-0.5" /> : null}
+        <div className="min-w-0">
+          <div className="text-sm text-char-900 leading-snug font-medium">{r.workDone || r.programName || '—'}</div>
+          {(r.materialSize || r.toolName || r.bladeSize || r.programSize) && (
+            <div className="text-xs text-char-500 mt-0.5">
+              {[r.materialSize && `Size: ${r.materialSize}`, r.programSize && `Prog: ${r.programSize}`, r.toolName && `Tool: ${r.toolName}`, r.bladeSize && `Blade: ${r.bladeSize}`].filter(Boolean).join(' · ')}
+            </div>
+          )}
+          {r.remarks && <div className="text-xs text-char-500 italic mt-0.5">{r.remarks}</div>}
+        </div>
       </div>
     )},
-    { key: 'outputSqft', label: 'Output', align: 'right', render: (r) => <b><T vars={{ n: num(r.outputSqft) }}>{'{n} sq ft'}</T>{r.pieces ? <span className="text-char-500 font-normal"> / <T vars={{ n: r.pieces }}>{'{n} pcs'}</T></span> : null}</b> },
+    { key: 'outputSqft', label: 'Output', align: 'right', render: (r) => (
+      r.outputSqft > 0 ? (
+        <b><T vars={{ n: num(r.outputSqft) }}>{'{n} sq ft'}</T>{r.pieces ? <span className="text-char-500 font-normal"> / <T vars={{ n: r.pieces }}>{'{n} pcs'}</T></span> : null}</b>
+      ) : r.pieces ? (
+        <b><T vars={{ n: r.pieces }}>{'{n} pcs'}</T></b>
+      ) : (
+        <span className="text-char-400">—</span>
+      )
+    )},
     { key: 'blockNo', label: 'Block', render: (r) => (r.blockNo ? `#${r.blockNo}` : '—') },
-    { key: 'hoursRun', label: 'Hours run', render: (r) => r.hoursRun ?? '—' },
+    { key: 'hoursRun', label: 'Hours run', render: (r) => (r.hoursRun != null ? `${r.hoursRun} h` : '—') },
     { key: 'stoppedMins', label: 'Stopped', render: (r) => (r.stoppedMins ? <span className={r.breakdown ? 'text-red-600 font-bold' : 'text-amber-700'}><T vars={{ n: r.stoppedMins }}>{'{n} min'}</T> · {r.stopReason}</span> : '—') },
   ];
 
   const baseQuery = { date };
-
 
   const byMachine = monthEntries.data?.byMachine || [];
   const byOperator = monthEntries.data?.byOperator || [];
@@ -85,6 +158,44 @@ export default function MachinesPage() {
         <CrudPage model="machineentries" baseQuery={baseQuery} title={t('machines')} subtitle="One entry per machine per shift · Daily cutting output & block consumption" label="Machine entry" addLabel="New entry" wide
           fields={entryFields} columns={columns} sort="-date,-createdAt" canEdit={() => false}
           exportName={`machine-entries-${date}`} onSaved={() => {}}
+          beforeSave={(body) => {
+            const cnc = isCnc(body);
+            const pillar = isPillar(body);
+            if (cnc || pillar) {
+              body.outputSqft = body.outputSqft || 0;
+              if (!body.workDone && body.programName) {
+                body.workDone = [
+                  body.programName,
+                  body.programSize ? `(${body.programSize})` : '',
+                  body.materialSize ? `Size: ${body.materialSize}` : '',
+                  body.toolName ? `Tool: ${body.toolName}` : '',
+                  body.bladeSize ? `Blade: ${body.bladeSize}` : '',
+                ].filter(Boolean).join(' ');
+              }
+              if (cnc) {
+                delete body.bladeSize;
+              } else if (pillar) {
+                delete body.toolName;
+                delete body.toolsUsed;
+                delete body.brokenToolsCount;
+                delete body.toolBreakageReason;
+              }
+            } else {
+              delete body.materialSize;
+              delete body.programName;
+              delete body.programSize;
+              delete body.bladeSize;
+              delete body.toolName;
+              delete body.toolsUsed;
+              delete body.brokenToolsCount;
+              delete body.toolBreakageReason;
+            }
+            if (!body.startTime) delete body.startTime;
+            if (!body.stopTime) delete body.stopTime;
+            if (!body.remarks) delete body.remarks;
+            if (!body.stopReason) delete body.stopReason;
+            return body;
+          }}
           headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /></>}
           facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
           summary={(rows, { facets: f }) => {
@@ -105,7 +216,28 @@ export default function MachinesPage() {
             );
           }}
           rowClass={(r) => (r.breakdown ? 'bg-red-50/60' : '')}
-          exportColumns={[{ key: 'date', label: 'Date' }, { key: 'shift', label: 'Shift' }, { key: 'machineName', label: 'Machine' }, { key: 'operatorName', label: 'Operator' }, { key: 'outputSqft', label: 'Output sq ft' }, { key: 'pieces', label: 'Pieces' }, { key: 'blockNo', label: 'Block' }, { key: 'stoppedMins', label: 'Stopped min' }, { key: 'stopReason', label: 'Reason' }]}
+          exportColumns={[
+            { key: 'date', label: 'Date' },
+            { key: 'shift', label: 'Shift' },
+            { key: 'machineName', label: 'Machine' },
+            { key: 'operatorName', label: 'Operator' },
+            { key: 'programName', label: 'Program Name' },
+            { key: 'programSize', label: 'Program size' },
+            { key: 'materialSize', label: 'Material size' },
+            { key: 'toolName', label: 'Tool Name' },
+            { key: 'bladeSize', label: 'Blade Size' },
+            { key: 'toolsUsed', label: 'No. of tools used' },
+            { key: 'brokenToolsCount', label: 'No. of broken tools in process' },
+            { key: 'toolBreakageReason', label: 'Reasons for tool breakage' },
+            { key: 'outputSqft', label: 'Output sq ft' },
+            { key: 'pieces', label: 'Pieces' },
+            { key: 'startTime', label: 'Start time' },
+            { key: 'stopTime', label: 'End time' },
+            { key: 'hoursRun', label: 'Hours run' },
+            { key: 'stoppedMins', label: 'Stopped min' },
+            { key: 'stopReason', label: 'Reason' },
+            { key: 'remarks', label: 'Remarks' },
+          ]}
         />
       )}
 
