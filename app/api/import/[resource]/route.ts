@@ -109,7 +109,9 @@ export const POST = withAuth((c) => spec(c.params).resource as Resource, 'create
   if (!good.length) throw badRequest('No valid rows to import');
   for (const r of good) assertWritable(auth.perm, def.key, Object.keys(r.data!)); // e.g. cost rate needs cost access
   const base = await auth.svc({ confirmed: s.confirmed });
-  const imported = await withTxn(async (session) => {
+  let imported: number;
+  try {
+    imported = await withTxn(async (session) => {
     const ctx: SvcCtx = { ...base, session };
     for (const r of good) {
       const input = r.data!;
@@ -121,6 +123,16 @@ export const POST = withAuth((c) => spec(c.params).resource as Resource, 'create
           if (def.lifecycle?.afterCreate) await def.lifecycle.afterCreate(ctx, created.toObject());
         }
       } catch (e: any) {
+        const isTransient =
+          e?.hasErrorLabel?.('TransientTransactionError') ||
+          e?.errorLabels?.includes?.('TransientTransactionError') ||
+          e?.code === 112 ||
+          e?.codeName === 'WriteConflict' ||
+          /write conflict/i.test(e?.message ?? '');
+        if (isTransient) {
+          // Bubble up transient write conflicts so withTransaction can auto-retry the transaction
+          throw e;
+        }
         // all-or-nothing: say which row stopped the import
         throw badRequest(`Row ${r.row}: ${e?.message ?? 'could not be saved'} — nothing was imported`);
       }
@@ -128,5 +140,17 @@ export const POST = withAuth((c) => spec(c.params).resource as Resource, 'create
     await writeAudit({ resource: def.key, refId: fileHash, action: 'bulk_import', label: `${good.length} ${s.noun} from ${file.name}`, changes: { imported: { to: good.length }, skipped: { to: checked.length - good.length } }, requestId: auth.requestId }, base.actor, session);
     return good.length;
   });
+  } catch (e: any) {
+    const isTransient =
+      e?.hasErrorLabel?.('TransientTransactionError') ||
+      e?.errorLabels?.includes?.('TransientTransactionError') ||
+      e?.code === 112 ||
+      e?.codeName === 'WriteConflict' ||
+      /write conflict/i.test(e?.message ?? '');
+    if (isTransient) {
+      throw conflict('Database is currently busy with other updates. Please try importing again in a moment.');
+    }
+    throw e;
+  }
   return { committed: true, imported, skipped: checked.length - imported, ...summary };
 });
