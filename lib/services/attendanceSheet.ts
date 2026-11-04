@@ -82,14 +82,36 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
   const teamFilter: Record<string, any>[] = [base, teamSf];
   if (Object.keys(roleCond).length) teamFilter.push(roleCond);
 
-  const teamEmps = (await Employee.find({ $and: teamFilter }, 'empCode shiftId').lean()) as any[];
+  // Everything the screen needs that does not depend on something else is asked for together, not one after the other: the team, the day's
+  // marks and (unless a status card was chosen, which needs the marks first) the page of people. The marks are read for the whole day and
+  // narrowed to the team here, which is what the old `empCode in team` query returned.
+  const status = (opts.status || '').toLowerCase().trim();
+  const q = opts.q?.trim().slice(0, 40);
+  const search = q ? { $or: [{ name: new RegExp('^' + escapeRe(q), 'i') }, { empCode: new RegExp('^' + escapeRe(q), 'i') }, { job: new RegExp('^' + escapeRe(q), 'i') }] } : {};
+  const statusCard = ['open', 'unmarked', 'present', 'absent', 'half', 'leave'].includes(status);
+  const pageFilterFor = (matchingCodes: string[] | null) => {
+    const andFilter: Record<string, any>[] = [base, teamSf];
+    if (Object.keys(roleCond).length) andFilter.push(roleCond);
+    if (Object.keys(search).length) andFilter.push(search);
+    if (matchingCodes) andFilter.push({ empCode: { $in: matchingCodes } });
+    if (opts.after) andFilter.push({ empCode: { $gt: opts.after.toUpperCase() } });
+    return { $and: andFilter };
+  };
+  const findPeople = (f: Record<string, any>) => Employee.find(f, 'empCode name job shiftId')
+    .sort({ empCode: 1 })
+    .skip(opts.page && opts.page > 1 ? (Math.min(opts.page, 200) - 1) * limit : 0)
+    .limit(limit + 1)
+    .lean() as unknown as Promise<any[]>;
+  const [teamEmps, allMarks, earlyPeople] = await Promise.all([
+    Employee.find({ $and: teamFilter }, 'empCode shiftId').lean() as unknown as Promise<any[]>,
+    Attendance.find({ date, isVoid: false }).lean() as unknown as Promise<any[]>,
+    statusCard ? Promise.resolve(null) : findPeople(pageFilterFor(null)),
+  ]);
   const teamCodes = teamEmps.map((e) => e.empCode);
   const empShift = new Map(teamEmps.map((e) => [e.empCode, e]));
   const now = new Date();
-
-  // Load all team records for the day to compute exact counts and statuses
-  const teamMarks: any[] = await Attendance.find({ date, isVoid: false, empCode: { $in: teamCodes } }).lean();
-  const teamMarkMap = new Map(teamMarks.map((m) => [m.empCode, m]));
+  const teamCodeSet = new Set(teamCodes);
+  const teamMarkMap = new Map(allMarks.filter((m) => teamCodeSet.has(m.empCode)).map((m) => [m.empCode, m]));
 
   const counts: Record<string, number> = { present: 0, absent: 0, half: 0, leave: 0 };
   let openCount = 0;
@@ -118,7 +140,6 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
   }
 
   // Filter by status if user clicked one of the cards (present, absent, half, leave, unmarked, open)
-  const status = (opts.status || '').toLowerCase().trim();
   let matchingCodes: string[] | null = null;
   if (status === 'open') {
     matchingCodes = [...openSet];
@@ -128,22 +149,9 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
     matchingCodes = teamEmps.filter((e) => statusMap.get(e.empCode) === status).map((e) => e.empCode);
   }
 
-  const q = opts.q?.trim().slice(0, 40);
-  const search = q ? { $or: [{ name: new RegExp('^' + escapeRe(q), 'i') }, { empCode: new RegExp('^' + escapeRe(q), 'i') }, { job: new RegExp('^' + escapeRe(q), 'i') }] } : {};
-  const andFilter: Record<string, any>[] = [base, teamSf];
-  if (Object.keys(roleCond).length) andFilter.push(roleCond);
-  if (Object.keys(search).length) andFilter.push(search);
-  if (matchingCodes) andFilter.push({ empCode: { $in: matchingCodes } });
-  if (opts.after) andFilter.push({ empCode: { $gt: opts.after.toUpperCase() } });
-
-  const pageFilter = { $and: andFilter };
   const total = matchingCodes ? matchingCodes.length : teamCodes.length;
 
-  const people = (await Employee.find(pageFilter, 'empCode name job shiftId')
-    .sort({ empCode: 1 })
-    .skip(opts.page && opts.page > 1 ? (Math.min(opts.page, 200) - 1) * limit : 0)
-    .limit(limit + 1)
-    .lean()) as any[];
+  const people = earlyPeople ?? (await findPeople(pageFilterFor(matchingCodes)));
 
   const hasMore = people.length > limit;
   if (hasMore) people.pop();
@@ -152,6 +160,7 @@ export async function attendanceSheet(auth: AuthCtx, date: string, opts: { q?: s
   // which of these rows this user may mark / fix / punch for / decide overtime for (the screen only enables buttons for those)
   const allowed = async (resource: 'attendance' | 'punches', action: 'create' | 'edit' | 'approve') => {
     if (!auth.perm.can(resource, action)) return new Set<string>();
+    if (auth.perm.scope(resource, action) === 'all') return new Set<string>(codes); // "everybody": nothing to look up
     const sf = await scopeFilter(auth.user, auth.perm, resource, action);
     return new Set<string>(((await Employee.find({ $and: [{ empCode: { $in: codes } }, sf] }, 'empCode').lean()) as any[]).map((e) => e.empCode));
   };

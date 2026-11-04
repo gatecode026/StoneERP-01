@@ -1,13 +1,22 @@
 'use client';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { PageHeader } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { todayISO, fmtDate } from '@/lib/format';
 import { HomeBody, HomeError, HomeSkeleton } from '@/components/home/parts';
-import { OwnerHome } from '@/components/home/OwnerDash';
-import { AccountantHome, ManagerHome, PresetHome, SalespersonHome, SupervisorHome, WorkerHome } from '@/components/home/RoleHomes';
-import UserManagementModal from '@/components/users/UserManagementModal';
-import DailyTaskModal from '@/components/tasks/DailyTaskModal';
+// Each person gets ONE home, so the code of the others is not downloaded: the Owner's dashboard and the role boards are separate files
+// (still drawn on the server with the page, so nothing flashes). The two pop-ups are fetched only when somebody opens them.
+const OwnerHome = dynamic(() => import('@/components/home/OwnerDash').then((m) => m.OwnerHome));
+const roleHome = (name) => dynamic(() => import('@/components/home/RoleHomes').then((m) => m[name]));
+const AccountantHome = roleHome('AccountantHome');
+const ManagerHome = roleHome('ManagerHome');
+const PresetHome = roleHome('PresetHome');
+const SalespersonHome = roleHome('SalespersonHome');
+const SupervisorHome = roleHome('SupervisorHome');
+const WorkerHome = roleHome('WorkerHome');
+const UserManagementModal = dynamic(() => import('@/components/users/UserManagementModal'), { ssr: false });
+const DailyTaskModal = dynamic(() => import('@/components/tasks/DailyTaskModal'), { ssr: false });
 import { Users, ListChecks } from 'lucide-react';
 import T from '@/components/T';
 
@@ -93,7 +102,7 @@ export default function HomeClient({ initialData = null, initialDate }) {
     <div>
       {header}
       <HomeBody>{body}</HomeBody>
-      {(kind === 'owner' || can('tasks', 'create')) && (
+      {dailyTaskOpen && (kind === 'owner' || can('tasks', 'create')) && (
         <DailyTaskModal
           open={dailyTaskOpen}
           onClose={() => setDailyTaskOpen(false)}
@@ -101,7 +110,7 @@ export default function HomeClient({ initialData = null, initialDate }) {
           defaultDate={date}
         />
       )}
-      {kind === 'owner' && (
+      {userModalOpen && kind === 'owner' && (
         <UserManagementModal
           open={userModalOpen}
           onClose={() => setUserModalOpen(false)}

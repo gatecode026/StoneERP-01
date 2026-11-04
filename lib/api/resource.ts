@@ -71,19 +71,22 @@ export async function listResource(auth: AuthCtx, def: ResourceDef) {
   const projection = Object.fromEntries(lq.select.map((f) => [f, 1]));
   projection._id = 1;
   const baseFilter = buildFilter({ ...lq, cursor: undefined }, def, scope);
-  const rows: any[] = await def.model
-    .find(filter, projection)
-    .sort({ [lq.sortField]: lq.sortDir, _id: lq.sortDir })
-    .skip(lq.page ? (lq.page - 1) * lq.limit : 0)
-    .limit(lq.limit + 1)
-    .lean();
+  const [rows, total]: [any[], number | undefined] = await Promise.all([
+    def.model
+      .find(filter, projection)
+      .sort({ [lq.sortField]: lq.sortDir, _id: lq.sortDir })
+      .skip(lq.page ? (lq.page - 1) * lq.limit : 0)
+      .limit(lq.limit + 1)
+      .lean(),
+    lq.count ? def.model.countDocuments(baseFilter, { limit: 10001 }) : Promise.resolve(undefined),
+  ]);
   const hasMore = rows.length > lq.limit;
   if (hasMore) rows.pop();
   const last = rows[rows.length - 1];
   const nextCursor = hasMore && last ? encodeCursor(lq.sortField === '_id' ? null : last[lq.sortField], last._id) : null;
   const out: Record<string, unknown> = { data: rows.map((r) => stripNulls(projectDoc(auth.perm, def.key, r))), nextCursor };
   if (lq.page) out.page = lq.page;
-  if (lq.count) out.total = await def.model.countDocuments(baseFilter, { limit: 10001 });
+  if (total !== undefined) out.total = total;
   return jsonWithEtag(auth.req, out); // unchanged lists answer 304 with no body
 }
 

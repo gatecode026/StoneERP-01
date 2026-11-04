@@ -2,18 +2,17 @@
 import ImportData from '@/components/ImportData';
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { inViewChart } from '@/components/charts/InView';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { fmtDate, todayISO, addDays, num2, inr, monthOf, daysInMonth } from '@/lib/format';
 import T from '@/components/T';
 
-const load = () => <div className="h-64 skeleton" />;
-const DieselTrendChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.DieselTrendChart), { ssr: false, loading: load });
-const VehicleDieselChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.VehicleDieselChart), { ssr: false, loading: load });
-const EfficiencyChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.EfficiencyChart), { ssr: false, loading: load });
-const PapersChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.PapersChart), { ssr: false, loading: load });
+const DieselTrendChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.DieselTrendChart));
+const VehicleDieselChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.VehicleDieselChart));
+const EfficiencyChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.EfficiencyChart));
+const PapersChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.PapersChart));
 
 // the last n months, oldest first
 const monthsBack = (month, n) => { const [y, m] = month.split('-').map(Number); return Array.from({ length: n }, (_, i) => new Date(Date.UTC(y, m - 1 - (n - 1 - i), 1)).toISOString().slice(0, 7)); };

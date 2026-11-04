@@ -1,18 +1,17 @@
 'use client';
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { inViewChart } from '@/components/charts/InView';
 import { useApp, useFetch } from '@/components/Providers';
 import T from '@/components/T';
 import { RoleGuard, PageHeader, Tabs, DataList, StatCard, Badge, ExportBtn, Pagination } from '@/components/ui';
 import { downloadCSV } from '@/lib/client';
 import { inr, num, num2, fmtDate } from '@/lib/format';
 
-const load = () => <div className="h-64 skeleton" />;
-const BlockYieldChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.BlockYieldChart), { ssr: false, loading: load });
-const YieldTrendChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.YieldTrendChart), { ssr: false, loading: load });
-const CostBreakdownChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.CostBreakdownChart), { ssr: false, loading: load });
-const GroupYieldChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.GroupYieldChart), { ssr: false, loading: load });
+const BlockYieldChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.BlockYieldChart));
+const YieldTrendChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.YieldTrendChart));
+const CostBreakdownChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.CostBreakdownChart));
+const GroupYieldChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.GroupYieldChart));
 
 export default function YieldPage() {
   const { t, tr, can } = useApp();

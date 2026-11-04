@@ -6,8 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
 import { Plus, Lock, Check, X, Pencil, RotateCcw, Eye, Boxes, Calendar, ChevronLeft, ChevronRight, Trash2, Camera, Maximize2, Download } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu, Photo, PhotoModal } from '@/components/ui';
+import { RoleGuard, PageHeader, Tabs, Sheet, Field, PhotoInput, SpeakButton, Badge, SkeletonList, Empty, ExportBtn, Pager, ActionMenu, Photo, PhotoModal } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
+import EmployeeMonthly from '@/components/daily/EmployeeMonthly';
 import MultiLookupSelect from '@/components/MultiLookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit, fileUrl } from '@/lib/client';
@@ -39,6 +40,8 @@ export default function DailyReportPage() {
   const sp = useSearchParams();
   const isWorker = scopeOf(perm, 'dailyreports', 'create') === 'own'; // own scope: write only my report
   const [date, setDate] = useState(sp.get('date') || todayISO());
+  // 'day': every employee's report for one day (the default). 'employee': one employee's reports for a whole month.
+  const [view, setView] = useState(sp.get('view') === 'employee' ? 'employee' : 'day');
   // workers see their own recent reports; everybody else sees the chosen day, a page at a time
   const day = useNumberedList(isWorker ? null : '/api/dailyreports', { date, sort: 'empName' }, { size: 25 });
   const mine = useFetch(isWorker ? '/api/dailyreports?sort=-date&limit=35' : null);
@@ -467,10 +470,10 @@ export default function DailyReportPage() {
 
   return (
     <RoleGuard perm="dailyreports">
-      <PageHeader title={t('dailyReport')} subtitle={isWorker ? 'What you did today, in your own words' : tr("Every employee's report for {d}", { d: fmtDate(date) })}
-        actions={<><ImportData resource="dailyreports" perm="dailyreports" noun="daily work reports" hint="employee and work done are required" />
-          {!isWorker && <input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} />}
-          {!isWorker && can('dailyreports', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/dailyreports?format=xlsx&${toQuery({ date, sort: 'empName' })}`)} />}
+      <PageHeader title={t('dailyReport')} subtitle={view === 'employee' ? 'Every report one employee submitted, month by month' : isWorker ? 'What you did today, in your own words' : tr("Every employee's report for {d}", { d: fmtDate(date) })}
+        actions={<>{view === 'day' && <ImportData resource="dailyreports" perm="dailyreports" noun="daily work reports" hint="employee and work done are required" />}
+          {!isWorker && view === 'day' && <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} />}
+          {!isWorker && view === 'day' && can('dailyreports', 'export') && rows.length > 0 && <ExportBtn onClick={() => window.location.assign(`/api/export/dailyreports?format=xlsx&${toQuery({ date, sort: 'empName' })}`)} />}
           {can('dailyreports', 'create') && (
             <button
               type="button"
@@ -648,7 +651,11 @@ export default function DailyReportPage() {
         </div>
       )}
 
-      {isWorker ? (
+      <Tabs value={view} onChange={setView} tabs={[{ key: 'day', label: 'Daily reports' }, { key: 'employee', label: isWorker ? 'My monthly report' : 'Employee monthly report' }]} />
+
+      {view === 'employee' ? (
+        <EmployeeMonthly onOpen={openDetail} ownCode={isWorker ? session?.empCode : null} canExport={can('dailyreports', 'export')} />
+      ) : isWorker ? (
         mine.loading ? <SkeletonList /> : (mine.data || []).length ? renderList(mine.data) : <Empty text="No reports yet — fill today's report" />
       ) : loading ? <SkeletonList /> : (
         <>

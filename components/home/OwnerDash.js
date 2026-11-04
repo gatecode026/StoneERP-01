@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, CheckSquare, ClipboardList, Cog, FolderKanban, HandCoins, Hourglass, IndianRupee, Landmark, Package, Receipt, Users } from 'lucide-react';
 import { cx } from '@/components/ui';
@@ -208,6 +208,9 @@ export function OwnerHome({ data }) {
   const pend = data.ageing?.total ?? d.sales?.pending;
   const over30 = (data.ageing?.buckets || []).slice(2).reduce((tot, b) => tot + b.amount, 0);
   const total = d.cash ? d.cash.inHand + d.cash.bank : 0;
+  // Every section below the six cards sits in its own Suspense boundary. Nothing here ever waits (the content is already in the page), but
+  // React hydrates each boundary as a separate small task instead of one long block, so the phone stays responsive while the page wakes up.
+  const part = (node) => <Suspense fallback={null}>{node}</Suspense>;
 
   return (
     <div>
@@ -278,10 +281,10 @@ export function OwnerHome({ data }) {
       </div>
 
       {/* Business pulse */}
-      <div className="mt-4"><Pulse series={s} /></div>
+      {part(<div className="mt-4"><Pulse series={s} /></div>)}
 
       {/* Graphs & Detailed Activity */}
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+      {part(<div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <Card title={<T>Machine output and idle time</T>} href="/machines" denied={!d.machines} empty={!s.length || !('sqft' in s[0]) || quiet(s.slice(-14), ['sqft', 'idleHours'])} emptyText={<T>No machine output in the last 14 days</T>}>
           <OwnerOutputChart series={s.slice(-14)} />
           <p className="text-[11px] text-slate-500 mt-1 font-mono"><T>Last 14 days. The line is the hours machines stood idle.</T></p>
@@ -291,15 +294,15 @@ export function OwnerHome({ data }) {
           <p className="text-[11px] text-slate-500 mt-1 font-mono"><T>Last 14 days.</T></p>
         </Card>
         <MachinesToday d={d} />
-      </div>
+      </div>)}
 
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+      {part(<div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <ExpensesToday d={d} />
         <Receivables ageing={data.ageing} />
         <Money d={d} series={s} />
-      </div>
+      </div>)}
 
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+      {part(<div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <StockLevels rows={data.stockLevels} />
         <AlertsCard d={d} />
         {d.reports && (
@@ -311,14 +314,14 @@ export function OwnerHome({ data }) {
             </>}
           </Card>
         )}
-      </div>
+      </div>)}
 
-      <div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
+      {part(<div className="grid lg:grid-cols-3 gap-4 items-start mt-4">
         <div className="lg:col-span-2"><ProfitCard profit={data.profit} className="" /></div>
         <ReportPreview d={d} />
-      </div>
+      </div>)}
 
-      <OwnerChat date={data.date} />
+      {part(<OwnerChat date={data.date} />)}
     </div>
   );
 }

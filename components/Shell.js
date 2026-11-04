@@ -31,7 +31,7 @@ function Brand({ compact }) {
       <img src="/logo-icon.png" alt="Vipul Stone Suppliers" className="w-9 h-9 object-contain shrink-0" />
       <div className="min-w-0 leading-tight">
         <div className="font-bold text-sm tracking-tight text-slate-900 truncate">{t('appName')}</div>
-        <div className="text-[10px] text-[#A07856] truncate font-medium"><T>RD Natural Stones · Bijoliya</T></div>
+        <div className="text-[10px] text-[#8A5C38] truncate font-medium"><T>RD Natural Stones · Bijoliya</T></div>
       </div>
     </div>
   );
@@ -40,7 +40,7 @@ function Brand({ compact }) {
 function LangToggle() {
   const { lang, setLang, tr } = useApp();
   return (
-    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-none border border-[#D4C2AB] bg-[#FAF7F2] text-xs font-semibold text-[#7D5333] hover:bg-[#F2ECE3] transition shadow-none font-mono" aria-label={tr('Language')}>
+    <button onClick={() => setLang(lang === 'en' ? 'hi' : 'en')} className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-none border border-[#D4C2AB] bg-[#FAF7F2] text-xs font-semibold text-[#7D5333] hover:bg-[#F2ECE3] transition shadow-none font-mono" aria-label={`${tr('Language')}: ${lang === 'en' ? 'हिं' : 'EN'}`}>
       <Languages size={14} className="text-[#8A5C38]" /> {lang === 'en' ? 'हिं' : 'EN'}
     </button>
   );
@@ -117,7 +117,7 @@ export default function Shell({ children }) {
       >
         <div className={cx('p-3.5 flex items-center border-b border-slate-200 shrink-0', collapsed ? 'justify-center' : 'justify-between')}>
           <Brand compact={collapsed} />
-          <button className="p-1.5 rounded-none hover:bg-[#F7F3EE] text-[#A07856] hover:text-[#7D5333] transition" onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
+          <button className="p-1.5 rounded-none hover:bg-[#F7F3EE] text-[#8A5C38] hover:text-[#7D5333] transition" aria-label={collapsed ? tr('Expand menu') : tr('Collapse menu')} aria-expanded={!collapsed} onClick={() => { setCollapsed(!collapsed); try { localStorage.setItem('vss_side', collapsed ? '0' : '1'); } catch {} }}>
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
@@ -125,7 +125,7 @@ export default function Shell({ children }) {
           <NavLink it={DASH} />
           {groups.map((g) => (
             <div key={g.key} className="pt-2">
-              {!collapsed && <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#A07856] font-mono">{t(g.key)}</div>}
+              {!collapsed && <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#8A5C38] font-mono">{t(g.key)}</div>}
               <div className="space-y-0.5">{g.items.map((it) => <NavLink key={it.key} it={it} />)}</div>
             </div>
           ))}

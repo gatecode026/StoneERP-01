@@ -1,14 +1,13 @@
 'use client';
 import { useState } from 'react';
-import dynamic from 'next/dynamic';
+import { inViewChart } from '@/components/charts/InView';
 import { StatCard, DataList } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
 import { addDays, todayISO, fmtDate, inr } from '@/lib/format';
 import T from '@/components/T';
 
-const load = () => <div className="h-64 skeleton" />;
-const PurchaseDailyChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.PurchaseDailyChart), { ssr: false, loading: load });
-const PurchaseByChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.PurchaseByChart), { ssr: false, loading: load });
+const PurchaseDailyChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.PurchaseDailyChart));
+const PurchaseByChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.PurchaseByChart));
 
 /** Purchases, day by day: what was bought each day, how much is paid and what is still to pay; top suppliers and items. */
 export default function PurchaseDaily() {

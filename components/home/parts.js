@@ -1,24 +1,16 @@
 'use client';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 import { Section, Skeleton, cx } from '@/components/ui';
 import { useH } from './strings';
 
-// charts are loaded on demand so they never weigh down the first paint of a home screen
-const loading = () => <div className="h-56 bg-slate-100 animate-pulse border border-slate-200 rounded-none" />;
-export const TrendChart = dynamic(() => import('./Charts').then((m) => m.TrendChart), { ssr: false, loading });
-export const ExpensePie = dynamic(() => import('./Charts').then((m) => m.ExpensePie), { ssr: false, loading });
-export const AgeingChart = dynamic(() => import('./Charts').then((m) => m.AgeingChart), { ssr: false, loading });
-// the Owner's graphs
-const own = (name) => dynamic(() => import('./OwnerCharts').then((m) => m[name]), { ssr: false, loading });
-export const OwnerPulseChart = own('PulseChart');
-export const OwnerOutputChart = own('OutputChart');
-export const OwnerAttendanceChart = own('AttendanceChart');
-export const OwnerBalanceChart = own('BalanceChart');
-export const OwnerExpenseDonut = own('ExpenseDonut');
-export const OwnerOwedChart = own('OwedChart');
+// the graphs are small plain-SVG components (components/charts/Lite.js), drawn on the server with the page: no charting library to load
+export { AgeingChart } from './Charts';
+export {
+  PulseChart as OwnerPulseChart, OutputChart as OwnerOutputChart, AttendanceChart as OwnerAttendanceChart,
+  BalanceChart as OwnerBalanceChart, ExpenseDonut as OwnerExpenseDonut, OwedChart as OwnerOwedChart,
+} from './OwnerCharts';
 export const HEAD_COLORS = ['#0F172A', '#2563EB', '#16A34A', '#D97706', '#DC2626', '#475569', '#7C3AED', '#0D9488'];
 
 /** A sharp, rectangular home-screen card: zero border-radius, crisp 1px border, no gradients. */

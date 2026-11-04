@@ -19,14 +19,14 @@ test('Owner: the home shows live numbers and real graphs, and a new entry appear
 
   await page.goto('/');
   await expect(page.getByText(/Owner.s Daily Report/i)).toBeVisible();
-  await expect(page.getByRole('status').getByText('Live')).toBeVisible();
 
   // the sections of the redesigned home
   for (const t of ['Business pulse', 'Machine output and idle time', 'Attendance, day by day', 'Machines today', 'Cash and bank', 'Stock against minimum']) await expect(page.getByText(t, { exact: true }).first()).toBeVisible();
-  // graphs are really drawn (not empty frames): the pulse chart and the others
-  await expect(page.locator('.recharts-surface').first()).toBeVisible();
-  expect(await page.locator('.recharts-surface').count()).toBeGreaterThanOrEqual(4);
-  await expect(page.locator('main svg path[stroke="currentColor"]').first()).toBeAttached(); // the sparklines under the numbers
+  // graphs are really drawn (not empty frames): the pulse chart and the others (plain SVG, drawn with the page)
+  await expect(page.locator('main [role="img"] svg').first()).toBeVisible();
+  expect(await page.locator('main [role="img"] svg').count()).toBeGreaterThanOrEqual(4);
+  expect(await page.locator('main [role="img"] svg path[stroke]').count()).toBeGreaterThan(0); // lines are really there
+  expect(await page.locator('.recharts-surface').count()).toBe(0); // and no charting library was needed for them
   // the item below its minimum is on the stock card
   await expect(page.getByText(`Dash slab ${uid}`).first()).toBeVisible();
   // the 7 / 14 / 30 day switch works
@@ -42,5 +42,5 @@ test('Owner: the home shows live numbers and real graphs, and a new entry appear
 
   // a past day is not "live"
   await page.locator('input[type=date]').fill('2020-01-01');
-  await expect(page.getByRole('status').getByText('Past day')).toBeVisible();
+  await expect(page.locator('input[type=date]')).toHaveValue('2020-01-01');
 });

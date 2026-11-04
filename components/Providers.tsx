@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, startTransition, use, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
 import { translate, translatePhrase } from '@/lib/i18n';
@@ -52,14 +52,18 @@ export function useTx() {
   return useCallback((v: any) => (typeof v === 'string' ? tr(v) : v), [tr]);
 }
 
+// The Hindi dictionary (126 KB) is its own file, cached by the browser for good: it is NOT part of the page data (it used to be sent again with every
+// page and every refresh, which made a Hindi page three times as heavy). The server renders Hindi straight away; in the browser `use()` holds the
+// page's hydration for the (cached) file, so the text never flashes from English to Hindi. A request for it starts as soon as this file runs.
+let hiPromise: Promise<Record<string, string>> | null = null;
+const loadHi = () => (hiPromise ??= import('@/lib/hi').then((m) => m.HI as Record<string, string>));
+if (typeof document !== 'undefined' && document.documentElement.lang === 'hi') void loadHi();
+
 // `initialSession` comes from the server (real, signed, server-side session) – the browser never decides who it is.
-export function Providers({ children, initialSession = null, initialLang = 'en', hiDict = null }: { children: ReactNode; initialSession?: ClientSession | null; initialLang?: 'en' | 'hi'; hiDict?: Record<string, string> | null }) {
+export function Providers({ children, initialSession = null, initialLang = 'en' }: { children: ReactNode; initialSession?: ClientSession | null; initialLang?: 'en' | 'hi' }) {
   const router = useRouter();
   const [lang, setLangState] = useState<'en' | 'hi'>(initialLang);
-  // the Hindi dictionary arrives with the page for people who use Hindi; someone who switches to Hindi later loads it once, on demand
-  const [dict, setDict] = useState<Record<string, string> | null>(hiDict);
-  useEffect(() => { if (hiDict) setDict(hiDict); }, [hiDict]);
-  useEffect(() => { if (lang === 'hi' && !dict) void import('@/lib/hi').then((m) => setDict(m.HI as Record<string, string>)); }, [lang, dict]);
+  const dict = lang === 'hi' ? use(loadHi()) : null;
   // Always follow the server's answer: signing in/out re-renders the root layout (router.refresh) without remounting this component.
   const session = initialSession;
   const [online, setOnline] = useState(true);
@@ -68,7 +72,7 @@ export function Providers({ children, initialSession = null, initialLang = 'en',
 
   useEffect(() => {
     if (!initialSession) {
-      try { const l = localStorage.getItem('vss_lang'); if (l === 'hi' || l === 'en') setLangState(l); } catch {}
+      try { const l = localStorage.getItem('vss_lang'); if (l === 'hi' || l === 'en') startTransition(() => setLangState(l)); } catch {}
     }
     setOnline(navigator.onLine);
     const upd = async () => { const st = await queueStats(); setQueued(st.pending + st.failed); setQueueFailed(st.failed); return st; };
@@ -114,16 +118,25 @@ export function Providers({ children, initialSession = null, initialLang = 'en',
     };
   }, [initialSession, router]);
 
-  // offline shell: register the service worker (production only) and, once signed in, warm the screens a worker needs without a network
+  // Offline shell: register the service worker (production only) and, once signed in, keep a copy of the screens a worker needs without a network.
+  // Each of those copies is a full page render on the server, so it is done sparingly: only screens this person may open, at most once every
+  // 6 hours on this device, and only when the browser is idle (it used to fetch five pages on EVERY load and every refresh, for everybody).
+  const sessionId = initialSession?.id;
   useEffect(() => {
     if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
     navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).then((reg) => {
-      if (initialSession) reg.active?.postMessage({ type: 'warm', urls: ['/', '/daily-report', '/attendance', '/tasks', '/salary'] });
+      if (!initialSession) return;
+      try { if (Date.now() - Number(localStorage.getItem('vss_warm') || 0) < 6 * 3_600_000) return; } catch { /* storage blocked: warm anyway */ }
+      const urls = ([['/daily-report', 'dailyreports'], ['/attendance', 'attendance'], ['/tasks', 'tasks'], ['/salary', 'salaryslips']] as const)
+        .filter(([, resource]) => canPerm(initialSession.perm, resource, 'view')).map(([url]) => url);
+      if (!urls.length) return;
+      const go = () => { try { localStorage.setItem('vss_warm', String(Date.now())); } catch { /* ignore */ } reg.active?.postMessage({ type: 'warm', urls }); };
+      if ('requestIdleCallback' in window) window.requestIdleCallback(go, { timeout: 20_000 }); else setTimeout(go, 10_000);
     }).catch(() => undefined);
-  }, [initialSession]);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setLang = useCallback((l: 'en' | 'hi') => {
-    setLangState(l);
+    startTransition(() => setLangState(l)); // switching to Hindi the first time waits for the dictionary file: keep the screen as it is until then
     try { localStorage.setItem('vss_lang', l); } catch {}
     if (initialSession) api('/api/auth/me', { method: 'PATCH', body: { lang: l } }).catch(() => {});
   }, [initialSession]);
@@ -159,9 +172,11 @@ export function Providers({ children, initialSession = null, initialLang = 'en',
 // returns that page's rows (long lists use usePagedList). The cache is keyed by person, so nobody ever sees another's data.
 const swr = new Map<string, { data: any; at: number }>();
 const inflight = new Map<string, Promise<any>>();
+const seeded = new Map<string, unknown>(); // the server-rendered answer last used for a key
 const STALE_MS = 30_000;
 const unwrap = (d: any) => (d && Array.isArray(d.data) && 'nextCursor' in d ? d.data : d);
-export const clearFetchCache = () => { swr.clear(); inflight.clear(); };
+export const clearFetchCache = () => { swr.clear(); inflight.clear(); seeded.clear(); };
+const sameJson = (a: unknown, b: unknown) => { try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; } };
 
 async function fetchWithRetry(url: string): Promise<any> {
   for (let attempt = 0; ; attempt++) {
@@ -177,7 +192,8 @@ export function useFetch(url: string | null, deps: unknown[] = [], opts: { initi
   const { session } = useApp();
   const key = url ? `${session?.id ?? '-'}|${url}` : null;
   // data the server already rendered into the page counts as freshly fetched: it is shown at once and refreshed after the usual 2 s
-  if (key && opts.initial && !swr.has(key)) swr.set(key, { data: opts.initial, at: -1 }); // -1: stamped with the real time in the effect below
+  // -1: stamped with the real time in the effect below. A NEW server-rendered answer (coming back to the screen) replaces what the browser kept: it is fresher.
+  if (key && opts.initial && seeded.get(key) !== opts.initial) { seeded.set(key, opts.initial); swr.set(key, { data: opts.initial, at: -1 }); }
   const hit = key ? swr.get(key) : undefined;
   const [data, setData] = useState<any>(hit?.data ?? null);
   const [loading, setLoading] = useState(!!url && !hit);
@@ -192,7 +208,13 @@ export function useFetch(url: string | null, deps: unknown[] = [], opts: { initi
     const run = () => {
       let p = inflight.get(key);
       if (!p) { p = fetchWithRetry(url).finally(() => inflight.delete(key)); inflight.set(key, p); }
-      return p.then((d) => { swr.set(key, { data: d, at: Date.now() }); if (live) { setData(d); setError(null); setLoading(false); } })
+      return p.then((d) => {
+        // the same answer as before (the dashboard asks again every few seconds): keep the SAME object, so React sees no change and re-draws nothing
+        const prev = swr.get(key)?.data;
+        const next = prev !== undefined && prev !== null && sameJson(prev, d) ? prev : d;
+        swr.set(key, { data: next, at: Date.now() });
+        if (live) { setData(next); setError(null); setLoading(false); }
+      })
         .catch((e) => { if (live) { setError(e); setLoading(false); } });
     };
     if (!cached || Date.now() - cached.at > 2_000 || tick > 0) void run();

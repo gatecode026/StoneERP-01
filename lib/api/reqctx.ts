@@ -9,7 +9,8 @@ import { logger } from '../logger';
  * SLOW_QUERY_MS is logged with its collection, operation and the SHAPE of its filter (keys only, never values).
  */
 export type ReqStore = { requestId: string; queries: number; dbMs: number; slow: number };
-const als = new AsyncLocalStorage<ReqStore>();
+const gAls = globalThis as unknown as { _vssAls?: AsyncLocalStorage<ReqStore> };
+const als = (gAls._vssAls ??= new AsyncLocalStorage<ReqStore>());
 
 export const SLOW_QUERY_MS = Number(process.env.SLOW_QUERY_MS ?? 200);
 export const runWithStore = <T>(requestId: string, fn: () => Promise<T>): Promise<T> => als.run({ requestId, queries: 0, dbMs: 0, slow: 0 }, fn);

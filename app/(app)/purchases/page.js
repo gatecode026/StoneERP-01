@@ -20,8 +20,8 @@ export default function PurchasesPage() {
   const [tab, setTab] = useState(sp.get('tab') || 'purchases');
   const approver = can('purchases', 'approve');
 
-  const itemsReq = useFetch('/api/stockitems?limit=200');
-  const suppliersReq = useFetch('/api/suppliers?limit=200');
+  const itemsReq = useFetch('/api/stockitems?limit=200&fields=name'); // names only: they feed the form's suggestions
+  const suppliersReq = useFetch('/api/suppliers?limit=200&fields=name');
   const itemsList = (Array.isArray(itemsReq.data) ? itemsReq.data : itemsReq.data?.data) || [];
   const suppliersList = (Array.isArray(suppliersReq.data) ? suppliersReq.data : suppliersReq.data?.data) || [];
 

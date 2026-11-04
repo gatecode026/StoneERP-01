@@ -278,7 +278,7 @@ export default function AttendancePage() {
             {!ownOnly && (sheet.total ?? 0) > 0 && <Badge tone="amber"><T vars={{ n: sheet.total }}>{'{n} records'}</T></Badge>}
             {!ownOnly && can('attendance', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&date=${date}`)} />}
             {canMarkOthers && <ImportData resource="attendance" perm="attendance" noun="attendance" hint="employee, date and state are required" />}
-            {!ownOnly && <input type="date" className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}
+            {!ownOnly && <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}
           </>} />
       )}
 

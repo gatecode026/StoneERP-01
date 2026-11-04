@@ -1,9 +1,11 @@
 import './globals.css';
+import { Suspense } from 'react';
 import { headers } from 'next/headers';
 import { Noto_Sans_Devanagari, Inter } from 'next/font/google';
 
 // Hindi text: self-hosted, Devanagari subset only, shown at once in the fallback font and swapped in when loaded (never blocks rendering)
-const deva = Noto_Sans_Devanagari({ subsets: ['devanagari'], display: 'swap', weight: ['400', '600', '700'], variable: '--font-deva' });
+// preload: false: the three Devanagari files (~200 KB) are fetched only when a page really shows Hindi text, not for everybody
+const deva = Noto_Sans_Devanagari({ subsets: ['devanagari'], display: 'swap', preload: false, weight: ['400', '600', '700'], variable: '--font-deva' });
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-sans' });
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/Providers';
@@ -44,7 +46,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const lang = session?.lang === 'en' ? 'en' : session ? 'hi' : 'en';
-  const hiDict = lang === 'hi' ? ((await import('@/lib/hi')).HI as Record<string, string>) : null; // only people who use Hindi receive the dictionary
   return (
     <html lang={lang} className={`${deva.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
@@ -52,7 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__nonce__=${JSON.stringify(nonce ?? '')}` }} />
       </head>
       <body suppressHydrationWarning>
-        <Providers initialSession={session} initialLang={lang} hiDict={hiDict}>{children}</Providers>
+        <Suspense fallback={null}><Providers initialSession={session} initialLang={lang}>{children}</Providers></Suspense>
       </body>
     </html>
   );

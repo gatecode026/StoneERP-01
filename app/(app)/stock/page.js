@@ -8,8 +8,10 @@ import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard } from '@/components/ui';
 import { useApp } from '@/components/Providers';
 import { api } from '@/lib/client';
-import StockDaily from '@/components/stock/StockDaily';
-import StockCount from '@/components/stock/StockCount';
+import dynamic from 'next/dynamic';
+// the two big tabs are fetched when somebody opens them, not with the screen
+const StockDaily = dynamic(() => import('@/components/stock/StockDaily'));
+const StockCount = dynamic(() => import('@/components/stock/StockCount'));
 import { inr, num } from '@/lib/format';
 
 // Physical Stocks format as per client: Date, Karigar, Colour Finish, Thickness, Size L, Size W, QTY, SQFT, Finish, Amount

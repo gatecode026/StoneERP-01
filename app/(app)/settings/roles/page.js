@@ -113,13 +113,15 @@ function RolesEditor() {
 
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label={tr('Roles')}>
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-3 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-2 shrink-0" role="tablist" aria-label={tr('Roles')}>
         {data.roles.filter((r) => r.shown).map((r) => (
           <button key={r.key} role="tab" aria-selected={sel === r.key} onClick={() => setSel(r.key)}
             className={cx('shrink-0 min-h-[44px] px-4 rounded-full text-sm font-semibold border transition', sel === r.key ? 'bg-terra text-white border-terra' : 'bg-white text-char-700 border-sand-300')}>
             {r.label[lang] || r.label.en}{r.custom && !r.userDefined && <span className="ml-1.5 text-[10px] opacity-80"><T>edited</T></span>}
           </button>
         ))}
+        </div>
         <button type="button" onClick={addRole} disabled={busy} className="shrink-0 min-h-[44px] px-4 rounded-full text-sm font-semibold border border-dashed border-terra text-terra bg-white hover:bg-sand-50 transition inline-flex items-center gap-1.5">
           <Plus size={15} /> <T>New role</T>
         </button>

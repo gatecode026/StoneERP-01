@@ -6,6 +6,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Tailwind's slate-500 (#64748B) is 4.45:1 on the cream background: just under the 4.5:1 text minimum
+        slate: { 500: '#586A82' },
         sand: {
           DEFAULT: '#FAF7F2',
           50: '#FAF8F5',
@@ -36,9 +38,9 @@ module.exports = {
           800: '#334155',
           700: '#334155',
           600: '#475569',
-          500: '#64748B',
-          400: '#94A3B8',
-          300: '#94A3B8',
+          500: '#586A82',
+          400: '#5F6F86',
+          300: '#5F6F86',
         },
         bronze: {
           DEFAULT: '#8A5C38',

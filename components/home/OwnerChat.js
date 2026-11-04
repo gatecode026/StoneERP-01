@@ -42,7 +42,7 @@ export default function OwnerChat({ date }) {
         onClick={() => setOpen(true)}
         aria-label={h('chatTitle')}
         title={h('chatTitle')}
-        className="fixed right-4 bottom-20 md:bottom-6 md:right-6 z-40 no-print w-12 h-12 rounded-none bg-[#8A5C38] text-white shadow-none border border-[#7D5333] flex items-center justify-center hover:bg-[#7D5333] active:bg-[#684124] transition"
+        className="fixed right-4 bottom-[152px] md:bottom-6 md:right-6 z-40 no-print w-12 h-12 rounded-none bg-[#8A5C38] text-white shadow-none border border-[#7D5333] flex items-center justify-center hover:bg-[#7D5333] active:bg-[#684124] transition"
       >
         <ChatbotIcon size={28} variant="white" />
       </button>

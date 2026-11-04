@@ -3,7 +3,7 @@ import ImportData from '@/components/ImportData';
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { inViewChart } from '@/components/charts/InView';
 import CrudPage from '@/components/CrudPage';
 import { RoleGuard, Tabs, Badge, StatCard, Section, DataList, PageHeader, Photo } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
@@ -11,7 +11,7 @@ import { MACHINE_TYPES, MACHINE_NAMES } from '@/lib/config';
 import { todayISO, addDays, fmtDate, monthOf, num, fmtMonth } from '@/lib/format';
 import T from '@/components/T';
 
-const MachineChart = dynamic(() => import('@/components/charts/MachineChart'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
+const MachineChart = inViewChart(() => import('@/components/charts/MachineChart'));
 
 export default function MachinesPage() {
   const { t, tr, can, session } = useApp();
@@ -24,7 +24,7 @@ export default function MachinesPage() {
   const monthEntries = useFetch(tab === 'monthly' ? `/api/machineentries/monthly?month=${month}` : null, [month]);
   const canManage = can('machines', 'create');
 
-  const machinesList = useFetch('/api/machines?limit=100');
+  const machinesList = useFetch('/api/machines?limit=100&fields=name,type'); // only what the form checks
   const machinesMap = useMemo(() => {
     const map = {};
     for (const m of (machinesList.data?.data || [])) {
@@ -196,7 +196,7 @@ export default function MachinesPage() {
             if (!body.stopReason) delete body.stopReason;
             return body;
           }}
-          headerExtra={<><input type="date" className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /></>}
+          headerExtra={<><input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /></>}
           facets={{ by: 'breakdown', sum: 'outputSqft,stoppedMins' }}
           summary={(rows, { facets: f }) => {
             const totalSqft = f?.sums.outputSqft || 0;

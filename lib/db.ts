@@ -88,15 +88,32 @@ export async function withTxn<T>(fn: (session: ClientSession | undefined) => Pro
     if (getEnv().ALLOW_NO_TXN && !isProd()) return fn(undefined);
     throw new Error('MongoDB is not a replica set: transactions are required (set ALLOW_NO_TXN=yes for local development only).');
   }
-  const session = await mongoose.startSession();
-  try {
-    let out!: T;
-    await session.withTransaction(async () => {
-      out = await fn(session);
-    }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
-    invalidate('home', 'reminders'); // dashboards derive from committed data: drop cached copies the moment something changes
-    return out;
-  } finally {
-    await session.endSession();
+  let attempts = 0;
+  const maxAttempts = 3;
+  while (true) {
+    attempts++;
+    const session = await mongoose.startSession();
+    try {
+      let out!: T;
+      await session.withTransaction(async () => {
+        out = await fn(session);
+      }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+      invalidate('home', 'reminders'); // dashboards derive from committed data: drop cached copies the moment something changes
+      return out;
+    } catch (err: any) {
+      const isTransient =
+        err?.hasErrorLabel?.('TransientTransactionError') ||
+        err?.errorLabels?.includes?.('TransientTransactionError') ||
+        err?.code === 112 ||
+        err?.codeName === 'WriteConflict' ||
+        /write conflict/i.test(err?.message ?? '');
+      if (isTransient && attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 100 * Math.pow(2, attempts) + Math.random() * 50));
+        continue;
+      }
+      throw err;
+    } finally {
+      await session.endSession();
+    }
   }
 }

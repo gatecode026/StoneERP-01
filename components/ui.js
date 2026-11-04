@@ -560,7 +560,7 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
                     </th>
                   );
                 })}
-                {actions && <th className="th text-right whitespace-nowrap w-px" />}
+                {actions && <th className="th text-right whitespace-nowrap w-px"><span className="sr-only">{tx('Actions')}</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -594,7 +594,7 @@ export function Section({ title, right, children, className }) {
     <section className={cx('card p-4', className)}>
       {(title || right) && (
         <div className="flex items-center justify-between mb-3 gap-2">
-          <h3 className="font-bold text-sm">{tx(title)}</h3>{right}
+          <h2 className="font-bold text-sm">{tx(title)}</h2>{right}
         </div>
       )}
       {children}

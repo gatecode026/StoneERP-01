@@ -4,7 +4,7 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import toast from '@/lib/toast';
 import { Check, X, Plus } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { inViewChart } from '@/components/charts/InView';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import { RoleGuard, Tabs, StatCard, Section, DataList, Badge } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
@@ -14,7 +14,7 @@ import { EXPENSE_HEADS, LIMITS } from '@/lib/config';
 import { inr, fmtDate, todayISO, monthOf, fmtMonth, daysInMonth } from '@/lib/format';
 import T from '@/components/T';
 
-const ExpenseCharts = dynamic(() => import('@/components/charts/ExpenseCharts'), { ssr: false, loading: () => <div className="h-64 skeleton" /> });
+const ExpenseCharts = inViewChart(() => import('@/components/charts/ExpenseCharts'));
 
 export default function ExpensesPage() {
   const { t, tr, can } = useApp();

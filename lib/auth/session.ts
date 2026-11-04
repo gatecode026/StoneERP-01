@@ -66,10 +66,22 @@ export async function createSession(userId: Types.ObjectId | string, meta: { ip?
   return { cookieValue: signToken(token), expiresAt };
 }
 
+const gSess = globalThis as unknown as { _vssSessionLookups?: Map<string, Promise<SessionUser | null>> };
+const lookups = (gSess._vssSessionLookups ??= new Map());
+
 /** Resolve a cookie value to the signed-in user, or null. Pure w.r.t. Next.js so it can be unit-tested. */
 export async function resolveSession(cookieValue: string | undefined | null): Promise<SessionUser | null> {
   const token = verifySigned(cookieValue);
   if (!token) return null;
+  const key = sha256(token);
+  const running = lookups.get(key);
+  if (running) return running; // another request of the same person is already asking
+  const p = lookUp(token).finally(() => lookups.delete(key));
+  lookups.set(key, p);
+  return p;
+}
+
+async function lookUp(token: string): Promise<SessionUser | null> {
   try {
     await connect();
     const now = Date.now();

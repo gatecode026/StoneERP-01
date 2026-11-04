@@ -3,7 +3,7 @@ import ImportData from '@/components/ImportData';
 import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import { inViewChart } from '@/components/charts/InView';
 import toast from '@/lib/toast';
 import { CheckCircle2 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
@@ -15,9 +15,8 @@ import { api } from '@/lib/client';
 import { addDays, todayISO, fmtDate, inr, monthOf, daysInMonth } from '@/lib/format';
 import T from '@/components/T';
 
-const load = () => <div className="h-64 skeleton" />;
-const RepairTrendChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.RepairTrendChart), { ssr: false, loading: load });
-const RepairByMachineChart = dynamic(() => import('@/components/charts/OpsCharts').then((m) => m.RepairByMachineChart), { ssr: false, loading: load });
+const RepairTrendChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.RepairTrendChart));
+const RepairByMachineChart = inViewChart(() => import('@/components/charts/OpsCharts').then((m) => m.RepairByMachineChart));
 
 const serviceDue = (m) => (m.lastServiceDate && m.serviceIntervalDays ? addDays(m.lastServiceDate, Number(m.serviceIntervalDays)) : null);
 // running hours left before the next service (machines that are serviced by hour-meter, not by calendar)

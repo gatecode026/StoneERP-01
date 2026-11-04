@@ -46,11 +46,15 @@ export const expenses: ResourceDef = {
       if (d.head && typeof d.head === 'string') {
         const trimmed = d.head.trim();
         if (trimmed) {
-          await ExpenseHead.updateOne(
-            { name: trimmed },
-            { $setOnInsert: { name: trimmed, isVoid: false } },
-            { upsert: true }
-          ).catch(() => {});
+          const seen = ((ctx as any)._seenHeads ??= new Set<string>());
+          if (!seen.has(trimmed)) {
+            seen.add(trimmed);
+            await ExpenseHead.updateOne(
+              { name: trimmed },
+              { $setOnInsert: { name: trimmed, isVoid: false } },
+              { upsert: true, session: ctx.session }
+            );
+          }
         }
       }
     },

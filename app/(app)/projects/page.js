@@ -219,12 +219,12 @@ export default function ProjectsPage() {
   }
 
   // Stats
-  const statsFetch = useFetch('/api/projects?limit=200');
-  const allProjects = statsFetch.data?.rows || statsFetch.data || [];
-  const inProgressCount = allProjects.filter((p) => p.status === 'In Progress').length;
-  const highPriorityCount = allProjects.filter((p) => p.priority === 'High' || p.priority === 'Urgent').length;
-  const completedCount = allProjects.filter((p) => p.status === 'Completed').length;
-  const pendingCount = allProjects.filter((p) => p.status === 'Pending' || p.status === 'Planning' || p.status === 'On Hold').length;
+  const statsFetch = useFetch('/api/projects/facets?by=status'); // counts per status, worked out by the database
+  const statusCount = (...names) => names.reduce((t, n) => t + (statsFetch.data?.groups?.[n]?.n || 0), 0);
+  const totalProjects = statsFetch.data?.total ?? 0;
+  const inProgressCount = statusCount('In Progress');
+  const completedCount = statusCount('Completed');
+  const pendingCount = statusCount('Pending', 'Planning', 'On Hold');
 
   const canManage = can('projects', 'create') || can('projects', 'edit') || session?.role === 'owner' || session?.role === 'manager';
 
@@ -530,7 +530,7 @@ export default function ProjectsPage() {
       <div className="space-y-4">
         {/* Top Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total Projects" value={allProjects.length} />
+          <StatCard label="Total Projects" value={totalProjects} />
           <StatCard label="In Progress" value={inProgressCount} tone="amber" />
           <StatCard label="Pending / Planning" value={pendingCount} tone="blue" />
           <StatCard label="Completed" value={completedCount} tone="green" />
