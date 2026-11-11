@@ -9,6 +9,8 @@ import { HomeSkeleton } from '@/components/home/parts';
 
 export const dynamic = 'force-dynamic';
 
+const clock = () => Date.now(); // when this page was rendered (the browser compares it with its own clock)
+
 /**
  * The home is rendered on the SERVER: the shell (menu, header) is sent at once, and today's numbers stream in as soon as they are ready,
  * already inside the HTML, so the first screen is not "empty, then a request, then the numbers". The browser takes over from there
@@ -28,7 +30,7 @@ async function TodayHome() {
   } catch {
     initial = null;
   }
-  return <HomeClient initialData={initial} initialDate={date} />;
+  return <HomeClient initialData={initial} initialDate={date} renderedAt={clock()} />;
 }
 
 export default function HomePage() {

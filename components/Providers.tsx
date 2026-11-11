@@ -174,6 +174,7 @@ const swr = new Map<string, { data: any; at: number }>();
 const inflight = new Map<string, Promise<any>>();
 const seeded = new Map<string, unknown>(); // the server-rendered answer last used for a key
 const STALE_MS = 30_000;
+const clock = () => Date.now();
 const unwrap = (d: any) => (d && Array.isArray(d.data) && 'nextCursor' in d ? d.data : d);
 export const clearFetchCache = () => { swr.clear(); inflight.clear(); seeded.clear(); };
 const sameJson = (a: unknown, b: unknown) => { try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; } };
@@ -188,12 +189,14 @@ async function fetchWithRetry(url: string): Promise<any> {
   }
 }
 
-export function useFetch(url: string | null, deps: unknown[] = [], opts: { initial?: unknown } = {}) {
+export function useFetch(url: string | null, deps: unknown[] = [], opts: { initial?: unknown; initialAt?: number } = {}) {
   const { session } = useApp();
   const key = url ? `${session?.id ?? '-'}|${url}` : null;
   // data the server already rendered into the page counts as freshly fetched: it is shown at once and refreshed after the usual 2 s
   // -1: stamped with the real time in the effect below. A NEW server-rendered answer (coming back to the screen) replaces what the browser kept: it is fresher.
-  if (key && opts.initial && seeded.get(key) !== opts.initial) { seeded.set(key, opts.initial); swr.set(key, { data: opts.initial, at: -1 }); }
+  // initialAt: when the server rendered it. The router may hand back a page it kept for a few seconds (experimental.staleTimes), so the answer is
+  // as old as its render, not as old as this visit: an old one is shown at once and read again straight away.
+  if (key && opts.initial && seeded.get(key) !== opts.initial) { seeded.set(key, opts.initial); swr.set(key, { data: opts.initial, at: opts.initialAt ? Math.min(opts.initialAt, clock()) : -1 }); }
   const hit = key ? swr.get(key) : undefined;
   const [data, setData] = useState<any>(hit?.data ?? null);
   const [loading, setLoading] = useState(!!url && !hit);

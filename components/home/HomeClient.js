@@ -24,13 +24,13 @@ const WITH_DATE = ['owner', 'manager', 'accountant', 'supervisor'];
 const TITLES = { manager: 'Operations board', accountant: 'Money board', supervisor: 'Team board', salesperson: 'Sales board' };
 
 // One role-specific home per person. The server renders today's (app/(app)/page.tsx); changing the date asks /api/home in one request.
-export default function HomeClient({ initialData = null, initialDate }) {
+export default function HomeClient({ initialData = null, initialDate, renderedAt }) {
   const { t, tr, can, session } = useApp();
   const [date, setDate] = useState(initialDate || todayISO());
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [dailyTaskOpen, setDailyTaskOpen] = useState(false);
   // the server already sent today's numbers: show them at once (no empty screen, no extra request), refresh in the background
-  const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`, [], { initial: date === initialDate ? initialData : null });
+  const { data, loading, error, reload } = useFetch(`/api/home?date=${date}`, [], { initial: date === initialDate ? initialData : null, initialAt: renderedAt });
   const kind = data?.kind || session?.perm?.roleKey;
   const title = kind === 'owner' ? t('ownerReport') : TITLES[kind] || `Namaste, ${session?.name}`;
 

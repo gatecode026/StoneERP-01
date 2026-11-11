@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
+  // Next 15+ no longer keeps visited pages for back/forward-style reuse by default (dynamic: 0), so every tab switch waited for a server render.
+  // Keep a visited page for 30 s: switching back to it is instant. The dashboard (the only server-seeded screen) checks how old its numbers are
+  // (see useFetch initialAt) and reads again at once if they are older than 2 s; every other screen fetches its own data on the client.
+  experimental: { staleTimes: { dynamic: 30 } },
   serverExternalPackages: ['@node-rs/argon2', 'pino', 'mongoose', 'sharp', 'pdf-lib', '@pdf-lib/fontkit'],
   // the PDF routes read the Devanagari font from disk at run time
   outputFileTracingIncludes: { '/api/**': ['./assets/fonts/**'] },
