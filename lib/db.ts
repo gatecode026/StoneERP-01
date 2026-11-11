@@ -37,8 +37,10 @@ export async function connect(): Promise<typeof mongoose> {
       const autoIndex = env.MONGO_AUTO_INDEX ?? !isProd();
       const m = await mongoose.connect(uri, {
         dbName: env.MONGODB_DB,
-        maxPoolSize: env.MONGO_MAX_POOL,
+        // serverless: every warm instance keeps its own pool, so a smaller pool per instance keeps the total under Atlas's connection limit; set MONGO_MAX_POOL to override
+        maxPoolSize: process.env.VERCEL && !process.env.MONGO_MAX_POOL ? 10 : env.MONGO_MAX_POOL,
         minPoolSize: isProd() ? 2 : 0,
+        maxIdleTimeMS: 60_000, // connections nobody used for a minute are closed (instances that go quiet do not hold slots on the cluster)
         serverSelectionTimeoutMS: 10_000,
         socketTimeoutMS: 45_000,
         retryWrites: true,
