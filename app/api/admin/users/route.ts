@@ -21,8 +21,8 @@ export const GET = withAuth('users', 'view', async (auth) => {
   const q = auth.query.get('q')?.trim().toLowerCase();
   const roleFilter = auth.query.get('role')?.trim().toLowerCase();
 
-  const emps: any[] = await Employee.find({ isVoid: false }).sort({ name: 1 }).lean();
-  const users: any[] = await User.find({}).lean();
+  const emps: any[] = await Employee.find({ isVoid: false }).select('empCode name mobile job plainPassword status').sort({ name: 1 }).lean();
+  const users: any[] = await User.find({}).select('employeeId empCode username plainPassword role').lean();
 
   const userMapByEmpId = new Map(users.map((u) => [String(u.employeeId), u]));
   const userMapByCode = new Map(users.map((u) => [u.empCode, u]));

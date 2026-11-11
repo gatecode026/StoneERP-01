@@ -219,7 +219,7 @@ export async function computeReminders(user: U, perm: EffectivePerm, settings: A
   })());
   if (v('machines')) jobs.push((async () => {
     const sf = await scopeFilter(user, perm, 'machines', 'view');
-    const rows: any[] = await Machine.find({ $and: [{ isVoid: false }, sf] }).lean();
+    const rows: any[] = await Machine.find({ $and: [{ isVoid: false }, sf] }).select('name lastServiceDate serviceIntervalDays serviceIntervalHours hourMeter lastServiceHourMeter').lean();
     for (const m of rows) {
       if (m.lastServiceDate && m.serviceIntervalDays) {
         const due = addDays(m.lastServiceDate, Number(m.serviceIntervalDays));
@@ -248,7 +248,7 @@ export async function computeReminders(user: U, perm: EffectivePerm, settings: A
     for (const d of rows) out.push({ type: 'paper_expiry', to: 'Owner', title: `${d.name}: expires ${d.expiryDate}`, severity: d.expiryDate <= in7 ? 'high' : 'med', link: '/papers' });
   })());
   if (v('vehicles')) jobs.push((async () => {
-    const rows: any[] = await Vehicle.find({ isVoid: false }).lean();
+    const rows: any[] = await Vehicle.find({ isVoid: false }).select('name insuranceExpiry fitnessExpiry permitExpiry pucExpiry').lean();
     for (const x of rows) for (const k of ['insurance', 'fitness', 'permit', 'puc']) {
       const dt = x[`${k}Expiry`];
       if (dt && dt <= in30) out.push({ type: 'paper_expiry', to: 'Owner', title: `${x.name}: ${k.toUpperCase()} expires ${dt}`, severity: dt <= in7 ? 'high' : 'med', link: '/vehicles' });
