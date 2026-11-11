@@ -2,6 +2,8 @@ import './globals.css';
 import { Suspense } from 'react';
 import { headers } from 'next/headers';
 import { Noto_Sans_Devanagari, Inter } from 'next/font/google';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 
 // Hindi text: self-hosted, Devanagari subset only, shown at once in the fallback font and swapped in when loaded (never blocks rendering)
 // preload: false: the three Devanagari files (~200 KB) are fetched only when a page really shows Hindi text, not for everybody
@@ -54,6 +56,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body suppressHydrationWarning>
         <Suspense fallback={null}><Providers initialSession={session} initialLang={lang}>{children}</Providers></Suspense>
+        {/* real-user speed (Core Web Vitals per page) and visits; served from /_vercel on our own origin, so the CSP needs no change; both do nothing off Vercel */}
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
