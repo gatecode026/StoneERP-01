@@ -59,6 +59,7 @@ export const Project = defineModel(
     indexes: [
       [{ projectCode: 1 }, liveUnique()],
       [{ status: 1, targetDate: 1 }],
+      [{ isVoid: 1, status: 1 }], // the four status counters (group by status over live projects) were a full collection scan
       [{ supervisorCode: 1 }],
       [{ supervisorCodes: 1 }],
       [{ operatorCode: 1 }],
