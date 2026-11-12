@@ -3,7 +3,7 @@ import ImportData from '@/components/ImportData';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import toast from '@/lib/toast';
-import { CheckCheck, Check, X, Pencil, RotateCcw, LogIn, LogOut } from 'lucide-react';
+import { Check, X, Pencil, RotateCcw, LogIn, LogOut } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, Tabs, SearchBox, SkeletonList, Badge, StatCard, Empty, DataList, Pager, ExportBtn, ActionMenu, cx } from '@/components/ui';
 import { useDebounced, useNumberedList } from '@/lib/usePaged';
@@ -105,17 +105,6 @@ export default function AttendancePage() {
       await submit('/api/attendance', { date: targetDate, empCode: code, state }, { label: trNow('Attendance {n}', { n: name }) });
       att.reload?.();
     } catch (err) { toast.error(err.message); setOver((m) => { const n = { ...m }; if (prev) n[code] = prev; else delete n[code]; return n; }); }
-  }
-  async function markAll() {
-    const todo = unmarked;
-    if (!todo) { toast('Everyone is already marked'); return; }
-    const id = toast.loading(trNow('Marking {n} present…', { n: todo }));
-    try {
-      // one request for the whole team (one transaction, one bulkWrite): the server marks everyone who has no mark yet
-      await api('/api/bulk/attendance', { method: 'POST', body: { date, rest: 'present' } });
-      toast.success('Done', { id });
-    } catch (err) { toast.error(err.message, { id }); }
-    sheet.reload();
   }
   // Punch In / Out for somebody (the same thing the biometric machine will send): for testing until the machine is connected
   async function punch(e) {
@@ -380,7 +369,6 @@ export default function AttendancePage() {
                 Filtered: <span className="font-semibold capitalize ml-1">{STATES.find((x) => x.v === statusFilter)?.label || (statusFilter === 'open' ? 'Needs a fix' : statusFilter === 'unmarked' ? 'Not marked' : statusFilter)}</span> <X size={14} className="ml-1 inline" />
               </button>
             )}
-            {canMark && unmarked > 0 && !dayOff && <button className="btn-green shrink-0" onClick={markAll}><CheckCheck size={18} /> {t('markAll')}</button>}
           </div>
           {sheet.loading ? <SkeletonList n={6} /> : (<>
             <div className="space-y-2.5 md:hidden">
