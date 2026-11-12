@@ -2,7 +2,7 @@ import { withAuth } from '@/lib/api/withAuth';
 import { getEffectivePerm } from '@/lib/perm/engine';
 import { badRequest } from '@/lib/errors';
 import { generateAllSectionsZip } from '@/lib/export/sectionBackup';
-import { todayIST } from '@/lib/time';
+import { parseBackupRange } from '@/lib/export/backupRange';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -21,8 +21,9 @@ export const GET = withAuth(
       throw badRequest(`Invalid format "${format}". Choose all, xlsx, csv, or pdf.`);
     }
 
-    const zipBuffer = await generateAllSectionsZip(format);
-    const dateStr = todayIST();
+    const range = parseBackupRange(q); // lifetime unless range=month|custom
+    const zipBuffer = await generateAllSectionsZip(format, range);
+    const dateStr = range.tag;
     const filename = `stoneerp-all-sections-${format}-backup-${dateStr}.zip`;
 
     return new Response(new Uint8Array(zipBuffer), {

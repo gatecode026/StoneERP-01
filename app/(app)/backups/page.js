@@ -1,16 +1,18 @@
 'use client';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Database, Download, FileSpreadsheet, FileText, Archive,
   FolderKanban, ListChecks, Users, ClipboardList, CalendarCheck, ShieldCheck,
   Cog, Hammer, Boxes, Wrench, Package, ShoppingCart, Receipt, Truck,
   UserCheck, Building2, MessageSquareWarning, IndianRupee, BookOpen,
-  CheckCircle2, Layers, HardDrive, Search, RefreshCw, FileArchive
+  CheckCircle2, Layers, HardDrive, Search, RefreshCw, FileArchive, CalendarRange
 } from 'lucide-react';
 import { useApp, useFetch, useTx } from '@/components/Providers';
-import { RoleGuard, PageHeader, StatCard, Badge, SkeletonList, Empty } from '@/components/ui';
+import { RoleGuard, PageHeader, StatCard, Badge, SkeletonList, Empty, Field } from '@/components/ui';
 import T from '@/components/T';
+import { todayISO } from '@/lib/format';
 
 const ICONS = {
   FolderKanban,
@@ -37,6 +39,13 @@ const ICONS = {
   Archive,
 };
 
+// Backup period: what the downloads (and the counts on this screen) cover. The value goes to the API as ?range=month or ?range=custom&from=&to=
+const PERIODS = [
+  { key: 'lifetime', label: 'Lifetime backup (all data)' },
+  { key: 'month', label: 'This month backup (current month)' },
+  { key: 'custom', label: 'Custom range (selected dates)' },
+];
+
 const CATEGORIES = [
   { key: 'all', label: 'All Sections' },
   { key: 'People & Attendance', label: 'People & Attendance' },
@@ -48,7 +57,18 @@ const CATEGORIES = [
 
 function BackupsScreen() {
   const tx = useTx();
-  const { data, loading, error, reload } = useFetch('/api/backups/sections');
+  const { tr } = useApp();
+  const sp = useSearchParams();
+  // the 25th-of-the-month reminder opens this screen with ?range=month
+  const [range, setRange] = useState(PERIODS.some((p) => p.key === sp.get('range')) ? sp.get('range') : 'lifetime');
+  const [from, setFrom] = useState(sp.get('from') || `${todayISO().slice(0, 8)}01`);
+  const [to, setTo] = useState(sp.get('to') || todayISO());
+  const periodOk = range !== 'custom' || (!!from && !!to && from <= to);
+  const periodQs = range === 'month' ? 'range=month' : range === 'custom' ? `range=custom&from=${from}&to=${to}` : '';
+  const withPeriod = (url) => (periodQs ? `${url}${url.includes('?') ? '&' : '?'}${periodQs}` : url);
+  // a download link that follows the period; while a custom range is incomplete or reversed it does nothing (see a[aria-disabled] in globals.css)
+  const dl = (url) => (periodOk ? { href: withPeriod(url), download: true } : { href: '#', 'aria-disabled': true, tabIndex: -1, onClick: (e) => e.preventDefault() });
+  const { data, loading, error, reload } = useFetch(periodOk ? withPeriod('/api/backups/sections') : null);
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState('all');
   const [downloadingZip, setDownloadingZip] = useState(false);
@@ -100,8 +120,7 @@ function BackupsScreen() {
               <T>Refresh</T>
             </button>
             <a
-              href="/api/backups/download-all?format=all"
-              download
+              {...dl('/api/backups/download-all?format=all')}
               onClick={() => handleZipDownload('all')}
               className="btn-primary btn-sm flex items-center gap-1.5"
             >
@@ -111,6 +130,36 @@ function BackupsScreen() {
           </div>
         }
       />
+
+      {/* Backup period: everything below (the counts and every download) follows it */}
+      <div className="card p-4">
+        <div className="flex flex-col md:flex-row md:items-end gap-3">
+          <Field label="Backup period" htmlFor="bk_period">
+            <div className="flex items-center gap-2">
+              <CalendarRange size={18} className="text-terra shrink-0" aria-hidden="true" />
+              <select id="bk_period" className="input !w-auto min-w-[280px]" value={range} onChange={(e) => setRange(e.target.value)}>
+                {PERIODS.map((p) => <option key={p.key} value={p.key}>{tr(p.label)}</option>)}
+              </select>
+            </div>
+          </Field>
+          {range === 'custom' && (
+            <>
+              <Field label="From" htmlFor="bk_from"><input id="bk_from" type="date" className="input !w-auto" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></Field>
+              <Field label="To" htmlFor="bk_to"><input id="bk_to" type="date" className="input !w-auto" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></Field>
+            </>
+          )}
+        </div>
+        {!periodOk ? (
+          <p className="text-xs text-red-600 mt-2" role="alert"><T>Choose both dates; the first date must not be after the last.</T></p>
+        ) : range === 'lifetime' ? (
+          <p className="text-xs text-char-500 mt-2"><T>Every download below holds all the data.</T></p>
+        ) : (
+          <p className="text-xs text-char-500 mt-2">
+            {data?.range?.from && <span className="font-semibold text-char">{tr('Records dated {a} to {b}', { a: data.range.from, b: data.range.to })}. </span>}
+            <T>Lists without dates (staff, customers, suppliers, machines, vehicles, stock lists, papers) are always included in full.</T>
+          </p>
+        )}
+      </div>
 
       {/* Overview Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -126,7 +175,7 @@ function BackupsScreen() {
           tone="green"
           label="Total Records"
           value={totalRecords.toLocaleString()}
-          sub="Live database records"
+          sub={range === 'lifetime' ? 'Live database records' : 'Records in the chosen period'}
         />
         <StatCard
           icon={FileSpreadsheet}
@@ -164,8 +213,7 @@ function BackupsScreen() {
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <a
-              href="/api/backups/download-all?format=all"
-              download
+              {...dl('/api/backups/download-all?format=all')}
               onClick={() => handleZipDownload('all')}
               className="btn-primary text-xs py-2 px-3.5 flex items-center gap-2 shadow-sm"
             >
@@ -173,8 +221,7 @@ function BackupsScreen() {
               <span><T>All Formats ZIP</T></span>
             </a>
             <a
-              href="/api/backups/download-all?format=xlsx"
-              download
+              {...dl('/api/backups/download-all?format=xlsx')}
               onClick={() => handleZipDownload('xlsx')}
               className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50"
             >
@@ -182,8 +229,7 @@ function BackupsScreen() {
               <span><T>Excel ZIP (.xlsx)</T></span>
             </a>
             <a
-              href="/api/backups/download-all?format=csv"
-              download
+              {...dl('/api/backups/download-all?format=csv')}
               onClick={() => handleZipDownload('csv')}
               className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 bg-white text-blue-800 border-blue-300 hover:bg-blue-50"
             >
@@ -191,8 +237,7 @@ function BackupsScreen() {
               <span><T>CSV ZIP (.csv)</T></span>
             </a>
             <a
-              href="/api/backups/download-all?format=pdf"
-              download
+              {...dl('/api/backups/download-all?format=pdf')}
               onClick={() => handleZipDownload('pdf')}
               className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 bg-white text-rose-800 border-rose-300 hover:bg-rose-50"
             >
@@ -317,8 +362,7 @@ function BackupsScreen() {
                   {/* Right: Download Actions */}
                   <div className="flex items-center gap-1.5 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-sand-200">
                     <a
-                      href={`/api/backups/download?section=${sec.id}&format=xlsx`}
-                      download
+                      {...dl(`/api/backups/download?section=${sec.id}&format=xlsx`)}
                       className="btn-outline btn-sm text-emerald-800 bg-emerald-50/60 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 flex items-center gap-1 px-2.5 py-1.5"
                     >
                       <FileSpreadsheet size={14} className="text-emerald-700" />
@@ -326,8 +370,7 @@ function BackupsScreen() {
                     </a>
 
                     <a
-                      href={`/api/backups/download?section=${sec.id}&format=csv`}
-                      download
+                      {...dl(`/api/backups/download?section=${sec.id}&format=csv`)}
                       className="btn-outline btn-sm text-blue-800 bg-blue-50/60 border-blue-300 hover:bg-blue-100 hover:border-blue-400 flex items-center gap-1 px-2.5 py-1.5"
                     >
                       <FileText size={14} className="text-blue-700" />
@@ -335,8 +378,7 @@ function BackupsScreen() {
                     </a>
 
                     <a
-                      href={`/api/backups/download?section=${sec.id}&format=pdf`}
-                      download
+                      {...dl(`/api/backups/download?section=${sec.id}&format=pdf`)}
                       className="btn-outline btn-sm text-rose-800 bg-rose-50/60 border-rose-300 hover:bg-rose-100 hover:border-rose-400 flex items-center gap-1 px-2.5 py-1.5"
                     >
                       <Download size={14} className="text-rose-700" />

@@ -9,6 +9,8 @@ import {
   BACKUP_SECTIONS,
   getSectionMeta,
 } from '@/lib/export/sectionBackup';
+import { Expense } from '@/lib/models';
+import { addDays, monthOf, todayIST } from '@/lib/time';
 import * as sectionsRoute from '@/app/api/backups/sections/route';
 import * as downloadRoute from '@/app/api/backups/download/route';
 import * as downloadAllRoute from '@/app/api/backups/download-all/route';
@@ -173,5 +175,106 @@ describe('Backups & Data Export System', () => {
   it('worker is forbidden from downloading all sections ZIP', async () => {
     const res = await getDownloadAll(worker, 'format=xlsx');
     expect(res.status).toBe(403);
+  });
+});
+
+// ---- Backup period: lifetime / this month / custom range ----
+describe('Backup period (lifetime, this month, custom range)', () => {
+  const today = todayIST();
+  const ym = monthOf(today);
+  const prevLast = addDays(`${ym}-01`, -1); // the last day of last month
+  const old = '2020-03-05';
+  const csvText = async (res: Response) => Buffer.from(await res.arrayBuffer()).toString('utf8');
+  const count = async (qs: string, id = 'expenses') => (await (await getSectionsQs(owner, qs)).json()).sections.find((s: any) => s.id === id);
+
+  beforeAll(async () => {
+    // four expenses in different periods (inserted straight into the collection: this tests the backup, not the expense form)
+    await Expense.collection.insertMany([
+      { date: old, head: 'OldRent', amount: 100, isVoid: false, createdAt: new Date() },
+      { date: prevLast, head: 'PrevDiesel', amount: 200, isVoid: false, createdAt: new Date() },
+      { date: `${ym}-01`, head: 'ThisDiesel', amount: 300, isVoid: false, createdAt: new Date() },
+      { date: today, head: 'TodayTea', amount: 400, isVoid: false, createdAt: new Date() },
+      { date: today, head: 'VoidedTea', amount: 999, isVoid: true, createdAt: new Date() },
+    ] as any[]);
+  });
+
+  const getSectionsQs = (who: Who, qs: string) =>
+    (sectionsRoute.GET as any)(new NextRequest(`http://localhost/api/backups/sections?${qs}`, { headers: { host: 'localhost', origin: 'http://localhost', cookie: who.cookie } })) as Promise<Response>;
+
+  it('lifetime (and no choice at all) holds every record, as before', async () => {
+    expect((await count('')).count).toBe(4);
+    expect((await count('range=lifetime')).count).toBe(4);
+    const csv = await csvText(await getDownload(owner, 'section=expenses&format=csv'));
+    for (const h of ['OldRent', 'PrevDiesel', 'ThisDiesel', 'TodayTea']) expect(csv).toContain(h);
+    expect(csv).not.toContain('VoidedTea'); // cancelled records never go into a backup
+  });
+
+  it('this month holds only the current month, and the screen counts follow it', async () => {
+    const r = await (await getSectionsQs(owner, 'range=month')).json();
+    expect(r.range).toMatchObject({ mode: 'month', from: `${ym}-01` });
+    expect(r.sections.find((s: any) => s.id === 'expenses')).toMatchObject({ count: 2, inPeriod: true });
+    const csv = await csvText(await getDownload(owner, 'section=expenses&format=csv&range=month'));
+    expect(csv).toContain('ThisDiesel');
+    expect(csv).toContain('TodayTea');
+    expect(csv).not.toContain('OldRent');
+    expect(csv).not.toContain('PrevDiesel');
+  });
+
+  it('a custom range keeps its first and last day, and nothing outside', async () => {
+    expect((await count(`range=custom&from=${prevLast}&to=${prevLast}`)).count).toBe(1); // one day
+    expect((await count(`range=custom&from=${old}&to=${prevLast}`)).count).toBe(2); // both ends included
+    expect((await count(`range=custom&from=2019-01-01&to=2019-12-31`)).count).toBe(0);
+    const res = await getDownload(owner, `section=expenses&format=csv&range=custom&from=${prevLast}&to=${prevLast}`);
+    expect(res.headers.get('content-disposition')).toContain(`expenses-backup-${prevLast}_to_${prevLast}.csv`);
+    const csv = await csvText(res);
+    expect(csv).toContain('PrevDiesel');
+    expect(csv).not.toContain('ThisDiesel');
+  });
+
+  it('names the file after the period', async () => {
+    expect((await getDownload(owner, 'section=expenses&format=csv&range=month')).headers.get('content-disposition')).toContain(`expenses-backup-month-${ym}.csv`);
+    expect((await getDownload(owner, 'section=expenses&format=csv')).headers.get('content-disposition')).toContain(`expenses-backup-${today}.csv`);
+  });
+
+  it('Excel and PDF follow the period too', async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(Buffer.from(await (await getDownload(owner, 'section=expenses&format=xlsx&range=month')).arrayBuffer()) as any);
+    expect(wb.worksheets[0].rowCount).toBe(3); // the heading and the two records of this month
+    const pdf = await getDownload(owner, 'section=expenses&format=pdf&range=month');
+    expect(pdf.status).toBe(200);
+    expect(Buffer.from(await pdf.arrayBuffer()).slice(0, 5).toString('ascii')).toBe('%PDF-');
+  });
+
+  it('lists without dates (staff, customers, ...) stay whole in every period', async () => {
+    const emp = await count('range=month', 'employees');
+    expect(emp.inPeriod).toBe(false);
+    expect(emp.count).toBeGreaterThanOrEqual(1);
+    expect((await csvText(await getDownload(owner, 'section=employees&format=csv&range=custom&from=2019-01-01&to=2019-01-02')))).toContain('Vipul Sharma');
+  });
+
+  it('the ZIP holds the period’s records only and says which period it is', async () => {
+    const zip = await JSZip.loadAsync(Buffer.from(await (await getDownloadAll(owner, 'format=csv&range=month')).arrayBuffer()));
+    const readme = await zip.file('README.txt')!.async('string');
+    expect(readme).toContain('Period: This month');
+    expect(readme).toContain('Lists without dates');
+    const idx = BACKUP_SECTIONS.findIndex((s) => s.id === 'expenses') + 1;
+    const exp = await zip.file(`${String(idx).padStart(2, '0')}-expenses.csv`)!.async('string');
+    expect(exp).toContain('ThisDiesel');
+    expect(exp).not.toContain('OldRent');
+    const res = await getDownloadAll(owner, 'format=csv&range=month');
+    expect(res.headers.get('content-disposition')).toContain(`stoneerp-all-sections-csv-backup-month-${ym}.zip`);
+    // and lifetime says so
+    const full = await JSZip.loadAsync(Buffer.from(await (await getDownloadAll(owner, 'format=csv')).arrayBuffer()));
+    expect(await full.file('README.txt')!.async('string')).toContain('Period: Lifetime');
+  });
+
+  it('refuses a period that makes no sense (400), and still needs the right to back up (403)', async () => {
+    for (const qs of ['range=custom', `range=custom&from=${today}`, `range=custom&from=${today}&to=${old}`, 'range=custom&from=2026-02-31&to=2026-03-01', 'range=week']) {
+      expect((await getDownload(owner, `section=expenses&format=csv&${qs}`)).status, qs).toBe(400);
+      expect((await getDownloadAll(owner, `format=csv&${qs}`)).status, qs).toBe(400);
+      expect((await getSectionsQs(owner, qs)).status, qs).toBe(400);
+    }
+    expect((await getDownload(worker, 'section=expenses&format=csv&range=month')).status).toBe(403);
+    expect((await getDownloadAll(worker, 'format=csv&range=month')).status).toBe(403);
   });
 });

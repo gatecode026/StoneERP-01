@@ -9,6 +9,7 @@ import {
 import { CSV_BOM, csvCell, csvLine } from './csv';
 import { PdfBuilder } from './pdf';
 import { todayIST } from '@/lib/time';
+import { rangeFilter, type BackupRange } from './backupRange';
 
 export type SectionCol = {
   key: string;
@@ -24,6 +25,8 @@ export type SectionMeta = {
   description: string;
   importFormatNote: string;
   model: any;
+  /** the field that dates a record (YYYY-MM-DD): a backup period keeps the records dated inside it. None = a list without dates (staff, customers, stock lists...): always included in full. */
+  dateField?: string;
   columns: SectionCol[];
   mapDoc: (doc: any) => Record<string, any>;
 };
@@ -31,6 +34,7 @@ export type SectionMeta = {
 export const BACKUP_SECTIONS: SectionMeta[] = [
   {
     id: 'projects',
+    dateField: 'startDate',
     name: 'Projects & Work Orders',
     group: 'Operations & Production',
     icon: 'FolderKanban',
@@ -233,6 +237,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'dailyreports',
+    dateField: 'date',
     name: 'Daily Work Reports',
     group: 'Operations & Production',
     icon: 'ClipboardList',
@@ -274,6 +279,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'attendance',
+    dateField: 'date',
     name: 'Staff Attendance',
     group: 'Master Data & People',
     icon: 'CalendarCheck',
@@ -351,6 +357,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'purchases',
+    dateField: 'date',
     name: 'Purchases & Inward Goods',
     group: 'Inventory & Materials',
     icon: 'Receipt',
@@ -386,6 +393,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'sales',
+    dateField: 'date',
     name: 'Sales Quotations & Orders',
     group: 'Commercial & Sales',
     icon: 'Receipt',
@@ -426,6 +434,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'dispatches',
+    dateField: 'date',
     name: 'Dispatches & Loading Slips',
     group: 'Commercial & Sales',
     icon: 'Truck',
@@ -462,6 +471,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'expenses',
+    dateField: 'date',
     name: 'Company Expenses',
     group: 'Financials & Accounts',
     icon: 'IndianRupee',
@@ -491,6 +501,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'cashentries',
+    dateField: 'date',
     name: 'Cash Book & Bank Ledger',
     group: 'Financials & Accounts',
     icon: 'BookOpen',
@@ -541,6 +552,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'machineentries',
+    dateField: 'date',
     name: 'Machine Production Logs',
     group: 'Operations & Production',
     icon: 'Cog',
@@ -572,6 +584,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'blocks',
+    dateField: 'date',
     name: 'Quarry Stone Blocks',
     group: 'Operations & Production',
     icon: 'Boxes',
@@ -605,6 +618,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'tasks',
+    dateField: 'dueDate',
     name: 'Work Tasks & Checklists',
     group: 'Operations & Production',
     icon: 'ListChecks',
@@ -630,6 +644,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'safetyrecords',
+    dateField: 'date',
     name: 'Health & Safety Records',
     group: 'Master Data & People',
     icon: 'ShieldCheck',
@@ -680,6 +695,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'repairs',
+    dateField: 'date',
     name: 'Machine Repairs & Maintenance',
     group: 'Operations & Production',
     icon: 'Hammer',
@@ -705,6 +721,7 @@ export const BACKUP_SECTIONS: SectionMeta[] = [
   },
   {
     id: 'complaints',
+    dateField: 'date',
     name: 'Customer Complaints & Claims',
     group: 'Commercial & Sales',
     icon: 'MessageSquareWarning',
@@ -757,7 +774,7 @@ export const getSectionMeta = (id: string): SectionMeta | undefined =>
 /**
  * Returns summary counts for all sections.
  */
-export async function getBackupSectionsSummary(): Promise<{
+export async function getBackupSectionsSummary(range?: BackupRange): Promise<{
   sections: Array<{
     id: string;
     name: string;
@@ -767,15 +784,18 @@ export async function getBackupSectionsSummary(): Promise<{
     importFormatNote: string;
     count: number;
     columnsCount: number;
+    /** true: the period narrows this section; false: it is a list without dates and is always included in full */
+    inPeriod: boolean;
   }>;
   totalRecords: number;
   generatedAt: string;
+  range: { mode: string; from?: string; to?: string; label: string };
 }> {
   const summaries = await Promise.all(
     BACKUP_SECTIONS.map(async (sec) => {
       let count = 0;
       try {
-        count = await sec.model.countDocuments({ isVoid: { $ne: true } });
+        count = await sec.model.countDocuments({ isVoid: { $ne: true }, ...rangeFilter(sec.dateField, range) });
       } catch {
         count = 0;
       }
@@ -788,6 +808,7 @@ export async function getBackupSectionsSummary(): Promise<{
         importFormatNote: sec.importFormatNote,
         count,
         columnsCount: sec.columns.length,
+        inPeriod: !!sec.dateField,
       };
     })
   );
@@ -797,18 +818,19 @@ export async function getBackupSectionsSummary(): Promise<{
     sections: summaries,
     totalRecords,
     generatedAt: todayIST(),
+    range: { mode: range?.mode ?? 'lifetime', from: range?.from, to: range?.to, label: range?.label ?? 'Lifetime (all data)' },
   };
 }
 
 /**
  * Queries section data from database, mapped to the exact import format.
  */
-export async function getSectionData(section: SectionMeta, limit = 50000): Promise<{
+export async function getSectionData(section: SectionMeta, limit = 50000, range?: BackupRange): Promise<{
   columns: SectionCol[];
   rows: Array<Record<string, any>>;
 }> {
   const docs: any[] = await section.model
-    .find({ isVoid: { $ne: true } })
+    .find({ isVoid: { $ne: true }, ...rangeFilter(section.dateField, range) })
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit)
     .lean();
@@ -823,8 +845,8 @@ export async function getSectionData(section: SectionMeta, limit = 50000): Promi
 /**
  * Generate Excel workbook matching the import format.
  */
-export async function generateSectionExcel(section: SectionMeta): Promise<Buffer> {
-  const { columns, rows } = await getSectionData(section);
+export async function generateSectionExcel(section: SectionMeta, range?: BackupRange): Promise<Buffer> {
+  const { columns, rows } = await getSectionData(section, 50000, range);
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Vipul Stone Suppliers ERP';
   wb.created = new Date();
@@ -882,8 +904,8 @@ export async function generateSectionExcel(section: SectionMeta): Promise<Buffer
 /**
  * Generate CSV matching the import format with UTF-8 BOM.
  */
-export async function generateSectionCsv(section: SectionMeta): Promise<Buffer> {
-  const { columns, rows } = await getSectionData(section);
+export async function generateSectionCsv(section: SectionMeta, range?: BackupRange): Promise<Buffer> {
+  const { columns, rows } = await getSectionData(section, 50000, range);
   let csv = CSV_BOM;
 
   // Header
@@ -901,8 +923,8 @@ export async function generateSectionCsv(section: SectionMeta): Promise<Buffer> 
 /**
  * Generate structured PDF report using PdfBuilder (Landscape).
  */
-export async function generateSectionPdf(section: SectionMeta): Promise<Buffer> {
-  const { columns, rows } = await getSectionData(section, 5000); // PDF budget limit
+export async function generateSectionPdf(section: SectionMeta, range?: BackupRange): Promise<Buffer> {
+  const { columns, rows } = await getSectionData(section, 5000, range); // PDF budget limit
   const doc = await PdfBuilder.create(`Backup: ${section.name}`, { landscape: true });
 
   // Document Title Header
@@ -913,7 +935,7 @@ export async function generateSectionPdf(section: SectionMeta): Promise<Buffer> 
     gap: 2,
   });
 
-  doc.para(`${section.name} · Export Date: ${todayIST()} · Total Records: ${rows.length}`, {
+  doc.para(`${section.name} · Export Date: ${todayIST()} · Period: ${range?.label ?? 'Lifetime (all data)'}${range && range.mode !== 'lifetime' && !section.dateField ? ' (this list has no dates: shown in full)' : ''} · Total Records: ${rows.length}`, {
     size: 9,
     color: 'grey',
     gap: 8,
@@ -945,7 +967,7 @@ export async function generateSectionPdf(section: SectionMeta): Promise<Buffer> 
  * Generate all sections bundled in a single ZIP file.
  * format: 'all' (Excel + CSV + PDF in folders) | 'xlsx' | 'csv' | 'pdf'
  */
-export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'pdf' = 'xlsx'): Promise<Buffer> {
+export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'pdf' = 'xlsx', range?: BackupRange): Promise<Buffer> {
   const zip = new JSZip();
   const dateStr = todayIST();
 
@@ -955,7 +977,7 @@ export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'p
     const safeName = `${prefix}-${section.id}`;
 
     if (format === 'xlsx' || format === 'all') {
-      const excelBuf = await generateSectionExcel(section);
+      const excelBuf = await generateSectionExcel(section, range);
       if (format === 'all') {
         zip.file(`excel/${safeName}.xlsx`, excelBuf);
       } else {
@@ -964,7 +986,7 @@ export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'p
     }
 
     if (format === 'csv' || format === 'all') {
-      const csvBuf = await generateSectionCsv(section);
+      const csvBuf = await generateSectionCsv(section, range);
       if (format === 'all') {
         zip.file(`csv/${safeName}.csv`, csvBuf);
       } else {
@@ -973,7 +995,7 @@ export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'p
     }
 
     if (format === 'pdf' || format === 'all') {
-      const pdfBuf = await generateSectionPdf(section);
+      const pdfBuf = await generateSectionPdf(section, range);
       if (format === 'all') {
         zip.file(`pdf/${safeName}.pdf`, pdfBuf);
       } else {
@@ -986,6 +1008,7 @@ export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'p
   const readme = `================================================================================
 STONE ERP — COMPLETE DATA BACKUP ARCHIVE
 Generated: ${dateStr}
+Period: ${range?.label ?? 'Lifetime (all data)'}
 Organization: Vipul Stone Suppliers
 Format: Import-Compatible (Re-import directly into StoneERP)
 ================================================================================
@@ -993,7 +1016,11 @@ Format: Import-Compatible (Re-import directly into StoneERP)
 Sections Included (${BACKUP_SECTIONS.length} total):
 ${BACKUP_SECTIONS.map((s, i) => `${String(i + 1).padStart(2, '0')}. ${s.name} (${s.id}) - ${s.importFormatNote}`).join('\n')}
 
-Note:
+${range && range.mode !== 'lifetime' ? `Period note:
+Sections that have dates (sales, expenses, attendance, daily reports, purchases, ...) hold only the records dated ${range.from} to ${range.to}.
+Lists without dates (employees, customers, suppliers, machines, vehicles, stock lists, papers) are included in full.
+
+` : ''}Note:
 All Excel and CSV files use the exact column headers and structure expected by
 StoneERP Data Import. You can upload any exported file directly via "Import from Excel".
 `;

@@ -7,7 +7,7 @@ import {
   generateSectionCsv,
   generateSectionPdf,
 } from '@/lib/export/sectionBackup';
-import { todayIST } from '@/lib/time';
+import { parseBackupRange } from '@/lib/export/backupRange';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -27,11 +27,12 @@ export const GET = withAuth(
     const meta = getSectionMeta(sectionId);
     if (!meta) throw notFound(`Section "${sectionId}" not found`);
 
-    const dateStr = todayIST();
+    const range = parseBackupRange(q); // lifetime unless range=month|custom
+    const dateStr = range.tag;
     const safeName = meta.id;
 
     if (format === 'xlsx') {
-      const buf = await generateSectionExcel(meta);
+      const buf = await generateSectionExcel(meta, range);
       return new Response(new Uint8Array(buf), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -42,7 +43,7 @@ export const GET = withAuth(
     }
 
     if (format === 'csv') {
-      const buf = await generateSectionCsv(meta);
+      const buf = await generateSectionCsv(meta, range);
       return new Response(new Uint8Array(buf), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
@@ -53,7 +54,7 @@ export const GET = withAuth(
     }
 
     if (format === 'pdf') {
-      const buf = await generateSectionPdf(meta);
+      const buf = await generateSectionPdf(meta, range);
       return new Response(new Uint8Array(buf), {
         headers: {
           'Content-Type': 'application/pdf',

@@ -18,6 +18,7 @@ body { font-family: var(--font-sans), system-ui, -apple-system, 'Segoe UI', var(
   .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-none border border-rose-700; }
   .btn-green { @apply btn bg-emerald-700 text-white hover:bg-emerald-800 active:bg-emerald-900 shadow-none border border-emerald-800; }
   .btn-sm { @apply min-h-[36px] px-3 text-xs rounded-none; }
+  a[aria-disabled="true"] { @apply opacity-50 pointer-events-none cursor-not-allowed; } /* a download whose choices are not complete yet */
   .input { @apply w-full min-h-[38px] rounded-none border border-[#D4C2AB] bg-white px-3 py-1.5 text-sm text-char transition-colors duration-75 focus:outline-none focus:ring-1 focus:ring-terra focus:border-terra disabled:bg-stone-100 disabled:text-char-500 disabled:cursor-not-allowed shadow-none; }
   select.input {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238A5C38'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
