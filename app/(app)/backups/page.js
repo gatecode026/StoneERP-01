@@ -207,7 +207,7 @@ function BackupsScreen() {
               <Badge tone="green"><T>Recommended</T></Badge>
             </div>
             <p className="text-xs text-char-600 leading-relaxed">
-              <T>Download every section file in a single compressed ZIP archive. Formats exactly mirror StoneERP bulk import specifications so you can inspect, analyze in Excel, or restore data anytime.</T>
+              <T>Download every section file in a single compressed ZIP archive, arranged month by month (one folder for each month, and a folder for the lists without dates). Formats exactly mirror StoneERP bulk import specifications so you can inspect, analyze in Excel, or restore data anytime.</T>
             </p>
           </div>
 

@@ -825,16 +825,20 @@ export async function getBackupSectionsSummary(range?: BackupRange): Promise<{
 /**
  * Queries section data from database, mapped to the exact import format.
  */
-export async function getSectionData(section: SectionMeta, limit = 50000, range?: BackupRange): Promise<{
-  columns: SectionCol[];
-  rows: Array<Record<string, any>>;
-}> {
-  const docs: any[] = await section.model
+/** The section's live records (cancelled ones are never backed up), newest first, kept to the period. */
+async function fetchSectionDocs(section: SectionMeta, limit: number, range?: BackupRange): Promise<any[]> {
+  return section.model
     .find({ isVoid: { $ne: true }, ...rangeFilter(section.dateField, range) })
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit)
     .lean();
+}
 
+export async function getSectionData(section: SectionMeta, limit = 50000, range?: BackupRange): Promise<{
+  columns: SectionCol[];
+  rows: Array<Record<string, any>>;
+}> {
+  const docs = await fetchSectionDocs(section, limit, range);
   const mapped = docs.map((d) => section.mapDoc(d));
   return {
     columns: section.columns,
@@ -846,7 +850,11 @@ export async function getSectionData(section: SectionMeta, limit = 50000, range?
  * Generate Excel workbook matching the import format.
  */
 export async function generateSectionExcel(section: SectionMeta, range?: BackupRange): Promise<Buffer> {
-  const { columns, rows } = await getSectionData(section, 50000, range);
+  return buildExcel(section, (await getSectionData(section, 50000, range)).rows);
+}
+
+async function buildExcel(section: SectionMeta, rows: Array<Record<string, any>>): Promise<Buffer> {
+  const columns = section.columns;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Vipul Stone Suppliers ERP';
   wb.created = new Date();
@@ -905,7 +913,11 @@ export async function generateSectionExcel(section: SectionMeta, range?: BackupR
  * Generate CSV matching the import format with UTF-8 BOM.
  */
 export async function generateSectionCsv(section: SectionMeta, range?: BackupRange): Promise<Buffer> {
-  const { columns, rows } = await getSectionData(section, 50000, range);
+  return buildCsv(section, (await getSectionData(section, 50000, range)).rows);
+}
+
+function buildCsv(section: SectionMeta, rows: Array<Record<string, any>>): Buffer {
+  const columns = section.columns;
   let csv = CSV_BOM;
 
   // Header
@@ -924,7 +936,13 @@ export async function generateSectionCsv(section: SectionMeta, range?: BackupRan
  * Generate structured PDF report using PdfBuilder (Landscape).
  */
 export async function generateSectionPdf(section: SectionMeta, range?: BackupRange): Promise<Buffer> {
-  const { columns, rows } = await getSectionData(section, 5000, range); // PDF budget limit
+  const { rows } = await getSectionData(section, 5000, range); // PDF budget limit
+  const period = `${range?.label ?? 'Lifetime (all data)'}${range && range.mode !== 'lifetime' && !section.dateField ? ' (this list has no dates: shown in full)' : ''}`;
+  return buildPdf(section, rows, period);
+}
+
+async function buildPdf(section: SectionMeta, rows: Array<Record<string, any>>, period: string): Promise<Buffer> {
+  const columns = section.columns;
   const doc = await PdfBuilder.create(`Backup: ${section.name}`, { landscape: true });
 
   // Document Title Header
@@ -935,7 +953,7 @@ export async function generateSectionPdf(section: SectionMeta, range?: BackupRan
     gap: 2,
   });
 
-  doc.para(`${section.name} · Export Date: ${todayIST()} · Period: ${range?.label ?? 'Lifetime (all data)'}${range && range.mode !== 'lifetime' && !section.dateField ? ' (this list has no dates: shown in full)' : ''} · Total Records: ${rows.length}`, {
+  doc.para(`${section.name} · Export Date: ${todayIST()} · Period: ${period} · Total Records: ${rows.length}`, {
     size: 9,
     color: 'grey',
     gap: 8,
@@ -963,45 +981,51 @@ export async function generateSectionPdf(section: SectionMeta, range?: BackupRan
   return Buffer.from(await doc.bytes());
 }
 
+const monthName = (ym: string) => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const isMonth = (ym: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(ym);
+/** Lists without dates (staff, customers, stock lists...) and any record that has no date go here, after the month folders. */
+export const LISTS_FOLDER = 'Lists (no date)';
+
 /**
- * Generate all sections bundled in a single ZIP file.
+ * All sections bundled in one ZIP, month by month: the ZIP opens on one folder per month ("2026-11 November"), and inside each month
+ * come the data folders (excel / csv / pdf, or just the files when one format is asked), one file per section, holding the records
+ * dated in that month. The lists that have no dates are in "Lists (no date)" at the end. Sections with nothing in a month are left out.
  * format: 'all' (Excel + CSV + PDF in folders) | 'xlsx' | 'csv' | 'pdf'
  */
 export async function generateAllSectionsZip(format: 'all' | 'xlsx' | 'csv' | 'pdf' = 'xlsx', range?: BackupRange): Promise<Buffer> {
   const zip = new JSZip();
   const dateStr = todayIST();
 
+  // one read per section, sorted into folders by the month of each record
+  const folders = new Map<string, Map<number, any[]>>();
   for (let idx = 0; idx < BACKUP_SECTIONS.length; idx++) {
     const section = BACKUP_SECTIONS[idx];
-    const prefix = String(idx + 1).padStart(2, '0');
-    const safeName = `${prefix}-${section.id}`;
-
-    if (format === 'xlsx' || format === 'all') {
-      const excelBuf = await generateSectionExcel(section, range);
-      if (format === 'all') {
-        zip.file(`excel/${safeName}.xlsx`, excelBuf);
-      } else {
-        zip.file(`${safeName}.xlsx`, excelBuf);
-      }
+    for (const d of await fetchSectionDocs(section, 50000, range)) {
+      const ym = section.dateField ? String(d[section.dateField] ?? '').slice(0, 7) : '';
+      const folder = isMonth(ym) ? `${ym} ${monthName(ym).split(' ')[0]}` : LISTS_FOLDER;
+      let bySection = folders.get(folder);
+      if (!bySection) folders.set(folder, (bySection = new Map()));
+      const list = bySection.get(idx);
+      if (list) list.push(d); else bySection.set(idx, [d]);
     }
+  }
+  const names = [...folders.keys()].sort((a, b) => (a === LISTS_FOLDER ? 1 : b === LISTS_FOLDER ? -1 : a.localeCompare(b)));
 
-    if (format === 'csv' || format === 'all') {
-      const csvBuf = await generateSectionCsv(section, range);
-      if (format === 'all') {
-        zip.file(`csv/${safeName}.csv`, csvBuf);
-      } else {
-        zip.file(`${safeName}.csv`, csvBuf);
-      }
+  const summary: string[] = [];
+  for (const folder of names) {
+    const bySection = folders.get(folder)!;
+    let total = 0;
+    for (const [idx, docs] of [...bySection.entries()].sort((a, b) => a[0] - b[0])) {
+      const section = BACKUP_SECTIONS[idx];
+      const safeName = `${String(idx + 1).padStart(2, '0')}-${section.id}`;
+      const rows = docs.map((d) => section.mapDoc(d));
+      total += rows.length;
+      const at = (dir: string, ext: string) => (format === 'all' ? `${folder}/${dir}/${safeName}.${ext}` : `${folder}/${safeName}.${ext}`);
+      if (format === 'xlsx' || format === 'all') zip.file(at('excel', 'xlsx'), await buildExcel(section, rows));
+      if (format === 'csv' || format === 'all') zip.file(at('csv', 'csv'), buildCsv(section, rows));
+      if (format === 'pdf' || format === 'all') zip.file(at('pdf', 'pdf'), await buildPdf(section, rows.slice(0, 5000), folder === LISTS_FOLDER ? 'Lists without a date' : monthName(folder.slice(0, 7))));
     }
-
-    if (format === 'pdf' || format === 'all') {
-      const pdfBuf = await generateSectionPdf(section, range);
-      if (format === 'all') {
-        zip.file(`pdf/${safeName}.pdf`, pdfBuf);
-      } else {
-        zip.file(`${safeName}.pdf`, pdfBuf);
-      }
-    }
+    summary.push(`  ${folder.padEnd(24)} ${String(total).padStart(7)} records in ${bySection.size} section${bySection.size === 1 ? '' : 's'}`);
   }
 
   // Add a README metadata file inside the zip explaining the backup contents
@@ -1013,7 +1037,17 @@ Organization: Vipul Stone Suppliers
 Format: Import-Compatible (Re-import directly into StoneERP)
 ================================================================================
 
-Sections Included (${BACKUP_SECTIONS.length} total):
+How this archive is arranged:
+  One folder per month (for example "2026-11 November") holding the records dated in that month,
+  then "${LISTS_FOLDER}" holding the lists that have no dates (employees, customers, suppliers, machines,
+  vehicles, stock lists, papers)${range && range.mode !== 'lifetime' ? '' : ' and any record that was saved without a date'}.
+  Inside each folder${format === 'all' ? ' there are the folders excel, csv and pdf, and in them' : ''} there is one file per section
+  (numbered as listed below). A section with no records in a month has no file in that folder.
+
+What is in it (${names.length} folder${names.length === 1 ? '' : 's'}):
+${summary.join('\n') || '  (no records)'}
+
+Sections (${BACKUP_SECTIONS.length} in total):
 ${BACKUP_SECTIONS.map((s, i) => `${String(i + 1).padStart(2, '0')}. ${s.name} (${s.id}) - ${s.importFormatNote}`).join('\n')}
 
 ${range && range.mode !== 'lifetime' ? `Period note:

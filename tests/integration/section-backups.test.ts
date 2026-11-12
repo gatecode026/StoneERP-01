@@ -9,7 +9,7 @@ import {
   BACKUP_SECTIONS,
   getSectionMeta,
 } from '@/lib/export/sectionBackup';
-import { Expense } from '@/lib/models';
+import { Expense, Project } from '@/lib/models';
 import { addDays, monthOf, todayIST } from '@/lib/time';
 import * as sectionsRoute from '@/app/api/backups/sections/route';
 import * as downloadRoute from '@/app/api/backups/download/route';
@@ -165,11 +165,12 @@ describe('Backups & Data Export System', () => {
     const filenames = Object.keys(zip.files);
 
     expect(filenames).toContain('README.txt');
-    expect(filenames.some((f) => f.includes('employees') && f.endsWith('.csv'))).toBe(true);
-    expect(filenames.some((f) => f.includes('stockitems') && f.endsWith('.csv'))).toBe(true);
-    expect(filenames.some((f) => f.includes('customers') && f.endsWith('.csv'))).toBe(true);
-    expect(filenames.some((f) => f.includes('projects') && f.endsWith('.csv'))).toBe(true);
-    expect(filenames.length).toBe(25); // 24 sections + 1 README.txt
+    // nothing dated exists yet: the lists without dates are in their folder, and a section with no records has no file
+    expect(filenames).toContain('Lists (no date)/06-employees.csv');
+    expect(filenames).toContain('Lists (no date)/05-stockitems.csv');
+    expect(filenames).toContain('Lists (no date)/09-customers.csv');
+    expect(filenames.some((f) => f.includes('projects'))).toBe(false);
+    expect(filenames.filter((f) => /^d{4}-d{2} /.test(f))).toEqual([]); // no month folders yet
   });
 
   it('worker is forbidden from downloading all sections ZIP', async () => {
@@ -252,20 +253,64 @@ describe('Backup period (lifetime, this month, custom range)', () => {
     expect((await csvText(await getDownload(owner, 'section=employees&format=csv&range=custom&from=2019-01-01&to=2019-01-02')))).toContain('Vipul Sharma');
   });
 
-  it('the ZIP holds the period’s records only and says which period it is', async () => {
-    const zip = await JSZip.loadAsync(Buffer.from(await (await getDownloadAll(owner, 'format=csv&range=month')).arrayBuffer()));
-    const readme = await zip.file('README.txt')!.async('string');
+  const monthFolder = (m: string) => `${m} ${new Date(`${m}-15T12:00:00Z`).toLocaleDateString('en-IN', { month: 'long', timeZone: 'UTC' })}`;
+  const idxOf = (id: string) => String(BACKUP_SECTIONS.findIndex((x) => x.id === id) + 1).padStart(2, '0');
+  const zipOf = async (qs: string) => JSZip.loadAsync(Buffer.from(await (await getDownloadAll(owner, qs)).arrayBuffer()));
+  const topFolders = (z: JSZip) => [...new Set(Object.keys(z.files).filter((n) => n.includes('/')).map((n) => n.split('/')[0]))];
+
+  it('the ZIP opens on one folder per month, each with that month’s records, then the lists without dates', async () => {
+    const z = await zipOf('format=csv');
+    // oldest month first, the lists last
+    expect(topFolders(z)).toEqual([monthFolder(old.slice(0, 7)), ...(prevLast.slice(0, 7) === ym ? [] : [monthFolder(prevLast.slice(0, 7))]), monthFolder(ym), 'Lists (no date)']);
+    const exp = (m: string) => z.file(`${monthFolder(m)}/${idxOf('expenses')}-expenses.csv`)!.async('string');
+    const oldCsv = await exp(old.slice(0, 7));
+    expect(oldCsv).toContain('OldRent');
+    expect(oldCsv).not.toContain('ThisDiesel');
+    const nowCsv = await exp(ym);
+    expect(nowCsv).toContain('ThisDiesel');
+    expect(nowCsv).toContain('TodayTea');
+    expect(nowCsv).not.toContain('OldRent');
+    // the lists are whole, in their own folder; nothing is dated in them
+    expect(await z.file(`Lists (no date)/${idxOf('employees')}-employees.csv`)!.async('string')).toContain('Vipul Sharma');
+    expect(z.file(`${monthFolder(ym)}/${idxOf('employees')}-employees.csv`)).toBeNull();
+    // a section with nothing in a month has no file there
+    expect(z.file(`${monthFolder(old.slice(0, 7))}/${idxOf('sales')}-sales.csv`)).toBeNull();
+    // every record is in the ZIP exactly once: the four expenses of the four dates
+    const all = (await Promise.all(Object.keys(z.files).filter((n) => n.endsWith(`-expenses.csv`)).map((n) => z.file(n)!.async('string')))).join('');
+    for (const h of ['OldRent', 'PrevDiesel', 'ThisDiesel', 'TodayTea']) expect(all.split(h).length - 1, h).toBe(1);
+  });
+
+  it('with every format, each month holds the data folders excel, csv and pdf', async () => {
+    const z = await zipOf('format=all');
+    const m = monthFolder(ym);
+    for (const p of [`${m}/excel/${idxOf('expenses')}-expenses.xlsx`, `${m}/csv/${idxOf('expenses')}-expenses.csv`, `${m}/pdf/${idxOf('expenses')}-expenses.pdf`, `Lists (no date)/excel/${idxOf('employees')}-employees.xlsx`]) {
+      expect(z.file(p), p).not.toBeNull();
+    }
+    expect(Buffer.from(await z.file(`${m}/pdf/${idxOf('expenses')}-expenses.pdf`)!.async('nodebuffer')).slice(0, 5).toString('ascii')).toBe('%PDF-');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await z.file(`${m}/excel/${idxOf('expenses')}-expenses.xlsx`)!.async('nodebuffer')) as any);
+    expect(wb.worksheets[0].rowCount).toBe(3); // the heading and this month's two expenses
+  });
+
+  it('a record saved without a date is not lost: it goes to the lists folder of a lifetime backup, and is not in a period', async () => {
+    await Project.collection.insertOne({ projectCode: 'PRJ-UNDATED', name: 'Undated Palace', isVoid: false, createdAt: new Date() } as any);
+    const full = await zipOf('format=csv');
+    expect(await full.file(`Lists (no date)/${idxOf('projects')}-projects.csv`)!.async('string')).toContain('Undated Palace');
+    const month = await zipOf('format=csv&range=month');
+    expect(Object.keys(month.files).some((n) => n.includes('projects'))).toBe(false);
+  });
+
+  it('the month ZIP has one month folder, says which period it is, and is named after it', async () => {
+    const z = await zipOf('format=csv&range=month');
+    expect(topFolders(z)).toEqual([monthFolder(ym), 'Lists (no date)']);
+    const readme = await z.file('README.txt')!.async('string');
     expect(readme).toContain('Period: This month');
-    expect(readme).toContain('Lists without dates');
-    const idx = BACKUP_SECTIONS.findIndex((s) => s.id === 'expenses') + 1;
-    const exp = await zip.file(`${String(idx).padStart(2, '0')}-expenses.csv`)!.async('string');
-    expect(exp).toContain('ThisDiesel');
-    expect(exp).not.toContain('OldRent');
+    expect(readme).toContain('One folder per month');
+    expect(readme).toContain(monthFolder(ym));
+    expect(await z.file(`${monthFolder(ym)}/${idxOf('expenses')}-expenses.csv`)!.async('string')).not.toContain('OldRent');
     const res = await getDownloadAll(owner, 'format=csv&range=month');
     expect(res.headers.get('content-disposition')).toContain(`stoneerp-all-sections-csv-backup-month-${ym}.zip`);
-    // and lifetime says so
-    const full = await JSZip.loadAsync(Buffer.from(await (await getDownloadAll(owner, 'format=csv')).arrayBuffer()));
-    expect(await full.file('README.txt')!.async('string')).toContain('Period: Lifetime');
+    expect(await (await zipOf('format=csv')).file('README.txt')!.async('string')).toContain('Period: Lifetime');
   });
 
   it('refuses a period that makes no sense (400), and still needs the right to back up (403)', async () => {
