@@ -9,6 +9,7 @@ import { buildDailyReport } from '../services/report';
 import { computeReminders, precomputeScorecards } from '../services/analytics';
 import { reconcile } from '../rollup/dailySummary';
 import { runBackup } from '../backup';
+import { BACKUP_REMINDER_DAY, backupDueReminder } from '../export/backupRange';
 import { sendQueued } from '../notify/whatsapp';
 import { addDays, daysBetween, monthOf, monthStart, todayIST } from '../time';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -68,6 +69,18 @@ export const JOBS: Record<string, JobDef> = {
   // retries messages that could not be delivered the first time; period is the hour, so it can run every hour
   'send-notifications': { period: () => `${todayIST()}T${new Date(Date.now() + 19_800_000).toISOString().slice(11, 13)}`, run: async () => ({ ...(await sendQueued()) }) },
   backup: { period: todayIST, run: (date) => runBackup(date) as Promise<Record<string, unknown>> },
+  // the 25th of every month (see vercel.json): one WhatsApp message to the Owner to take the month's backup; the same reminder shows in the app (computeReminders)
+  'backup-reminder': {
+    period: () => monthOf(todayIST()),
+    async run(month) {
+      const { user, mobile } = await owner();
+      const r = backupDueReminder(`${month}-${BACKUP_REMINDER_DAY}`)!;
+      const site = process.env.APP_ORIGIN?.split(',')[0]?.trim().replace(/\/$/, '');
+      const text = `Namaste ${user.name}, ${r.title}. ${r.detail}${site ? ` ${site}${r.link}` : ''}`;
+      const queued = await queue([{ _id: `backup-reminder:${month}:${mobile}`, to: mobile, kind: 'backup-reminder', text, meta: { month } }]);
+      return { month, queued, delivery: await sendQueued() };
+    },
+  },
   reconcile: {
     period: todayIST,
     async run(date) {

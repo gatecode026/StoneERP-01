@@ -1,6 +1,6 @@
 /**
  * Run a scheduled job by hand (or from a plain cron on a VPS):   npm run job -- <name> [--period=YYYY-MM-DD] [--force]
- * Names: daily-report | payment-reminders | reconcile | scorecards
+ * Names: daily-report | payment-reminders | send-notifications | backup | backup-reminder | reconcile | scorecards
  */
 import { disconnect } from '../lib/db';
 import { JOBS, runJob } from '../lib/jobs';

@@ -26,6 +26,10 @@
     {
       "path": "/api/jobs/scorecards",
       "schedule": "30 21 1 * *"
+    },
+    {
+      "path": "/api/jobs/backup-reminder",
+      "schedule": "30 4 25 * *"
     }
   ]
 }

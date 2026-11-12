@@ -10,6 +10,7 @@ import { addDays, daysBetween, daysInMonth, monthEnd, monthOf, monthStart, today
 import { fmtInr } from '../fmt';
 import { trackQueries } from '../api/reqctx';
 import { stockSnapshot } from './stockSnapshot';
+import { backupDueReminder } from '../export/backupRange';
 
 type U = Pick<SessionUser, 'id' | 'empCode'>;
 const r0 = (n: number) => Math.round(Number(n) || 0);
@@ -271,6 +272,9 @@ export async function computeReminders(user: U, perm: EffectivePerm, settings: A
     const rows: any[] = await SafetyRecord.find({ kind: 'checkup', isVoid: false, dueDate: { $gt: '', $lte: in15 } }).limit(50).select('empName dueDate').lean();
     for (const c of rows) out.push({ type: 'checkup_due', to: 'Supervisor, owner', title: `Health check-up: ${c.empName} due ${c.dueDate}`, severity: c.dueDate < today ? 'high' : 'med', link: '/safety' });
   })());
+  // the 25th of the month: the Owner is reminded to take the month's backup (high: it is shown among the dashboard alerts too)
+  const bk = perm.roleKey === 'owner' ? backupDueReminder(today) : null;
+  if (bk) out.push({ type: 'backup_due', to: 'Owner', title: bk.title, detail: bk.detail, severity: 'high', link: bk.link });
   await Promise.all(jobs);
   return out;
 }

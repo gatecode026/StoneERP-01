@@ -22,6 +22,7 @@ const REMINDER_TABLE = [
   ['paper_expiry', 'Licence, insurance, vehicle papers or lease expiring', 'Owner'],
   ['request', 'Employee leave or advance request', 'Owner / manager to approve'],
   ['task_overdue', 'Overdue tasks', 'Assignee, owner'],
+  ['backup_due', 'Monthly backup (reminded on the 25th of every month)', 'Owner'],
 ];
 
 export default function TasksPage() {
