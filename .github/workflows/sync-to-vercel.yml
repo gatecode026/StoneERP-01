@@ -1,0 +1,51 @@
+name: Sync Code to Vercel Repository
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout destination repository
+        uses: actions/checkout@v4
+        with:
+          repository: gatecodebpo-cmd/stoneerp
+          token: ${{ secrets.SYNC_REPO_TOKEN }}
+          ref: main
+          path: destination
+
+      - name: Sync project files
+        run: |
+          rsync -av --delete \
+            --exclude='.git/' \
+            --exclude='.github/workflows/' \
+            source/ destination/
+
+      - name: Commit and push changes
+        working-directory: destination
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to sync"
+            exit 0
+          fi
+
+          git commit -m "Auto sync from gatecode026/StoneERP-01"
+          git push origin HEAD:main
