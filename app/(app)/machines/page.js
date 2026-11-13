@@ -194,6 +194,10 @@ export default function MachinesPage() {
             if (!body.stopTime) delete body.stopTime;
             if (!body.remarks) delete body.remarks;
             if (!body.stopReason) delete body.stopReason;
+            // the pickers fill in the names for the screen; the server sets them itself and refuses them when sent (400)
+            delete body.machineName;
+            delete body.machineType;
+            delete body.operatorName;
             return body;
           }}
           headerExtra={<><input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={today} onChange={(e) => setDate(e.target.value || today)} /><ImportData resource="machineentries" perm="machineentries" noun="machine entries" hint="machine, operator and shift are required" /></>}
