@@ -10,7 +10,14 @@ const choose = async (page: Page, id: string, text: RegExp) => {
   await page.locator('[role=option], ul[role=listbox] li').filter({ hasText: text }).first().click();
 };
 
-test('Owner: a machine entry with a block, stock output, hour-meter, electricity and waste', async ({ page }) => {
+// the Machine field lists machines with check boxes (one entry can cover several machines) and closes with Done
+const pickMachine = async (page: Page, text: RegExp) => {
+  await page.locator('#f_machineId').click();
+  await page.getByText(text).first().click(); // a row of the list toggles its check box
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+};
+
+test('Owner: an ordinary machine saves its output, and a CNC machine gets its own form', async ({ page }) => {
   await signIn(page, 'owner');
   const post = async (path: string, data: object) => {
     const r = await page.request.post(path, { headers: SAME_ORIGIN, data });
@@ -18,52 +25,39 @@ test('Owner: a machine entry with a block, stock output, hour-meter, electricity
     return r.json();
   };
   const machineName = `Gang saw ${uid}`;
-  const slabName = `Slab ${uid}`;
+  const cncName = `CNC router ${uid}`;
   await post('/api/machines', { name: machineName, type: 'Gang saw', location: 'Factory' });
-  await post('/api/stockitems', { name: slabName, category: 'finished', unit: 'sq ft', openingBalance: 0 });
-  await post('/api/stockitems', { name: `Raw ${uid}`, category: 'raw', unit: 'CFT', openingBalance: 0 });
-  const block = await post('/api/blocks', { rawanna: `RWN-${uid}`, length: 8, width: 5, height: 4, source: 'own' });
+  await post('/api/machines', { name: cncName, type: 'CNC', location: 'Factory' });
 
+  // an ordinary machine: the standard form (work done, output, photo, remarks) and no CNC fields
   await page.goto('/machines');
   await page.getByRole('button', { name: /New entry/ }).first().click();
-
-  // the block dropdown works and lists the block (it was empty before: the server refused the filter)
-  await page.locator('#f_blockNo').click();
-  await expect(page.locator('[role=option], ul[role=listbox] li').filter({ hasText: `Block ${block.blockNo}` })).toBeVisible();
-  await page.getByRole('heading', { name: /New entry/ }).click();
-
-  // the shift sets the start and stop times (Settings → Working hours)
-  await expect(page.locator('#f_startTime')).toHaveValue('09:00');
-  await page.locator('#f_shift').selectOption('Night');
-  await expect(page.locator('#f_startTime')).toHaveValue('21:00');
-  await expect(page.locator('#f_stopTime')).toHaveValue('06:00');
-  await page.locator('#f_shift').selectOption('Day');
-  await expect(page.locator('#f_stopTime')).toHaveValue('18:00');
-
-  await choose(page, 'f_machineId', new RegExp(machineName));
+  await pickMachine(page, new RegExp(machineName));
+  await expect(page.locator('#f_outputSqft')).toBeVisible();
+  await expect(page.locator('#f_programName')).toHaveCount(0);
   await choose(page, 'f_operatorCode', /E2E worker/);
+  await page.locator('#f_workDone').fill(`Cut slabs ${uid}`);
   await page.locator('#f_outputSqft').fill('410');
-  await choose(page, 'f_blockNo', new RegExp(`Block ${block.blockNo}`));
-  await choose(page, 'f_stockItemId', new RegExp(slabName));
-  await page.locator('#f_hourMeterStart').fill('1200');
-  await page.locator('#f_hourMeterEnd').fill('1209.5');
-  await page.locator('#f_electricityReadingStart').fill('5000');
-  await page.locator('#f_electricityReadingEnd').fill('5180');
-  await page.locator('#f_wasteSqft').fill('12');
-
-  // waste needs its reason
-  await page.getByRole('button', { name: /^(Submit|Save)$/i }).click();
-  await expect(page.getByText(/Reason for the waste is required/i).first()).toBeVisible();
-  await page.locator('#f_wasteReason').fill('Slab cracked on the saw');
   await page.getByRole('button', { name: /^(Submit|Save)$/i }).click();
   await expect(page.getByText(/Machine entry saved/i).first()).toBeVisible();
+  let entries = await (await page.request.get('/api/machineentries?limit=5')).json();
+  expect(entries.data[0]).toMatchObject({ machineName, workDone: `Cut slabs ${uid}`, outputSqft: 410 });
 
-  const entries = await (await page.request.get('/api/machineentries?limit=5')).json();
-  expect(entries.data[0]).toMatchObject({ machineName, blockNo: block.blockNo, outputSqft: 410, hoursRun: 9.5, electricityUnits: 180, wasteSqft: 12, wasteReason: 'Slab cracked on the saw' });
-  const items = await (await page.request.get(`/api/stockitems?q=${slabName}`)).json();
-  expect(items.data[0].balance).toBe(410); // the output went into finished stock
-  const blocks = await (await page.request.get(`/api/blocks?blockNo=${block.blockNo}`)).json();
-  expect(blocks.data[0].stage).toBe('cutting'); // the block is now being cut
+  // a CNC machine: its own fields (program, tools, times); the ordinary output field is not asked
+  await page.getByRole('button', { name: /New entry/ }).first().click();
+  await pickMachine(page, new RegExp(cncName));
+  await expect(page.locator('#f_programName')).toBeVisible();
+  await expect(page.locator('#f_toolName')).toBeVisible();
+  await expect(page.locator('#f_startTime')).toBeVisible();
+  await expect(page.locator('#f_outputSqft')).toHaveCount(0);
+  await choose(page, 'f_operatorCode', /E2E worker/);
+  await page.locator('#f_programName').fill(`Rosette ${uid}`);
+  await page.locator('#f_toolName').fill('Flat 6 mm');
+  await page.getByRole('button', { name: /^(Submit|Save)$/i }).click();
+  await expect(page.getByText(/Machine entry saved/i).first()).toBeVisible();
+  entries = await (await page.request.get('/api/machineentries?limit=5')).json();
+  expect(entries.data[0]).toMatchObject({ machineName: cncName, programName: `Rosette ${uid}`, toolName: 'Flat 6 mm' });
+  expect(entries.data[0].workDone).toContain(`Rosette ${uid}`);
 });
 
 test('Owner: the Supervisor (team) dropdown on the Employee form lists supervisors', async ({ page }) => {

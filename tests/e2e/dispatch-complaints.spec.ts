@@ -12,6 +12,8 @@ const choose = async (page: Page, id: string, text: RegExp | string) => {
   await page.locator(`#${id}`).click();
   await page.locator('[role=option], ul[role=listbox] li').filter({ hasText: text }).first().click();
 };
+// /dispatch opens on Daily Truck Updates; the loading slips, incoming trucks and freight are on their own tabs
+const dispatchTab = async (page: Page, tab: string) => { await page.goto('/dispatch'); await page.getByRole('button', { name: new RegExp(`^${tab}`) }).click(); };
 const ok = (page: Page) => page.getByRole('button', { name: /^(Yes|OK|Confirm)/i }).last().click();
 
 test('Owner: loading slips know what is left, the e-way bill is asked for, late details can be added, freight is paid', async ({ page }) => {
@@ -22,7 +24,7 @@ test('Owner: loading slips know what is left, the e-way bill is asked for, late 
   const order = await post(page, '/api/sales', { customerId: cust._id, stage: 'order', items: [{ stockItemId: slab._id, name: slab.name, qty: 100, unit: 'sq ft', rate: 60, gstRate: 0 }] });
 
   // ---- a loading slip for 60 of the 100: the truck number is checked, the quantity cannot exceed what is left
-  await page.goto('/dispatch');
+  await dispatchTab(page, 'Customer Loading Slips');
   await page.getByRole('button', { name: /New loading slip/ }).click();
   await page.getByPlaceholder('Search order or customer…').fill(`Kota Buyer ${uid}`);
   await page.locator('[role=option], ul[role=listbox] li').filter({ hasText: `Kota Buyer ${uid}` }).first().click();
@@ -65,7 +67,7 @@ test('Owner: loading slips know what is left, the e-way bill is asked for, late 
   expect(first).toMatchObject({ status: 'out', driverMobile: '9829012345', freight: 3500 });
 
   // ---- after it left: the e-way bill is added late, the truck number cannot be changed
-  await page.goto('/dispatch');
+  await dispatchTab(page, 'Customer Loading Slips');
   const out = page.locator('tbody tr, [class*=card]').filter({ hasText: 'RJ14 GA 7001' }).first();
   await out.getByRole('button').last().click();
   await page.getByRole('menuitem', { name: /^Edit/ }).first().click();
@@ -166,8 +168,7 @@ test('Owner: an incoming truck is entered and corrected, and the freight of a tr
   }
 
   // ---- incoming truck
-  await page.goto('/dispatch');
-  await page.getByRole('button', { name: /^Trucks in$/ }).click();
+  await dispatchTab(page, 'Incoming Trucks');
   await page.getByRole('button', { name: /Truck in/ }).first().click();
   await page.locator('#f_truckNo').fill('x1');
   await page.locator('#f_driverName').fill('9999');
@@ -199,7 +200,7 @@ test('Owner: an incoming truck is entered and corrected, and the freight of a tr
 
 test('Owner: the loading-slip order picker lists orders to load, or says what to do when there are none', async ({ page }) => {
   await signIn(page, 'owner');
-  await page.goto('/dispatch');
+  await dispatchTab(page, 'Customer Loading Slips');
   await page.getByRole('button', { name: /New loading slip/ }).click();
   await page.getByPlaceholder('Search order or customer…').click();
   // a database with orders lists them (SO-…); an empty one explains how to get one instead of a bare "Nothing to choose"

@@ -26,28 +26,25 @@ test('Owner: stock day by day follows purchases, production and sales; a monthly
   // day by day
   await page.goto('/stock');
   await page.getByRole('button', { name: /^Day by day$/ }).click();
-  await page.locator('input[placeholder="Choose an item…"]').fill(name);
-  await page.locator('[role=option], ul[role=listbox] li').filter({ hasText: name }).first().click();
-  await expect(page.getByText('Stock, day by day')).toBeVisible();
-  await expect(page.getByText('Every entry adds up to the balance shown.')).toBeVisible();
-  await expect(page.locator('.recharts-bar-rectangle').first()).toBeVisible();
+  // the day's ledger (every material) on the day of the purchase lists it
+  await page.getByLabel('Choose date').fill(ago(1));
+  await expect(page.locator('tr').filter({ hasText: name }).filter({ hasText: '200' }).first()).toBeVisible();
   const daily = await (await page.request.get(`/api/stockitems/daily?itemId=${item._id}&days=7`)).json();
   expect(daily.days.find((d: { date: string }) => d.date === ago(2))).toMatchObject({ in: 0, out: 120 });
   expect(daily.days.find((d: { date: string }) => d.date === ago(1))).toMatchObject({ in: 200, closing: 580 });
 
   // monthly count: type what is on the floor, see the difference, the owner confirms
   await page.getByRole('button', { name: /^Monthly count$/ }).click();
-  await page.locator('input[type=month]').fill(`${year}-01`);
-  await page.getByRole('button', { name: /Start the count/ }).click();
-  await expect(page.getByText(`Stock count ${year}-01`)).toBeVisible();
-  const counted = page.getByLabel(`Counted ${name}`);
-  await counted.fill('565');
+  await page.getByLabel('Choose month').fill(`${year}-01`);
+  await page.getByRole('button', { name: /Start .* Physical Count/ }).first().click();
+  await page.getByPlaceholder('Search material name…').fill(name);
+  await page.getByLabel(`Count for ${name}`).fill('565');
   await expect(page.getByText('-15').first()).toBeVisible();
-  await page.getByLabel(`Reason for the difference ${name}`).fill('Broken pieces not entered');
-  await page.getByRole('button', { name: /Save the count/ }).click();
+  await page.getByLabel(`Reason for ${name}`).fill('Broken pieces not entered');
+  await page.getByRole('button', { name: /Save Count/ }).click();
   await expect(page.getByText(/Count saved/i).first()).toBeVisible();
   expect(await balance()).toBe(580); // not corrected until confirmed
-  await page.getByRole('button', { name: /Confirm and correct the stock/ }).click();
+  await page.getByRole('button', { name: /Confirm & Correct Stock/ }).click();
   await page.getByRole('button', { name: /^(Yes|OK|Confirm)/i }).last().click();
   await expect(page.getByText(/Count confirmed/i).first()).toBeVisible();
   expect(await balance()).toBe(565);

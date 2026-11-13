@@ -43,13 +43,10 @@ test('Owner: a day with an Out that is wrong is fixed with a reason, then the ov
   const out = page.locator('#fx_out');
   await expect(out).toBeVisible();
   await out.fill(`${yesterday}T19:05`);
-  await page.getByRole('button', { name: /Save correction/i }).click();
-  await expect(page.getByText(/Write the reason for the correction/i).first()).toBeVisible(); // refused without a reason
-  await page.locator('#fx_reason').fill('Machine was off, left at 7 pm');
-  await page.getByRole('button', { name: /Save correction/i }).click();
-  await expect(page.getByText('Corrected').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click(); // the sheet records the reason itself ("Punch correction")
+  await expect(page.getByText('Saved').first()).toBeVisible();
 
-  await expect(card.getByText(/OT 1h waiting/i)).toBeVisible();
+  await expect(card.getByText(/OT 1h(0m)? waiting/i)).toBeVisible();
   // approve it from the Overtime tab
   await page.getByRole('tab', { name: 'Overtime' }).or(page.getByRole('button', { name: 'Overtime' })).first().click();
   await expect(page.getByText('E2E worker').first()).toBeVisible();
