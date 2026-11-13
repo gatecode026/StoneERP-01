@@ -16,6 +16,8 @@ import { todayISO, fmtDate, fmtDateTime } from '@/lib/format';
 import { EMPLOYEE_RULES } from '@/lib/validators';
 import T from '@/components/T';
 
+const nowMs = () => Date.now(); // a cache-busting stamp for a request made when a row is opened (not while drawing the screen)
+
 const TONE = {
   active: 'gray', approved: 'green', applied: 'green', paid: 'green', closed: 'green', done: 'green', ok: 'green', in: 'blue', out: 'green',
   pending: 'amber', open: 'red', in_progress: 'amber', loading: 'amber', due: 'amber', rejected: 'red', void: 'red', draft: 'amber', not_ok: 'red',
@@ -522,7 +524,7 @@ export default function CrudPage({
   // lists carry no photos or documents, so editing loads the full record first
   async function startEdit(row) {
     try {
-      const full = await api(`/api/${model}/${row._id}?_t=${Date.now()}`);
+      const full = await api(`/api/${model}/${row._id}?_t=${nowMs()}`);
       const extra = loadExtra ? await loadExtra(full) : {};
       const merged = { ...full, ...extra };
       setEditing(merged); setShowErrors(false); setForm(merged); setOpen(true);

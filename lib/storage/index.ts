@@ -201,7 +201,7 @@ class ImageKitDriver implements StorageDriver {
   }
   async exists(key: string) {
     const primaryPath = this.toIkPath(key);
-    let r = await fetch(this.readUrl(primaryPath), { method: 'HEAD' });
+    const r = await fetch(this.readUrl(primaryPath), { method: 'HEAD' });
     if (!r.ok && primaryPath !== key) {
       const fallback = await fetch(this.readUrl(key.replace(/^\/+/, '')), { method: 'HEAD' });
       if (fallback.ok) return true;
