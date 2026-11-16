@@ -92,7 +92,8 @@ export default function Shell({ children }) {
     const active = isActive(pathname, it.href);
     const navLabel = it.label && !hi ? it.label : t(it.key);
     return (
-      <Link href={it.href} title={navLabel}
+      <Link href={it.href} title={navLabel} prefetch={false}
+        onMouseEnter={() => router.prefetch(it.href)} onFocus={() => router.prefetch(it.href)} onTouchStart={() => router.prefetch(it.href)}
         className={cx(
           'flex items-center gap-3 rounded-none px-3 min-h-[40px] md:min-h-[36px] md:py-1.5 text-sm md:text-[13px] font-medium transition',
           active
