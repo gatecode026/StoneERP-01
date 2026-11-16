@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { X, Camera, Mic, MicOff, Search, Download, ShieldAlert, ChevronLeft, ImageIcon, MoreVertical, Maximize2, ExternalLink } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -501,8 +501,14 @@ export function SpeakButton({ onText, lang = 'hi-IN', label }) {
 }
 
 // Table on desktop, stacked cards on mobile.
+// true on a screen wide enough for the table (Tailwind's md); the server and the first paint assume a phone
+const MD = '(min-width: 768px)';
+const onMd = (cb) => { const m = window.matchMedia(MD); m.addEventListener('change', cb); return () => m.removeEventListener('change', cb); };
+const useWide = () => useSyncExternalStore(onMd, () => window.matchMedia(MD).matches, () => false);
+
 export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loading, rowClass, actions, sortKey, onSort }) {
   const tx = useTx();
+  const wide = useWide();
   if (loading) return <SkeletonList n={4} className="h-24" />;
   if (!rows?.length) return <Empty text={empty} />;
   const primary = columns.find((c) => c.primary) || columns[0];
@@ -510,7 +516,7 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
   const cell = (c, r) => (c.render ? c.render(r) : r[c.key] ?? '—');
   return (
     <>
-      <div className="md:hidden space-y-2.5">
+      {!wide && <div className="md:hidden space-y-2.5">
         {rows.map((r, i) => (
           <div key={r[rowKey] || i} onClick={() => onRowClick?.(r)}
             className={cx('card p-3.5 cv-auto', onRowClick && 'active:bg-sand-100 cursor-pointer', rowClass?.(r))}>
@@ -531,8 +537,8 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
             </div>
           </div>
         ))}
-      </div>
-      <div className="hidden md:block card overflow-hidden">
+      </div>}
+      {wide && <div className="hidden md:block card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -573,7 +579,7 @@ export function DataList({ columns, rows, onRowClick, rowKey = '_id', empty, loa
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </>
   );
 }
