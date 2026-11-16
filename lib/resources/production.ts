@@ -135,9 +135,7 @@ export const machineentries: ResourceDef = {
       for (const entry of inserted) {
         const d = entry.toObject();
         await roll.machineEntry(d.date, d, 1, ctx.session);
-        if (d.stockItemId && d.outputSqft > 0) {
-          await applyStock(ctx, { itemId: d.stockItemId, delta: d.outputSqft, type: 'in', date: d.date, ref: `Production – ${d.machineName}`, note: `Block ${d.blockNo ?? '-'}`, refModel: 'machineentries', refId: d._id });
-        }
+        // the output is NOT added to finished stock here: a supervisor or admin enters it by hand as a stock movement
         if (d.blockNo) {
           const b: any = await Block.findOneAndUpdate({ blockNo: d.blockNo, stage: 'received' }, { $set: { stage: 'cutting' } }, { session: ctx.session, returnDocument: 'before', lean: true });
           if (b?.stockItemId && b.cft > 0) await applyStock(ctx, { itemId: b.stockItemId, delta: -b.cft, type: 'out', date: d.date, ref: `Block ${d.blockNo} to cutting`, refModel: 'blocks', refId: b._id });

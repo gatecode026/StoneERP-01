@@ -67,14 +67,15 @@ describe('the dropdowns on the Machine Work and Employee forms', () => {
 });
 
 describe('a machine entry', () => {
-  it('uses the block (moves it to cutting, takes the raw block out of stock) and adds the output to finished stock', async () => {
+  it('uses the block (moves it to cutting, takes the raw block out of stock) but leaves finished stock for the supervisor to enter by hand', async () => {
     const blk = (await api.create(owner, 'blocks', { rawanna: 'R-10', length: 8, width: 5, height: 4 })).json; // 160 CFT
     expect(((await StockItem.findById(raw._id).lean()) as any).balance).toBeGreaterThanOrEqual(160);
     const before = ((await StockItem.findById(raw._id).lean()) as any).balance;
+    const slabBefore = ((await StockItem.findById(slab._id).lean()) as any).balance;
     const r = await entry({ blockNo: blk.blockNo, stockItemId: slab._id, outputSqft: 410, startTime: '09:00', stopTime: '18:00' });
     expect(r.status, JSON.stringify(r.json)).toBe(201);
     expect(((await Block.findOne({ blockNo: blk.blockNo }).lean()) as any).stage).toBe('cutting');
-    expect(((await StockItem.findById(slab._id).lean()) as any).balance).toBe(410);
+    expect(((await StockItem.findById(slab._id).lean()) as any).balance).toBe(slabBefore); // output is not auto-added
     expect(((await StockItem.findById(raw._id).lean()) as any).balance).toBe(before - 160);
     expect(r.json.hoursRun).toBe(9);
   });

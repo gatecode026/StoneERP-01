@@ -443,13 +443,13 @@ describe('blocks and machine work', () => {
     const acc = await api.list(accountant, 'blocks');
     expect(acc.json.data[0]).toHaveProperty('cost');
   });
-  it('a night shift across midnight counts its hours; output adds finished stock; a breakdown opens a repair; cancelling reverses stock', async () => {
+  it('a night shift across midnight counts its hours; output does not touch finished stock (entered by hand); a breakdown opens a repair', async () => {
     const m = (await api.create(owner, 'machines', { name: 'Gang saw 1', type: 'Gang saw' })).json;
     const before = (await item(pavers._id)).balance;
     const r = await api.create(supervisor, 'machineentries', { shift: 'Night', machineId: m._id, operatorCode: 'E001', startTime: '20:00', stopTime: '04:00', outputSqft: 200, blockNo: 251, stockItemId: pavers._id, stoppedMins: 60, breakdown: true, stopReason: 'Blade jam' });
     expect(r.status, JSON.stringify(r.json)).toBe(201);
     expect(r.json.hoursRun).toBe(7);
-    expect((await item(pavers._id)).balance).toBe(before + 200);
+    expect((await item(pavers._id)).balance).toBe(before);
     const reps = await api.list(supervisor, 'repairs', 'status=open');
     expect(reps.json.data.some((x: any) => x.machineName === 'Gang saw 1')).toBe(true);
     const blk = (await api.list(supervisor, 'blocks', 'blockNo=251')).json.data[0];

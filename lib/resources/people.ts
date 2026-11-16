@@ -180,16 +180,10 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
   if (!hasMachine && !hasStone && !prev) return;
 
   try {
-    const { StockItem, Machine, MachineEntry, DailyReport } = await import('../models');
-    const { applyStock, reverseStockFor } = await import('../services/core');
+    const { Machine, MachineEntry } = await import('../models');
 
-    // If updating from a previous state, reverse previously applied stock and void previous machine entries
+    // Stock is NOT touched here: a supervisor or admin enters it by hand as a stock movement. Only the machine work is recorded.
     if (prev) {
-      try {
-        await reverseStockFor(ctx, 'dailyreports', d._id, 'Daily report updated');
-      } catch (err) {
-        console.error('Failed to reverse stock on daily report update:', err);
-      }
       try {
         await MachineEntry.updateMany(
           { date: prev.date, operatorCode: prev.empCode, isVoid: false },
@@ -230,108 +224,7 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
     const entryList = rawEntries.filter((e) => Boolean(e.colour || e.finish || e.output || e.thickness || e.size || e.pieces || e.quantity || e.feet || e.rate || e.amount));
 
     if (hasMachine || entryList.length > 0 || hasStone) {
-      const createdItemIds: any[] = [];
-
-      // 1. Process Stock Items and Stock Movements for each stone entry
-      for (const e of entryList) {
-        const eColour = (e.colour || colour || 'Finished Stone').trim();
-        const eOutput = (e.finish || e.output || output || '').trim();
-        const eThickness = e.thickness != null && Number(e.thickness) > 0 ? Number(e.thickness) : undefined;
-        const eSize = e.size ? String(e.size).trim() : undefined;
-        const eEdges = e.edges ? String(e.edges).trim() : undefined;
-        const ePieces = (e.pieces != null && Number(e.pieces) > 0) ? Number(e.pieces) : ((e.quantity != null && Number(e.quantity) > 0) ? Number(e.quantity) : undefined);
-        const eRate = e.rate != null && Number(e.rate) > 0 ? Number(e.rate) : undefined;
-        const eQty = e.feet != null && Number(e.feet) > 0 ? Number(e.feet) : (e.quantity != null && Number(e.quantity) > 0 ? Number(e.quantity) : 0);
-
-        if (eColour !== 'Finished Stone' || eQty > 0 || ePieces || eOutput) {
-          const nameRegex = new RegExp('^' + eColour.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
-          let subItem: any = null;
-          if (eOutput) {
-            const finishRegex = new RegExp('^' + eOutput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
-            subItem = await StockItem.findOne({ name: nameRegex, finish: finishRegex, isVoid: false }).session(s(ctx));
-          }
-          if (!subItem) {
-            subItem = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
-          }
-
-          if (subItem) {
-            const $set: any = {};
-            if (eOutput && !subItem.finish) $set.finish = eOutput;
-            if (eSize && !subItem.size) $set.size = eSize;
-            if (eThickness && (!subItem.thickness || subItem.thickness !== eThickness)) $set.thickness = eThickness;
-            if (eEdges && (!subItem.edges || subItem.edges !== eEdges)) $set.edges = eEdges;
-            if (eRate) { $set.price = eRate; $set.sellRate = eRate; }
-            if (d.empName && !subItem.karigar) $set.karigar = d.empName;
-            if (d.photos?.[0] && !subItem.photo) $set.photo = d.photos[0];
-
-            const updateDoc: any = {};
-            if (Object.keys($set).length) updateDoc.$set = $set;
-            if (ePieces) updateDoc.$inc = { pieces: ePieces };
-
-            if (Object.keys(updateDoc).length) {
-              await StockItem.updateOne({ _id: subItem._id }, updateDoc, { session: ctx.session });
-            }
-          } else {
-            try {
-              const [newItem] = await StockItem.create([{
-                name: eColour,
-                finish: eOutput || undefined,
-                size: eSize || undefined,
-                thickness: eThickness,
-                edges: eEdges,
-                price: eRate,
-                sellRate: eRate,
-                pieces: ePieces || 0,
-                unit: 'sq ft',
-                category: 'finished',
-                karigar: d.empName,
-                photo: d.photos?.[0],
-                balance: 0,
-                createdById: oid(ctx.actor.id),
-                createdByName: ctx.actor.name,
-                updatedById: oid(ctx.actor.id),
-                updatedByName: ctx.actor.name,
-              }], { session: ctx.session });
-              subItem = newItem;
-            } catch {
-              subItem = await StockItem.findOne({ name: nameRegex, isVoid: false }).session(s(ctx));
-            }
-          }
-
-          if (subItem) {
-            createdItemIds.push(subItem._id);
-            if (eQty > 0) {
-              await applyStock(ctx, {
-                itemId: subItem._id,
-                delta: eQty,
-                type: 'in',
-                date: d.date,
-                ref: `Daily report: ${d.empName} (${d.machineNames || d.machineName || 'Plant'})`,
-                note: [
-                  eColour,
-                  eOutput ? `Finish: ${eOutput}` : '',
-                  eThickness ? `${eThickness}mm` : '',
-                  eSize ? `Size: ${eSize}` : '',
-                  ePieces ? `${ePieces} pcs` : '',
-                  eRate ? `₹${eRate}/sqft` : '',
-                ].filter(Boolean).join(' · '),
-                refModel: 'dailyreports',
-                refId: d._id,
-              });
-            }
-          }
-        }
-      }
-
-      if (createdItemIds.length) {
-        await DailyReport.updateOne(
-          { _id: d._id },
-          { $set: { stockItemId: createdItemIds[0], stockUpdated: true } },
-          { session: ctx.session }
-        );
-      }
-
-      // 2. Record machine work entries and advance machine hour meter
+      // Record machine work entries and advance machine hour meter
       const machineIds: any[] = (d.machineIds && d.machineIds.length)
         ? d.machineIds
         : (d.machineId ? [d.machineId] : []);
@@ -396,7 +289,6 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
                       ? `${existingEntry.workDone} | ${workDetails}`
                       : workDetails,
                     ...(d.photos?.[0] && !existingEntry.photo ? { photo: d.photos[0] } : {}),
-                    ...(createdItemIds[0] && !existingEntry.stockItemId ? { stockItemId: createdItemIds[0] } : {}),
                   },
                 },
                 { session: ctx.session }
@@ -414,7 +306,7 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
                 outputSqft: splitQty,
                 pieces: splitPieces,
                 workDone: workDetails,
-                stockItemId: createdItemIds[0] || d.stockItemId,
+                stockItemId: d.stockItemId,
                 photo: d.photos?.[0],
                 remarks: [
                   d.problem ? `Problem: ${d.problem}` : '',
@@ -432,7 +324,7 @@ async function syncDailyReportStockAndMachine(ctx: SvcCtx, d: any, prev?: any) {
         }
       }
 
-      invalidate('stockitems', 'stockmovements', 'machineentries', 'machines', 'yield', 'perf', 'home');
+      invalidate('machineentries', 'machines', 'yield', 'perf', 'home');
     }
   } catch (err) {
     console.error('Failed to sync stock/machine work from daily report:', err);

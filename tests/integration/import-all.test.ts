@@ -67,11 +67,11 @@ describe('Excel import for every list that has entries', () => {
     expect((await PerfRemark.findOne().lean() as any).month).toBe('2026-09');
   });
 
-  it('production: machine entries (with stock output), blocks, royalties, repairs, trips', async () => {
-    const m = await imp('machineentries', [['Date', 'Shift', 'Machine', 'Operator', 'Start time', 'Stop time', 'Output (sq ft)', 'Stopped (minutes)', 'Breakdown', 'Add output to stock item'], [D, 'day', 'Gang saw 1', 'E001', '8:00 am', '18:00', 410, 60, 'Yes', 'Slab']]);
+  it('production: machine entries (stock untouched), blocks, royalties, repairs, trips', async () => {
+    const m = await imp('machineentries', [['Date', 'Shift', 'Machine', 'Operator', 'Start time', 'Stop time', 'Output (sq ft)', 'Stopped (minutes)', 'Breakdown', 'Stock item made'], [D, 'day', 'Gang saw 1', 'E001', '8:00 am', '18:00', 410, 60, 'Yes', 'Slab']]);
     expect(m.json.imported).toBe(1);
     expect((await MachineEntry.findOne().lean() as any)).toMatchObject({ outputSqft: 410, startTime: '08:00', breakdown: true });
-    expect(((await StockItem.findOne({ name: 'Slab' }).lean()) as any).balance).toBe(1410); // output raised the finished stock, as when entered by hand
+    expect(((await StockItem.findOne({ name: 'Slab' }).lean()) as any).balance).toBe(1000); // output does not move stock: that is entered by hand
     const b = await imp('blocks', [['Date', 'Source', 'Rawanna number', 'Length', 'Width', 'Height', 'Grade'], [D, 'own', 'RW-1', 2.4, 1.5, 1.2, 'A'], [D, 'own', 'RW-1', 1, 1, 1, '']]);
     expect(b.json).toMatchObject({ imported: 1, skipped: 1 });
     expect((await Block.findOne({ rawanna: 'RW-1' }).lean() as any).blockNo).toBeGreaterThan(0);

@@ -311,14 +311,14 @@ export const IMPORT_SPECS: Record<string, ImportSpec> = {
   // ------------------------------------------------------------ production
   machineentries: {
     resource: 'machineentries', noun: 'machine entries', required: ['machine', 'operator', 'shift'], refs: [machineRef(), employee('operator', 'operatorCode'), itemRef('stockItemId', true)],
-    footnote: 'One row per machine per shift. "Machine" is the machine name; "Operator" the employee code. "Add output to stock item" (optional) raises that finished item by the output.',
+    footnote: 'One row per machine per shift. "Machine" is the machine name; "Operator" the employee code. "Stock item made" (optional) only notes which item was made: stock itself is entered by hand as a stock movement.',
     columns: [
       dateCol(), enumCol('shift', 'Shift', ['Day', 'Night'], 'Day'), col('machine', 'Machine', ['machinename'], 'Gang saw 1'), empCol('operator', 'Operator'),
       col('startTime', 'Start time', ['start'], '08:00', { parse: parseTime }), col('stopTime', 'Stop time', ['stop', 'end'], '18:00', { parse: parseTime }), col('workDone', 'Work done', ['work'], '600x600x30 mm slabs'),
       numCol('outputSqft', 'Output (sq ft)', ['output', 'sqft'], '410'), numCol('pieces', 'Output (pieces)', ['piecesoutput'], '120'), numCol('blockNo', 'Block no.', ['block', 'blocknumber'], '245'),
       numCol('wasteSqft', 'Waste (sq ft)', ['waste'], ''), col('wasteReason', 'Waste reason', [], ''), numCol('stoppedMins', 'Stopped (minutes)', ['stopped', 'idle'], '60'), col('stopReason', 'Stop reason', [], 'Power cut'),
       col('breakdown', 'Breakdown', [], 'No', { note: 'Yes / No', parse: yes }), col('bladeChanged', 'Blade changed', [], 'No', { note: 'Yes / No', parse: yes }),
-      col('item', 'Add output to stock item', ['stockitem', 'finishedstock'], '', { note: 'Optional' }),
+      col('item', 'Stock item made', ['stockitem', 'finishedstock', 'addoutputtostockitem'], '', { note: 'Optional' }),
     ],
     describe: (i) => `${i.machine ?? ''} ${i.date ?? ''} ${i.shift ?? ''}`,
   },
