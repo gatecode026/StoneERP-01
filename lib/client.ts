@@ -12,16 +12,41 @@ export class ApiError extends Error {
   constructor(message: string, status: number, data?: any) { super(message); this.status = status; this.data = data; }
 }
 
+/** First pages of lists already shown in this tab (lib/usePaged.ts): shown again at once, then refreshed. Emptied by every write. */
+export const listCache = new Map<string, any>();
+
+// The GET requests a screen makes in its first seconds are remembered per address, so that the next full load of that address can send
+// them from the HTML, before the JavaScript has even arrived (see the inline script in app/layout.tsx). A list made fresh on each load.
+const firstRequests: Record<string, string[]> = {};
+function rememberFirstRequests(url: string) {
+  if (performance.now() > 4000 || !url.startsWith('/api/') || url.includes('_t=')) return;
+  const list = (firstRequests[location.pathname] ??= []);
+  if (list.includes(url) || list.length >= 6) return;
+  list.push(url);
+  try { localStorage.setItem('vss_pre:' + location.pathname, JSON.stringify(list)); } catch { /* storage blocked: no early requests, nothing else changes */ }
+}
+
 export async function api(path: string, { method = 'GET', body, headers }: { method?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<any> {
-  let res: Response;
-  try {
-    res = await fetch(path.startsWith('/') ? path : '/' + path, {
-      method, cache: 'no-store',
-      headers: body !== undefined ? { 'Content-Type': 'application/json', ...(headers ?? {}) } : headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch (e) {
-    throw new ApiError('Network error', 0, { network: true });
+  let res: Response | undefined;
+  const url = path.startsWith('/') ? path : '/' + path;
+  if (method !== 'GET') listCache.clear(); // something is being saved: no remembered list may be shown again
+  else if (typeof window !== 'undefined' && !headers) {
+    // the inline script of app/layout.tsx may have sent this very request while the JavaScript was still loading: use its answer (once, and only while fresh)
+    const w = window as any;
+    const early = w.__pre?.[url];
+    if (early) { delete w.__pre[url]; if (Date.now() - w.__preAt < 10_000) res = await early; }
+    rememberFirstRequests(url);
+  }
+  if (!res) {
+    try {
+      res = await fetch(url, {
+        method, cache: 'no-store',
+        headers: body !== undefined ? { 'Content-Type': 'application/json', ...(headers ?? {}) } : headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      throw new ApiError('Network error', 0, { network: true });
+    }
   }
   if (res.status === 503 && res.headers.get('x-offline')) throw new ApiError('Offline', 0, { network: true }); // answered by the service worker: no network and no stored copy
   let data: any = null;

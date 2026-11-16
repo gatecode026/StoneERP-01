@@ -53,6 +53,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         {/* react-hot-toast (goober) injects a <style> at runtime; it reads its CSP nonce from window.__nonce__ */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__nonce__=${JSON.stringify(nonce ?? '')}` }} />
+        {/* early fetch: the data requests this address opened with last time (remembered by lib/client.ts) go out now, while the JavaScript is still loading */}
+        {session && <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `try{var u=JSON.parse(localStorage.getItem('vss_pre:'+location.pathname)||'[]'),p=window.__pre={};window.__preAt=Date.now();for(var i=0;i<u.length&&i<6;i++)if(typeof u[i]==='string'&&u[i].indexOf('/api/')===0)p[u[i]]=fetch(u[i],{cache:'no-store'}).catch(function(){})}catch(e){}` }} />}
       </head>
       <body suppressHydrationWarning>
         <Suspense fallback={null}><Providers initialSession={session} initialLang={lang}>{children}</Providers></Suspense>

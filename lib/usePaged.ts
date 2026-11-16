@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from './client';
+import { api, listCache } from './client';
 
 export function useDebounced<T>(value: T, ms = 300): T {
   const [v, setV] = useState(value);
@@ -42,13 +42,14 @@ export function usePagedList(path: string | null, params: Record<string, unknown
   const { limit = 25, count = true } = opts;
   const qs = toQuery({ ...params, limit });
   const key = `${path}?${qs}`;
-  const [rows, setRows] = useState<any[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [total, setTotal] = useState<number | null>(null);
-  const [loading, setLoading] = useState(!!path);
+  const hit = listCache.get(key); // seen before in this tab: shown at once, refreshed below
+  const [rows, setRows] = useState<any[]>(hit?.rows ?? []);
+  const [cursor, setCursor] = useState<string | null>(hit?.cursor ?? null);
+  const [total, setTotal] = useState<number | null>(hit?.total ?? null);
+  const [loading, setLoading] = useState(!!path && !hit);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<any>(null);
-  const [meta, setMeta] = useState<Record<string, any>>({});
+  const [meta, setMeta] = useState<Record<string, any>>(hit?.meta ?? {});
   const seq = useRef(0);
 
   const [reloadKey, setReloadKey] = useState(0);
@@ -56,18 +57,19 @@ export function usePagedList(path: string | null, params: Record<string, unknown
   const load = useCallback(async () => {
     if (!path) { setRows([]); setCursor(null); setTotal(null); setLoading(false); return; }
     const mine = ++seq.current;
-    setLoading(true);
+    const kept = listCache.get(key);
+    if (kept) { setRows(kept.rows); setCursor(kept.cursor); setTotal(kept.total); setMeta(kept.meta); setLoading(false); } else setLoading(true);
     try {
       const cacheBust = reloadKey ? `&_t=${Date.now()}` : '';
       const r = await api(`${path}?${qs}${count ? '&count=1' : ''}${cacheBust}`);
       if (mine !== seq.current) return;
-      setRows(r.data ?? []); setCursor(r.nextCursor ?? null); setTotal(r.total ?? null); setError(null); { const { data: _d, nextCursor: _n, ...rest } = r; void _d; void _n; setMeta(rest); }
+      setRows(r.data ?? []); setCursor(r.nextCursor ?? null); setTotal(r.total ?? null); setError(null); { const { data: _d, nextCursor: _n, ...rest } = r; void _d; void _n; setMeta(rest); if (listCache.size > 60) listCache.clear(); listCache.set(key, { rows: r.data ?? [], cursor: r.nextCursor ?? null, total: r.total ?? null, meta: rest }); }
     } catch (e) {
       if (mine === seq.current) setError(e);
     } finally {
       if (mine === seq.current) setLoading(false);
     }
-  }, [path, qs, count, reloadKey]);
+  }, [path, qs, count, reloadKey, key]);
 
   const reload = useCallback(async () => {
     setReloadKey((k) => k + 1);
