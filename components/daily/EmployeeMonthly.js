@@ -8,7 +8,7 @@ import { useApp, useFetch } from '@/components/Providers';
 import { Badge, Empty, SkeletonList, StatCard, cx } from '@/components/ui';
 import LookupSelect from '@/components/LookupSelect';
 import { toQuery } from '@/lib/usePaged';
-import { fmtDate, fmtDateTime, monthOf, num, todayISO } from '@/lib/format';
+import { fmtDate, fmtDateTime, monthOf, num, num2, todayISO } from '@/lib/format';
 import T from '@/components/T';
 
 const LIMIT = 100;
@@ -45,7 +45,7 @@ function Entries({ entries }) {
         <thead className="bg-sand-100 text-char-700"><tr>{cols.map(([k, l]) => <th key={k} className={cx('p-1.5', right.has(k) ? 'text-right' : 'text-left')}><T>{l}</T></th>)}</tr></thead>
         <tbody className="divide-y divide-sand-100">
           {entries.map((e, i) => (
-            <tr key={i}>{cols.map(([k]) => <td key={k} className={cx('p-1.5', right.has(k) ? 'text-right' : '')}>{e[k] == null || e[k] === '' ? '—' : (['rate', 'amount'].includes(k) ? `₹${num(e[k])}` : typeof e[k] === 'number' ? num(e[k]) : e[k])}</td>)}</tr>
+            <tr key={i}>{cols.map(([k]) => <td key={k} className={cx('p-1.5', right.has(k) ? 'text-right' : '')}>{e[k] == null || e[k] === '' ? '—' : (['rate', 'amount'].includes(k) ? `₹${num2(e[k])}` : typeof e[k] === 'number' ? num2(e[k]) : e[k])}</td>)}</tr>
           ))}
         </tbody>
       </table>
@@ -84,8 +84,8 @@ function ReportCard({ r, onOpen, locale }) {
           {r.thickness && <Fact label={<T>Thickness</T>}>{`${r.thickness} mm`}</Fact>}
           {r.size && <Fact label={<T>Size</T>}>{r.size}</Fact>}
           {r.edges && <Fact label={<T>Edges</T>}>{r.edges}</Fact>}
-          {r.rate != null && r.rate !== '' && <Fact label={<T>Rate</T>}>{`₹${num(r.rate)}`}</Fact>}
-          {r.amount != null && r.amount !== '' && <Fact label={<T>Amount</T>}>{`₹${num(r.amount)}`}</Fact>}
+          {r.rate != null && r.rate !== '' && <Fact label={<T>Rate</T>}>{`₹${num2(r.rate)}`}</Fact>}
+          {r.amount != null && r.amount !== '' && <Fact label={<T>Amount</T>}>{`₹${num2(r.amount)}`}</Fact>}
         </div>
         {r.entries?.length > 0 && <Entries entries={r.entries} />}
         {r.problem && <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm"><div className="text-[11px] uppercase font-semibold text-red-700 mb-0.5"><T>Problem faced</T></div><p className="text-red-700 whitespace-pre-wrap break-words">{r.problem}</p></div>}

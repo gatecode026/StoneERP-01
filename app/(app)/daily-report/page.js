@@ -13,7 +13,7 @@ import MultiLookupSelect from '@/components/MultiLookupSelect';
 import { useNumberedList, toQuery } from '@/lib/usePaged';
 import { api, submit, fileUrl } from '@/lib/client';
 import { scopeOf } from '@/lib/clientPerm';
-import { todayISO, addDays, fmtDate, fmtDateTime, fmtMonth, num } from '@/lib/format';
+import { todayISO, addDays, fmtDate, fmtDateTime, fmtMonth, num, num2 } from '@/lib/format';
 import T from '@/components/T';
 
 const blankEntry = () => ({
@@ -461,8 +461,8 @@ export default function DailyReportPage() {
     ...(detail.edges ? [['Edges', detail.edges]] : []),
     ...(detail.pieces != null && detail.pieces !== '' ? [['Quantity (Pieces)', num(detail.pieces)]] : []),
     ...(detail.feet != null && detail.feet !== '' ? [['Feet', `${num(detail.feet)} sq ft`]] : []),
-    ...(detail.rate != null && detail.rate !== '' ? [['Rate', `₹${num(detail.rate)}`]] : []),
-    ...(detail.amount != null && detail.amount !== '' ? [['Amount', `₹${num(detail.amount)}`]] : []),
+    ...(detail.rate != null && detail.rate !== '' ? [['Rate', `₹${num2(detail.rate)}`]] : []),
+    ...(detail.amount != null && detail.amount !== '' ? [['Amount', `₹${num2(detail.amount)}`]] : []),
     ['Hours', detail.hours != null && detail.hours > 0 ? `${detail.hours} h` : '—'],
     ...(!detail.feet && detail.quantity != null && detail.quantity > 0 ? [['Quantity', `${num(detail.quantity)} sq ft`]] : []),
     ...(detail.stockUpdated ? [['Stock Status', '✔ Automatically credited to Stock']] : []),
@@ -713,8 +713,8 @@ export default function DailyReportPage() {
                           <td className="p-1.5">{e.size || '—'}</td>
                           <td className="p-1.5 text-right">{e.quantity != null ? num(e.quantity) : (e.pieces != null ? num(e.pieces) : '—')}</td>
                           <td className="p-1.5 text-right font-semibold text-terra-900">{e.feet != null ? num(e.feet) : '—'}</td>
-                          <td className="p-1.5 text-right">{e.rate != null ? `₹${num(e.rate)}` : '—'}</td>
-                          <td className="p-1.5 text-right font-bold text-char-900">{e.amount != null ? `₹${num(e.amount)}` : '—'}</td>
+                          <td className="p-1.5 text-right">{e.rate != null ? `₹${num2(e.rate)}` : '—'}</td>
+                          <td className="p-1.5 text-right font-bold text-char-900">{e.amount != null ? `₹${num2(e.amount)}` : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
