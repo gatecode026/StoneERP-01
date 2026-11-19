@@ -4,7 +4,7 @@ import type { ResourceDef } from '../api/resource';
 import { badRequest, conflict } from '../errors';
 import { nextSeq, oid } from '../services/core';
 import { employeeByCode } from '../services/lookup';
-import { dateStr, enumOf, req, text, num, posNum, empCode } from './zod';
+import { dateStr, enumOf, req, text, num, posNum, empCode, photos } from './zod';
 import { SITES, PROJECT_STATUSES, PROJECT_PRIORITIES } from '../models/projects';
 
 export const PRJ_CODE_PREFIX = 'PRJ-';
@@ -60,6 +60,7 @@ const projectFields = {
   balanceOrderAmount: num().optional(),
   otherRemark: text(2000).optional(),
   notes: text(2000).optional(),
+  photos: photos(2).optional(), // reference images, at most 2
 };
 
 export const projects: ResourceDef = {

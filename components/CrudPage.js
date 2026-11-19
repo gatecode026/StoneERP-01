@@ -256,7 +256,7 @@ export function FormFields({ fields, form, set, mode, showErrors = false }) {
         break;
       case 'photo': input = <PhotoInput value={v} onChange={(x) => set({ [f.name]: x })} label={f.buttonLabel} />; break;
       case 'doc': input = <DocInput value={v} onChange={(x) => set({ [f.name]: x })} resource={f.resource} kind={f.kind} label={f.buttonLabel} />; break;
-      case 'photos': input = <PhotoInput multiple value={v} onChange={(x) => set({ [f.name]: x })} />; break;
+      case 'photos': input = <PhotoInput multiple value={v} onChange={(x) => set({ [f.name]: x })} max={f.max} gallery={f.gallery} />; break;
       case 'password': {
         const gen = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a = new Uint32Array(10); crypto.getRandomValues(a); return [...a].map((n) => c[n % c.length]).join('') + '7'; };
         input = (

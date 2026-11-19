@@ -5,14 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import {
   FolderKanban, CheckCircle2, Clock, AlertTriangle, Plus, ListChecks,
   User, Users, Calendar, Layers, Hammer, ShieldAlert, CheckSquare, Sparkles,
-  ExternalLink, FileText, PackageCheck, Briefcase, Boxes, Pencil, Cog
+  ExternalLink, FileText, PackageCheck, Briefcase, Boxes, Pencil, Cog, History
 } from 'lucide-react';
 import CrudPage, { StatusBadge } from '@/components/CrudPage';
 import ImportData from '@/components/ImportData';
 import MultiLookupSelect from '@/components/MultiLookupSelect';
-import { RoleGuard, Badge, Sheet, StatCard, KV, cx } from '@/components/ui';
+import { RoleGuard, Badge, Sheet, StatCard, KV, cx, Photo, PhotoModal } from '@/components/ui';
 import { useApp, useFetch } from '@/components/Providers';
-import { fmtDate, todayISO, inr, num } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtClock, todayISO, inr, num } from '@/lib/format';
 import { api } from '@/lib/client';
 import toast from '@/lib/toast';
 import T from '@/components/T';
@@ -62,6 +62,8 @@ export default function ProjectsPage() {
 
   // Selected project for viewing details and tasks
   const [selectedProject, setSelectedProject] = useState(null);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
+  const history = useFetch(selectedProject?._id ? `/api/projects/${selectedProject._id}/history` : null);
 
   // Authoritative loader for project details: immediately displays cached row and fetches fresh document from server
   const openProjectDetails = async (proj) => {
@@ -153,6 +155,7 @@ export default function ProjectsPage() {
       }
       window.dispatchEvent(new CustomEvent('vss-data-changed'));
       statsFetch.reload();
+      history.reload();
     } catch (err) {
       toast.error(err.message);
     }
@@ -392,6 +395,7 @@ export default function ProjectsPage() {
     },
     { name: 'otherRemark', label: 'Other Remark', type: 'textarea', wide: true, section: 'Notes & Instructions', placeholder: 'Extra remarks...' },
     { name: 'notes', label: 'Additional Notes', type: 'textarea', wide: true, section: 'Notes & Instructions' },
+    { name: 'photos', label: 'Reference Images (max 2)', type: 'photos', max: 2, gallery: true, section: 'Notes & Instructions', hint: 'Take a photo with the camera or pick from the gallery' },
   ];
 
   const columns = [
@@ -669,6 +673,55 @@ export default function ProjectsPage() {
                 );
               })()}
 
+              {/* Who changed the completed pieces, and when (from the audit log) */}
+              <div className="p-3.5 rounded-none border border-sand-300 bg-sand-50/50 space-y-2.5">
+                <div className="flex items-center gap-1.5">
+                  <History size={15} className="text-terra" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-char-900">{tr('Pieces Update History')}</h3>
+                </div>
+                {history.loading && !history.data ? (
+                  <div className="text-xs text-char-500">{tr('Loading…')}</div>
+                ) : !history.data?.rows?.length ? (
+                  <div className="text-xs text-char-400 italic">{tr('No updates yet')}</div>
+                ) : (
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto border border-sand-200 bg-white">
+                    <table className="w-full text-xs">
+                      <thead className="bg-sand-100 text-char-600 sticky top-0">
+                        <tr>
+                          <th className="text-left font-bold px-2.5 py-1.5">{tr('Name')}</th>
+                          <th className="text-left font-bold px-2.5 py-1.5">{tr('Date')}</th>
+                          <th className="text-left font-bold px-2.5 py-1.5">{tr('Time')}</th>
+                          <th className="text-left font-bold px-2.5 py-1.5">{tr('Change')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.data.rows.map((h, i) => {
+                          const from = Number(h.from) || 0, to = Number(h.to) || 0, diff = to - from;
+                          return (
+                            <tr key={i} className="border-t border-sand-100">
+                              <td className="px-2.5 py-1.5 font-semibold text-char-900">{h.by}{h.role ? <span className="text-char-400 font-normal"> · {h.role}</span> : null}</td>
+                              <td className="px-2.5 py-1.5 text-char-700 whitespace-nowrap">{fmtDateTime(h.at).split(' ')[0]}</td>
+                              <td className="px-2.5 py-1.5 text-char-700 whitespace-nowrap">{fmtClock(h.at)}</td>
+                              <td className="px-2.5 py-1.5 text-char-800">
+                                {h.to == null ? (
+                                  <span className="text-char-500">{tr('Project created')}</span>
+                                ) : (
+                                  <>
+                                    {num(from)} → <b>{num(to)}</b>{' '}
+                                    <span className={diff >= 0 ? 'text-emerald-700 font-semibold' : 'text-red-600 font-semibold'}>({diff >= 0 ? '+' : ''}{num(diff)})</span>
+                                    {h.status === 'Completed' ? <span className="ml-1.5"><Badge tone="green">{tr('Completed')}</Badge></span> : null}
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* Order Details & Schedule Information */}
               <div className="p-3.5 rounded-none border border-sand-300 bg-sand-50/50 space-y-2.5">
                 <div className="flex items-center gap-1.5">
@@ -924,6 +977,20 @@ export default function ProjectsPage() {
                   </div>
                 </div>
               </div>
+
+              {selectedProject.photos?.length > 0 && (
+                <div className="p-3.5 rounded-none border border-sand-300 bg-sand-50/50 space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-char-900">Reference Images</h3>
+                  <div className="flex flex-wrap gap-2.5">
+                    {selectedProject.photos.map((src, i) => (
+                      <button key={i} type="button" onClick={() => setPreviewPhoto(src)} className="block h-28 w-28 overflow-hidden border border-sand-300 hover:border-terra" aria-label={tr('Open reference image {n}', { n: i + 1 })}>
+                        <Photo src={src} thumb width={112} height={112} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {previewPhoto && <PhotoModal src={previewPhoto} onClose={() => setPreviewPhoto(null)} />}
 
               {/* Other Remarks if any */}
               {selectedProject.otherRemark && (

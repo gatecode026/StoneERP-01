@@ -52,6 +52,7 @@ export const Project = defineModel(
     priority: { type: S, enum: PROJECT_PRIORITIES as unknown as string[], default: 'Normal' },
     contractValue: money({ default: 0 }),
     notes: { type: S, maxlength: 2000 },
+    photos: { type: [S], default: [], validate: (v: string[]) => v.length <= 2 }, // reference images for the workers, at most 2
     taskCount: { type: N, default: 0 },
     tasksDone: { type: N, default: 0 },
   },

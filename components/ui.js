@@ -274,14 +274,20 @@ export function ExportBtn({ onClick, label }) {
 }
 
 // Camera / gallery photo, compressed in the browser and stored as base64
-export function PhotoInput({ value, onChange, label, multiple, capture = 'environment' }) {
-  const { t } = useApp();
+// gallery: show separate "Camera" and "Gallery" buttons. max: the most photos a multiple input takes.
+export function PhotoInput({ value, onChange, label, multiple, capture = 'environment', gallery, max }) {
+  const { t, tr } = useApp();
   const tx = useTx();
   const ref = useRef();
+  const galleryRef = useRef();
   const [previewSrc, setPreviewSrc] = useState(null);
   const items = multiple ? (Array.isArray(value) ? value : []) : value ? [value] : [];
+  const room = multiple && max ? Math.max(0, max - items.length) : Infinity;
   async function pick(e) {
-    const files = [...(e.target.files || [])];
+    let files = [...(e.target.files || [])];
+    e.target.value = '';
+    if (!files.length) return;
+    if (files.length > room) { toast.error(tr('Only {n} photos allowed', { n: max })); files = files.slice(0, room); }
     if (!files.length) return;
     try {
       const out = [];
@@ -293,13 +299,22 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
   return (
     <div>
       <div className="flex flex-wrap gap-2.5 items-center">
-        {(!items.length || multiple) && (
+        {(!items.length || multiple) && room > 0 && (
           <button
             type="button"
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-none border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-none"
             onClick={() => ref.current?.click()}
           >
-            <Camera size={16} className="text-terra" /> {tx(label) || t('addPhoto')}
+            <Camera size={16} className="text-terra" /> {gallery ? tx('Camera') : tx(label) || t('addPhoto')}
+          </button>
+        )}
+        {gallery && (!items.length || multiple) && room > 0 && (
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-none border border-dashed border-sand-300 hover:border-terra bg-sand-50/60 hover:bg-sand-100 text-xs font-semibold text-char-700 transition shadow-none"
+            onClick={() => galleryRef.current?.click()}
+          >
+            <ImageIcon size={16} className="text-terra" /> {tx('Gallery')}
           </button>
         )}
         {items.map((src, i) => (
@@ -338,6 +353,7 @@ export function PhotoInput({ value, onChange, label, multiple, capture = 'enviro
         ))}
       </div>
       <input ref={ref} type="file" accept="image/*" capture={capture} multiple={multiple} className="hidden" onChange={pick} />
+      {gallery && <input ref={galleryRef} type="file" accept="image/*" multiple={multiple && room > 1} className="hidden" onChange={pick} />}
       {previewSrc && <PhotoModal src={previewSrc} onClose={() => setPreviewSrc(null)} />}
     </div>
   );

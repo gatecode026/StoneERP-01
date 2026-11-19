@@ -50,6 +50,7 @@ const FORMS: { name: string; resource: string; body: () => Record<string, unknow
   { name: 'Vehicle: RC photo', resource: 'vehicles', body: () => ({ name: `Truck ${++n}`, kind: 'Truck', regNo: `RJ14GA${String(1000 + n)}` }), fields: ['rcPhoto'] },
   { name: 'Stock item: photo', resource: 'stockitems', body: () => ({ name: `Item ${++n}`, category: 'finished', unit: 'sq ft' }), fields: ['photo'] },
   { name: 'Complaint: photos []', resource: 'complaints', body: () => ({ customerId: customer._id, problem: 'Broken pieces', details: '4 slabs cracked' }), fields: ['photos[]'] },
+  { name: 'Project: reference images []', resource: 'projects', body: () => ({ name: `Project ${++n}`, targetDate: '2026-12-31' }), fields: ['photos[]'] },
   { name: 'Loading slip: loaded and covered photos, papers []', resource: 'dispatches', body: () => ({ saleId: sale._id, truckNo: `RJ14 GA ${String(2000 + ++n)}`, items: [{ stockItemId: slab._id, name: 'Slab U', qty: 1 }] }), fields: ['photoLoaded', 'photoCovered', 'documents[]'] },
 ];
 
@@ -121,6 +122,13 @@ describe.each(FORMS)('$name', (form) => {
     const r = await api.create(owner, form.resource, body);
     expect(r.status, JSON.stringify(r.json)).toBe(400);
     expect(JSON.stringify(r.json)).toMatch(/not a valid image|damaged|Must be an image|valid file|Only JPEG/i);
+  });
+});
+
+describe('a project takes at most 2 reference images', () => {
+  it('refuses a third image', async () => {
+    const r = await api.create(owner, 'projects', { name: `Project ${++n}`, targetDate: '2026-12-31', photos: [PNG, PNG, PNG] });
+    expect(r.status, JSON.stringify(r.json)).toBe(400);
   });
 });
 
