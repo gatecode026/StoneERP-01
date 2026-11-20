@@ -9,6 +9,6 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth('salarysheets', 'view', async (auth) => {
   const month = monthQuery.parse(auth.query.get('month') ?? monthOf(todayIST()));
   const sheet = await getSheet(month, await getSettings());
-  const p = pageRows(sheet.rows, auth.query);
+  const p = pageRows(sheet.rows, auth.query, ['name', 'empCode', 'job']);
   return { ...sheet, rows: p.rows, total: p.total, page: p.page, limit: p.limit, pages: p.pages }; // totals above are over every employee
 });

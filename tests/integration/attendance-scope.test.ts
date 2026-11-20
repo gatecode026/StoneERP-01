@@ -94,3 +94,16 @@ describe('leave requests with Own rights', () => {
     expect((await api.list(ownOnly, 'leaves')).json.data.length).toBe(1);
   });
 });
+
+describe('employee month view: one employee, one month, in date order', () => {
+  it('lists only that employee\'s days within the month', async () => {
+    const month = '2025-03';
+    for (const [empCode, date, state] of [['E003', `${month}-02`, 'present'], ['E003', `${month}-01`, 'half'], ['E003', '2025-04-01', 'present'], ['E002', `${month}-01`, 'absent']] as const) {
+      expect((await api.create(owner, 'attendance', { empCode, date, state })).status).toBeLessThan(300);
+    }
+    const r = await api.list(owner, 'attendance', `empCode=E003&from=${month}-01&to=${month}-31&sort=date&limit=40`);
+    expect(r.status).toBe(200);
+    expect(r.json.data.map((x: any) => [x.empCode, x.date, x.state])).toEqual([['E003', `${month}-01`, 'half'], ['E003', `${month}-02`, 'present']]);
+    expect((await api.list(supervisor, 'attendance', `empCode=E003&from=${month}-01&to=${month}-31`)).json.data).toEqual([]); // not in this supervisor's team
+  });
+});

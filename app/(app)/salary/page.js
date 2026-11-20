@@ -5,7 +5,8 @@ import Link from 'next/link';
 import toast from '@/lib/toast';
 import { BadgeCheck, Save, Banknote, FileText, MessageCircle, Pencil, Check, Search, ChevronDown, X } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
-import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination, cx } from '@/components/ui';
+import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination, SearchBox, cx } from '@/components/ui';
+import { useDebounced } from '@/lib/usePaged';
 import { api, downloadCSV, openWA } from '@/lib/client';
 import { inr, num, fmtMonth, todayISO, monthOf, addDays } from '@/lib/format';
 import { SALARY } from '@/lib/config';
@@ -20,9 +21,11 @@ export default function SalaryPage() {
   const [month, setMonth] = useState(prevMonth());
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(25);
-  useEffect(() => { setPage(1); }, [month, size]);
+  const [q, setQ] = useState('');
+  const dq = useDebounced(q.trim(), 300);
+  useEffect(() => { setPage(1); }, [month, size, dq]);
   // the sheet's totals cover everybody; the table below is one page at a time (server side)
-  const raw = useFetch(isWorker ? `/api/salary/slip?month=${month}` : `/api/salary/preview?month=${month}&page=${page}&limit=${size}`);
+  const raw = useFetch(isWorker ? `/api/salary/slip?month=${month}` : `/api/salary/preview?month=${month}&page=${page}&limit=${size}&q=${encodeURIComponent(dq)}`);
   const { loading, reload } = raw;
   const data = isWorker ? (raw.data?.row ? { status: raw.data.status, rows: [raw.data.row], totals: {} } : raw.data && { status: 'preview', rows: [], totals: {} }) : raw.data;
   const [sel, setSel] = useState(null);
@@ -238,12 +241,13 @@ export default function SalaryPage() {
               </div>
             </>
           )}
+          {!isWorker && <div className="mb-3"><SearchBox value={q} onChange={setQ} placeholder="Search name, code or job…" /></div>}
           {loading ? <SkeletonList /> : rows.length ? (
             <>
               <DataList rows={rows} rowKey="empCode" columns={columns} onRowClick={setSel} />
               {!isWorker && <Pagination page={page} pageSize={size} total={data?.total} shown={rows.length} onPage={setPage} onSize={setSize} />}
             </>
-          ) : <Empty text="No salary data for this month" />}
+          ) : <Empty text={dq ? 'No employees match your search' : 'No salary data for this month'} />}
           <p className="text-[11px] text-char-500 mt-3">
             <T vars={{ o: SALARY.otMultiplier, p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Monthly = salary ÷ days in month × paid days (days worked + paid leave + weekly offs and holidays) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime (only after it is approved) = {o}× hourly rate · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.'}</T>
           </p>

@@ -13,6 +13,7 @@ import { scopeOf } from '@/lib/clientPerm';
 import { todayISO, fmtDate, monthOf, fmtClock, fmtDuration } from '@/lib/format';
 import FixSheet from '@/components/attendance/FixSheet';
 import OvertimeTab from '@/components/attendance/OvertimeTab';
+import EmployeeMonthTab from '@/components/attendance/EmployeeMonthTab';
 import T from '@/components/T';
 import { trNow } from '@/lib/trNow';
 
@@ -241,8 +242,8 @@ export default function AttendancePage() {
     }
     return items;
   };
-  const tabsEl = (canApprove || leavesOn) && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Attendance' }, ...(canApprove ? [{ key: 'overtime', label: 'Overtime' }] : []), ...(leavesOn ? [{ key: 'leaves', label: 'Leave requests' }] : [])]} />;
-  const showMark = tab === 'mark' || (!leavesOn && !canApprove);
+  const tabsEl = (canApprove || leavesOn || !ownOnly) && <Tabs value={tab} onChange={setTab} tabs={[{ key: 'mark', label: 'Attendance' }, ...(!ownOnly ? [{ key: 'month', label: 'Employee month' }] : []), ...(canApprove ? [{ key: 'overtime', label: 'Overtime' }] : []), ...(leavesOn ? [{ key: 'leaves', label: 'Leave requests' }] : [])]} />;
+  const showMark = tab === 'mark' || (!leavesOn && !canApprove && ownOnly);
 
   return (
     <RoleGuard perm="attendance">
@@ -270,6 +271,8 @@ export default function AttendancePage() {
             {!ownOnly && <input type="date" aria-label={tr('Date')} className="input !w-auto" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value || todayISO())} />}
           </>} />
       )}
+
+      {!ownOnly && tab === 'month' && <EmployeeMonthTab />}
 
       {canApprove && tab === 'overtime' && <OvertimeTab list={ot} onChanged={() => sheet.reload()} />}
 

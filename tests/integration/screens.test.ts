@@ -244,6 +244,10 @@ describe('salary sheet and performance: paged on the server, totals over everybo
     expect(pg.rows[0].empCode).toBe(full.rows[5].empCode);
     expect(pg.totals).toEqual(full.totals); // totals never depend on the page
     expect((await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&q=worker 3`)).json.total).toBe(1);
+    const job = full.rows[0].job; // the search also matches the job
+    const byJob = (await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&all=1&q=${encodeURIComponent(job)}`)).json;
+    expect(byJob.total).toBe(full.rows.filter((r: { job?: string; name: string; empCode: string }) => [r.job, r.name, r.empCode].some((v) => String(v ?? '').toLowerCase().includes(job.toLowerCase()))).length);
+    expect(byJob.total).toBeGreaterThan(0);
     expect((await call(owner, salaryPreview.GET as never, `/api/salary/preview?month=${month}&page=999&limit=5`)).json.page).toBe(pg.pages); // out-of-range page = last page
   });
   it('performance: ranking and best five over everybody, table paged', async () => {
