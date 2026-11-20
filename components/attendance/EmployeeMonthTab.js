@@ -23,14 +23,11 @@ function daysOf(month) {
   return out;
 }
 
-/** One employee's whole month: each day's punch in / out, hours, late, overtime and status. */
-export default function EmployeeMonthTab() {
-  const { tr, can } = useApp();
-  const [emp, setEmp] = useState(null);
-  const [month, setMonth] = useState(monthOf(todayISO()));
+/** One employee's whole month: each day's punch in / out, hours, late, overtime and status. Also opened from the Salary sheet. */
+export function EmployeeMonthView({ empCode, month, compact }) {
+  const { tr } = useApp();
   const days = daysOf(month);
-  const range = `empCode=${encodeURIComponent(emp?.id || '')}&from=${month}-01&to=${days[days.length - 1] || `${month}-01`}`;
-  const att = useFetch(emp ? `/api/attendance?${range}&sort=date&limit=40` : null);
+  const att = useFetch(empCode ? `/api/attendance?${monthRange(empCode, month)}&sort=date&limit=40` : null);
   const byDate = Object.fromEntries((att.data || []).map((r) => [r.date, r]));
   const rows = days.map((date) => ({ date, ...(byDate[date] || {}) })).reverse();
 
@@ -52,31 +49,46 @@ export default function EmployeeMonthTab() {
     { key: 'method', label: 'Source', render: (r) => (r.method ? <span className="text-xs">{r.method}{r.corrected ? <> · <Badge tone="blue"><T>corrected</T></Badge></> : null}</span> : '—') },
   ];
 
+  if (att.loading) return <SkeletonList />;
+  if (att.error) return <Empty text={att.error.message || 'Could not load attendance'} />;
+  return (
+    <>
+      <div className={compact ? 'grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3' : 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-3'}>
+        <StatCard label="Present" value={count('present')} />
+        <StatCard label="Half day" value={count('half')} />
+        <StatCard label="Absent" value={count('absent')} />
+        <StatCard label="Leave" value={count('leave')} />
+        <StatCard label="Not marked" value={rows.filter((r) => !r.state).length} />
+        <StatCard label="Hours worked" value={fmtDuration(worked)} />
+        <StatCard label="OT approved" value={fmtDuration(otApproved)} />
+        <StatCard label="OT waiting" value={fmtDuration(otWaiting)} />
+      </div>
+      {rows.length ? <DataList rows={rows} rowKey="date" columns={columns} /> : <Empty text="No days in this month yet" />}
+    </>
+  );
+}
+
+export const monthRange = (empCode, month) => {
+  const days = daysOf(month);
+  return `empCode=${encodeURIComponent(empCode)}&from=${month}-01&to=${days[days.length - 1] || `${month}-01`}`;
+};
+
+/** Attendance screen tab: pick an employee and a month. */
+export default function EmployeeMonthTab() {
+  const { tr, can } = useApp();
+  const [emp, setEmp] = useState(null);
+  const [month, setMonth] = useState(monthOf(todayISO()));
   return (
     <>
       <PageHeader title="Employee monthly attendance" subtitle="Pick an employee and a month to see every day's punches, hours and overtime"
         actions={<>
-          {emp && can('attendance', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&${range}`)} />}
+          {emp && can('attendance', 'export') && <ExportBtn onClick={() => window.location.assign(`/api/export/attendance?format=xlsx&${monthRange(emp.id, month)}`)} />}
           <input type="month" aria-label={tr('Month')} className="input !w-auto" value={month} max={monthOf(todayISO())} onChange={(e) => setMonth(e.target.value || month)} />
         </>} />
       <div className="mb-3">
         <LookupSelect kind="employees" by="empCode" value={emp?.id || ''} valueLabel={emp?.label} onChange={(it) => setEmp(it || null)} placeholder="Select an employee…" />
       </div>
-      {!emp ? <Empty text="Select an employee to see their attendance for the month" /> : att.loading ? <SkeletonList /> : (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-3">
-            <StatCard label="Present" value={count('present')} />
-            <StatCard label="Half day" value={count('half')} />
-            <StatCard label="Absent" value={count('absent')} />
-            <StatCard label="Leave" value={count('leave')} />
-            <StatCard label="Not marked" value={rows.filter((r) => !r.state).length} />
-            <StatCard label="Hours worked" value={fmtDuration(worked)} />
-            <StatCard label="OT approved" value={fmtDuration(otApproved)} />
-            <StatCard label="OT waiting" value={fmtDuration(otWaiting)} />
-          </div>
-          {rows.length ? <DataList rows={rows} rowKey="date" columns={columns} /> : <Empty text="No days in this month yet" />}
-        </>
-      )}
+      {!emp ? <Empty text="Select an employee to see their attendance for the month" /> : <EmployeeMonthView empCode={emp.id} month={month} />}
     </>
   );
 }

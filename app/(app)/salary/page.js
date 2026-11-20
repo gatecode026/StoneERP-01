@@ -3,7 +3,7 @@ import { confirmDialog, promptDialog } from '@/components/Dialogs';
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import toast from '@/lib/toast';
-import { BadgeCheck, Save, Banknote, FileText, MessageCircle, Pencil, Check, Search, ChevronDown, X } from 'lucide-react';
+import { BadgeCheck, Save, Banknote, FileText, MessageCircle, Pencil, Check, Search, ChevronDown, X, CalendarDays } from 'lucide-react';
 import { useApp, useFetch } from '@/components/Providers';
 import { RoleGuard, PageHeader, DataList, StatCard, Badge, Sheet, KV, ExportBtn, SkeletonList, Empty, Pagination, SearchBox, cx } from '@/components/ui';
 import { useDebounced } from '@/lib/usePaged';
@@ -11,6 +11,7 @@ import { api, downloadCSV, openWA } from '@/lib/client';
 import { inr, num, fmtMonth, todayISO, monthOf, addDays } from '@/lib/format';
 import { SALARY } from '@/lib/config';
 import T from '@/components/T';
+import { EmployeeMonthView } from '@/components/attendance/EmployeeMonthTab';
 
 const prevMonth = () => monthOf(addDays(`${monthOf(todayISO())}-01`, -1));
 const PT = { monthly: 'Monthly', daily: 'Daily', piece: 'Piece rate' };
@@ -32,6 +33,8 @@ export default function SalaryPage() {
   const [busy, setBusy] = useState(false);
   const office = can('salarysheets', 'create');
   const mayPay = can('salarypayments', 'create');
+  const canAtt = !isWorker && can('attendance', 'view');
+  const [attFor, setAttFor] = useState(null); // the row whose month of attendance is open
   const normMode = (m) => { const x = String(m || '').trim().toLowerCase(); return x === 'cash' ? 'Cash' : x === 'upi' ? 'UPI' : 'Bank'; };
   const rows = data?.rows || [];
   const tot = data?.totals || {};
@@ -179,11 +182,24 @@ export default function SalaryPage() {
     { key: 'advanceRecovery', label: 'Advance cut', align: 'right', render: (r) => (r.advanceRecovery ? `− ${inr(r.advanceRecovery)}` : '—') },
     { key: 'net', label: 'Net salary', align: 'right', render: (r) => <b className="text-terra">{inr(r.net)}</b> },
     { key: 'paid', label: 'Paid', render: (r) => (r.paid ? <Badge tone="green">{r.paidMode}</Badge> : <Badge tone="gray">—</Badge>) },
-    ...(office ? [{
+    ...(office || canAtt ? [{
       key: '_update',
-      label: 'Update',
+      label: 'Actions',
       align: 'right',
       render: (r) => (
+        <div className="flex items-center justify-end gap-1.5">
+        {canAtt && (
+          <button
+            type="button"
+            className="btn-outline !py-1 !px-2.5 !text-xs flex items-center gap-1 font-semibold"
+            onClick={(e) => { e.stopPropagation(); setAttFor(r); }}
+            title={tr('View attendance for {name}', { name: r.name })}
+          >
+            <CalendarDays size={12} />
+            <T>Attendance</T>
+          </button>
+        )}
+        {office && (
         <button
           type="button"
           className="btn-outline !py-1 !px-2.5 !text-xs flex items-center gap-1 text-terra border-terra-200 hover:bg-terra-50 hover:border-terra-400 font-semibold shadow-xs"
@@ -196,6 +212,8 @@ export default function SalaryPage() {
           <Pencil size={12} />
           <span>Update</span>
         </button>
+        )}
+        </div>
       ),
     }] : []),
   ];
@@ -295,6 +313,11 @@ export default function SalaryPage() {
             {mayPay && ['approved', 'paid'].includes(sheetStatus) && !sel.paid && <button className="btn-outline w-full mt-3" onClick={async () => { const mode = await promptDialog('Paid by: Bank / Cash / UPI', 'Bank'); if (mode) { act('salaryPay', { mode: normMode(mode), empCode: sel.empCode }, 'Marked paid'); setSel(null); } }}><T>Mark this salary paid</T></button>}
           </div>
         )}
+      </Sheet>
+
+      {/* ── One employee's attendance for the sheet's month ── */}
+      <Sheet open={!!attFor} wide onClose={() => setAttFor(null)} title={`${attFor?.name || ''} · ${tr('Attendance')} · ${fmtMonth(month)}`}>
+        {attFor && <EmployeeMonthView empCode={attFor.empCode} month={month} compact />}
       </Sheet>
 
       {/* ── Update Salary Modal Sheet ── */}
