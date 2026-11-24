@@ -117,7 +117,7 @@ export async function salarySlipDocument(slip: any, company: Company, lang: 'en'
     [l.status, r.paid ? `${l.paid} (${r.paidMode}, ${fmtDate(r.paidOn)})` : slip.status],
   ]);
   doc.space(6);
-  doc.table([{ head: l.earnings, w: 70 }, { head: '₹', w: 30, align: 'right' }], [[l.wages, inr(r.wages)], [`${l.ot} (${r.otHours} h)`, inr(r.otPay)], [l.gross, inr(r.gross)]], { boldLast: true });
+  doc.table([{ head: l.earnings, w: 70 }, { head: '₹', w: 30, align: 'right' }], [[l.wages, inr(r.wages)], ...(r.otPay > 0 ? [[`${l.ot} (${r.otHours} h)`, inr(r.otPay)]] : []), [l.gross, inr(r.gross)]], { boldLast: true });
   doc.space(4);
   doc.table([{ head: l.ded, w: 70 }, { head: '₹', w: 30, align: 'right' }], [[l.pf, inr(r.pf)], [l.esi, inr(r.esi)], [l.adv, inr(r.advanceRecovery)]]);
   doc.space(8);

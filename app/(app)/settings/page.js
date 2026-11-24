@@ -22,8 +22,7 @@ const SECTIONS = [
     { k: 'cashReceipt', label: 'Cash receipt warning at (Sec 269ST)', type: 'number' }, { k: 'cashExpense', label: 'Cash expense warning above (Sec 40A(3))', type: 'number' },
   ] },
   { key: 'salary', title: 'Salary rules', fields: [
-    { k: 'hoursPerDay', label: 'Working hours in a day (only if a person has no shift)', type: 'number' }, { k: 'payDay', label: 'Salary day of the month (1–28)', type: 'number' },
-    { k: 'otMultiplier', label: 'Overtime pay × normal rate', type: 'number', step: '0.1' }, 
+    { k: 'payDay', label: 'Salary day of the month (1–28)', type: 'number' },
     { k: 'pfRate', label: 'PF rate (%)', type: 'number', scale: 100, step: '0.01' }, { k: 'pfWageCap', label: 'PF wage ceiling (₹)', type: 'number' },
     { k: 'esiRate', label: 'ESI rate (%)', type: 'number', scale: 100, step: '0.01' }, { k: 'esiGrossCap', label: 'ESI gross ceiling (₹)', type: 'number' },
   ] },

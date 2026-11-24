@@ -4,8 +4,6 @@ import { useTestDb } from '../helpers';
 import { api, call, makeUser, resetCaches, PNG, type Who } from '../api';
 import { Account, Advance, AuditLog, CashEntry, Customer, Settings, StockItem, Supplier } from '@/lib/models';
 import { todayIST, addDays } from '@/lib/time';
-import { getSettings } from '@/lib/settings';
-import { isOffDay, offDaysBetween } from '@/lib/attendance/calendar';
 import * as orderRoute from '@/app/api/sales/[id]/order/route';
 import * as invoiceRoute from '@/app/api/sales/[id]/invoice/route';
 import * as outRoute from '@/app/api/dispatches/[id]/out/route';
@@ -486,16 +484,11 @@ describe('salary: calculation, owner approval, payment, advance recovery', () =>
     expect(r.status).toBe(200);
     const e1 = r.json.rows.find((x: any) => x.empCode === 'E001');
     const e2 = r.json.rows.find((x: any) => x.empCode === 'E002');
-    // monthly: a day marked on a weekly off is not an extra day (the off day is paid anyway); every weekly off of the month is paid
-    const dates = Array.from({ length: 10 }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`);
-    const wh = (await getSettings()).workHours;
-    const worked = dates.filter((d) => !isOffDay(d, wh)).length;
-    const offPaid = offDaysBetween(`${month}-01`, `${month}-${String(days).padStart(2, '0')}`, wh).length;
-    expect(e1.paidOffDays).toBe(offPaid);
-    expect(e1.daysPresent).toBe(worked + offPaid);
-    expect(e1.wages).toBe(Math.round((16000 / days) * (worked + offPaid)));
+    // monthly: only the 10 days worked are paid (a weekly off worked counts as a day); unworked weekly offs are not paid
+    expect(e1.daysPresent).toBe(10);
+    expect(e1.wages).toBe(Math.round((16000 / days) * 10));
     expect(e1.advanceRecovery).toBe(1000);
-    expect(e1.net).toBe(Math.round((16000 / days) * (worked + offPaid)) - 1000);
+    expect(e1.net).toBe(Math.round((16000 / days) * 10) - 1000);
     expect(e2.wages).toBe(600 * 10);
     expect(r.json.status).toBe('preview');
   });
@@ -512,8 +505,7 @@ describe('salary: calculation, owner approval, payment, advance recovery', () =>
     await call(supervisor, bulkAtt.POST as never, '/x', { method: 'POST', body: { date: `${month}-01`, marks: [{ empCode: 'E001', state: 'absent' }] } });
     const frozen = await call(accountant, salPreview.GET as never, `/x?month=${month}`);
     expect(frozen.json.status).toBe('approved');
-    const wh2 = (await getSettings()).workHours;
-    expect(frozen.json.rows.find((x: any) => x.empCode === 'E001').daysPresent).toBe(Array.from({ length: 10 }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`).filter((d) => !isOffDay(d, wh2)).length + offDaysBetween(`${month}-01`, `${month}-${String(days).padStart(2, '0')}`, wh2).length);
+    expect(frozen.json.rows.find((x: any) => x.empCode === 'E001').daysPresent).toBe(10); // still the 10 days worked when it was approved
   });
   it('paying posts cash/bank once per person; paying twice is refused', async () => {
     const bankBefore = await bal('bank');

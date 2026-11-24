@@ -34,7 +34,7 @@ const workHours = z.object({
   weekOff: z.object({ sun: weekOff, mon: weekOff, tue: weekOff, wed: weekOff, thu: weekOff, fri: weekOff, sat: weekOff }).partial(),
   holidays: z.array(z.object({ date: isoDate, endDate: z.union([isoDate, z.literal('')]).optional(), name: text(60).min(1, 'Give the holiday a name') }).strict()
     .refine((h) => !h.endDate || h.endDate >= h.date, 'A holiday cannot end before it starts')).max(120),
-  paidWeekOff: z.boolean(), appPunching: z.boolean(), punchGapMinutes: z.number().int().min(0).max(60), openDayAfterHours: z.number().min(0).max(24),
+  appPunching: z.boolean(), punchGapMinutes: z.number().int().min(0).max(60), openDayAfterHours: z.number().min(0).max(24),
 }).partial();
 
 // every section is optional: the screen saves one section at a time

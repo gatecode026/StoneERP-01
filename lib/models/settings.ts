@@ -85,7 +85,6 @@ const settingsSchema = new Schema(
       // which weekdays are off: every one, or only the 1st/3rd/5th or the 2nd/4th of the month (for alternate Saturdays)
       weekOff: { sun: weekOff('all'), mon: weekOff('none'), tue: weekOff('none'), wed: weekOff('none'), thu: weekOff('none'), fri: weekOff('none'), sat: weekOff('none') },
       holidays: { type: [holidaySchema], default: [] },
-      paidWeekOff: { type: Boolean, default: true }, // monthly-paid staff lose no pay on a weekly off or a holiday
       appPunching: { type: Boolean, default: true }, // Punch In / Out buttons in the app (for testing, until the biometric machine is connected)
       punchGapMinutes: { type: Number, default: 2, min: 0, max: 60 }, // a repeat punch this soon is ignored
       openDayAfterHours: { type: Number, default: 2, min: 0, max: 24 }, // an In with no Out this long after the shift ends is flagged for a fix

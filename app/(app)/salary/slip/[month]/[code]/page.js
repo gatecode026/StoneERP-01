@@ -41,7 +41,7 @@ export default function Slip() {
         </div>
         <div className="grid md:grid-cols-2 gap-6 mt-3">
           <div><div className="font-bold text-xs uppercase text-gray-500 mb-1">{l.earnings}</div>
-            <Row a={l.wages} b={inr(r.wages)} /><Row a={`${l.ot} (${r.otHours} h)`} b={inr(r.otPay)} /><Row a={l.gross} b={inr(r.gross)} bold /></div>
+            <Row a={l.wages} b={inr(r.wages)} />{r.otPay > 0 && <Row a={`${l.ot} (${r.otHours} h)`} b={inr(r.otPay)} />}<Row a={l.gross} b={inr(r.gross)} bold /></div>
           <div><div className="font-bold text-xs uppercase text-gray-500 mb-1">{l.ded}</div>
             <Row a={l.pf} b={inr(r.pf)} /><Row a={l.esi} b={inr(r.esi)} /><Row a={l.adv} b={inr(r.advanceRecovery)} /></div>
         </div>

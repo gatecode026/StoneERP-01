@@ -22,16 +22,17 @@ beforeAll(async () => {
 afterAll(async () => { await db.close(); });
 
 describe('Settings → Working hours', () => {
-  it('starts with a day and a night shift, Sunday off, and weekly offs paid', async () => {
+  it('starts with a day and a night shift and Sunday off', async () => {
     const wh = (await getSettings()).workHours;
     expect(wh.shifts.map((s) => `${s.id} ${s.start}-${s.end}`)).toEqual(['day 09:00-18:00', 'night 21:00-06:00']);
     expect(wh.defaultShiftId).toBe('day');
     expect(wh.weekOff).toMatchObject({ sun: 'all', mon: 'none', sat: 'none' });
-    expect(wh).toMatchObject({ paidWeekOff: true, appPunching: true, holidays: [] });
+    expect(wh).toMatchObject({ appPunching: true, holidays: [] });
+    expect(wh).not.toHaveProperty('paidWeekOff'); // weekly offs are never paid: there is no switch for it
   });
 
   it('only the Owner (the settings right) can change it', async () => {
-    expect((await put(manager, { workHours: { paidWeekOff: false } })).status).toBe(403);
+    expect((await put(manager, { workHours: { appPunching: false } })).status).toBe(403);
   });
 
   it('saves shifts, Saturday and Sunday off, a holiday range and the rules; changes are audited', async () => {
@@ -40,7 +41,7 @@ describe('Settings → Working hours', () => {
       defaultShiftId: 'day',
       weekOff: { sun: 'all', sat: 'all' },
       holidays: [{ date: '2026-11-08', endDate: '2026-11-10', name: 'Diwali' }],
-      paidWeekOff: false, appPunching: false, punchGapMinutes: 5, openDayAfterHours: 3,
+      appPunching: false, punchGapMinutes: 5, openDayAfterHours: 3,
     } });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     const wh = (await getSettings()).workHours;
@@ -48,7 +49,7 @@ describe('Settings → Working hours', () => {
     expect(wh.shifts[0]).toMatchObject({ start: '08:30', end: '17:30' });
     expect(wh.weekOff).toMatchObject({ sun: 'all', sat: 'all', mon: 'none' });
     expect(wh.holidays[0]).toMatchObject({ date: '2026-11-08', endDate: '2026-11-10', name: 'Diwali' });
-    expect(wh).toMatchObject({ paidWeekOff: false, appPunching: false, punchGapMinutes: 5, openDayAfterHours: 3 });
+    expect(wh).toMatchObject({ appPunching: false, punchGapMinutes: 5, openDayAfterHours: 3 });
     const { AuditLog } = await import('@/lib/models');
     expect(await AuditLog.countDocuments({ model: 'settings' })).toBeGreaterThanOrEqual(1);
   });

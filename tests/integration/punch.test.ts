@@ -247,7 +247,7 @@ describe('salary from punches', () => {
   const monthly = (code: string) => computeSalary(month, '' as any, {}).then((x) => x);
   void monthly;
 
-  it('monthly: paid weekly offs, approved overtime only, pending shown separately', async () => {
+  it('monthly: only days worked are paid (no paid leave, no paid weekly off), overtime never paid', async () => {
     const days = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => `2026-09-${String(from + i).padStart(2, '0')}`).filter((d) => ![6, 13, 20, 27].includes(Number(d.slice(8))));
     await seed('E001', 'Ramesh Meena', [
       ...days(1, 20).map((d) => [d, 'present'] as [string, string]),
@@ -259,51 +259,43 @@ describe('salary from punches', () => {
     ]);
     const settings = await getSettings();
     const row = (await computeSalary(month, settings, { empCodes: ['E001'] }))[0];
-    // present days (non-Sunday): 1..20 minus Sundays (13, 20 are Sundays: 6,13,20 in range) -> 17, plus 24, 25, 26 = 20 ; half 0.5 ; leave 1
-    const presentWorking = days(1, 20).length + 3;
-    expect(row.paidOffDays).toBe(4);
-    expect(row.daysPresent).toBe(presentWorking + 0.5 + 1 + 4);
-    expect(row.otHours).toBe(5.5); // 90 + 240 minutes approved
+    // worked: 1..20 without Sundays, plus 24, 25, 26 and the Sunday 27 = present ; 21 half = ½ ; 22 leave and 23 absent earn nothing
+    const presentWorked = days(1, 20).length + 4;
+    expect(row.daysPresent).toBe(presentWorked + 0.5);
+    expect(row).toMatchObject({ leave: 1, absent: 1, half: 1 });
+    expect(row.otHours).toBe(1.5); // only the 90 approved minutes on a working day; the Sunday worked is paid as a day
     expect(row.otPendingHours).toBe(1); // the 60 pending minutes
     expect(row.wages).toBe(Math.round((30000 / 30) * row.daysPresent));
-    expect(row.otPay).toBe(Math.round((30000 / 30 / 8) * 5.5 * 2)); // 8 paid hours in the Day shift, double rate
+    expect(row.otPay).toBe(0); // overtime hours are recorded but never paid in salary
+    expect(row.gross).toBe(row.wages);
     expect(row.unmarked).toBeGreaterThanOrEqual(0);
-    expect(row.formula).toMatch(/weekly off/);
+    expect(row.formula).toMatch(/days worked/);
   });
 
-  it('Saturday and Sunday both off: nothing is deducted for either', async () => {
+  it('more weekly offs add no pay: Saturday off too still pays only the days worked', async () => {
+    const before = (await computeSalary(month, await getSettings(), { empCodes: ['E001'] }))[0];
     await Settings.updateOne({ _id: 'main' }, { $set: { 'workHours.weekOff.sat': 'all' } });
     clearSettingsCache();
-    const settings = await getSettings();
-    const row = (await computeSalary(month, settings, { empCodes: ['E001'] }))[0];
-    expect(row.paidOffDays).toBe(8); // 4 Sundays + 4 Saturdays
-    await Settings.updateOne({ _id: 'main' }, { $set: { 'workHours.weekOff.sat': 'none' } });
-    clearSettingsCache();
-  });
-
-  it('can be switched off: weekly offs not paid', async () => {
-    await Settings.updateOne({ _id: 'main' }, { $set: { 'workHours.paidWeekOff': false } });
-    clearSettingsCache();
     const row = (await computeSalary(month, await getSettings(), { empCodes: ['E001'] }))[0];
-    expect(row.paidOffDays).toBe(0);
-    await Settings.updateOne({ _id: 'main' }, { $set: { 'workHours.paidWeekOff': true } });
+    expect(row.daysPresent).toBe(before.daysPresent);
+    expect(row.wages).toBe(before.wages);
+    await Settings.updateOne({ _id: 'main' }, { $set: { 'workHours.weekOff.sat': 'none' } });
     clearSettingsCache();
   });
 
   it('daily wage: paid for the days they came, a Sunday worked is a paid day, no weekly-off pay', async () => {
     await seed('E002', 'Sunil Gurjar', [['2026-09-01', 'present'], ['2026-09-02', 'half'], ['2026-09-06', 'present', { otMinutes: 480, otStatus: 'approved', otApprovedMinutes: 480 }]]);
     const row = (await computeSalary(month, await getSettings(), { empCodes: ['E002'] }))[0];
-    expect(row.paidOffDays).toBe(0);
     expect(row.daysPresent).toBe(2.5);
     expect(row.wages).toBe(2000);
     expect(row.otHours).toBe(0); // the day worked on the Sunday is already paid as a day
   });
 
-  it('records made before punching (state overtime with hours) are still paid', async () => {
+  it('records made before punching (state overtime with hours) still count as a day worked', async () => {
     await Attendance.create({ date: '2026-09-02', empCode: 'E004', empName: 'Other Team', state: 'overtime', otHours: 3, method: 'manual' });
     const row = (await computeSalary(month, await getSettings(), { empCodes: ['E004'] }))[0];
     expect(row.otHours).toBe(3);
-    expect(row.daysPresent).toBeGreaterThanOrEqual(1 + 4);
+    expect(row.daysPresent).toBe(1); // the one day worked; weekly offs add nothing
   });
 });
 

@@ -96,7 +96,7 @@ function WeekOffCard({ wh, onSaved }) {
   const { draft, setDraft } = c;
   return (
     <Section title="Weekly off" right={<SaveBtn dirty={c.dirty} busy={c.busy} onClick={() => c.save({ weekOff: draft }, onSaved)} />}>
-      <p className="text-xs text-char-500 -mt-1 mb-3"><T>Choose the days nobody has to come. For alternate Saturdays pick "Off on the 2nd and 4th". Monthly-paid staff lose no pay on these days; anyone who works on one gets the hours as overtime.</T></p>
+      <p className="text-xs text-char-500 -mt-1 mb-3"><T>Choose the days nobody has to come. For alternate Saturdays pick "Off on the 2nd and 4th". These days are not paid; a day worked on one is paid as a normal day.</T></p>
       <div className="grid sm:grid-cols-2 gap-3">
         {DAYS.map(([k, label]) => (
           <Field key={k} label={label} htmlFor={`wo_${k}`}>
@@ -135,16 +135,13 @@ function HolidaysCard({ wh, onSaved }) {
 }
 
 function RulesCard({ wh, onSaved }) {
-  const pick = { paidWeekOff: wh.paidWeekOff, appPunching: wh.appPunching, punchGapMinutes: wh.punchGapMinutes, openDayAfterHours: wh.openDayAfterHours };
+  const pick = { appPunching: wh.appPunching, punchGapMinutes: wh.punchGapMinutes, openDayAfterHours: wh.openDayAfterHours };
   const c = useCard(pick, onSaved);
   const { draft, setDraft } = c;
-  const save = () => c.save({ paidWeekOff: !!draft.paidWeekOff, appPunching: !!draft.appPunching, punchGapMinutes: Number(draft.punchGapMinutes), openDayAfterHours: Number(draft.openDayAfterHours) }, onSaved);
+  const save = () => c.save({ appPunching: !!draft.appPunching, punchGapMinutes: Number(draft.punchGapMinutes), openDayAfterHours: Number(draft.openDayAfterHours) }, onSaved);
   return (
     <Section title="Punching and pay rules" right={<SaveBtn dirty={c.dirty} busy={c.busy} onClick={save} />}>
       <div className="grid sm:grid-cols-2 gap-3">
-        <label className="flex items-center gap-2.5 min-h-[44px] text-sm font-medium sm:col-span-2">
-          <input type="checkbox" className="h-5 w-5 rounded-none accent-[#8A5C38]" checked={!!draft.paidWeekOff} onChange={(e) => setDraft({ ...draft, paidWeekOff: e.target.checked })} /> <T>Monthly-paid staff are paid for weekly offs and holidays</T>
-        </label>
         <label className="flex items-center gap-2.5 min-h-[44px] text-sm font-medium sm:col-span-2">
           <input type="checkbox" className="h-5 w-5 rounded-none accent-[#8A5C38]" checked={!!draft.appPunching} onChange={(e) => setDraft({ ...draft, appPunching: e.target.checked })} /> <T>Allow Punch In / Out buttons in the app (for testing; switch off when the biometric machine is in use)</T>
         </label>

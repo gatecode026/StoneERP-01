@@ -9,7 +9,7 @@ export type WorkHours = {
   shifts: Shift[]; defaultShiftId: string;
   weekOff: Record<'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat', WeekOffRule>;
   holidays: { date: string; endDate?: string; name: string }[];
-  paidWeekOff: boolean; appPunching: boolean; punchGapMinutes: number; openDayAfterHours: number;
+  appPunching: boolean; punchGapMinutes: number; openDayAfterHours: number;
 };
 
 export type AppSettings = {

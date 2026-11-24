@@ -177,7 +177,8 @@ export default function SalaryPage() {
     { key: 'name', label: 'Employee', primary: true, render: (r) => <span>{r.name}<div className="text-[11px] text-char-500 font-normal">{r.job} · {PT[r.payType]} {r.rate != null ? `(₹${num(r.rate)})` : ''}</div></span> },
     { key: 'days', label: 'Days / qty', render: (r) => (r.payType === 'piece' ? `${num(r.qty)} ${r.pieceUnit === 'piece' ? 'pcs' : 'sq ft'}` : `${r.daysPresent} days`) },
     { key: 'wages', label: 'Wages', align: 'right', render: (r) => inr(r.wages) },
-    { key: 'otPay', label: 'Overtime', align: 'right', render: (r) => (r.otPay ? `+ ${inr(r.otPay)}` : '—') },
+    // overtime is not paid any more; the column stays only for an old approved sheet that paid it
+    ...(rows.some((r) => r.otPay > 0) ? [{ key: 'otPay', label: 'Overtime', align: 'right', render: (r) => (r.otPay ? `+ ${inr(r.otPay)}` : '—') }] : []),
     { key: 'ded', label: 'PF / ESI', align: 'right', render: (r) => (r.pf + r.esi ? `− ${inr(r.pf + r.esi)}` : '—') },
     { key: 'advanceRecovery', label: 'Advance cut', align: 'right', render: (r) => (r.advanceRecovery ? `− ${inr(r.advanceRecovery)}` : '—') },
     { key: 'net', label: 'Net salary', align: 'right', render: (r) => <b className="text-terra">{inr(r.net)}</b> },
@@ -224,7 +225,7 @@ export default function SalaryPage() {
       <PageHeader title={t('salary')} subtitle={isWorker ? 'Your salary slip' : 'Calculated automatically from attendance, pay rate and advances'}
         actions={<>
           <input type="month" className="input !w-auto" value={month} max={monthOf(todayISO())} onChange={(e) => setMonth(e.target.value || month)} />
-          {can('salarysheets', 'export') && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/salary/preview?month=${month}&all=1`); downloadCSV(`salary-sheet-${month}`, all.rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, { key: 'otPay', label: 'Overtime' }, { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }]); } catch (e) { toast.error(e.message); } }} />}
+          {can('salarysheets', 'export') && rows.length > 0 && <ExportBtn onClick={async () => { try { const all = await api(`/api/salary/preview?month=${month}&all=1`); downloadCSV(`salary-sheet-${month}`, all.rows, [{ key: 'empCode', label: 'Code' }, { key: 'name', label: 'Name' }, { key: 'job', label: 'Job' }, { key: 'payType', label: 'Pay type' }, { key: 'daysPresent', label: 'Days present' }, { key: 'qty', label: 'Qty' }, { key: 'wages', label: 'Wages' }, ...(all.rows.some((r) => r.otPay > 0) ? [{ key: 'otPay', label: 'Overtime' }] : []), { key: 'pf', label: 'PF' }, { key: 'esi', label: 'ESI' }, { key: 'advanceRecovery', label: 'Advance recovery' }, { key: 'net', label: 'Net salary' }, { key: 'bank', label: 'Bank / UPI' }]); } catch (e) { toast.error(e.message); } }} />}
         </>} />
 
 
@@ -267,7 +268,7 @@ export default function SalaryPage() {
             </>
           ) : <Empty text={dq ? 'No employees match your search' : 'No salary data for this month'} />}
           <p className="text-[11px] text-char-500 mt-3">
-            <T vars={{ o: SALARY.otMultiplier, p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Monthly = salary ÷ days in month × paid days (days worked + paid leave + weekly offs and holidays) · Daily = rate × days present · Piece rate = quantity from daily reports × rate · Overtime (only after it is approved) = {o}× hourly rate · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages + overtime − advance recovery − PF/ESI.'}</T>
+            <T vars={{ p: SALARY.pfRate * 100, pc: num(SALARY.pfWageCap), e: SALARY.esiRate * 100, ec: num(SALARY.esiGrossCap) }}>{'Only days worked are paid: present = 1 day, half day = ½ day. Leave, absent, unmarked days, weekly offs and holidays are not paid · Monthly = salary ÷ days in month × days worked · Daily = rate × days worked · Piece rate = quantity from daily reports × rate · Overtime is not added to salary · PF {p}% (wages capped ₹{pc}), ESI {e}% (gross up to ₹{ec}) where applicable · Net = wages − advance recovery − PF/ESI.'}</T>
           </p>
         </>
       )}
@@ -302,10 +303,9 @@ export default function SalaryPage() {
               </button>
             )}
             {sel.unmarked > 0 && <div className="rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.unmarked }}>{'{n} day(s) have no attendance marked — they are not paid.'}</T></div>}
-            {sel.payType !== 'piece' && <><KV label="Present days">{sel.present}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV>{sel.paidOffDays > 0 && <KV label="Weekly off / holidays (paid)">{sel.paidOffDays}</KV>}</>}
+            {sel.payType !== 'piece' && <><KV label="Present days">{sel.present}</KV><KV label="Half days / leave / absent">{sel.half} / {sel.leave} / {sel.absent}</KV></>}
             <KV label="Wages">{inr(sel.wages)}</KV>
-            <KV label={tr('Overtime approved ({h} h × {m}×)', { h: sel.otHours, m: SALARY.otMultiplier })}>+ {inr(sel.otPay)}</KV>
-            {sel.otPendingHours > 0 && <div className="rounded-none bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 mb-2"><T vars={{ n: sel.otPendingHours }}>{'{n} h of overtime is waiting for approval and is not in this salary yet. Approve it on the Attendance screen, then the salary is worked out again.'}</T></div>}
+            {sel.otPay > 0 && <KV label={tr('Overtime approved ({h} h × {m}×)', { h: sel.otHours, m: SALARY.otMultiplier })}>+ {inr(sel.otPay)}</KV>}
             <KV label="Gross">{inr(sel.gross)}</KV>
             <KV label="PF">− {inr(sel.pf)}</KV><KV label="ESI">− {inr(sel.esi)}</KV><KV label="Advance recovery">− {inr(sel.advanceRecovery)}</KV>
             <KV label={<b><T>Net salary</T></b>}><b className="text-lg text-terra">{inr(sel.net)}</b></KV>
